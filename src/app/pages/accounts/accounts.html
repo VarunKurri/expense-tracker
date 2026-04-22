@@ -1,4 +1,49 @@
 <div class="page">
-  <h1>Accounts</h1>
-  <p class="hint">Accounts coming in Part 4.</p>
+  <div class="header-row">
+    <div>
+      <h1>Accounts</h1>
+      <p class="hint">Manage your bank accounts, credit cards, and cash</p>
+    </div>
+    <button class="btn primary" (click)="openNewForm()">+ New Account</button>
+  </div>
+
+  <app-summary-bar [assets]="assets()" [liabilities]="liabilities()" />
+
+  @if (activeAccounts().length === 0) {
+    <div class="empty glass">
+      <div class="empty-icon">🏦</div>
+      <h3>No accounts yet</h3>
+      <p>Add your first account to start tracking your finances</p>
+      <button class="btn primary" (click)="openNewForm()">+ Add account</button>
+    </div>
+  } @else {
+    <div class="cards-grid">
+      @for (account of activeAccounts(); track account.id) {
+        <app-account-card
+          [account]="account"
+          [balance]="balanceFor(account)"
+          (edit)="openEditForm($event)" />
+      }
+    </div>
+  }
+
+  <app-account-form
+    [open]="formOpen()"
+    [account]="editingAccount()"
+    (closed)="closeForm()"
+    (saved)="handleSave($event)" />
+
+  @if (editingAccount() && formOpen()) {
+    <div class="floating-delete">
+      <button class="btn danger" (click)="askDelete()">Delete this account</button>
+    </div>
+  }
+
+  <app-confirm
+    [open]="confirmOpen()"
+    title="Delete account?"
+    [message]="'This will permanently delete &quot;' + (accountToDelete()?.name || '') + '&quot;. Existing transactions will still exist but will lose their link. This cannot be undone.'"
+    confirmText="Delete account"
+    (confirmed)="confirmDelete()"
+    (cancelled)="cancelDelete()" />
 </div>

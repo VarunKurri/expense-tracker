@@ -1,0 +1,16 @@
+<div class="summary glass-strong">
+  <div class="stat">
+    <div class="stat-label">Assets</div>
+    <div class="stat-value asset">{{ format(assets) }}</div>
+  </div>
+  <div class="divider"></div>
+  <div class="stat">
+    <div class="stat-label">Liabilities</div>
+    <div class="stat-value liability">{{ format(liabilities) }}</div>
+  </div>
+  <div class="divider"></div>
+  <div class="stat highlight">
+    <div class="stat-label">Net Worth</div>
+    <div class="stat-value" [class.negative]="netWorth < 0">{{ format(netWorth) }}</div>
+  </div>
+</div>

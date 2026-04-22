@@ -1,0 +1,23 @@
+.message {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 24px 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn.danger {
+  background: var(--color-expense);
+  color: white;
+  border-color: transparent;
+
+  &:hover {
+    background: #dc2626;
+    box-shadow: 0 4px 14px rgba(255, 59, 48, 0.3);
+  }
+}

@@ -1,0 +1,55 @@
+.summary {
+  display: flex;
+  align-items: center;
+  padding: 20px 28px;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  .stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+
+    &.asset    { color: var(--color-income); }
+    &.liability { color: var(--color-expense); }
+    &.negative  { color: var(--color-expense); }
+  }
+
+  &.highlight .stat-value {
+    font-size: 26px;
+  }
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--glass-border);
+}
+
+@media (max-width: 768px) {
+  .summary {
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px 20px;
+
+    .stat .stat-value         { font-size: 18px; }
+    .stat.highlight .stat-value { font-size: 20px; }
+    .divider { display: none; }
+  }
+}
