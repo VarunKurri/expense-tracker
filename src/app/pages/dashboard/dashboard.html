@@ -1,0 +1,20 @@
+<div class="page">
+  <h1>Dashboard</h1>
+  <p class="hint">Full dashboard coming in Part 4.</p>
+
+  <div class="migration-card glass" style="padding: 24px; margin-top: 24px; max-width: 480px;">
+    <h3 style="margin-bottom: 6px; font-size: 16px;">Migrate old expenses</h3>
+    <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 16px;">
+      Moves data from the old <code>expenses</code> collection into the new
+      <code>transactions</code> collection. Safe to run even with no old data.
+    </p>
+    <button class="btn primary" (click)="runMigration()" [disabled]="migrating()">
+      @if (migrating()) { Migrating… } @else { Run migration }
+    </button>
+    @if (migrationResult()) {
+      <p style="margin-top: 14px; font-size: 13px; color: var(--text-secondary);">
+        {{ migrationResult() }}
+      </p>
+    }
+  </div>
+</div>

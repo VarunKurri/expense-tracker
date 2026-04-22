@@ -18,7 +18,10 @@
     "@angular/forms": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
     "@angular/router": "^21.2.0",
+    "chart.js": "^4.5.1",
+    "date-fns": "^4.1.0",
     "firebase": "^11.10.0",
+    "ng2-charts": "^10.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "^0.16.1"

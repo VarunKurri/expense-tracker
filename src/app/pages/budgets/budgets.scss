@@ -1,0 +1,19 @@
+.page {
+  padding: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+
+  h1 {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+
+  .hint {
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .page { padding: 20px 16px; }
+}
