@@ -1,13 +1,14 @@
 <app-modal [open]="open" [title]="account ? 'Edit Account' : 'New Account'" (closed)="closed.emit()">
   <form class="form" (ngSubmit)="save()">
+
     <div class="field">
-      <label>Account name</label>
+      <label class="label-sm">Account name</label>
       <input class="input" [(ngModel)]="name" name="name" placeholder="e.g. Chase Debit" required />
     </div>
 
     <div class="row">
       <div class="field">
-        <label>Type</label>
+        <label class="label-sm">Type</label>
         <select class="input" [(ngModel)]="type" name="type" (ngModelChange)="onTypeChange()">
           @for (t of accountTypes; track t.value) {
             <option [value]="t.value">{{ t.label }}</option>
@@ -15,59 +16,77 @@
         </select>
       </div>
       <div class="field">
-        <label>Opening balance</label>
-        <input class="input" type="number" step="0.01" [(ngModel)]="openingBalance" name="openingBalance" />
+        <label class="label-sm">Opening balance</label>
+        <input class="input" type="number" step="0.01"
+               [(ngModel)]="openingBalance" name="openingBalance" />
       </div>
     </div>
 
     <div class="row">
       <div class="field">
-        <label>Institution (optional)</label>
-        <input class="input" [(ngModel)]="institution" name="institution" placeholder="Chase, Apple, etc." />
+        <label class="label-sm">Institution (optional)</label>
+        <input class="input" [(ngModel)]="institution" name="institution"
+               placeholder="Chase, Apple, etc." />
       </div>
       <div class="field">
-        <label>Last 4 digits (optional)</label>
-        <input class="input" [(ngModel)]="last4" name="last4" maxlength="4" placeholder="1234" />
+        <label class="label-sm">Last 4 digits (optional)</label>
+        <input class="input" [(ngModel)]="last4" name="last4"
+               maxlength="4" placeholder="1234" />
       </div>
     </div>
 
     <div class="field">
-      <label>Icon</label>
+      <label class="label-sm">Icon</label>
       <div class="picker">
         @for (opt of iconOptions; track opt) {
-          <button type="button" class="icon-opt" [class.active]="icon === opt" (click)="icon = opt">{{ opt }}</button>
+          <button type="button" class="icon-opt"
+                  [class.active]="icon === opt"
+                  (click)="icon = opt">{{ opt }}</button>
         }
       </div>
     </div>
 
     <div class="field">
-      <label>Color</label>
+      <label class="label-sm">Color</label>
       <div class="picker">
         @for (opt of colorOptions; track opt) {
-          <button type="button" class="color-opt" [class.active]="color === opt"
-                  [style.background]="opt" (click)="color = opt"></button>
+          <button type="button" class="color-opt"
+                  [class.active]="color === opt"
+                  [style.background]="opt"
+                  (click)="color = opt"></button>
         }
       </div>
     </div>
 
+    <!-- PREVIEW — flat Tally style -->
     <div class="preview">
-      <span class="preview-label">Preview</span>
-      <div class="preview-card" [style.background]="'linear-gradient(135deg, ' + color + ', ' + color + 'dd)'">
-        <span class="preview-icon">{{ icon }}</span>
-        <span class="preview-name">{{ name || 'Account name' }}</span>
+      <span class="label-sm">Preview</span>
+      <div class="preview-card">
+        <div class="preview-emoji" [style.background]="color + '22'">
+          {{ icon }}
+        </div>
+        <div>
+          <div class="preview-name">{{ name || 'Account name' }}</div>
+          <div class="preview-type">{{ accountTypes.find(t => t.value === type)?.label || type }}</div>
+        </div>
+        <div class="preview-bal" [style.color]="color">$0.00</div>
       </div>
     </div>
 
+    <!-- ACTIONS — Tally button classes -->
     <div class="actions">
       @if (account) {
-        <button type="button" class="btn danger" (click)="deleteRequested.emit()">Delete</button>
+        <button type="button" class="btn-danger"
+                (click)="deleteRequested.emit()">Delete</button>
       }
       <div class="actions-right">
-        <button type="button" class="btn ghost" (click)="closed.emit()">Cancel</button>
-        <button type="submit" class="btn primary" [disabled]="submitting()">
+        <button type="button" class="btn-ghost"
+                (click)="closed.emit()">Cancel</button>
+        <button type="submit" class="btn-primary" [disabled]="submitting()">
           {{ submitting() ? 'Saving…' : (account ? 'Save changes' : 'Create account') }}
         </button>
       </div>
     </div>
+
   </form>
 </app-modal>

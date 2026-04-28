@@ -1,28 +1,23 @@
-<div
-  class="card"
-  [style.background]="'linear-gradient(135deg, ' + (account.color || '#3b82f6') + ', ' + (account.color || '#3b82f6') + 'aa)'"
-  (click)="edit.emit(account)"
->
-  <div class="card-top">
-    <span class="icon">{{ account.icon || '🏦' }}</span>
-    <span class="type-badge">{{ typeLabel }}</span>
+<div class="card" (click)="edit.emit(account)">
+  <div class="card-head">
+    <div class="card-emoji">{{ account.icon || '🏦' }}</div>
+    <span class="card-type">{{ typeLabel }}</span>
   </div>
 
-  <div class="card-middle">
-    <div class="name">{{ account.name }}</div>
-    @if (account.institution || account.last4) {
-      <div class="meta">
-        @if (account.institution) { {{ account.institution }} }
-        @if (account.last4) { <span class="dot">•</span> •••• {{ account.last4 }} }
-      </div>
-    }
-  </div>
+  <div class="card-name">{{ account.name }}</div>
 
-  <div class="card-bottom">
-    <div class="balance-label">{{ isDebt ? 'Owed' : 'Balance' }}</div>
-    <div class="balance" [class.debt]="isDebt">
-      @if (isDebt) { <span class="sign">−</span> }
-      {{ displayBalance }}
+  @if (account.institution || account.last4) {
+    <div class="card-meta">
+      @if (account.institution) { {{ account.institution }} }
+      @if (account.last4) {
+        <span class="card-dot">·</span> •••• {{ account.last4 }}
+      }
     </div>
+  }
+
+  <div class="card-balance" [class.negative]="isDebt">
+    {{ isDebt ? '−' : '' }}{{ displayBalance }}
   </div>
+
+  <div class="card-label">{{ isDebt ? 'Owed' : 'Balance' }}</div>
 </div>
