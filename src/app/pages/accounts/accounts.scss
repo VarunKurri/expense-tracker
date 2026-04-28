@@ -62,13 +62,6 @@
   }
 }
 
-.floating-delete {
-  position: fixed;
-  bottom: 32px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 110;
-}
 
 @media (max-width: 768px) {
   .page { padding: 20px 16px; }

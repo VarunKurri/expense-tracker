@@ -7,11 +7,13 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  position: relative;
-  z-index: 1;
+  background: var(--bg);
 }
 
 .login-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 24px;
   padding: 52px 44px;
   text-align: center;
   max-width: 380px;
@@ -25,29 +27,37 @@
 
   h1 {
     font-size: 26px;
-    font-weight: 600;
+    font-weight: 700;
     margin-bottom: 6px;
     letter-spacing: -0.03em;
-    color: var(--text-primary);
+    color: var(--fg);
   }
 
   .subtitle {
-    color: var(--text-muted);
+    color: var(--fg-3);
     margin-bottom: 32px;
     font-size: 14px;
-    font-weight: 400;
   }
 }
 
-.google-btn {
-  width: 100%;
-  padding: 13px 24px;
-  font-size: 15px;
-  font-weight: 500;
-  display: flex;
+.btn-primary {
+  padding: 11px 18px;
+  border-radius: 10px;
+  background: var(--green);
+  color: #000;
+  font-weight: 600;
+  font-size: 14px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
+  transition: background 0.18s ease;
+
+  &:hover { background: var(--green-hi); }
 }
 
 /* ============================================
@@ -55,14 +65,13 @@
    ============================================ */
 .shell {
   display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-columns: 240px 1fr;
   min-height: 100vh;
-  position: relative;
-  z-index: 1;
+  background: var(--bg);
+  color: var(--fg);
 
   &.sidebar-collapsed {
     grid-template-columns: 0 1fr;
-
     .sidebar { transform: translateX(-100%); }
   }
 }
@@ -71,41 +80,54 @@
    SIDEBAR
    ============================================ */
 .sidebar {
-  padding: 18px 14px;
+  padding: 20px 14px;
   display: flex;
   flex-direction: column;
-  border-radius: 0;
-  border-left: none;
-  border-top: none;
-  border-bottom: none;
-  transition: transform var(--t-base);
+  border-right: 1px solid var(--line);
+  background: var(--bg-2);
+  transition: transform 0.25s ease;
   position: sticky;
   top: 0;
   height: 100vh;
+  overflow-y: auto;
 }
 
+/* ============================================
+   BRAND
+   ============================================ */
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 6px 10px;
   margin-bottom: 20px;
-
-  .brand-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .brand-name {
-    font-weight: 600;
-    font-size: 14px;
-    letter-spacing: -0.02em;
-    color: var(--text-primary);
-  }
 }
 
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--green);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.04em;
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+}
+
+/* ============================================
+   NAV
+   ============================================ */
 .nav {
   flex: 1;
   display: flex;
@@ -113,61 +135,110 @@
   gap: 2px;
 }
 
+.nav-section {
+  color: var(--fg-4);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 14px 12px 6px;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   padding: 9px 12px;
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   text-decoration: none;
-  color: var(--text-secondary);
-  font-size: 13.5px;
+  color: var(--fg-3);
+  font-size: 14px;
   font-weight: 500;
-  transition: all var(--t-fast);
+  transition: all 0.18s ease;
+  cursor: pointer;
 
   &:hover {
-    background: rgba(0, 0, 0, 0.05);
-    color: var(--text-primary);
+    background: var(--surface);
+    color: var(--fg);
   }
 
   &.active {
-    background: var(--accent);
-    color: white;
-    box-shadow: 0 2px 10px rgba(0, 122, 255, 0.25);
+    background: var(--surface-hi);
+    color: var(--fg);
 
-    svg { stroke: white; }
+    svg { stroke: var(--fg); }
   }
 
   .nav-icon {
     flex-shrink: 0;
-    opacity: 0.85;
   }
-
-  &.active .nav-icon { opacity: 1; }
 }
 
+.nav-badge {
+  margin-left: auto;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #000;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+/* ============================================
+   THEME TOGGLE
+   ============================================ */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--fg-3);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  &:hover {
+    background: var(--surface);
+    color: var(--fg);
+  }
+}
+
+/* ============================================
+   USER BOX
+   ============================================ */
 .user-box {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.04);
-  margin-top: 12px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  margin-top: 4px;
+  cursor: pointer;
+  transition: background 0.18s ease;
+
+  &:hover { background: var(--surface); }
 
   .avatar {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
-    background: var(--accent);
-    color: white;
+    background: linear-gradient(135deg, var(--green), #00A03E);
+    color: #000;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 600;
-    font-size: 13px;
+    font-weight: 700;
+    font-size: 14px;
     flex-shrink: 0;
-    letter-spacing: 0;
   }
 
   .user-info {
@@ -181,11 +252,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
       letter-spacing: -0.01em;
+      color: var(--fg);
     }
 
     .user-email {
       font-size: 11px;
-      color: var(--text-muted);
+      color: var(--fg-3);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -195,7 +267,7 @@
   .signout {
     background: transparent;
     border: none;
-    color: var(--text-muted);
+    color: var(--fg-4);
     width: 28px;
     height: 28px;
     border-radius: 6px;
@@ -204,17 +276,20 @@
     justify-content: center;
     flex-shrink: 0;
     padding: 0;
+    cursor: pointer;
+    transition: all 0.18s ease;
 
     &:hover {
-      background: rgba(255, 59, 48, 0.1);
-      color: var(--color-expense);
-      svg { stroke: var(--color-expense); }
+      background: var(--red-bg);
+      color: var(--red);
+
+      svg { stroke: var(--red); }
     }
   }
 }
 
 /* ============================================
-   TOP BAR (mobile only)
+   TOPBAR (mobile only)
    ============================================ */
 .topbar {
   display: none;
@@ -224,7 +299,10 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  border-radius: 0;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--line);
 
   .menu-btn {
     background: transparent;
@@ -233,22 +311,25 @@
     align-items: center;
     justify-content: center;
     padding: 6px;
-    color: var(--text-primary);
+    color: var(--fg);
+    cursor: pointer;
   }
 
   .brand-name {
-    font-weight: 600;
+    font-weight: 700;
     font-size: 15px;
     letter-spacing: -0.02em;
+    color: var(--fg);
   }
 }
 
 /* ============================================
-   MAIN CONTENT AREA
+   MAIN
    ============================================ */
 .main {
   min-height: 100vh;
   overflow-x: hidden;
+  background: var(--bg);
 }
 
 /* ============================================
@@ -268,12 +349,16 @@
       transform: translateX(-100%);
     }
 
-    &:not(.sidebar-collapsed) .sidebar { transform: translateX(0); }
+    &:not(.sidebar-collapsed) .sidebar {
+      transform: translateX(0);
+    }
   }
 
   .topbar { display: flex; }
 }
 
 @media (min-width: 769px) {
-  .sidebar-collapsed .sidebar { transform: translateX(-100%); }
+  .sidebar-collapsed .sidebar {
+    transform: translateX(-100%);
+  }
 }

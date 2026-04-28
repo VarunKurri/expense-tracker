@@ -31,13 +31,8 @@
     [open]="formOpen()"
     [account]="editingAccount()"
     (closed)="closeForm()"
-    (saved)="handleSave($event)" />
-
-  @if (editingAccount() && formOpen()) {
-    <div class="floating-delete">
-      <button class="btn danger" (click)="askDelete()">Delete this account</button>
-    </div>
-  }
+    (saved)="handleSave($event)"
+    (deleteRequested)="askDelete()" />
 
   <app-confirm
     [open]="confirmOpen()"

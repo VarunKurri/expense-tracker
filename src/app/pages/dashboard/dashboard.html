@@ -1,20 +1,111 @@
 <div class="page">
-  <h1>Dashboard</h1>
-  <p class="hint">Full dashboard coming in Part 4.</p>
 
-  <div class="migration-card glass" style="padding: 24px; margin-top: 24px; max-width: 480px;">
-    <h3 style="margin-bottom: 6px; font-size: 16px;">Migrate old expenses</h3>
-    <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 16px;">
-      Moves data from the old <code>expenses</code> collection into the new
-      <code>transactions</code> collection. Safe to run even with no old data.
-    </p>
-    <button class="btn primary" (click)="runMigration()" [disabled]="migrating()">
-      @if (migrating()) { Migrating… } @else { Run migration }
-    </button>
-    @if (migrationResult()) {
-      <p style="margin-top: 14px; font-size: 13px; color: var(--text-secondary);">
-        {{ migrationResult() }}
-      </p>
-    }
+  <!-- HERO — Net Worth -->
+  <div class="hero">
+    <div class="hero-top">
+      <div class="hero-label">
+        <span class="dot"></span>
+        Net worth · all accounts
+      </div>
+      <div class="range-seg">
+        @for (r of ['7D','30D','90D','YTD']; track r) {
+          <button class="range-btn"
+                  [class.active]="activeRange() === r"
+                  (click)="setRange(r)">{{ r }}</button>
+        }
+      </div>
+    </div>
+
+    <div class="hero-number" [class.negative]="isNegative(netWorth())">
+      <span class="cur">$</span>
+      <span class="whole">{{ formatWhole(netWorth()) }}</span>
+      <span class="cents">{{ formatCents(netWorth()) }}</span>
+    </div>
+
+    <div class="hero-actions">
+      <button class="btn-primary" (click)="navigate('/transactions')">
+        + Add money
+      </button>
+      <button class="btn-ghost" (click)="navigate('/transactions')">
+        ↕ Transactions
+      </button>
+      <button class="btn-ghost" (click)="navigate('/accounts')">
+        ▤ Accounts
+      </button>
+    </div>
   </div>
+
+  <!-- KPI TILES -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-top">
+        <span class="kpi-label">Income</span>
+        <span class="kpi-dot income"></span>
+      </div>
+      <div class="kpi-value">{{ formatCurrency(thisMonthIncome()) }}</div>
+      <div class="kpi-sub">this month</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-top">
+        <span class="kpi-label">Spending</span>
+        <span class="kpi-dot expense"></span>
+      </div>
+      <div class="kpi-value expense">{{ formatCurrency(thisMonthExpenses()) }}</div>
+      <div class="kpi-sub">this month</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-top">
+        <span class="kpi-label">Savings rate</span>
+        <span class="kpi-dot neutral"></span>
+      </div>
+      <div class="kpi-value">{{ savingsRate() }}%</div>
+      <div class="kpi-sub">of income kept</div>
+    </div>
+  </div>
+
+  <!-- ACCOUNTS STRIP -->
+  @if (activeAccounts().length > 0) {
+    <div class="section-header">
+      <span class="section-title">Accounts</span>
+      <button class="section-link" (click)="navigate('/accounts')">View all</button>
+    </div>
+    <div class="accts-strip">
+      @for (account of activeAccounts(); track account.id) {
+        <div class="acct-card" (click)="navigate('/accounts')">
+          <div class="acct-head">
+            <div class="acct-emoji">{{ account.icon || '🏦' }}</div>
+            <span class="acct-type">{{ account.type }}</span>
+          </div>
+          <div class="acct-name">{{ account.name }}</div>
+          <div class="acct-bal"
+               [class.negative]="isNegative(balanceFor(account.id!, account.openingBalance))">
+            {{ formatCurrency(balanceFor(account.id!, account.openingBalance)) }}
+          </div>
+          @if (account.last4) {
+            <div class="acct-sub">•••• {{ account.last4 }}</div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- MIGRATION CARD -->
+  @if (!migrationResult()) {
+    <div class="migration-card">
+      <div class="migration-info">
+        <div class="migration-title">Migrate old expenses</div>
+        <div class="migration-sub">
+          Moves data from the old <code>expenses</code> collection into
+          <code>transactions</code>. Safe to run with no old data.
+        </div>
+      </div>
+      <button class="btn-primary" (click)="runMigration()" [disabled]="migrating()">
+        {{ migrating() ? 'Running…' : 'Run migration' }}
+      </button>
+    </div>
+  }
+  @if (migrationResult()) {
+    <div class="migration-done">{{ migrationResult() }}</div>
+  }
+
 </div>

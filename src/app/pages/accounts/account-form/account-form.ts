@@ -16,6 +16,7 @@ export class AccountForm implements OnChanges {
   @Input() account: Account | null = null;
   @Output() closed = new EventEmitter<void>();
   @Output() saved = new EventEmitter<Omit<Account, 'id' | 'createdAt'>>();
+  @Output() deleteRequested = new EventEmitter<void>();
 
   name = '';
   type: AccountType = 'checking';

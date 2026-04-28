@@ -27,6 +27,7 @@
 
 ## Design system
 
+- Read tally-design-system.md and the JSX files in expense_tracker_design/tally/ for visual reference
 - Glassmorphic style (blurred cards, gradients, subtle shadows)
 - CSS variables defined in `src/styles.scss`
 - Desktop-first, responsive down to mobile

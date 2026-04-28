@@ -59,10 +59,15 @@
     </div>
 
     <div class="actions">
-      <button type="button" class="btn ghost" (click)="closed.emit()">Cancel</button>
-      <button type="submit" class="btn primary" [disabled]="submitting()">
-        {{ submitting() ? 'Saving…' : (account ? 'Save changes' : 'Create account') }}
-      </button>
+      @if (account) {
+        <button type="button" class="btn danger" (click)="deleteRequested.emit()">Delete</button>
+      }
+      <div class="actions-right">
+        <button type="button" class="btn ghost" (click)="closed.emit()">Cancel</button>
+        <button type="submit" class="btn primary" [disabled]="submitting()">
+          {{ submitting() ? 'Saving…' : (account ? 'Save changes' : 'Create account') }}
+        </button>
+      </div>
     </div>
   </form>
 </app-modal>
