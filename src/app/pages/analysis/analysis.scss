@@ -1,19 +1,118 @@
 .page {
-  padding: 32px;
-  max-width: 1400px;
+  padding: 28px 32px 48px;
+  max-width: 1320px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
 
+.page-head {
   h1 {
-    font-size: 28px;
-    margin-bottom: 8px;
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    color: var(--fg);
+    margin-bottom: 4px;
   }
 
-  .hint {
-    color: var(--text-muted);
-    font-size: 14px;
+  .sub {
+    color: var(--fg-3);
+    font-size: 13.5px;
+    margin: 0;
   }
 }
 
+.coming-soon {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 40px 32px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  .cs-icon {
+    font-size: 40px;
+    opacity: 0.5;
+    margin-bottom: 4px;
+  }
+
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    margin: 0;
+  }
+
+  p {
+    color: var(--fg-3);
+    font-size: 14px;
+    max-width: 420px;
+    line-height: 1.5;
+    margin: 0;
+  }
+}
+
+.cs-stats {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-top: 20px;
+  background: var(--bg-3);
+  border-radius: 14px;
+  padding: 20px 28px;
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cs-stat {
+  flex: 1;
+  text-align: center;
+}
+
+.cs-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-4);
+  margin-bottom: 6px;
+}
+
+.cs-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.cs-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--line);
+  flex-shrink: 0;
+  margin: 0 24px;
+}
+
 @media (max-width: 768px) {
-  .page { padding: 20px 16px; }
+  .page { padding: 20px 16px 40px; }
+  .coming-soon { padding: 32px 20px; }
+
+  .cs-stats {
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .cs-divider {
+    width: 100%;
+    height: 1px;
+    margin: 0;
+  }
 }
