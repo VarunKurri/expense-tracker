@@ -7,6 +7,8 @@ import { CategoryService } from '../../services/category.service';
 import { TransactionForm } from './transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { Transaction } from '../../models';
+import { QuickAddService } from '../../services/quick-add.service';
+import { effect } from '@angular/core';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
 type DateRange = 'this-month' | 'last-month' | 'this-year' | 'all';
@@ -22,6 +24,7 @@ export class Transactions {
   private txService = inject(TransactionService);
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
+  private quickAdd = inject(QuickAddService);
 
   // Modal state
   formOpen = signal(false);
@@ -183,6 +186,20 @@ export class Transactions {
   closeForm() {
     this.formOpen.set(false);
     this.editing.set(null);
+    this.quickAdd.close();
+  }
+
+  constructor() {
+    effect(() => {
+      if (this.quickAdd.open()) {
+        // Run outside the effect to avoid signal update conflicts
+        setTimeout(() => {
+          this.formOpen.set(true);
+          this.editing.set(null);
+          this.quickAdd.close();
+        }, 0);
+      }
+    });
   }
 
   async handleSave(data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {

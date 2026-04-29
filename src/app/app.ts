@@ -1,10 +1,11 @@
 import { Component, inject, signal, effect } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
 import { SeedService } from './services/seed.service';
 import { ThemeService } from './services/theme.service';
 import { Icon } from './components/icon/icon';
+import { QuickAddService } from './services/quick-add.service';
 
 @Component({
   selector: 'app-root',
@@ -17,8 +18,10 @@ export class App {
   auth = inject(AuthService);
   seed = inject(SeedService);
   themeService = inject(ThemeService);
+  private router = inject(Router);
+  quickAddService = inject(QuickAddService);
 
-  sidebarOpen = signal(true);
+  sidebarOpen = signal(false);
 
   nav = [
   { path: '/dashboard',    label: 'Home',         iconName: 'home' },
@@ -27,6 +30,7 @@ export class App {
   { path: '/bills',        label: 'Bills',        iconName: 'bills',   badge: 0 },
   { path: '/budgets',      label: 'Budgets',      iconName: 'budgets' },
   { path: '/analysis',     label: 'Analysis',     iconName: 'analysis' },
+  { path: '/import',       label: 'Import',       iconName: 'receipt' },
 ];
 
   // Stroke-based SVG paths, 20×20 viewBox
@@ -45,6 +49,24 @@ export class App {
         setTimeout(() => this.seed.seedIfEmpty(), 500);
       }
     });
+  }
+
+  onNavClick() {
+    // Close sidebar on mobile after navigation
+    if (window.innerWidth < 769) {
+      this.sidebarOpen.set(false);
+    }
+  }
+
+  quickAdd() {
+    if (!this.router.url.includes('/transactions')) {
+      this.router.navigate(['/transactions']).then(() => {
+        // Wait for component to initialize before triggering
+        setTimeout(() => this.quickAddService.trigger(), 100);
+      });
+    } else {
+      this.quickAddService.trigger();
+    }
   }
 
   async signIn() {

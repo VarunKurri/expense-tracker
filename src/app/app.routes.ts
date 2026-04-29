@@ -30,5 +30,9 @@ export const routes: Routes = [
     path: 'analysis',
     loadComponent: () => import('./pages/analysis/analysis').then(m => m.Analysis)
   },
+  {
+  path: 'import',
+    loadComponent: () => import('./pages/import/import').then(m => m.Import)
+  },
   { path: '**', redirectTo: 'dashboard' }
 ];

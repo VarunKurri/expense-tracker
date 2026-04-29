@@ -24,4 +24,8 @@ export interface Transaction {
   aiExtracted?: boolean;
   aiConfidence?: number;
   receiptUrl?: string;
+
+  // Refund tracking
+  refunded?: boolean;
+  refundedBy?: string; // transaction ID of the refunding income
 }

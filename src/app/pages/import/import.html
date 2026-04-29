@@ -1,0 +1,150 @@
+<div class="page">
+
+  @if (step() === 'upload') {
+    <div class="page-head">
+      <div>
+        <h1>Import from Notion</h1>
+        <p class="sub">Upload your Notion CSV exports to migrate your data</p>
+      </div>
+    </div>
+
+    <div class="seed-banner">
+        <span>First time? Add Notion categories to Trackr before importing.</span>
+        <button class="btn-ghost" (click)="seedCategories()">
+            + Add Notion categories
+        </button>
+    </div>
+
+    <div class="upload-grid">
+      <div class="upload-card">
+        <div class="upload-icon">💸</div>
+        <div class="upload-title">Expenses</div>
+        <div class="upload-sub">Your Notion Expense Log CSV</div>
+        <label class="upload-btn">
+          Choose file
+          <input type="file" accept=".csv" (change)="onExpenseFile($event)" hidden />
+        </label>
+        @if (expenseRows().length > 0) {
+          <div class="upload-count">✅ {{ expenseRows().length }} rows ready</div>
+        }
+      </div>
+
+      <div class="upload-card">
+        <div class="upload-icon">💰</div>
+        <div class="upload-title">Income</div>
+        <div class="upload-sub">Your Notion Income Log CSV</div>
+        <label class="upload-btn">
+          Choose file
+          <input type="file" accept=".csv" (change)="onIncomeFile($event)" hidden />
+        </label>
+        @if (incomeRows().length > 0) {
+          <div class="upload-count">✅ {{ incomeRows().length }} rows ready</div>
+        }
+      </div>
+
+      <div class="upload-card">
+        <div class="upload-icon">🔀</div>
+        <div class="upload-title">Transfers</div>
+        <div class="upload-sub">Your Notion Transfer Log CSV</div>
+        <label class="upload-btn">
+          Choose file
+          <input type="file" accept=".csv" (change)="onTransferFile($event)" hidden />
+        </label>
+        @if (transferRows().length > 0) {
+          <div class="upload-count">✅ {{ transferRows().length }} rows ready</div>
+        }
+      </div>
+    </div>
+
+    <div class="upload-note">
+      <strong>How to export from Notion:</strong>
+      Open each database → click ··· menu → Export → Markdown & CSV → Export
+    </div>
+
+    @if (allRows().length > 0) {
+      <div class="preview-bar">
+        <span>{{ allRows().length }} total rows parsed
+          @if (warningRows().length > 0) {
+            · <span class="warn-count">⚠️ {{ warningRows().length }} warnings</span>
+          }
+        </span>
+        <button class="btn-primary" (click)="goToPreview()">Preview import →</button>
+      </div>
+    }
+  }
+
+  @if (step() === 'preview') {
+    <div class="page-head">
+      <div>
+        <h1>Preview</h1>
+        <p class="sub">{{ allRows().length }} transactions ready to import</p>
+      </div>
+      <div class="head-actions">
+        <button class="btn-ghost" (click)="goBack()">← Back</button>
+        <button class="btn-primary" (click)="runImport()" [disabled]="importing()">
+          {{ importing() ? 'Importing…' : 'Import ' + allRows().length + ' transactions' }}
+        </button>
+      </div>
+    </div>
+
+    @if (warningRows().length > 0) {
+      <div class="warning-banner">
+        ⚠️ {{ warningRows().length }} rows have warnings — they will still be imported
+        but may need manual correction in the Transactions page.
+      </div>
+    }
+
+    <div class="preview-table">
+      <div class="table-header">
+        <span>Transaction</span>
+        <span>Type</span>
+        <span>Account</span>
+        <span>Category</span>
+        <span>Date</span>
+        <span>Amount</span>
+      </div>
+
+      @for (row of allRows(); track row.merchant + row.date + row.amount) {
+        <div class="table-row" [class.has-warning]="row.warning">
+          <span class="col-merchant">
+            {{ row.merchant }}
+            @if (row.refunded) { <span class="refund-badge">↩ Refunded</span> }
+          </span>
+          <span class="col-type" [class]="row.type">{{ row.type }}</span>
+          <span class="col-account">
+            @if (row.type === 'transfer') {
+              {{ row.fromAccountName }} → {{ row.toAccountName }}
+            } @else {
+              <span [class.unmatched]="!row.accountId">{{ row.accountName }}</span>
+            }
+          </span>
+          <span class="col-category">
+            <span [class.unmatched]="!row.categoryId && row.type !== 'transfer'">
+              {{ row.categoryName || (row.type === 'transfer' ? '—' : 'Uncategorized') }}
+            </span>
+          </span>
+          <span class="col-date">{{ row.date }}</span>
+          <span class="col-amount" [class]="row.type">
+            {{ row.type === 'expense' ? '−' : row.type === 'income' ? '+' : '' }}
+            ${{ row.amount.toLocaleString('en-US', {minimumFractionDigits: 2}) }}
+          </span>
+          @if (row.warning) {
+            <span class="row-warning">⚠️ {{ row.warning }}</span>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  @if (step() === 'done') {
+    <div class="done-card">
+      <div class="done-icon">🎉</div>
+      <h2>Import complete</h2>
+      <p>Successfully imported {{ importedCount() }} transactions from Notion.</p>
+      <button class="btn-primary" (click)="goToTransactions()">
+        View transactions →
+      </button>
+    </div>
+  }
+
+</div>
