@@ -29,13 +29,24 @@ export class Accounts {
   );
 
   balanceFor(account: Account): number {
-    return (account.openingBalance || 0) + this.transactionSvc.balanceForAccount(account.id!);
+    const txDelta = this.transactionSvc.balanceForAccount(account.id!);
+    if (account.type === 'credit') {
+      return account.openingBalance - txDelta;
+    }
+    return (account.openingBalance || 0) + txDelta;
+  }
+
+  availableCreditFor(account: Account): number {
+    if (!account.creditLimit) return 0;
+    return account.creditLimit - this.balanceFor(account);
   }
 
   assets = computed(() => {
     let total = 0;
     for (const a of this.activeAccounts()) {
       const bal = this.balanceFor(a);
+      // Credit cards are never assets (unless overpaid, which is rare)
+      if (a.type === 'credit') continue;
       if (bal > 0) total += bal;
     }
     return total;
@@ -45,7 +56,13 @@ export class Accounts {
     let total = 0;
     for (const a of this.activeAccounts()) {
       const bal = this.balanceFor(a);
-      if (bal < 0) total += Math.abs(bal);
+      if (a.type === 'credit' && bal > 0) {
+        // Credit card balance owed = liability
+        total += bal;
+      } else if (a.type !== 'credit' && bal < 0) {
+        // Overdraft on a checking/savings = liability
+        total += Math.abs(bal);
+      }
     }
     return total;
   });

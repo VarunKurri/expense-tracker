@@ -1,0 +1,125 @@
+@if (account(); as a) {
+  <div class="page">
+
+    <!-- BACK + ACTIONS -->
+    <div class="top-bar">
+      <button class="back-btn" (click)="goBack()">
+        ← Accounts
+      </button>
+      <button class="btn-primary" (click)="formOpen.set(true)">Edit</button>
+    </div>
+
+    <!-- HERO CARD -->
+    <div class="hero-card">
+      <div class="hero-top">
+        <div class="hero-icon">{{ a.icon || '💳' }}</div>
+        <div class="hero-info">
+          <div class="hero-name">{{ a.name }}</div>
+          @if (a.institution || a.last4) {
+            <div class="hero-meta">
+              @if (a.institution) { {{ a.institution }} }
+              @if (a.last4) { · •••• {{ a.last4 }} }
+            </div>
+          }
+        </div>
+        <div class="hero-badge" [style.background]="(a.color || '#8b5cf6') + '22'"
+             [style.color]="a.color || '#8b5cf6'">
+          Credit Card
+        </div>
+      </div>
+
+      <div class="hero-balance">
+        <div class="balance-label">Current balance</div>
+        <div class="balance-value" [class.safe]="balance() < (a.creditLimit || 9999) * 0.6"
+             [class.warn]="balance() >= (a.creditLimit || 9999) * 0.6 && balance() < (a.creditLimit || 9999) * 0.8"
+             [class.danger]="balance() >= (a.creditLimit || 9999) * 0.8">
+          {{ formatCurrency(balance()) }}
+        </div>
+        <div class="balance-sub">of {{ formatCurrency(a.creditLimit || 0) }} limit</div>
+      </div>
+
+      <!-- UTILIZATION BAR -->
+      @if (a.creditLimit) {
+        <div class="util-bar">
+          <div class="util-fill"
+               [style.width]="utilizationPct() + '%'"
+               [style.background]="utilizationColor()"></div>
+        </div>
+        <div class="util-label">
+          <span>{{ utilizationPct() }}% utilized</span>
+          <span class="util-avail">{{ formatCurrency(availableCredit()) }} available</span>
+        </div>
+      }
+    </div>
+
+    <!-- STATS GRID -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Available credit</div>
+        <div class="stat-value green">{{ formatCurrency(availableCredit()) }}</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Credit limit</div>
+        <div class="stat-value">{{ formatCurrency(a.creditLimit || 0) }}</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Minimum payment</div>
+        <div class="stat-value">{{ a.minimumPayment != null ? formatCurrency(a.minimumPayment) : 'Check app' }}</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Autopay</div>
+        <div class="stat-value" [class.green]="a.autopayEnabled">
+          {{ a.autopayEnabled ? 'Enabled ✓' : 'Disabled' }}
+        </div>
+      </div>
+    </div>
+
+    <!-- DATES -->
+    <div class="dates-card">
+      <div class="dates-title">Payment schedule</div>
+      <div class="dates-row">
+        <div class="date-item">
+          <div class="date-label">Statement closes</div>
+          <div class="date-value">{{ statementDate() || '—' }}</div>
+          @if (a.statementClosingDay) {
+            <div class="date-sub">Day {{ a.statementClosingDay }} of each month</div>
+          }
+        </div>
+        <div class="dates-divider"></div>
+        <div class="date-item">
+          <div class="date-label">Payment due</div>
+          <div class="date-value">{{ paymentDueDate() || '—' }}</div>
+          @if (a.paymentDueDay) {
+            <div class="date-sub">Day {{ a.paymentDueDay }} of each month</div>
+          }
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- EDIT MODAL -->
+  <app-account-form
+    [open]="formOpen()"
+    [account]="a"
+    (closed)="formOpen.set(false)"
+    (saved)="handleSave($event)"
+    (deleteRequested)="askDelete()" />
+
+  <app-confirm
+    [open]="confirmOpen()"
+    title="Delete account?"
+    [message]="'Permanently delete &quot;' + a.name + '&quot;? This cannot be undone.'"
+    confirmText="Delete"
+    (confirmed)="confirmDelete()"
+    (cancelled)="confirmOpen.set(false)" />
+
+} @else {
+  <div class="page">
+    <button class="back-btn" (click)="goBack()">← Accounts</button>
+    <p style="color: var(--fg-3); padding: 40px 0;">Account not found.</p>
+  </div>
+}

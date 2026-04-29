@@ -1,0 +1,119 @@
+<app-modal
+  [open]="open"
+  [title]="transaction ? 'Edit Transaction' : 'New Transaction'"
+  size="md"
+  (closed)="closed.emit()">
+
+  <div class="form">
+
+    <!-- TYPE TABS -->
+    @if (!transaction) {
+      <div class="type-seg">
+        <button class="type-btn"
+                [class.active]="type === 'expense'"
+                [class.neg]="type === 'expense'"
+                (click)="setType('expense')">Spent</button>
+        <button class="type-btn"
+                [class.active]="type === 'income'"
+                [class.pos]="type === 'income'"
+                (click)="setType('income')">Received</button>
+        <button class="type-btn"
+                [class.active]="type === 'transfer'"
+                (click)="setType('transfer')">Moved</button>
+      </div>
+    }
+
+    <!-- AMOUNT -->
+    <div class="amount-field">
+      <span class="amount-curr">$</span>
+      <input class="amount-input"
+             type="number" step="0.01"
+             [(ngModel)]="amount" name="amount"
+             placeholder="0.00" />
+    </div>
+
+    <!-- EXPENSE / INCOME FIELDS -->
+    @if (type !== 'transfer') {
+      <div class="field">
+        <span class="label-sm">{{ type === 'income' ? 'Source' : 'Merchant' }}</span>
+        <input class="input-field"
+               [(ngModel)]="merchant" name="merchant"
+               [placeholder]="type === 'income' ? 'e.g. Company Payroll' : 'e.g. Valero Gas'" />
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <span class="label-sm">Account</span>
+          <select class="input-field" [(ngModel)]="accountId" name="accountId">
+            <option value="" disabled>Select account</option>
+            @for (a of activeAccounts(); track a.id) {
+              <option [value]="a.id">{{ a.icon }} {{ a.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <span class="label-sm">Category</span>
+          <select class="input-field" [(ngModel)]="categoryId" name="categoryId">
+            <option value="">Uncategorized</option>
+            @for (c of filteredCategories(); track c.id) {
+              <option [value]="c.id">{{ c.icon }} {{ c.name }}</option>
+            }
+          </select>
+        </div>
+      </div>
+    }
+
+    <!-- TRANSFER FIELDS -->
+    @if (type === 'transfer') {
+      <div class="form-grid">
+        <div class="field">
+          <span class="label-sm">From</span>
+          <select class="input-field" [(ngModel)]="fromAccountId" name="fromAccountId">
+            <option value="" disabled>Select account</option>
+            @for (a of activeAccounts(); track a.id) {
+              <option [value]="a.id">{{ a.icon }} {{ a.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <span class="label-sm">To</span>
+          <select class="input-field" [(ngModel)]="toAccountId" name="toAccountId">
+            <option value="" disabled>Select account</option>
+            @for (a of activeAccounts(); track a.id) {
+              <option [value]="a.id">{{ a.icon }} {{ a.name }}</option>
+            }
+          </select>
+        </div>
+      </div>
+    }
+
+    <!-- DATE & NOTES -->
+    <div class="form-grid">
+      <div class="field">
+        <span class="label-sm">Date</span>
+        <input class="input-field" type="date"
+               [(ngModel)]="date" name="date" />
+      </div>
+      <div class="field">
+        <span class="label-sm">Notes (optional)</span>
+        <input class="input-field"
+               [(ngModel)]="notes" name="notes"
+               placeholder="Any notes…" />
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="modal-actions">
+      @if (transaction) {
+        <button class="btn-danger" (click)="deleteRequested.emit()">Delete</button>
+      }
+      <div class="actions-right">
+        <button class="btn-ghost" (click)="closed.emit()">Cancel</button>
+        <button class="btn-primary" (click)="save()" [disabled]="submitting()">
+          {{ transaction ? 'Save changes' : 'Add transaction' }}
+        </button>
+      </div>
+    </div>
+
+  </div>
+</app-modal>

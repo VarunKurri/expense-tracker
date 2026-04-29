@@ -8,6 +8,7 @@ import { Observable, of, switchMap } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
 import { Transaction } from '../models';
+import { Account } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class TransactionService {
@@ -44,15 +45,30 @@ export class TransactionService {
   balanceForAccount(accountId: string): number {
     let balance = 0;
     for (const t of this.transactions()) {
-      if (t.type === 'income' && t.accountId === accountId) balance += t.amount;
-      else if (t.type === 'expense' && t.accountId === accountId) balance -= t.amount;
-      else if (t.type === 'transfer') {
+      if (t.type === 'income' && t.accountId === accountId) {
+        balance += t.amount;
+      } else if (t.type === 'expense' && t.accountId === accountId) {
+        balance -= t.amount;
+      } else if (t.type === 'transfer') {
         if (t.fromAccountId === accountId) balance -= t.amount;
         if (t.toAccountId === accountId) balance += t.amount;
       }
     }
     return balance;
   }
+
+  // For credit cards: currentBalance = openingBalance + txBalance
+  // openingBalance is positive debt, expenses add to it, payments reduce it
+  creditCardBalance(account: Account): number {
+    const txDelta = this.balanceForAccount(account.id!);
+    // expenses subtract from txDelta, so we negate to get debt
+    return account.openingBalance - txDelta;
+  }
+
+availableCredit(account: Account): number {
+  if (!account.creditLimit) return 0;
+  return account.creditLimit - this.creditCardBalance(account);
+}
 
   async add(tx: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
     const user = this.auth.user();

@@ -22,6 +22,7 @@
         <app-account-card
           [account]="account"
           [balance]="balanceFor(account)"
+          [availableCredit]="availableCreditFor(account)"
           (edit)="openEditForm($event)" />
       }
     </div>

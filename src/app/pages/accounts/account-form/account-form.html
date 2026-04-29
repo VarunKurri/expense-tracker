@@ -1,24 +1,36 @@
-<app-modal [open]="open" [title]="account ? 'Edit Account' : 'New Account'" (closed)="closed.emit()">
-  <form class="form" (ngSubmit)="save()">
+<app-modal
+  [open]="open"
+  [title]="account ? 'Edit Account' : 'New Account'"
+  (closed)="closed.emit()">
+
+  <div class="form">
 
     <div class="field">
       <label class="label-sm">Account name</label>
-      <input class="input" [(ngModel)]="name" name="name" placeholder="e.g. Chase Debit" required />
+      <input class="input" [(ngModel)]="name" name="name"
+             placeholder="e.g. Apple Card" required />
     </div>
 
     <div class="row">
       <div class="field">
         <label class="label-sm">Type</label>
-        <select class="input" [(ngModel)]="type" name="type" (ngModelChange)="onTypeChange()">
+        <select class="input" [(ngModel)]="type" name="type"
+                (ngModelChange)="onTypeChange()">
           @for (t of accountTypes; track t.value) {
             <option [value]="t.value">{{ t.label }}</option>
           }
         </select>
       </div>
       <div class="field">
-        <label class="label-sm">Opening balance</label>
+        <label class="label-sm">
+          {{ isCredit ? 'Current balance owed' : 'Opening balance' }}
+        </label>
         <input class="input" type="number" step="0.01"
-               [(ngModel)]="openingBalance" name="openingBalance" />
+               [(ngModel)]="openingBalance" name="openingBalance"
+               [placeholder]="isCredit ? 'e.g. 500' : '0.00'" />
+        @if (isCredit) {
+          <span class="field-hint">Enter what you currently owe on this card</span>
+        }
       </div>
     </div>
 
@@ -34,6 +46,62 @@
                maxlength="4" placeholder="1234" />
       </div>
     </div>
+
+    <!-- CREDIT CARD FIELDS -->
+    @if (isCredit) {
+      <div class="credit-section">
+        <div class="credit-section-title">Credit card details</div>
+
+        <div class="row">
+          <div class="field">
+            <label class="label-sm">Credit limit</label>
+            <input class="input" type="number" step="0.01"
+                   [(ngModel)]="creditLimit" name="creditLimit"
+                   placeholder="e.g. 5000" />
+          </div>
+          <div class="field">
+            <label class="label-sm">Minimum payment due</label>
+            <input class="input" type="number" step="0.01"
+                   [(ngModel)]="minimumPayment" name="minimumPayment"
+                   placeholder="e.g. 25" />
+            <span class="field-hint">Update this each billing cycle from your card app</span>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label class="label-sm">Statement closes (day)</label>
+            <select class="input" [(ngModel)]="statementClosingDay"
+                    name="statementClosingDay">
+              @for (d of days; track d) {
+                <option [value]="d">{{ d }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label class="label-sm">Payment due (day)</label>
+            <select class="input" [(ngModel)]="paymentDueDay"
+                    name="paymentDueDay">
+              @for (d of days; track d) {
+                <option [value]="d">{{ d }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <div class="autopay-row">
+          <div>
+            <div class="autopay-label">Autopay enabled</div>
+            <div class="autopay-sub">Automatically pays your bill each month</div>
+          </div>
+          <button type="button"
+                  class="toggle"
+                  [class.on]="autopayEnabled"
+                  (click)="autopayEnabled = !autopayEnabled">
+          </button>
+        </div>
+      </div>
+    }
 
     <div class="field">
       <label class="label-sm">Icon</label>
@@ -58,7 +126,6 @@
       </div>
     </div>
 
-    <!-- PREVIEW — flat Tally style -->
     <div class="preview">
       <span class="label-sm">Preview</span>
       <div class="preview-card">
@@ -67,13 +134,14 @@
         </div>
         <div>
           <div class="preview-name">{{ name || 'Account name' }}</div>
-          <div class="preview-type">{{ accountTypes.find(t => t.value === type)?.label || type }}</div>
+          <div class="preview-type">
+            {{ accountTypes.find(t => t.value === type)?.label || type }}
+          </div>
         </div>
         <div class="preview-bal" [style.color]="color">$0.00</div>
       </div>
     </div>
 
-    <!-- ACTIONS — Tally button classes -->
     <div class="actions">
       @if (account) {
         <button type="button" class="btn-danger"
@@ -82,11 +150,13 @@
       <div class="actions-right">
         <button type="button" class="btn-ghost"
                 (click)="closed.emit()">Cancel</button>
-        <button type="submit" class="btn-primary" [disabled]="submitting()">
+        <button type="button" class="btn-primary"
+                [disabled]="submitting()"
+                (click)="save()">
           {{ submitting() ? 'Saving…' : (account ? 'Save changes' : 'Create account') }}
         </button>
       </div>
     </div>
 
-  </form>
+  </div>
 </app-modal>

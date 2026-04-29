@@ -1,4 +1,176 @@
 <div class="page">
-  <h1>Transactions</h1>
-  <p class="hint">Coming in Part 5.</p>
+
+  <!-- HEADER -->
+  <div class="page-head">
+    <div>
+      <h1>Transactions</h1>
+      <p class="sub">Every income, expense, and transfer</p>
+    </div>
+    <button class="btn-primary" (click)="openNew()">+ Add</button>
+  </div>
+
+  <!-- TOTALS -->
+  <div class="totals-row">
+    <div class="total-card">
+      <div class="total-label">Income</div>
+      <div class="total-value income">{{ formatCurrency(totals().income) }}</div>
+    </div>
+    <div class="total-card">
+      <div class="total-label">Expenses</div>
+      <div class="total-value expense">{{ formatCurrency(totals().expense) }}</div>
+    </div>
+    <div class="total-card">
+      <div class="total-label">Net</div>
+      <div class="total-value" [class.income]="totals().net >= 0" [class.expense]="totals().net < 0">
+        {{ totals().net >= 0 ? '+' : '−' }}{{ formatCurrency(totals().net) }}
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <!-- Search -->
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 20 20" fill="none"
+           stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+        <path d="M8 14A6 6 0 108 2a6 6 0 000 12zM18 18l-4.35-4.35"/>
+      </svg>
+      <input class="search-input" [(ngModel)]="search"
+             [ngModel]="search()"
+             (ngModelChange)="search.set($event)"
+             placeholder="Search merchant, notes…" />
+    </div>
+
+    <!-- Type pills -->
+    <div class="chips">
+      @for (t of [
+        {val: 'all', label: 'All'},
+        {val: 'expense', label: 'Expenses'},
+        {val: 'income', label: 'Income'},
+        {val: 'transfer', label: 'Transfers'}
+      ]; track t.val) {
+        <button class="chip" [class.active]="filterType() === t.val"
+                (click)="setFilterType(t.val)">{{ t.label }}</button>
+      }
+    </div>
+
+    <!-- Date range -->
+    <select class="filter-select"
+            [value]="filterDateRange()"
+            (change)="filterDateRange.set($any($event.target).value)">
+      <option value="this-month">This month</option>
+      <option value="last-month">Last month</option>
+      <option value="this-year">This year</option>
+      <option value="all">All time</option>
+    </select>
+
+    <!-- Account filter -->
+    @if (activeAccounts().length > 1) {
+      <select class="filter-select"
+              [value]="filterAccountId()"
+              (change)="filterAccountId.set($any($event.target).value)">
+        <option value="">All accounts</option>
+        @for (a of activeAccounts(); track a.id) {
+          <option [value]="a.id">{{ a.icon }} {{ a.name }}</option>
+        }
+      </select>
+    }
+
+    <!-- Reset -->
+    @if (hasActiveFilters()) {
+      <button class="reset-btn" (click)="resetFilters()">Reset</button>
+    }
+  </div>
+
+  <!-- TRANSACTION LIST -->
+  @if (grouped().length === 0) {
+    <div class="empty">
+      <div class="empty-icon">📭</div>
+      <h3>No transactions</h3>
+      <p>{{ hasActiveFilters() ? 'No results match your filters.' : 'Add your first transaction to get started.' }}</p>
+      @if (!hasActiveFilters()) {
+        <button class="btn-primary" (click)="openNew()">+ Add transaction</button>
+      }
+    </div>
+  } @else {
+    <div class="tx-list">
+      @for (group of grouped(); track group.date) {
+        <div class="tx-group">
+          <div class="tx-day-hdr">
+            <span>{{ group.label }}</span>
+            <span class="day-total"
+                  [class.pos]="group.total >= 0"
+                  [class.neg]="group.total < 0">
+              {{ group.total >= 0 ? '+' : '−' }}{{ formatCurrency(group.total) }}
+            </span>
+          </div>
+          @for (tx of group.items; track tx.id) {
+            <div class="tx-row" (click)="openEdit(tx)"
+                 [class.income]="tx.type === 'income'"
+                 [class.expense]="tx.type === 'expense'"
+                 [class.transfer]="tx.type === 'transfer'">
+
+              <div class="tx-icon-wrap">
+                @if (categoryFor(tx.categoryId); as cat) {
+                  <span class="tx-icon">{{ cat.icon }}</span>
+                } @else {
+                  <span class="tx-icon">
+                    @if (tx.type === 'income') { ↓ }
+                    @else if (tx.type === 'transfer') { ↔ }
+                    @else { ↑ }
+                  </span>
+                }
+              </div>
+
+              <div class="tx-main">
+                @if (tx.type === 'transfer') {
+                  <div class="tx-title">Transfer</div>
+                  <div class="tx-meta">
+                    {{ accountName(tx.fromAccountId || '') }} →
+                    {{ accountName(tx.toAccountId || '') }}
+                  </div>
+                } @else {
+                  <div class="tx-title">{{ tx.merchant || 'Untitled' }}</div>
+                  <div class="tx-meta">
+                    @if (categoryFor(tx.categoryId); as cat) {
+                      <span class="tx-cat">{{ cat.name }}</span>
+                      <span class="tx-dot">·</span>
+                    }
+                    {{ accountName(tx.accountId || '') }}
+                  </div>
+                }
+              </div>
+
+              <div class="tx-amount"
+                   [class.pos]="tx.type === 'income'"
+                   [class.neg]="tx.type === 'expense'"
+                   [class.neu]="tx.type === 'transfer'">
+                @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
+                @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
+                @else { {{ formatCurrency(tx.amount) }} }
+              </div>
+
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
 </div>
+
+<!-- MODALS -->
+<app-transaction-form
+  [open]="formOpen()"
+  [transaction]="editing()"
+  (closed)="closeForm()"
+  (saved)="handleSave($event)"
+  (deleteRequested)="askDelete()" />
+
+<app-confirm
+  [open]="confirmOpen()"
+  title="Delete transaction?"
+  message="This cannot be undone."
+  confirmText="Delete"
+  (confirmed)="confirmDelete()"
+  (cancelled)="cancelDelete()" />

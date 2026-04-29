@@ -2,16 +2,21 @@ export type AccountType = 'checking' | 'savings' | 'credit' | 'cash' | 'investme
 
 export interface Account {
   id?: string;
-  name: string;               // "Chase Debit", "Apple Card"
+  name: string;
   type: AccountType;
-  // For checking/savings/cash: balance is money you have
-  // For credit: balance is debt you owe (negative = debt)
   openingBalance: number;
   currency: 'USD';
-  institution?: string;       // "Chase", "Apple"
-  last4?: string;             // last 4 digits of card
-  color?: string;             // hex, for UI
-  icon?: string;              // emoji
+  institution?: string;
+  last4?: string;
+  color?: string;
+  icon?: string;
   archived?: boolean;
   createdAt: number;
+
+  // Credit card specific
+  creditLimit?: number;
+  statementClosingDay?: number;  // day of month 1-31
+  paymentDueDay?: number;        // day of month 1-31
+  autopayEnabled?: boolean;
+  minimumPayment?: number;
 }

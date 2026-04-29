@@ -59,4 +59,8 @@ export class AccountService {
     if (!user) throw new Error('Not signed in');
     await deleteDoc(doc(this.db, `users/${user.uid}/accounts/${id}`));
   }
+
+  getById(id: string): Account | undefined {
+    return this.accounts().find(a => a.id === id);
+  }
 }

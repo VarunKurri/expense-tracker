@@ -11,6 +11,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/accounts/accounts').then(m => m.Accounts)
   },
   {
+    path: 'accounts/:id',
+    loadComponent: () => import('./pages/accounts/account-detail/account-detail').then(m => m.AccountDetail)
+  },
+  {
     path: 'transactions',
     loadComponent: () => import('./pages/transactions/transactions').then(m => m.Transactions)
   },

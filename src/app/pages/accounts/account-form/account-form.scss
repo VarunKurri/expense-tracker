@@ -231,3 +231,80 @@ select.input {
     .actions-right { justify-content: flex-end; }
   }
 }
+
+.field-hint {
+  font-size: 11px;
+  color: var(--fg-4);
+  margin-top: 2px;
+}
+
+.credit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bg-3);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.credit-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-4);
+}
+
+.autopay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.autopay-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.autopay-sub {
+  font-size: 11.5px;
+  color: var(--fg-3);
+  margin-top: 2px;
+}
+
+.toggle {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--fg-4);
+    transition: all 0.2s ease;
+  }
+
+  &.on {
+    background: var(--green);
+    border-color: var(--green);
+
+    &::after {
+      left: 21px;
+      background: #000;
+    }
+  }
+}

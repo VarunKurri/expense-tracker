@@ -1,4 +1,4 @@
-<div class="card" (click)="edit.emit(account)">
+<div class="card" (click)="onClick()">
   <div class="card-head">
     <div class="card-emoji">{{ account.icon || '🏦' }}</div>
     <span class="card-type">{{ typeLabel }}</span>
@@ -16,8 +16,24 @@
   }
 
   <div class="card-balance" [class.negative]="isDebt">
-    {{ isDebt ? '−' : '' }}{{ displayBalance }}
+    {{ formatCurrency(balance) }}
   </div>
+  <div class="card-label">{{ isDebt ? 'Balance owed' : 'Balance' }}</div>
 
-  <div class="card-label">{{ isDebt ? 'Owed' : 'Balance' }}</div>
+  @if (isCredit) {
+    <div class="card-credit-row">
+      @if (account.creditLimit) {
+        <div class="card-credit-chip">
+          <span class="chip-label">Available</span>
+          <span class="chip-value">{{ formatCurrency(availableCredit) }}</span>
+        </div>
+      }
+      @if (account.paymentDueDay) {
+        <div class="card-credit-chip">
+          <span class="chip-label">Due</span>
+          <span class="chip-value">{{ paymentDueDate }}</span>
+        </div>
+      }
+    </div>
+  }
 </div>
