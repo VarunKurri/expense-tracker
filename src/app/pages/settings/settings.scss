@@ -1,0 +1,85 @@
+.page {
+  padding: 28px 32px 48px;
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.page-head {
+  h1 {
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    color: var(--fg);
+    margin-bottom: 4px;
+  }
+  .sub { color: var(--fg-3); font-size: 13.5px; margin: 0; }
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg-4);
+  padding: 0 4px 8px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.18s ease;
+
+  &:hover { background: var(--surface-hi); }
+}
+
+.settings-icon {
+  font-size: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--bg-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.settings-info { flex: 1; }
+
+.settings-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.settings-sub {
+  font-size: 12.5px;
+  color: var(--fg-3);
+  margin-top: 2px;
+}
+
+.settings-arrow {
+  font-size: 20px;
+  color: var(--fg-4);
+}

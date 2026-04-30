@@ -35,7 +35,7 @@
 
       <nav class="nav">
         <div class="nav-section">Money</div>
-        @for (item of nav; track item.path) {
+        @for (item of nav(); track item.path) {
           <a [routerLink]="item.path"
              routerLinkActive="active"
              class="nav-item"
@@ -48,6 +48,10 @@
           </a>
         }
         <div class="nav-section">Account</div>
+        <a routerLink="/settings" routerLinkActive="active" class="nav-item" (click)="onNavClick()">
+          <app-icon name="settings" [size]="17" class="nav-icon" />
+          <span>Settings</span>
+        </a>
       </nav>
 
       <button class="theme-toggle" (click)="themeService.toggle()">

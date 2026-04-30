@@ -1,4 +1,4 @@
-import { Component, inject, signal, effect } from '@angular/core';
+import { Component, inject, signal, computed, effect } from '@angular/core';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
@@ -6,6 +6,14 @@ import { SeedService } from './services/seed.service';
 import { ThemeService } from './services/theme.service';
 import { Icon } from './components/icon/icon';
 import { QuickAddService } from './services/quick-add.service';
+import { BillService } from './services/bill.service';
+
+interface NavItem {
+  path: string;
+  label: string;
+  iconName: string;
+  badge?: number | null;
+}
 
 @Component({
   selector: 'app-root',
@@ -20,18 +28,19 @@ export class App {
   themeService = inject(ThemeService);
   private router = inject(Router);
   quickAddService = inject(QuickAddService);
+  billService = inject(BillService);
 
   sidebarOpen = signal(false);
 
-  nav = [
-  { path: '/dashboard',    label: 'Home',         iconName: 'home' },
-  { path: '/accounts',     label: 'Accounts',     iconName: 'accounts' },
-  { path: '/transactions', label: 'Transactions', iconName: 'tx' },
-  { path: '/bills',        label: 'Bills',        iconName: 'bills',   badge: 0 },
-  { path: '/budgets',      label: 'Budgets',      iconName: 'budgets' },
-  { path: '/analysis',     label: 'Analysis',     iconName: 'analysis' },
-  { path: '/import',       label: 'Import',       iconName: 'receipt' },
-];
+  nav = computed((): NavItem[] => [
+    { path: '/dashboard',    label: 'Home',         iconName: 'home' },
+    { path: '/accounts',     label: 'Accounts',     iconName: 'accounts' },
+    { path: '/transactions', label: 'Transactions', iconName: 'tx' },
+    { path: '/bills',        label: 'Bills',        iconName: 'bills',
+      badge: (this.billService.overdueBills().length + this.billService.upcomingBills(7).length) || null },
+    { path: '/budgets',      label: 'Budgets',      iconName: 'budgets' },
+    { path: '/analysis',     label: 'Analysis',     iconName: 'analysis' },
+  ]);
 
   // Stroke-based SVG paths, 20×20 viewBox
   // readonly navIcons: Record<string, string> = {

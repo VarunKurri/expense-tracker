@@ -1,6 +1,6 @@
 <div class="page">
 
-  <!-- HERO — Net Worth -->
+  <!-- HERO -->
   <div class="hero">
     <div class="hero-top">
       <div class="hero-label">
@@ -26,16 +26,17 @@
       <span class="cents">{{ formatCents(netWorth()) }}</span>
     </div>
 
+    <div class="hero-change"
+         [class.pos]="netWorthChange() >= 0"
+         [class.neg]="netWorthChange() < 0">
+      {{ netWorthChange() >= 0 ? '+' : '−' }}{{ formatCurrency(netWorthChange()) }}
+      <span class="hero-change-label">in the last 30d</span>
+    </div>
+
     <div class="hero-actions">
-      <button class="btn-primary" (click)="addMoney()">
-        + Add money
-      </button>
-      <button class="btn-ghost" (click)="addExpense()">
-        − Add expense
-      </button>
-      <button class="btn-ghost" (click)="navigate('/accounts')">
-        ▤ Accounts
-      </button>
+      <button class="btn-primary" (click)="addMoney()">+ Add money</button>
+      <button class="btn-ghost" (click)="addExpense()">− Add expense</button>
+      <button class="btn-ghost" (click)="navigate('/accounts')">▤ Accounts</button>
     </div>
   </div>
 
@@ -47,25 +48,33 @@
         <span class="kpi-dot income"></span>
       </div>
       <div class="kpi-value income">{{ formatCurrency(rangeIncome()) }}</div>
-      <div class="kpi-sub">{{ activeRange() === '7D' ? 'last 7 days' : activeRange() === '30D' ? 'last 30 days' : activeRange() === '90D' ? 'last 90 days' : 'this year' }}</div>
+      <div class="kpi-sub">
+        {{ activeRange() === '7D' ? 'last 7 days' :
+           activeRange() === '30D' ? 'last 30 days' :
+           activeRange() === '90D' ? 'last 90 days' : 'this year' }}
+      </div>
     </div>
-
     <div class="kpi">
       <div class="kpi-top">
         <span class="kpi-label">Spending</span>
         <span class="kpi-dot expense"></span>
       </div>
       <div class="kpi-value expense">{{ formatCurrency(rangeExpenses()) }}</div>
-      <div class="kpi-sub">{{ activeRange() === '7D' ? 'last 7 days' : activeRange() === '30D' ? 'last 30 days' : activeRange() === '90D' ? 'last 90 days' : 'this year' }}</div>
+      <div class="kpi-sub">
+        {{ activeRange() === '7D' ? 'last 7 days' :
+           activeRange() === '30D' ? 'last 30 days' :
+           activeRange() === '90D' ? 'last 90 days' : 'this year' }}
+      </div>
     </div>
-
     <div class="kpi">
       <div class="kpi-top">
         <span class="kpi-label">Savings rate</span>
         <span class="kpi-dot neutral"></span>
       </div>
       @if (savingsRate() !== null) {
-        <div class="kpi-value" [class.income]="savingsRate()! > 0" [class.expense]="savingsRate()! < 0">
+        <div class="kpi-value"
+             [class.income]="savingsRate()! > 0"
+             [class.expense]="savingsRate()! < 0">
           {{ savingsRate() }}%
         </div>
       } @else {
@@ -89,8 +98,7 @@
             <span class="acct-type">{{ account.type }}</span>
           </div>
           <div class="acct-name">{{ account.name }}</div>
-          <div class="acct-bal"
-               [class.negative]="isNegative(balanceFor(account))">
+          <div class="acct-bal" [class.negative]="isNegative(balanceFor(account))">
             {{ formatCurrency(balanceFor(account)) }}
           </div>
           @if (account.last4) {
@@ -101,55 +109,196 @@
     </div>
   }
 
-  <!-- UPCOMING BILLS -->
-  @if (upcomingBills().length > 0) {
-    <div class="section-header">
-      <span class="section-title">Due soon</span>
-      <button class="section-link" (click)="navigate('/bills')">View all</button>
-    </div>
-    <div class="bills-strip">
-      @for (bill of upcomingBills(); track bill.id) {
-        <div class="bill-chip" (click)="navigate('/bills')">
-          <span class="bill-chip-icon">{{ bill.icon || '📄' }}</span>
-          <div class="bill-chip-info">
-            <div class="bill-chip-name">{{ bill.name }}</div>
-            <div class="bill-chip-date">{{ bill.nextDueDate | date:'MMM d' }}</div>
-          </div>
-          <div class="bill-chip-amount">{{ formatCurrency(bill.amount) }}</div>
-        </div>
-      }
-    </div>
-  }
+  <!-- MAIN CONTENT GRID -->
+  <div class="main-grid">
 
-  <!-- RECENT TRANSACTIONS -->
-  @if (recentTransactions().length > 0) {
-    <div class="section-header">
-      <span class="section-title">Recent</span>
-      <button class="section-link" (click)="navigate('/transactions')">View all</button>
+    <!-- LEFT COLUMN -->
+    <div class="left-col">
+
+      <!-- Cash flow chart -->
+      <div class="panel">
+        <div class="flow-header">
+          <div class="flow-header-left">
+            <div class="panel-title">Cash flow</div>
+            <div class="flow-stats">
+              <span class="flow-stat">
+                <span class="flow-dot income-dot"></span>
+                Income <strong>{{ formatCurrency(cashFlowIncome()) }}</strong>
+              </span>
+              <span class="flow-stat">
+                <span class="flow-dot spending-dot"></span>
+                Spending <strong>{{ formatCurrency(cashFlowExpenses()) }}</strong>
+              </span>
+            </div>
+          </div>
+          <div class="flow-net-block">
+            <div class="flow-net-label">NET</div>
+            <div class="flow-net-value"
+                [class.pos]="cashFlowNet() >= 0"
+                [class.neg]="cashFlowNet() < 0">
+              {{ cashFlowNet() >= 0 ? '+' : '−' }}{{ formatCurrency(cashFlowNet()) }}
+            </div>
+          </div>
+        </div>
+        <div class="flow-chart-wrap">
+          <canvas #cashFlowCanvas></canvas>
+        </div>
+      </div>
+
+      <!-- Activity -->
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Activity</div>
+            <div class="panel-sub-text">Recent transactions</div>
+          </div>
+          <button class="panel-link" (click)="navigate('/transactions')">View all →</button>
+        </div>
+
+        @if (recentTransactions().length === 0) {
+          <div class="panel-empty">No transactions yet</div>
+        }
+
+        @for (tx of recentTransactions(); track tx.id) {
+          <div class="activity-row" (click)="navigate('/transactions')">
+            <div class="activity-icon"
+                [class.income]="tx.type === 'income'"
+                [class.transfer]="tx.type === 'transfer'">
+              @if (categoryFor(tx.categoryId); as cat) {
+                {{ cat.icon }}
+              } @else if (tx.type === 'income') { ↓ }
+              @else if (tx.type === 'transfer') { ↔ }
+              @else { ↑ }
+            </div>
+            <div class="activity-main">
+              <div class="activity-title">
+                {{ tx.type === 'transfer' ? 'Transfer' : (tx.merchant || 'Untitled') }}
+              </div>
+              <div class="activity-meta">
+                @if (categoryFor(tx.categoryId); as cat) {
+                  <span>{{ cat.name }}</span>
+                  <span class="meta-dot">·</span>
+                }
+                <span>{{ accountName(tx.accountId) }}</span>
+                <span class="meta-dot">·</span>
+                <span>{{ timeAgo(tx.date) }}</span>
+              </div>
+            </div>
+            <div class="activity-amount"
+                [class.pos]="tx.type === 'income'"
+                [class.neg]="tx.type === 'expense'"
+                [class.neu]="tx.type === 'transfer'">
+              @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
+              @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
+              @else { {{ formatCurrency(tx.amount) }} }
+            </div>
+          </div>
+        }
+      </div>
+
     </div>
-    <div class="recent-list">
-      @for (tx of recentTransactions(); track tx.id) {
-        <div class="recent-row" (click)="navigate('/transactions')">
-          <div class="recent-icon" [class.income]="tx.type === 'income'">
-            @if (tx.type === 'income') { ↓ }
-            @else if (tx.type === 'transfer') { ↔ }
-            @else { ↑ }
+
+    <!-- RIGHT COLUMN — single continuous column -->
+    <div class="right-col">
+
+      <!-- Where it went -->
+      @if (thisMonthTotal() > 0) {
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Where it went</div>
+              <div class="panel-sub-text">This month · {{ formatCurrency(thisMonthTotal()) }}</div>
+            </div>
+            <button class="panel-link" (click)="navigate('/analysis')">Details →</button>
           </div>
-          <div class="recent-main">
-            <div class="recent-title">{{ tx.merchant || 'Transfer' }}</div>
-            <div class="recent-date">{{ tx.date }}</div>
-          </div>
-          <div class="recent-amount"
-               [class.pos]="tx.type === 'income'"
-               [class.neg]="tx.type === 'expense'"
-               [class.neu]="tx.type === 'transfer'">
-            @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
-            @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
-            @else { {{ formatCurrency(tx.amount) }} }
+          <div class="donut-section">
+            <div class="mini-donut-wrap">
+              <canvas #miniDonutCanvas></canvas>
+              <div class="mini-donut-center">
+                <div class="mini-donut-total">{{ formatCurrencyShort(thisMonthTotal()) }}</div>
+                <div class="mini-donut-label">total</div>
+              </div>
+            </div>
+            <div class="donut-legend">
+              @for (cat of categoryBreakdown(); track cat.name) {
+                <div class="donut-legend-row">
+                  <div class="donut-legend-dot" [style.background]="cat.color"></div>
+                  <span class="donut-legend-name">{{ cat.name }}</span>
+                  <span class="donut-legend-amount">{{ formatCurrency(cat.amount) }}</span>
+                  <span class="donut-legend-pct">{{ cat.pct }}%</span>
+                </div>
+              }
+            </div>
           </div>
         </div>
       }
+
+      <!-- Upcoming bills -->
+      @if (upcomingBills().length > 0) {
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Upcoming</div>
+              <div class="panel-sub-text">
+                {{ upcomingBills().length }} bill{{ upcomingBills().length === 1 ? '' : 's' }}
+              </div>
+            </div>
+            <button class="panel-link" (click)="navigate('/bills')">All →</button>
+          </div>
+          @for (bill of upcomingBills(); track bill.id) {
+            <div class="upcoming-row" (click)="navigate('/bills')">
+              <div class="upcoming-date">
+                <div class="upcoming-day">{{ bill.nextDueDate | date:'d' }}</div>
+                <div class="upcoming-mon">{{ bill.nextDueDate | date:'MMM' | uppercase }}</div>
+              </div>
+              <div class="upcoming-info">
+                <div class="upcoming-name">{{ bill.name }}</div>
+                <div class="upcoming-meta">
+                  @if (daysUntil(bill.nextDueDate) === 0) { Today }
+                  @else { in {{ daysUntil(bill.nextDueDate) }}d }
+                  · {{ bill.frequency }}
+                </div>
+              </div>
+              <div class="upcoming-amount">{{ formatCurrency(bill.amount) }}</div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Budget summary -->
+      @if (budgetSummary().length > 0) {
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Budgets · {{ currentMonth | date:'MMMM' }}</div>
+              <div class="panel-sub-text">{{ budgetSummary().length }} tracked</div>
+            </div>
+            <button class="panel-link" (click)="navigate('/budgets')">Manage →</button>
+          </div>
+          <div class="budget-rows">
+            @for (b of budgetSummary(); track b!.name) {
+              <div class="budget-mini-row">
+                <div class="budget-mini-head">
+                  <span class="budget-mini-icon">{{ b!.icon }}</span>
+                  <span class="budget-mini-name">{{ b!.name }}</span>
+                  <span class="budget-mini-amt">
+                    {{ formatCurrencyShort(b!.spent) }} / {{ formatCurrencyShort(b!.budget) }}
+                  </span>
+                </div>
+                <div class="budget-mini-bar">
+                  <div class="budget-mini-fill"
+                      [class.warn]="b!.status === 'warn'"
+                      [class.over]="b!.status === 'over'"
+                      [style.width]="(b!.pct > 100 ? 100 : b!.pct) + '%'">
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
     </div>
-  }
+  </div>
 
 </div>
