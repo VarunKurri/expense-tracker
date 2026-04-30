@@ -4,7 +4,7 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .page-head {
@@ -21,11 +21,7 @@
     margin-bottom: 4px;
   }
 
-  .sub {
-    color: var(--fg-3);
-    font-size: 13.5px;
-    margin: 0;
-  }
+  .sub { color: var(--fg-3); font-size: 13.5px; margin: 0; }
 }
 
 .btn-primary {
@@ -40,110 +36,411 @@
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.18s ease;
-
   &:hover { background: var(--green-hi); }
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 
-.coming-soon {
+/* ── MONTH NAV ─────────────────────────────────────────────── */
+.month-nav {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+.month-btn {
+  padding: 7px 14px;
+  border-radius: 999px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 40px 32px;
-  text-align: center;
+  color: var(--fg-3);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+
+  &:hover { color: var(--fg); background: var(--surface-hi); }
+
+  &.active {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: transparent;
+  }
+
+  &.current:not(.active) {
+    border-color: var(--green);
+    color: var(--green);
+  }
+}
+
+/* ── SUMMARY BAR ───────────────────────────────────────────── */
+.summary-bar {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 12px;
-
-  .cs-icon {
-    font-size: 40px;
-    opacity: 0.5;
-    margin-bottom: 4px;
-  }
-
-  h2 {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    color: var(--fg);
-    margin: 0;
-  }
-
-  p {
-    color: var(--fg-3);
-    font-size: 14px;
-    max-width: 420px;
-    line-height: 1.5;
-    margin: 0;
-  }
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  gap: 24px;
 }
 
-.cs-preview {
-  width: 100%;
-  max-width: 480px;
-  margin-top: 16px;
+.summary-stat {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 4px;
+}
+
+.summary-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-4);
+}
+
+.summary-value {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  &.over { color: var(--red); }
+}
+
+.summary-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+
+/* ── BUDGET LIST ───────────────────────────────────────────── */
+.budget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.budget-row {
+  display: flex;
+  align-items: center;
   gap: 14px;
-  opacity: 0.5;
-  pointer-events: none;
-  user-select: none;
-  text-align: left;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  &:hover { background: var(--surface-hi); }
+  &.over { border-color: rgba(255, 77, 94, 0.3); }
 }
 
-.cs-budget {
+.budget-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.budget-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.budget-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
 }
 
-.cs-top {
+.budget-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: -0.01em;
+}
+
+.budget-amounts {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.spent-amt {
+  font-weight: 600;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  &.warn { color: var(--amber); }
+  &.over { color: var(--red); }
+}
+
+.budget-sep { color: var(--fg-4); }
+
+.budget-amt {
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.remaining-amt {
+  color: var(--green);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.over-badge {
+  background: var(--red-bg);
+  color: var(--red);
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.budget-bar-wrap {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.budget-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--green);
+  transition: width 0.4s ease;
+  &.warn { background: var(--amber); }
+  &.over { background: var(--red); }
+}
+
+.budget-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.budget-pct {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+  text-align: right;
+  &.warn { color: var(--amber); }
+  &.over { color: var(--red); }
+}
+
+.override-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--line);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+  &:hover { background: var(--surface-hi); }
+}
+
+/* ── YOY CHART ─────────────────────────────────────────────── */
+.chart-section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px 24px 16px;
+}
+
+.chart-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  margin-bottom: 20px;
 }
 
-.cs-cat {
-  font-weight: 500;
+.chart-title {
+  font-size: 13.5px;
+  font-weight: 600;
   color: var(--fg);
+}
+
+.chart-legend {
+  display: flex;
+  gap: 14px;
+}
+
+.legend-item {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.cs-vals {
+  font-size: 12px;
   color: var(--fg-3);
-  font-size: 12.5px;
-  font-variant-numeric: tabular-nums;
-
-  b {
-    color: var(--fg);
-    font-weight: 600;
-  }
 }
 
-.cs-bar {
-  height: 7px;
-  border-radius: 4px;
-  background: var(--bg-3);
-  overflow: hidden;
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  &.budget { background: var(--bg-3); border: 1px solid var(--line); }
+  &.spent  { background: var(--green); }
 }
 
-.cs-fill {
+/* Main chart container */
+.chart-outer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 160px;
+  position: relative;
+  padding-bottom: 28px;
+}
+
+.chart-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
   height: 100%;
-  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: opacity 0.18s ease;
+
+  &:not(.active) { opacity: 0.65; }
+  &.active       { opacity: 1; }
+  &:hover        { opacity: 1; }
+}
+
+/* Bars container — positioned at bottom of column */
+.chart-bars-wrap {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Budget bar — grey background bar */
+.chart-budget-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 5px 5px 3px 3px;
+  min-height: 4px;
+  transition: height 0.4s ease;
+}
+
+/* Spent bar — colored foreground bar */
+.chart-spent-bar {
+  position: absolute;
+  bottom: 0;
+  left: 2px;
+  right: 2px;
   background: var(--green);
-  transition: width 0.3s ease;
+  border-radius: 4px 4px 2px 2px;
+  min-height: 0;
+  transition: height 0.4s ease, background 0.18s ease;
 
   &.warn { background: var(--amber); }
   &.over { background: var(--red); }
 }
 
+.chart-month-label {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9.5px;
+  color: var(--fg-4);
+  font-weight: 500;
+  white-space: nowrap;
+
+  .active & { color: var(--fg-2); font-weight: 600; }
+}
+
+/* Tooltip */
+.chart-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface-hi);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 20;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  pointer-events: none;
+}
+
+.tt-month {
+  font-weight: 700;
+  color: var(--fg);
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  color: var(--fg-3);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+
+  .over { color: var(--red); font-weight: 600; }
+}
+
+/* ── EMPTY ─────────────────────────────────────────────────── */
+.empty {
+  padding: 64px 24px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  .empty-icon { font-size: 40px; opacity: 0.4; }
+  h3 { font-size: 18px; font-weight: 600; color: var(--fg); margin: 0; }
+  p { color: var(--fg-3); font-size: 14px; margin: 0; max-width: 340px; }
+}
+
+/* ── RESPONSIVE ────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
   .page-head { flex-direction: column; align-items: stretch; }
-  .btn-primary { width: 100%; justify-content: center; }
-  .coming-soon { padding: 32px 20px; }
+  .summary-bar { flex-wrap: wrap; gap: 16px; }
+  .summary-divider { display: none; }
+  .budget-amounts { flex-wrap: wrap; }
+  .chart-outer { height: 120px; }
 }

@@ -1,45 +1,134 @@
 <div class="page">
+
+  <!-- HEADER -->
   <div class="page-head">
     <div>
       <h1>Budgets</h1>
-      <p class="sub">Set monthly limits and track your spending by category</p>
+      <p class="sub">Monthly spending limits by category</p>
     </div>
-    <button class="btn-primary" disabled>+ New Budget</button>
+    <button class="btn-primary" (click)="openNew()">+ New Budget</button>
   </div>
 
-  <div class="coming-soon">
-    <div class="cs-icon">🎯</div>
-    <h2>Coming soon</h2>
-    <p>Set monthly budgets per category and see how your spending compares month over month.</p>
-    <div class="cs-preview">
-      <div class="cs-budget">
-        <div class="cs-top">
-          <span class="cs-cat">🛒 Groceries</span>
-          <span class="cs-vals"><b>$380</b> of $500</span>
-        </div>
-        <div class="cs-bar"><div class="cs-fill" style="width: 76%"></div></div>
+  <!-- MONTH SELECTOR -->
+  <div class="month-nav">
+    @for (m of availableMonths(); track m.value) {
+      <button class="month-btn"
+              [class.active]="selectedMonth() === m.value"
+              [class.current]="isCurrentMonth(m.value)"
+              (click)="selectedMonth.set(m.value)">
+        {{ m.label }}
+      </button>
+    }
+  </div>
+
+  @if (budgetService.defaultBudgets().length === 0) {
+
+    <!-- EMPTY STATE -->
+    <div class="empty">
+      <div class="empty-icon">🎯</div>
+      <h3>No budgets set</h3>
+      <p>Add a monthly budget for each spending category to start tracking.</p>
+      <button class="btn-primary" (click)="openNew()">+ Add first budget</button>
+    </div>
+
+  } @else {
+
+    <!-- SUMMARY BAR -->
+    <div class="summary-bar">
+      <div class="summary-stat">
+        <div class="summary-label">Total budget</div>
+        <div class="summary-value">{{ formatCurrencyFull(totals().budget) }}</div>
       </div>
-      <div class="cs-budget">
-        <div class="cs-top">
-          <span class="cs-cat">🍽️ Dining</span>
-          <span class="cs-vals"><b>$210</b> of $250</span>
+      <div class="summary-divider"></div>
+      <div class="summary-stat">
+        <div class="summary-label">Total spent</div>
+        <div class="summary-value" [class.over]="totals().spent > totals().budget">
+          {{ formatCurrencyFull(totals().spent) }}
         </div>
-        <div class="cs-bar"><div class="cs-fill warn" style="width: 84%"></div></div>
       </div>
-      <div class="cs-budget">
-        <div class="cs-top">
-          <span class="cs-cat">⛽ Gas</span>
-          <span class="cs-vals"><b>$180</b> of $150</span>
+      <div class="summary-divider"></div>
+      <div class="summary-stat">
+        <div class="summary-label">Remaining</div>
+        <div class="summary-value"
+             [class.over]="totals().budget - totals().spent < 0">
+          {{ formatCurrencyFull(totals().budget - totals().spent) }}
         </div>
-        <div class="cs-bar"><div class="cs-fill over" style="width: 100%"></div></div>
       </div>
-      <div class="cs-budget">
-        <div class="cs-top">
-          <span class="cs-cat">🛍️ Shopping</span>
-          <span class="cs-vals"><b>$95</b> of $300</span>
+      <div class="summary-divider"></div>
+      <div class="summary-stat">
+        <div class="summary-label">Over budget</div>
+        <div class="summary-value" [class.over]="totals().over > 0">
+          {{ totals().over }} categor{{ totals().over === 1 ? 'y' : 'ies' }}
         </div>
-        <div class="cs-bar"><div class="cs-fill" style="width: 32%"></div></div>
       </div>
     </div>
-  </div>
+
+    <!-- BUDGET BARS -->
+    <div class="budget-list">
+      @for (row of budgetRows(); track row.budget.id) {
+        <div class="budget-row" [class.over]="row.status === 'over'"
+             (click)="openEdit(row.budget)">
+          <div class="budget-left">
+            <div class="budget-icon">{{ row.categoryIcon }}</div>
+            <div class="budget-info">
+              <div class="budget-name">{{ row.categoryName }}</div>
+              <div class="budget-amounts">
+                <span class="spent-amt"
+                      [class.over]="row.status === 'over'"
+                      [class.warn]="row.status === 'warn'">
+                  {{ formatCurrencyFull(row.spent) }}
+                </span>
+                <span class="budget-sep">of</span>
+                <span class="budget-amt">{{ formatCurrencyFull(row.budget.amount) }}</span>
+                @if (row.remaining < 0) {
+                  <span class="over-badge">{{ formatCurrency(Math.abs(row.remaining)) }} over</span>
+                } @else {
+                  <span class="remaining-amt">{{ formatCurrencyFull(row.remaining) }} left</span>
+                }
+              </div>
+              <div class="budget-bar-wrap">
+                <div class="budget-bar-fill"
+                     [class.warn]="row.status === 'warn'"
+                     [class.over]="row.status === 'over'"
+                     [style.width]="(row.pct > 100 ? 100 : row.pct) + '%'">
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="budget-right">
+            <div class="budget-pct"
+                 [class.warn]="row.status === 'warn'"
+                 [class.over]="row.status === 'over'">
+              {{ row.pct }}%
+            </div>
+            <button class="override-btn"
+                    (click)="$event.stopPropagation(); openOverride(row.budget.categoryId)"
+                    title="Override for this month">
+              ✏️
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+
+  }
+
 </div>
+
+<!-- MODALS -->
+<app-budget-form
+  [open]="formOpen()"
+  [budget]="editing()"
+  [preselectedCategoryId]="preselectedCategoryId()"
+  [preselectedMonth]="preselectedMonth()"
+  (closed)="closeForm()"
+  (saved)="handleSave($event)"
+  (deleteRequested)="askDelete()" />
+
+<app-confirm
+  [open]="confirmOpen()"
+  title="Delete budget?"
+  message="This will remove the budget limit for this category."
+  confirmText="Delete"
+  (confirmed)="confirmDelete()"
+  (cancelled)="confirmOpen.set(false)" />

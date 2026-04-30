@@ -1,0 +1,65 @@
+<app-modal
+  [open]="open"
+  [title]="budget ? 'Edit Budget' : 'New Budget'"
+  size="sm"
+  (closed)="closed.emit()">
+
+  <div class="form">
+    <div class="field">
+      <label class="label-sm">Category</label>
+      <select class="input-field" [(ngModel)]="categoryId" name="categoryId"
+              [disabled]="!!budget">
+        <option value="" disabled>Select category</option>
+        @for (c of expenseCategories(); track c.id) {
+          <option [value]="c.id">{{ c.icon }} {{ c.name }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="label-sm">Monthly limit</label>
+      <div class="amount-wrap">
+        <span class="curr">$</span>
+        <input class="input-field amount-input" type="number" step="1"
+               [(ngModel)]="amount" name="amount" placeholder="0" />
+      </div>
+    </div>
+
+    <div class="type-toggle">
+      <button type="button" class="type-btn" [class.active]="isDefault"
+              (click)="isDefault = true">
+        <div class="type-btn-title">Every month</div>
+        <div class="type-btn-sub">Default budget for this category</div>
+      </button>
+      <button type="button" class="type-btn" [class.active]="!isDefault"
+              (click)="isDefault = false">
+        <div class="type-btn-title">Specific month</div>
+        <div class="type-btn-sub">Override for one month only</div>
+      </button>
+    </div>
+
+    @if (!isDefault) {
+      <div class="field">
+        <label class="label-sm">Month</label>
+        <select class="input-field" [(ngModel)]="month" name="month">
+          @for (m of months; track m.value) {
+            <option [value]="m.value">{{ m.label }}</option>
+          }
+        </select>
+      </div>
+    }
+
+    <div class="actions">
+      @if (budget) {
+        <button type="button" class="btn-danger"
+                (click)="deleteRequested.emit()">Delete</button>
+      }
+      <div class="actions-right">
+        <button type="button" class="btn-ghost" (click)="closed.emit()">Cancel</button>
+        <button type="button" class="btn-primary" (click)="save()">
+          {{ budget ? 'Save changes' : 'Add budget' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</app-modal>
