@@ -2,13 +2,16 @@ export type BillFrequency = 'monthly' | 'yearly' | 'weekly' | 'quarterly';
 
 export interface Bill {
   id?: string;
-  name: string;               // "ChatGPT Plus"
+  name: string;
   amount: number;
   frequency: BillFrequency;
   nextDueDate: string;        // YYYY-MM-DD
-  accountId?: string;         // which account it bills to
+  accountId?: string;
   categoryId?: string;
-  active: boolean;
+  autopayEnabled: boolean;
   icon?: string;
+  color?: string;
+  notes?: string;
+  active: boolean;
   createdAt: number;
 }

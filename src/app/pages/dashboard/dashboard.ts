@@ -5,6 +5,7 @@ import { AccountService } from '../../services/account.service';
 import { TransactionService } from '../../services/transaction.service';
 import { QuickAddService } from '../../services/quick-add.service';
 import { Account } from '../../models';
+import { BillService } from '../../services/bill.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -18,6 +19,9 @@ export class Dashboard {
   private txService = inject(TransactionService);
   private router = inject(Router);
   private quickAddService = inject(QuickAddService);
+  private billService = inject(BillService);
+
+  upcomingBills = computed(() => this.billService.upcomingBills(7));
 
   activeRange = signal<'7D' | '30D' | '90D' | 'YTD'>('30D');
 

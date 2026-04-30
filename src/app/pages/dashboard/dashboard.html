@@ -101,6 +101,26 @@
     </div>
   }
 
+  <!-- UPCOMING BILLS -->
+  @if (upcomingBills().length > 0) {
+    <div class="section-header">
+      <span class="section-title">Due soon</span>
+      <button class="section-link" (click)="navigate('/bills')">View all</button>
+    </div>
+    <div class="bills-strip">
+      @for (bill of upcomingBills(); track bill.id) {
+        <div class="bill-chip" (click)="navigate('/bills')">
+          <span class="bill-chip-icon">{{ bill.icon || '📄' }}</span>
+          <div class="bill-chip-info">
+            <div class="bill-chip-name">{{ bill.name }}</div>
+            <div class="bill-chip-date">{{ bill.nextDueDate | date:'MMM d' }}</div>
+          </div>
+          <div class="bill-chip-amount">{{ formatCurrency(bill.amount) }}</div>
+        </div>
+      }
+    </div>
+  }
+
   <!-- RECENT TRANSACTIONS -->
   @if (recentTransactions().length > 0) {
     <div class="section-header">

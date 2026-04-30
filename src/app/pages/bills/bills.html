@@ -4,47 +4,242 @@
       <h1>Bills & Subscriptions</h1>
       <p class="sub">Track your recurring payments and due dates</p>
     </div>
-    <button class="btn-primary" disabled>+ New Bill</button>
+    <div class="head-actions">
+      @if (!importDone() && billService.bills().length === 0) {
+        <button class="btn-ghost" (click)="importFromTransactions()"
+                [disabled]="importing()">
+          {{ importing() ? 'Importing…' : '⬇ Import from transactions' }}
+        </button>
+      }
+      <button class="btn-primary" (click)="openNew()">+ New Bill</button>
+    </div>
   </div>
 
-  <div class="coming-soon">
-    <div class="cs-icon">📄</div>
-    <h2>Coming soon</h2>
-    <p>Track subscriptions like Netflix, ChatGPT, Claude, and more. Get notified before bills are due.</p>
-    <div class="cs-preview">
-      <div class="cs-bill">
-        <div class="cs-date">
-          <div class="cs-day">15</div>
-          <div class="cs-mon">MAY</div>
-        </div>
-        <div class="cs-info">
-          <div class="cs-name">Netflix</div>
-          <div class="cs-meta">Monthly · Checking</div>
-        </div>
-        <div class="cs-amount">$15.99</div>
-      </div>
-      <div class="cs-bill">
-        <div class="cs-date">
-          <div class="cs-day">22</div>
-          <div class="cs-mon">MAY</div>
-        </div>
-        <div class="cs-info">
-          <div class="cs-name">ChatGPT Plus</div>
-          <div class="cs-meta">Monthly · Credit Card</div>
-        </div>
-        <div class="cs-amount">$20.00</div>
-      </div>
-      <div class="cs-bill">
-        <div class="cs-date">
-          <div class="cs-day">28</div>
-          <div class="cs-mon">MAY</div>
-        </div>
-        <div class="cs-info">
-          <div class="cs-name">Claude Pro</div>
-          <div class="cs-meta">Monthly · Credit Card</div>
-        </div>
-        <div class="cs-amount">$20.00</div>
+  <!-- SUMMARY BAR -->
+  <div class="summary-bar">
+    <div class="summary-stat">
+      <div class="summary-label">Monthly cost</div>
+      <div class="summary-value">{{ formatCurrency(totalMonthly()) }}</div>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-stat">
+      <div class="summary-label">Active bills</div>
+      <div class="summary-value">{{ billService.bills().length }}</div>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-stat">
+      <div class="summary-label">Due this month</div>
+      <div class="summary-value" [class.warn]="upcoming().length > 0">
+        {{ upcoming().length }}
       </div>
     </div>
   </div>
+
+  <!-- OVERDUE -->
+  @if (overdue().length > 0) {
+    <div class="section-header">
+      <span class="section-title overdue">⚠️ Overdue</span>
+    </div>
+    <div class="bills-list">
+      @for (bill of overdue(); track bill.id) {
+        <div class="bill-row overdue-row" (click)="openEdit(bill)">
+          <div class="bill-icon">{{ bill.icon || '📄' }}</div>
+          <div class="bill-main">
+            <div class="bill-name">{{ bill.name }}</div>
+            <div class="bill-meta">
+              {{ frequencyLabel(bill.frequency) }}
+              @if (accountName(bill.accountId)) {
+                · {{ accountName(bill.accountId) }}
+              }
+            </div>
+          </div>
+          <div class="bill-right">
+            <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
+            <div class="bill-due overdue-text">
+              {{ Math.abs(daysUntil(bill.nextDueDate)) }}d overdue
+            </div>
+            <button class="mark-paid-btn"
+                    (click)="$event.stopPropagation(); markPaid(bill)"
+                    [disabled]="markingPaid() === bill.id">
+              {{ markingPaid() === bill.id ? '…' : 'Mark paid' }}
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- UPCOMING (next 30 days) -->
+  @if (upcoming().length > 0) {
+    <div class="section-header">
+      <span class="section-title">Upcoming · next 30 days</span>
+    </div>
+    <div class="bills-list">
+      @for (bill of upcoming(); track bill.id) {
+        <div class="bill-row" (click)="openEdit(bill)">
+          <div class="bill-date-box">
+            <div class="bill-day">
+              {{ bill.nextDueDate | date:'d' }}
+            </div>
+            <div class="bill-mon">
+              {{ bill.nextDueDate | date:'MMM' | uppercase }}
+            </div>
+          </div>
+          <div class="bill-main">
+            <div class="bill-name">{{ bill.name }}</div>
+            <div class="bill-meta">
+              {{ frequencyLabel(bill.frequency) }}
+              @if (accountName(bill.accountId)) {
+                · {{ accountName(bill.accountId) }}
+              }
+              @if (bill.autopayEnabled) {
+                · <span class="autopay-chip">Autopay</span>
+              }
+            </div>
+          </div>
+          <div class="bill-right">
+            <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
+            <div class="bill-due">
+              @if (daysUntil(bill.nextDueDate) === 0) { Due today }
+              @else { {{ daysUntil(bill.nextDueDate) }}d left }
+            </div>
+            <button class="mark-paid-btn"
+                    (click)="$event.stopPropagation(); markPaid(bill)"
+                    [disabled]="markingPaid() === bill.id">
+              {{ markingPaid() === bill.id ? '…' : 'Mark paid' }}
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- FUTURE (beyond 30 days) -->
+  @if (futureBills().length > 0) {
+    <div class="section-header">
+      <span class="section-title">Later</span>
+    </div>
+    <div class="bills-list">
+      @for (bill of futureBills(); track bill.id) {
+        <div class="bill-row" (click)="openEdit(bill)">
+          <div class="bill-date-box">
+            <div class="bill-day">{{ bill.nextDueDate | date:'d' }}</div>
+            <div class="bill-mon">{{ bill.nextDueDate | date:'MMM' | uppercase }}</div>
+          </div>
+          <div class="bill-main">
+            <div class="bill-name">{{ bill.name }}</div>
+            <div class="bill-meta">
+              {{ frequencyLabel(bill.frequency) }}
+              @if (accountName(bill.accountId)) {
+                · {{ accountName(bill.accountId) }}
+              }
+            </div>
+          </div>
+          <div class="bill-right">
+            <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- EMPTY STATE -->
+  @if (billService.bills().length === 0 && !importing()) {
+    <div class="empty">
+      <div class="empty-icon">📄</div>
+      <h3>No bills yet</h3>
+      <p>Import your subscriptions from existing transactions or add bills manually.</p>
+      <div class="empty-actions">
+        <button class="btn-ghost" (click)="importFromTransactions()">
+          ⬇ Import from transactions
+        </button>
+        <button class="btn-primary" (click)="openNew()">+ Add manually</button>
+      </div>
+    </div>
+  }
+
+  <!-- ALL ACTIVE BILLS -->
+  @if (activeBills().length > 0) {
+    <div class="section-header" style="margin-top: 8px;">
+      <span class="section-title">All active · {{ activeBills().length }}</span>
+    </div>
+    <div class="active-grid">
+      @for (bill of activeBills(); track bill.id) {
+        <div class="active-card" (click)="openEdit(bill)">
+          <div class="active-card-top">
+            <div class="active-icon">{{ bill.icon || '📄' }}</div>
+            <div class="active-freq">{{ frequencyLabel(bill.frequency) }}</div>
+          </div>
+          <div class="active-name">{{ bill.name }}</div>
+          <div class="active-amount">{{ formatCurrency(bill.amount) }}</div>
+          <div class="active-meta">
+            @if (accountIcon(bill.accountId)) {
+              {{ accountIcon(bill.accountId) }}
+            }
+            @if (bill.autopayEnabled) {
+              <span class="autopay-chip">Autopay</span>
+            }
+          </div>
+          <div class="active-next">
+            Next · {{ formatDate(bill.nextDueDate) }}
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- PAYMENT HISTORY -->
+  @if (paymentHistory().length > 0) {
+    <div class="section-header" style="margin-top: 8px;">
+      <span class="section-title">Payment history</span>
+      <span class="section-total">{{ formatCurrency(totalHistorySpent()) }} total</span>
+    </div>
+
+    @for (group of groupedHistory(); track group.month) {
+      <div class="history-group">
+        <div class="history-month-hdr">
+          <span>{{ group.label }}</span>
+          <span class="history-month-total">{{ formatCurrency(group.total) }}</span>
+        </div>
+        <div class="history-list">
+          @for (tx of group.items; track tx.id) {
+            <div class="history-row">
+              <div class="history-icon">
+                {{ billService.bills().find(b =>
+                  b.name.toLowerCase() === (tx.merchant || '').toLowerCase()
+                )?.icon || '📄' }}
+              </div>
+              <div class="history-main">
+                <div class="history-name">{{ tx.merchant }}</div>
+                <div class="history-meta">
+                  {{ tx.date | date:'MMM d, yyyy' }}
+                  @if (accountName(tx.accountId)) {
+                    · {{ accountName(tx.accountId) }}
+                  }
+                </div>
+              </div>
+              <div class="history-amount">{{ formatCurrency(tx.amount) }}</div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  }
+
 </div>
+
+<!-- MODALS -->
+<app-bill-form
+  [open]="formOpen()"
+  [bill]="editing()"
+  (closed)="closeForm()"
+  (saved)="handleSave($event)"
+  (deleteRequested)="askDelete()" />
+
+<app-confirm
+  [open]="confirmOpen()"
+  title="Delete bill?"
+  [message]="'Permanently delete &quot;' + (toDelete()?.name || '') + '&quot;? This cannot be undone.'"
+  confirmText="Delete"
+  (confirmed)="confirmDelete()"
+  (cancelled)="confirmOpen.set(false)" />
