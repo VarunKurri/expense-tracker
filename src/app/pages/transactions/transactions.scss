@@ -351,3 +351,13 @@
     .filter-select { width: 100%; }
   }
 }
+
+.refunded-badge {
+  font-size: 10px;
+  background: var(--green-bg);
+  color: var(--green);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-right: 4px;
+  font-weight: 600;
+}

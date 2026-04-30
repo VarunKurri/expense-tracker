@@ -1,30 +1,204 @@
 <div class="page">
+
+  <!-- HEADER -->
   <div class="page-head">
     <div>
       <h1>Analysis</h1>
-      <p class="sub">Understand your spending patterns over time</p>
+      <p class="sub">Trends and patterns across your spend</p>
+    </div>
+    <div class="head-actions">
+      <!-- Time range -->
+      <div class="range-pills">
+        @for (r of ranges; track r.value) {
+          <button class="range-pill"
+                  [class.active]="range() === r.value"
+                  (click)="range.set(r.value)">{{ r.label }}</button>
+        }
+      </div>
     </div>
   </div>
 
-  <div class="coming-soon">
-    <div class="cs-icon">📈</div>
-    <h2>Coming soon</h2>
-    <p>Visual breakdowns of your spending by category, account, and time period — with trends and insights.</p>
-    <div class="cs-stats">
-      <div class="cs-stat">
-        <div class="cs-stat-label">Top category</div>
-        <div class="cs-stat-value">🛒 Groceries</div>
+  <!-- FILTERS ROW -->
+  <div class="filters-row">
+    @if (activeAccounts().length > 1) {
+      <select class="filter-select"
+              [value]="filterAccountId()"
+              (change)="filterAccountId.set($any($event.target).value)">
+        <option value="">All accounts</option>
+        @for (a of activeAccounts(); track a.id) {
+          <option [value]="a.id">{{ a.icon }} {{ a.name }}</option>
+        }
+      </select>
+    }
+
+    <button class="filter-btn"
+            [class.active]="excludeRefunded()"
+            (click)="excludeRefunded.set(!excludeRefunded())">
+      {{ excludeRefunded() ? '✓ Excluding refunded' : 'Include refunded' }}
+    </button>
+
+    <button class="filter-btn"
+            [class.active]="excludedCategories().size > 0"
+            (click)="showCategoryFilter.set(!showCategoryFilter())">
+      🎛 Exclude categories
+      @if (excludedCategories().size > 0) {
+        <span class="filter-badge">{{ excludedCategories().size }}</span>
+      }
+    </button>
+
+    @if (showCategoryFilter()) {
+      <div class="category-filter-panel">
+        <div class="cfp-title">Tap to exclude from analysis</div>
+        <div class="cfp-cats">
+          @for (cat of allExpenseCategories(); track cat.id) {
+            <button class="cfp-cat"
+                    [class.excluded]="isCategoryExcluded(cat.id!)"
+                    (click)="toggleCategoryExclusion(cat.id!)">
+              {{ cat.icon }} {{ cat.name }}
+              @if (isCategoryExcluded(cat.id!)) { <span>✕</span> }
+            </button>
+          }
+        </div>
       </div>
-      <div class="cs-divider"></div>
-      <div class="cs-stat">
-        <div class="cs-stat-label">Avg / month</div>
-        <div class="cs-stat-value">$2,840</div>
-      </div>
-      <div class="cs-divider"></div>
-      <div class="cs-stat">
-        <div class="cs-stat-label">Savings rate</div>
-        <div class="cs-stat-value">34%</div>
-      </div>
+    }
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Avg monthly spend</div>
+      <div class="kpi-value">{{ formatCurrency(avgMonthlySpend()) }}</div>
+      <div class="kpi-sub">across selected period</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-label">Top category</div>
+      @if (topCategory(); as top) {
+        <div class="kpi-value kpi-cat">
+          <span>{{ top.icon }}</span>
+          {{ top.name }}
+        </div>
+        <div class="kpi-sub">{{ formatCurrency(top.amount) }}</div>
+      } @else {
+        <div class="kpi-value muted">—</div>
+      }
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-label">Savings rate</div>
+      @if (savingsRate() !== null) {
+        <div class="kpi-value"
+             [class.positive]="savingsRate()! > 0"
+             [class.negative]="savingsRate()! < 0">
+          {{ savingsRate() }}%
+        </div>
+      } @else {
+        <div class="kpi-value muted">—</div>
+      }
+      <div class="kpi-sub">period-over-period</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-label">Largest expense</div>
+      @if (largestExpense(); as big) {
+        <div class="kpi-value">{{ formatCurrency(big.amount) }}</div>
+        <div class="kpi-sub">{{ big.merchant || 'Unknown' }}</div>
+      } @else {
+        <div class="kpi-value muted">—</div>
+      }
     </div>
   </div>
+
+  <!-- MONTHLY TREND CHART -->
+  <div class="chart-card">
+    <div class="chart-card-head">
+      <div>
+        <div class="chart-card-title">Monthly trend</div>
+        <div class="chart-card-sub">Income vs spending</div>
+      </div>
+      <div class="chart-legend">
+        <div class="legend-item">
+          <div class="legend-dot income-dot"></div>
+          <span>Income</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot spending-dot"></div>
+          <span>Spending</span>
+        </div>
+      </div>
+    </div>
+    <div class="bar-chart-wrap">
+      <canvas #barCanvas></canvas>
+    </div>
+  </div>
+
+  <!-- BOTTOM GRID -->
+  <div class="bottom-grid">
+
+    <!-- TOP MERCHANTS -->
+    <div class="card-panel">
+      <div class="panel-head">
+        <div class="panel-title">Top merchants</div>
+        <div class="panel-sub">by total spend</div>
+      </div>
+      @if (topMerchants().length === 0) {
+        <div class="panel-empty">No expense data</div>
+      }
+      <div class="merchants-list">
+        @for (m of topMerchants(); track m.name) {
+          <div class="merchant-row">
+            <div class="merchant-rank">{{ m.rank.toString().padStart(2, '0') }}</div>
+            <div class="merchant-info">
+              <div class="merchant-name">{{ m.name }}</div>
+              <div class="merchant-count">
+                {{ m.count }} transaction{{ m.count === 1 ? '' : 's' }}
+              </div>
+            </div>
+            <div class="merchant-amount">{{ formatCurrency(m.amount) }}</div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- SPENDING BY CATEGORY -->
+    <div class="card-panel">
+      <div class="panel-head">
+        <div class="panel-title">Where it went</div>
+        <div class="panel-sub">{{ formatCurrency(totalExpenses()) }} total</div>
+      </div>
+
+      <!-- DONUT CHART -->
+      <div class="donut-wrap">
+        <div class="donut-container">
+          <canvas #donutCanvas></canvas>
+          <div class="donut-center">
+            <div class="donut-total">{{ formatCurrency(totalExpenses()) }}</div>
+            <div class="donut-label">total spent</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CATEGORY BARS -->
+      <div class="cat-list">
+        @for (cat of categoryBreakdown(); track cat.id) {
+          <div class="cat-row">
+            <div class="cat-icon-name">
+              <span class="cat-icon">{{ cat.icon }}</span>
+              <span class="cat-name">{{ cat.name }}</span>
+            </div>
+            <div class="cat-bar-wrap">
+              <div class="cat-bar-fill"
+                   [style.width]="cat.pct + '%'"
+                   [style.background]="cat.color">
+              </div>
+            </div>
+            <div class="cat-amount">{{ formatCurrency(cat.amount) }}</div>
+            <div class="cat-pct">{{ cat.pct }}%</div>
+          </div>
+        }
+      </div>
+    </div>
+
+  </div>
+
 </div>

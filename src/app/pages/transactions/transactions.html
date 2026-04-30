@@ -142,9 +142,12 @@
               </div>
 
               <div class="tx-amount"
-                   [class.pos]="tx.type === 'income'"
-                   [class.neg]="tx.type === 'expense'"
-                   [class.neu]="tx.type === 'transfer'">
+                  [class.pos]="tx.type === 'income'"
+                  [class.neg]="tx.type === 'expense'"
+                  [class.neu]="tx.type === 'transfer'">
+                @if (tx.refunded) {
+                  <span class="refunded-badge">↩</span>
+                }
                 @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
                 @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
                 @else { {{ formatCurrency(tx.amount) }} }

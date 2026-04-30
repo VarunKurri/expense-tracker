@@ -37,6 +37,7 @@ export class TransactionForm implements OnChanges {
   categoryId: string = '';
   fromAccountId: string = '';
   toAccountId: string = '';
+  refunded = false;
 
   submitting = signal(false);
 
@@ -66,6 +67,7 @@ export class TransactionForm implements OnChanges {
       this.categoryId = this.transaction.categoryId || '';
       this.fromAccountId = this.transaction.fromAccountId || '';
       this.toAccountId = this.transaction.toAccountId || '';
+      this.refunded = this.transaction.refunded || false;
     } else {
       // Read directly from service — no timing issue
       this.type = this.quickAddService.defaultType() || 'expense';
@@ -120,6 +122,7 @@ export class TransactionForm implements OnChanges {
         accountId: this.accountId,
         ...(this.categoryId ? { categoryId: this.categoryId } : {}),
         ...(this.notes.trim() ? { notes: this.notes.trim() } : {}),
+        refunded: this.refunded,
       });
     }
   }

@@ -187,3 +187,56 @@ select.input-field {
   .form-grid { grid-template-columns: 1fr; }
   .amount-input { font-size: 42px; }
 }
+
+.refunded-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--bg-3);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.refunded-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.refunded-sub {
+  font-size: 11.5px;
+  color: var(--fg-3);
+  margin-top: 2px;
+}
+
+.toggle {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--fg-4);
+    transition: all 0.2s ease;
+  }
+
+  &.on {
+    background: var(--green);
+    border-color: var(--green);
+    &::after { left: 21px; background: #000; }
+  }
+}

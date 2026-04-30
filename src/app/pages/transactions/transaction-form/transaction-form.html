@@ -102,6 +102,23 @@
       </div>
     </div>
 
+    <!-- REFUNDED TOGGLE — only show when editing an expense -->
+    @if (transaction && type === 'expense') {
+      <div class="refunded-row">
+        <div>
+          <div class="refunded-label">Mark as refunded</div>
+          <div class="refunded-sub">
+            Excludes from analysis. For partial refunds, log the payback as income instead.
+          </div>
+        </div>
+        <button type="button"
+                class="toggle"
+                [class.on]="refunded"
+                (click)="refunded = !refunded">
+        </button>
+      </div>
+    }
+
     <!-- ACTIONS -->
     <div class="modal-actions">
       @if (transaction) {
