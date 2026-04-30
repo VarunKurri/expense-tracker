@@ -17,17 +17,21 @@
     </div>
 
     <div class="hero-number" [class.negative]="isNegative(netWorth())">
-      <span class="cur">$</span>
+      @if (isNegative(netWorth())) {
+        <span class="cur">−$</span>
+      } @else {
+        <span class="cur">$</span>
+      }
       <span class="whole">{{ formatWhole(netWorth()) }}</span>
       <span class="cents">{{ formatCents(netWorth()) }}</span>
     </div>
 
     <div class="hero-actions">
-      <button class="btn-primary" (click)="navigate('/transactions')">
+      <button class="btn-primary" (click)="addMoney()">
         + Add money
       </button>
-      <button class="btn-ghost" (click)="navigate('/transactions')">
-        ↕ Transactions
+      <button class="btn-ghost" (click)="addExpense()">
+        − Add expense
       </button>
       <button class="btn-ghost" (click)="navigate('/accounts')">
         ▤ Accounts
@@ -42,23 +46,31 @@
         <span class="kpi-label">Income</span>
         <span class="kpi-dot income"></span>
       </div>
-      <div class="kpi-value">{{ formatCurrency(thisMonthIncome()) }}</div>
-      <div class="kpi-sub">this month</div>
+      <div class="kpi-value income">{{ formatCurrency(rangeIncome()) }}</div>
+      <div class="kpi-sub">{{ activeRange() === '7D' ? 'last 7 days' : activeRange() === '30D' ? 'last 30 days' : activeRange() === '90D' ? 'last 90 days' : 'this year' }}</div>
     </div>
+
     <div class="kpi">
       <div class="kpi-top">
         <span class="kpi-label">Spending</span>
         <span class="kpi-dot expense"></span>
       </div>
-      <div class="kpi-value expense">{{ formatCurrency(thisMonthExpenses()) }}</div>
-      <div class="kpi-sub">this month</div>
+      <div class="kpi-value expense">{{ formatCurrency(rangeExpenses()) }}</div>
+      <div class="kpi-sub">{{ activeRange() === '7D' ? 'last 7 days' : activeRange() === '30D' ? 'last 30 days' : activeRange() === '90D' ? 'last 90 days' : 'this year' }}</div>
     </div>
+
     <div class="kpi">
       <div class="kpi-top">
         <span class="kpi-label">Savings rate</span>
         <span class="kpi-dot neutral"></span>
       </div>
-      <div class="kpi-value">{{ savingsRate() }}%</div>
+      @if (savingsRate() !== null) {
+        <div class="kpi-value" [class.income]="savingsRate()! > 0" [class.expense]="savingsRate()! < 0">
+          {{ savingsRate() }}%
+        </div>
+      } @else {
+        <div class="kpi-value muted">—</div>
+      }
       <div class="kpi-sub">of income kept</div>
     </div>
   </div>
@@ -78,8 +90,8 @@
           </div>
           <div class="acct-name">{{ account.name }}</div>
           <div class="acct-bal"
-               [class.negative]="isNegative(balanceFor(account.id!, account.openingBalance))">
-            {{ formatCurrency(balanceFor(account.id!, account.openingBalance)) }}
+               [class.negative]="isNegative(balanceFor(account))">
+            {{ formatCurrency(balanceFor(account)) }}
           </div>
           @if (account.last4) {
             <div class="acct-sub">•••• {{ account.last4 }}</div>
@@ -89,23 +101,35 @@
     </div>
   }
 
-  <!-- MIGRATION CARD -->
-  @if (!migrationResult()) {
-    <div class="migration-card">
-      <div class="migration-info">
-        <div class="migration-title">Migrate old expenses</div>
-        <div class="migration-sub">
-          Moves data from the old <code>expenses</code> collection into
-          <code>transactions</code>. Safe to run with no old data.
-        </div>
-      </div>
-      <button class="btn-primary" (click)="runMigration()" [disabled]="migrating()">
-        {{ migrating() ? 'Running…' : 'Run migration' }}
-      </button>
+  <!-- RECENT TRANSACTIONS -->
+  @if (recentTransactions().length > 0) {
+    <div class="section-header">
+      <span class="section-title">Recent</span>
+      <button class="section-link" (click)="navigate('/transactions')">View all</button>
     </div>
-  }
-  @if (migrationResult()) {
-    <div class="migration-done">{{ migrationResult() }}</div>
+    <div class="recent-list">
+      @for (tx of recentTransactions(); track tx.id) {
+        <div class="recent-row" (click)="navigate('/transactions')">
+          <div class="recent-icon" [class.income]="tx.type === 'income'">
+            @if (tx.type === 'income') { ↓ }
+            @else if (tx.type === 'transfer') { ↔ }
+            @else { ↑ }
+          </div>
+          <div class="recent-main">
+            <div class="recent-title">{{ tx.merchant || 'Transfer' }}</div>
+            <div class="recent-date">{{ tx.date }}</div>
+          </div>
+          <div class="recent-amount"
+               [class.pos]="tx.type === 'income'"
+               [class.neg]="tx.type === 'expense'"
+               [class.neu]="tx.type === 'transfer'">
+            @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
+            @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
+            @else { {{ formatCurrency(tx.amount) }} }
+          </div>
+        </div>
+      }
+    </div>
   }
 
 </div>

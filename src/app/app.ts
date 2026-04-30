@@ -61,8 +61,7 @@ export class App {
   quickAdd() {
     if (!this.router.url.includes('/transactions')) {
       this.router.navigate(['/transactions']).then(() => {
-        // Wait for component to initialize before triggering
-        setTimeout(() => this.quickAddService.trigger(), 100);
+        setTimeout(() => this.quickAddService.trigger(), 150);
       });
     } else {
       this.quickAddService.trigger();

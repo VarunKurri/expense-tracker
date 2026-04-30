@@ -24,7 +24,7 @@ export class Transactions {
   private txService = inject(TransactionService);
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
-  private quickAdd = inject(QuickAddService);
+  quickAdd = inject(QuickAddService);
 
   // Modal state
   formOpen = signal(false);
@@ -186,17 +186,16 @@ export class Transactions {
   closeForm() {
     this.formOpen.set(false);
     this.editing.set(null);
-    this.quickAdd.close();
+    this.quickAdd.close(); // ← move it here
   }
 
   constructor() {
     effect(() => {
       if (this.quickAdd.open()) {
-        // Run outside the effect to avoid signal update conflicts
         setTimeout(() => {
-          this.formOpen.set(true);
           this.editing.set(null);
-          this.quickAdd.close();
+          this.formOpen.set(true);
+          // Don't close here — let the form read defaultType first
         }, 0);
       }
     });

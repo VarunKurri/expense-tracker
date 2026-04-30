@@ -8,6 +8,7 @@ import { Modal } from '../../../components/modal/modal';
 import { AccountService } from '../../../services/account.service';
 import { CategoryService } from '../../../services/category.service';
 import { Transaction, TransactionType } from '../../../models';
+import { QuickAddService } from '../../../services/quick-add.service';
 
 @Component({
   selector: 'app-transaction-form',
@@ -19,6 +20,7 @@ import { Transaction, TransactionType } from '../../../models';
 export class TransactionForm implements OnChanges {
   accounts = inject(AccountService);
   categories = inject(CategoryService);
+  private quickAddService = inject(QuickAddService);
 
   @Input() open = false;
   @Input() transaction: Transaction | null = null;
@@ -65,7 +67,8 @@ export class TransactionForm implements OnChanges {
       this.fromAccountId = this.transaction.fromAccountId || '';
       this.toAccountId = this.transaction.toAccountId || '';
     } else {
-      this.type = 'expense';
+      // Read directly from service — no timing issue
+      this.type = this.quickAddService.defaultType() || 'expense';
       this.amount = 0;
       this.date = new Date().toISOString().slice(0, 10);
       this.notes = '';

@@ -54,7 +54,8 @@ export class TransactionService {
         if (t.toAccountId === accountId) balance += t.amount;
       }
     }
-    return balance;
+    // Round only at the end, not during accumulation
+    return Math.round(balance * 100) / 100;
   }
 
   // For credit cards: currentBalance = openingBalance + txBalance

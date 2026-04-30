@@ -3,7 +3,8 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AccountService } from '../../services/account.service';
 import { TransactionService } from '../../services/transaction.service';
-import { MigrationService } from '../../services/migration.service';
+import { QuickAddService } from '../../services/quick-add.service';
+import { Account } from '../../models';
 
 @Component({
   selector: 'app-dashboard',
@@ -13,79 +14,138 @@ import { MigrationService } from '../../services/migration.service';
   styleUrl: './dashboard.scss',
 })
 export class Dashboard {
-  private accounts = inject(AccountService);
-  private transactions = inject(TransactionService);
-  private migration = inject(MigrationService);
+  private accountService = inject(AccountService);
+  private txService = inject(TransactionService);
   private router = inject(Router);
+  private quickAddService = inject(QuickAddService);
 
-  migrating = signal(false);
-  migrationResult = signal<string | null>(null);
   activeRange = signal<'7D' | '30D' | '90D' | 'YTD'>('30D');
 
   activeAccounts = computed(() =>
-    this.accounts.accounts().filter(a => !a.archived)
+    this.accountService.accounts().filter(a => !a.archived)
   );
 
-  balanceFor(accountId: string, openingBalance: number): number {
-    return openingBalance + this.transactions.balanceForAccount(accountId);
+  balanceFor(account: Account): number {
+    const txDelta = this.txService.balanceForAccount(account.id!);
+    let balance: number;
+    if (account.type === 'credit') {
+      balance = account.openingBalance - txDelta;
+    } else {
+      balance = (account.openingBalance || 0) + txDelta;
+    }
+    return Math.round(balance * 100) / 100;
   }
 
-  netWorth = computed(() =>
-    this.activeAccounts().reduce((sum, a) =>
-      sum + this.balanceFor(a.id!, a.openingBalance), 0)
-  );
+  netWorth = computed(() => {
+    let assets = 0;
+    let liabilities = 0;
+    for (const a of this.activeAccounts()) {
+      const bal = this.balanceFor(a);
+      if (a.type === 'credit') {
+        if (bal > 0) liabilities += bal;
+        else assets += Math.abs(bal);
+      } else {
+        if (bal >= 0) assets += bal;
+        else liabilities += Math.abs(bal);
+      }
+    }
+    return Math.round((assets - liabilities) * 100) / 100;
+  });
 
-  thisMonthIncome = computed(() => {
-    const month = new Date().toISOString().slice(0, 7);
-    return this.transactions.transactions()
-      .filter(t => t.type === 'income' && t.date.startsWith(month))
+  private rangeStart = computed((): string => {
+    const today = new Date();
+    const y = today.getFullYear();
+    switch (this.activeRange()) {
+      case '7D': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        return d.toISOString().slice(0, 10);
+      }
+      case '30D': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 30);
+        return d.toISOString().slice(0, 10);
+      }
+      case '90D': {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 90);
+        return d.toISOString().slice(0, 10);
+      }
+      case 'YTD':
+        return `${y}-01-01`;
+    }
+  });
+
+  rangeIncome = computed(() => {
+    const start = this.rangeStart();
+    return this.txService.transactions()
+      .filter(t => t.type === 'income' && t.date >= start)
       .reduce((s, t) => s + t.amount, 0);
   });
 
-  thisMonthExpenses = computed(() => {
-    const month = new Date().toISOString().slice(0, 7);
-    return this.transactions.transactions()
-      .filter(t => t.type === 'expense' && t.date.startsWith(month))
+  rangeExpenses = computed(() => {
+    const start = this.rangeStart();
+    return this.txService.transactions()
+      .filter(t => t.type === 'expense' && t.date >= start)
       .reduce((s, t) => s + t.amount, 0);
   });
 
   savingsRate = computed(() => {
-    const income = this.thisMonthIncome();
-    if (!income) return 0;
-    return Math.round(((income - this.thisMonthExpenses()) / income) * 100);
+    const income = this.rangeIncome();
+    if (!income) return null;
+    return Math.round(((income - this.rangeExpenses()) / income) * 100);
   });
 
+  recentTransactions = computed(() =>
+    this.txService.transactions().slice(0, 5)
+  );
+
+  // ── Format helpers ────────────────────────────────────────
   formatWhole(n: number): string {
-    return Math.abs(Math.floor(n)).toLocaleString('en-US');
+    // Round to 2 decimal places first, then take the integer part
+    const rounded = Math.round(Math.abs(n) * 100) / 100;
+    return Math.floor(rounded).toLocaleString('en-US');
   }
 
   formatCents(n: number): string {
-    return Math.abs(n % 1).toFixed(2).slice(1);
+    const rounded = Math.round(Math.abs(n) * 100) / 100;
+    const cents = Math.round((rounded % 1) * 100);
+    return cents.toString().padStart(2, '0');
   }
 
   formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
-    }).format(n);
+    }).format(Math.abs(n));
   }
 
   isNegative(n: number): boolean { return n < 0; }
 
   navigate(path: string) { this.router.navigate([path]); }
 
-  async runMigration() {
-    this.migrating.set(true);
-    try {
-      const res = await this.migration.migrateOldExpenses();
-      this.migrationResult.set(`✅ Migrated ${res.migrated} expense(s).`);
-    } catch (err) {
-      this.migrationResult.set('❌ ' + (err as Error).message);
-    } finally {
-      this.migrating.set(false);
+  setRange(r: string) {
+    this.activeRange.set(r as '7D' | '30D' | '90D' | 'YTD');
+  }
+
+  // ── Quick actions ─────────────────────────────────────────
+  addMoney() {
+    if (!this.router.url.includes('/transactions')) {
+      this.router.navigate(['/transactions']).then(() => {
+        setTimeout(() => this.quickAddService.trigger('income'), 150);
+      });
+    } else {
+      this.quickAddService.trigger('income');
     }
   }
-  setRange(r: String) {
-    this.activeRange.set(r as '7D' | '30D' | '90D' | 'YTD');
+
+  addExpense() {
+    if (!this.router.url.includes('/transactions')) {
+      this.router.navigate(['/transactions']).then(() => {
+        setTimeout(() => this.quickAddService.trigger('expense'), 150);
+      });
+    } else {
+      this.quickAddService.trigger('expense');
+    }
   }
 }
