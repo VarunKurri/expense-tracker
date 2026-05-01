@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TransactionService } from '../../services/transaction.service';
@@ -8,7 +8,6 @@ import { TransactionForm } from './transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { Transaction } from '../../models';
 import { QuickAddService } from '../../services/quick-add.service';
-import { effect } from '@angular/core';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
 type DateRange = 'this-month' | 'last-month' | 'this-year' | 'all';
@@ -29,6 +28,7 @@ export class Transactions {
   // Modal state
   formOpen = signal(false);
   editing = signal<Transaction | null>(null);
+  viewing = signal<Transaction | null>(null); // ← new: view panel
   confirmOpen = signal(false);
   toDelete = signal<Transaction | null>(null);
 
@@ -41,20 +41,24 @@ export class Transactions {
 
   // Date range bounds
   private dateRange = computed(() => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = today.getMonth();
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+
+    const localDate = (year: number, month: number, day: number) => {
+      const mm = String(month + 1).padStart(2, '0');
+      const dd = String(day).padStart(2, '0');
+      return `${year}-${mm}-${dd}`;
+    };
+
+    const lastDay = (year: number, month: number) =>
+      new Date(year, month + 1, 0).getDate();
+
     switch (this.filterDateRange()) {
       case 'this-month':
-        return {
-          start: new Date(y, m, 1).toISOString().slice(0, 10),
-          end: new Date(y, m + 1, 0).toISOString().slice(0, 10)
-        };
+        return { start: localDate(y, m, 1), end: localDate(y, m, lastDay(y, m)) };
       case 'last-month':
-        return {
-          start: new Date(y, m - 1, 1).toISOString().slice(0, 10),
-          end: new Date(y, m, 0).toISOString().slice(0, 10)
-        };
+        return { start: localDate(y, m - 1, 1), end: localDate(y, m - 1, lastDay(y, m - 1)) };
       case 'this-year':
         return { start: `${y}-01-01`, end: `${y}-12-31` };
       default:
@@ -80,15 +84,15 @@ export class Transactions {
       }
       if (this.filterCategoryId() && t.categoryId !== this.filterCategoryId()) return false;
       if (q) {
-        const m = (t.merchant || '').toLowerCase();
-        const n = (t.notes || '').toLowerCase();
-        if (!m.includes(q) && !n.includes(q)) return false;
+        const merchant = (t.merchant || '').toLowerCase();
+        const notes = (t.notes || '').toLowerCase();
+        if (!merchant.includes(q) && !notes.includes(q)) return false;
       }
       return true;
     });
   });
 
-  // Group by date
+  // Group by date with improved labels
   grouped = computed(() => {
     const groups = new Map<string, Transaction[]>();
     for (const t of this.filtered()) {
@@ -128,7 +132,8 @@ export class Transactions {
   );
 
   // Helpers
-  accountName(id: string): string {
+  accountName(id?: string): string {
+    if (!id) return '—';
     const a = this.accountService.accounts().find(a => a.id === id);
     return a ? `${a.icon} ${a.name}` : '—';
   }
@@ -146,13 +151,23 @@ export class Transactions {
 
   formatDateLabel(date: string): string {
     const d = new Date(date + 'T00:00:00');
-    const today = new Date();
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    if (d.toDateString() === today.toDateString()) return 'Today';
-    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+
+    const weekday = d.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+    const monthDay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    if (d.getTime() === today.getTime()) return `TODAY · ${weekday}, ${monthDay.toUpperCase()}`;
+    if (d.getTime() === yesterday.getTime()) return `YESTERDAY · ${weekday}, ${monthDay.toUpperCase()}`;
+    return `${weekday}, ${monthDay.toUpperCase()}`;
+  }
+
+  formatFullDate(date: string): string {
+    const d = new Date(date + 'T00:00:00');
     return d.toLocaleDateString('en-US', {
-      weekday: 'long', month: 'short', day: 'numeric'
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
   }
 
@@ -172,7 +187,25 @@ export class Transactions {
     this.search.set('');
   }
 
-  // CRUD
+  // ── View panel ────────────────────────────────────────────
+  openView(tx: Transaction) {
+    this.viewing.set(tx);
+  }
+
+  closeView() {
+    this.viewing.set(null);
+  }
+
+  editFromView() {
+    const tx = this.viewing();
+    this.viewing.set(null);
+    if (tx) {
+      this.editing.set(tx);
+      this.formOpen.set(true);
+    }
+  }
+
+  // ── CRUD ──────────────────────────────────────────────────
   openNew() {
     this.editing.set(null);
     this.formOpen.set(true);
@@ -186,7 +219,7 @@ export class Transactions {
   closeForm() {
     this.formOpen.set(false);
     this.editing.set(null);
-    this.quickAdd.close(); // ← move it here
+    this.quickAdd.close();
   }
 
   constructor() {
@@ -195,7 +228,6 @@ export class Transactions {
         setTimeout(() => {
           this.editing.set(null);
           this.formOpen.set(true);
-          // Don't close here — let the form read defaultType first
         }, 0);
       }
     });

@@ -21,7 +21,9 @@
     </div>
     <div class="total-card">
       <div class="total-label">Net</div>
-      <div class="total-value" [class.income]="totals().net >= 0" [class.expense]="totals().net < 0">
+      <div class="total-value"
+           [class.income]="totals().net >= 0"
+           [class.expense]="totals().net < 0">
         {{ totals().net >= 0 ? '+' : '−' }}{{ formatCurrency(totals().net) }}
       </div>
     </div>
@@ -31,25 +33,26 @@
   <div class="filter-bar">
     <!-- Search -->
     <div class="search-wrap">
-      <svg class="search-icon" width="14" height="14" viewBox="0 0 20 20" fill="none"
-           stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 20 20"
+           fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
         <path d="M8 14A6 6 0 108 2a6 6 0 000 12zM18 18l-4.35-4.35"/>
       </svg>
-      <input class="search-input" [(ngModel)]="search"
+      <input class="search-input"
              [ngModel]="search()"
              (ngModelChange)="search.set($event)"
              placeholder="Search merchant, notes…" />
     </div>
 
-    <!-- Type pills -->
+    <!-- Type chips -->
     <div class="chips">
       @for (t of [
         {val: 'all', label: 'All'},
-        {val: 'expense', label: 'Expenses'},
-        {val: 'income', label: 'Income'},
-        {val: 'transfer', label: 'Transfers'}
+        {val: 'expense', label: 'Out'},
+        {val: 'income', label: 'In'},
+        {val: 'transfer', label: 'Move'}
       ]; track t.val) {
-        <button class="chip" [class.active]="filterType() === t.val"
+        <button class="chip"
+                [class.active]="filterType() === t.val"
                 (click)="setFilterType(t.val)">{{ t.label }}</button>
       }
     </div>
@@ -76,6 +79,16 @@
       </select>
     }
 
+    <!-- Category filter -->
+    <select class="filter-select"
+            [value]="filterCategoryId()"
+            (change)="filterCategoryId.set($any($event.target).value)">
+      <option value="">All categories</option>
+      @for (c of allCategories(); track c.id) {
+        <option [value]="c.id">{{ c.icon }} {{ c.name }}</option>
+      }
+    </select>
+
     <!-- Reset -->
     @if (hasActiveFilters()) {
       <button class="reset-btn" (click)="resetFilters()">Reset</button>
@@ -96,71 +109,166 @@
     <div class="tx-list">
       @for (group of grouped(); track group.date) {
         <div class="tx-group">
+          <!-- Day header -->
           <div class="tx-day-hdr">
-            <span>{{ group.label }}</span>
+            <span class="day-label">{{ group.label }}</span>
             <span class="day-total"
                   [class.pos]="group.total >= 0"
                   [class.neg]="group.total < 0">
               {{ group.total >= 0 ? '+' : '−' }}{{ formatCurrency(group.total) }}
             </span>
           </div>
-          @for (tx of group.items; track tx.id) {
-            <div class="tx-row" (click)="openEdit(tx)"
-                 [class.income]="tx.type === 'income'"
-                 [class.expense]="tx.type === 'expense'"
-                 [class.transfer]="tx.type === 'transfer'">
 
-              <div class="tx-icon-wrap">
-                @if (categoryFor(tx.categoryId); as cat) {
-                  <span class="tx-icon">{{ cat.icon }}</span>
-                } @else {
-                  <span class="tx-icon">
-                    @if (tx.type === 'income') { ↓ }
-                    @else if (tx.type === 'transfer') { ↔ }
-                    @else { ↑ }
-                  </span>
-                }
-              </div>
+          <!-- Card wrapping all rows in this day -->
+          <div class="tx-card">
+            @for (tx of group.items; track tx.id; let last = $last) {
+              <div class="tx-row"
+                   [class.last]="last"
+                   (click)="openView(tx)">
 
-              <div class="tx-main">
-                @if (tx.type === 'transfer') {
-                  <div class="tx-title">Transfer</div>
-                  <div class="tx-meta">
-                    {{ accountName(tx.fromAccountId || '') }} →
-                    {{ accountName(tx.toAccountId || '') }}
+                <div class="tx-icon-wrap"
+                     [class.income]="tx.type === 'income'"
+                     [class.transfer]="tx.type === 'transfer'">
+                  @if (categoryFor(tx.categoryId); as cat) {
+                    <span class="tx-icon">{{ cat.icon }}</span>
+                  } @else if (tx.type === 'income') {
+                    <span class="tx-icon arrow-down">↓</span>
+                  } @else if (tx.type === 'transfer') {
+                    <span class="tx-icon">↔</span>
+                  } @else {
+                    <span class="tx-icon">↑</span>
+                  }
+                </div>
+
+                <div class="tx-main">
+                  @if (tx.type === 'transfer') {
+                    <div class="tx-title">Transfer</div>
+                    <div class="tx-meta">
+                      {{ accountName(tx.fromAccountId) }}
+                      <span class="tx-arrow">→</span>
+                      {{ accountName(tx.toAccountId) }}
+                    </div>
+                  } @else {
+                    <div class="tx-title">{{ tx.merchant || 'Untitled' }}</div>
+                    <div class="tx-meta">
+                      @if (categoryFor(tx.categoryId); as cat) {
+                        <span class="tx-cat-chip">{{ cat.name }}</span>
+                        <span class="tx-dot">·</span>
+                      }
+                      <span>{{ accountName(tx.accountId) }}</span>
+                    </div>
+                  }
+                </div>
+
+                <div class="tx-right">
+                  <div class="tx-amount"
+                       [class.pos]="tx.type === 'income'"
+                       [class.neg]="tx.type === 'expense'"
+                       [class.neu]="tx.type === 'transfer'">
+                    @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
+                    @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
+                    @else { {{ formatCurrency(tx.amount) }} }
                   </div>
-                } @else {
-                  <div class="tx-title">{{ tx.merchant || 'Untitled' }}</div>
-                  <div class="tx-meta">
-                    @if (categoryFor(tx.categoryId); as cat) {
-                      <span class="tx-cat">{{ cat.name }}</span>
-                      <span class="tx-dot">·</span>
-                    }
-                    {{ accountName(tx.accountId || '') }}
-                  </div>
-                }
-              </div>
+                  @if (tx.refunded) {
+                    <span class="refunded-badge">↩ Refunded</span>
+                  }
+                  @if (tx.notes) {
+                    <span class="has-notes">📝</span>
+                  }
+                </div>
 
-              <div class="tx-amount"
-                  [class.pos]="tx.type === 'income'"
-                  [class.neg]="tx.type === 'expense'"
-                  [class.neu]="tx.type === 'transfer'">
-                @if (tx.refunded) {
-                  <span class="refunded-badge">↩</span>
-                }
-                @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
-                @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
-                @else { {{ formatCurrency(tx.amount) }} }
               </div>
-
-            </div>
-          }
+            }
+          </div>
         </div>
       }
     </div>
   }
 
 </div>
+
+<!-- ── VIEW PANEL (slide-up) ─────────────────────────────── -->
+@if (viewing()) {
+  <div class="view-backdrop" (click)="closeView()"></div>
+  <div class="view-panel">
+    <div class="view-handle"></div>
+
+    <div class="view-header">
+      <button class="view-close" (click)="closeView()">✕</button>
+      <button class="view-edit-btn" (click)="editFromView()">Edit</button>
+    </div>
+
+    @if (viewing(); as tx) {
+      <!-- Amount -->
+      <div class="view-amount-wrap">
+        <div class="view-amount"
+             [class.pos]="tx.type === 'income'"
+             [class.neg]="tx.type === 'expense'"
+             [class.neu]="tx.type === 'transfer'">
+          @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
+          @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
+          @else { {{ formatCurrency(tx.amount) }} }
+        </div>
+        @if (tx.refunded) {
+          <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
+        }
+      </div>
+
+      <!-- Details rows -->
+      <div class="view-details">
+        @if (tx.type !== 'transfer') {
+          <div class="view-row">
+            <span class="view-row-label">
+              {{ tx.type === 'income' ? 'Source' : 'Merchant' }}
+            </span>
+            <span class="view-row-value">{{ tx.merchant || '—' }}</span>
+          </div>
+        }
+
+        <div class="view-row">
+          <span class="view-row-label">Date</span>
+          <span class="view-row-value">{{ formatFullDate(tx.date) }}</span>
+        </div>
+
+        @if (tx.type === 'transfer') {
+          <div class="view-row">
+            <span class="view-row-label">From</span>
+            <span class="view-row-value">{{ accountName(tx.fromAccountId) }}</span>
+          </div>
+          <div class="view-row">
+            <span class="view-row-label">To</span>
+            <span class="view-row-value">{{ accountName(tx.toAccountId) }}</span>
+          </div>
+        } @else {
+          <div class="view-row">
+            <span class="view-row-label">Account</span>
+            <span class="view-row-value">{{ accountName(tx.accountId) }}</span>
+          </div>
+          @if (categoryFor(tx.categoryId); as cat) {
+            <div class="view-row">
+              <span class="view-row-label">Category</span>
+              <span class="view-row-value">{{ cat.icon }} {{ cat.name }}</span>
+            </div>
+          }
+        }
+
+        @if (tx.notes) {
+          <div class="view-row view-row-notes">
+            <span class="view-row-label">Notes</span>
+            <span class="view-row-value notes-text">{{ tx.notes }}</span>
+          </div>
+        }
+
+        <div class="view-row">
+          <span class="view-row-label">Type</span>
+          <span class="view-row-value view-type-badge" [class]="tx.type">
+            {{ tx.type === 'income' ? 'Income' : tx.type === 'expense' ? 'Expense' : 'Transfer' }}
+          </span>
+        </div>
+      </div>
+    }
+  </div>
+}
 
 <!-- MODALS -->
 <app-transaction-form
