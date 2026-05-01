@@ -87,19 +87,24 @@
       </div>
     }
 
-    <!-- DATE & NOTES -->
-    <div class="form-grid">
-      <div class="field">
-        <span class="label-sm">Date</span>
-        <input class="input-field" type="date"
-               [(ngModel)]="date" name="date" />
-      </div>
-      <div class="field">
-        <span class="label-sm">Notes (optional)</span>
-        <input class="input-field"
-               [(ngModel)]="notes" name="notes"
-               placeholder="Any notes…" />
-      </div>
+    <!-- DATE — full width own row -->
+    <div class="field">
+      <span class="label-sm">Date</span>
+      <input class="input-field" type="date"
+             [(ngModel)]="date" name="date" />
+    </div>
+
+    <!-- NOTES — full width, auto-growing textarea -->
+    <div class="field">
+      <span class="label-sm">Notes <span class="label-optional">(optional)</span></span>
+      <textarea
+        class="input-field notes-textarea"
+        [(ngModel)]="notes"
+        name="notes"
+        placeholder="Add notes, split details, bill breakdowns…"
+        rows="2"
+        (input)="onNotesInput($event)">
+      </textarea>
     </div>
 
     <!-- REFUNDED TOGGLE — only show when editing an expense -->

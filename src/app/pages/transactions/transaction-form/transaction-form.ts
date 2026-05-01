@@ -69,7 +69,6 @@ export class TransactionForm implements OnChanges {
       this.toAccountId = this.transaction.toAccountId || '';
       this.refunded = this.transaction.refunded || false;
     } else {
-      // Read directly from service — no timing issue
       this.type = this.quickAddService.defaultType() || 'expense';
       this.amount = 0;
       this.date = new Date().toISOString().slice(0, 10);
@@ -81,6 +80,26 @@ export class TransactionForm implements OnChanges {
       this.fromAccountId = first?.id || '';
       const second = this.activeAccounts()[1];
       this.toAccountId = second?.id || '';
+    }
+
+    // Reset textarea height after load (next tick so DOM is ready)
+    setTimeout(() => this.resetNotesHeight(), 0);
+  }
+
+  /** Auto-grow the notes textarea as the user types */
+  onNotesInput(event: Event) {
+    const el = event.target as HTMLTextAreaElement;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+  }
+
+  /** Reset textarea to its natural collapsed height (e.g. when form reloads) */
+  private resetNotesHeight() {
+    const el = document.querySelector<HTMLTextAreaElement>('textarea[name="notes"]');
+    if (!el) return;
+    el.style.height = 'auto';
+    if (el.value) {
+      el.style.height = Math.min(el.scrollHeight, 200) + 'px';
     }
   }
 

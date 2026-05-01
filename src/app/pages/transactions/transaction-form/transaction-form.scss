@@ -85,6 +85,14 @@
   letter-spacing: 0.07em;
 }
 
+.label-optional {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--fg-4);
+  font-size: 11px;
+}
+
 .input-field {
   width: 100%;
   padding: 11px 14px;
@@ -112,6 +120,26 @@ select.input-field {
   background-position: right 12px center;
   padding-right: 36px;
   cursor: pointer;
+}
+
+/* NOTES TEXTAREA */
+.notes-textarea {
+  resize: none;
+  overflow: hidden;
+  min-height: 44px;
+  max-height: 200px;
+  line-height: 1.55;
+  transition: border-color 0.18s ease, height 0.1s ease;
+
+  /* When it hits max-height, show scroll instead of overflowing */
+  &:has(:focus) {
+    overflow-y: auto;
+  }
+}
+
+/* Once it's taller than ~3 lines, enable scroll so it doesn't go infinite */
+.notes-textarea:not(:placeholder-shown) {
+  overflow: hidden; /* JS handles this via scrollHeight check */
 }
 
 .form-grid {
@@ -183,11 +211,7 @@ select.input-field {
   &:hover { background: rgba(255, 77, 94, 0.2); }
 }
 
-@media (max-width: 500px) {
-  .form-grid { grid-template-columns: 1fr; }
-  .amount-input { font-size: 42px; }
-}
-
+/* REFUNDED TOGGLE */
 .refunded-row {
   display: flex;
   align-items: center;
@@ -239,4 +263,9 @@ select.input-field {
     border-color: var(--green);
     &::after { left: 21px; background: #000; }
   }
+}
+
+@media (max-width: 500px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .amount-input { font-size: 42px; }
 }

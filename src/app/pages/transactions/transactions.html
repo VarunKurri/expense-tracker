@@ -57,10 +57,11 @@
       }
     </div>
 
-    <!-- Date range -->
+    <!-- Date range — Last 30 days is default and first option -->
     <select class="filter-select"
             [value]="filterDateRange()"
             (change)="filterDateRange.set($any($event.target).value)">
+      <option value="last-30">Last 30 days</option>
       <option value="this-month">This month</option>
       <option value="last-month">Last month</option>
       <option value="this-year">This year</option>
@@ -100,8 +101,11 @@
     <div class="empty">
       <div class="empty-icon">📭</div>
       <h3>No transactions</h3>
-      <p>{{ hasActiveFilters() ? 'No results match your filters.' : 'Add your first transaction to get started.' }}</p>
-      @if (!hasActiveFilters()) {
+      @if (hasActiveFilters()) {
+        <p>No results match your filters.</p>
+        <button class="btn-outline" (click)="resetFilters()">Reset filters</button>
+      } @else {
+        <p>Add your first transaction to get started.</p>
         <button class="btn-primary" (click)="openNew()">+ Add transaction</button>
       }
     </div>
@@ -112,11 +116,13 @@
           <!-- Day header -->
           <div class="tx-day-hdr">
             <span class="day-label">{{ group.label }}</span>
-            <span class="day-total"
-                  [class.pos]="group.total >= 0"
-                  [class.neg]="group.total < 0">
-              {{ group.total >= 0 ? '+' : '−' }}{{ formatCurrency(group.total) }}
-            </span>
+            @if (group.total !== 0) {
+              <span class="day-total"
+                    [class.pos]="group.total > 0"
+                    [class.neg]="group.total < 0">
+                {{ group.total > 0 ? '+' : '−' }}{{ formatCurrency(group.total) }}
+              </span>
+            }
           </div>
 
           <!-- Card wrapping all rows in this day -->
@@ -187,7 +193,7 @@
 
 </div>
 
-<!-- ── VIEW PANEL (slide-up) ─────────────────────────────── -->
+<!-- ── VIEW PANEL ─────────────────────────────────────────── -->
 @if (viewing()) {
   <div class="view-backdrop" (click)="closeView()"></div>
   <div class="view-panel">

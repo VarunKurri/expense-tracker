@@ -10,7 +10,7 @@ import { Transaction } from '../../models';
 import { QuickAddService } from '../../services/quick-add.service';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
-type DateRange = 'this-month' | 'last-month' | 'this-year' | 'all';
+type DateRange = 'last-30' | 'this-month' | 'last-month' | 'this-year' | 'all';
 
 @Component({
   selector: 'app-transactions',
@@ -28,13 +28,13 @@ export class Transactions {
   // Modal state
   formOpen = signal(false);
   editing = signal<Transaction | null>(null);
-  viewing = signal<Transaction | null>(null); // ← new: view panel
+  viewing = signal<Transaction | null>(null);
   confirmOpen = signal(false);
   toDelete = signal<Transaction | null>(null);
 
-  // Filter state
+  // Filter state — default is last 30 days
   filterType = signal<FilterType>('all');
-  filterDateRange = signal<DateRange>('this-month');
+  filterDateRange = signal<DateRange>('last-30');
   filterAccountId = signal('');
   filterCategoryId = signal('');
   search = signal('');
@@ -54,11 +54,23 @@ export class Transactions {
     const lastDay = (year: number, month: number) =>
       new Date(year, month + 1, 0).getDate();
 
+    const todayStr = localDate(y, m, now.getDate());
+
     switch (this.filterDateRange()) {
+      case 'last-30': {
+        const d30 = new Date(now);
+        d30.setDate(d30.getDate() - 29);
+        const s = localDate(d30.getFullYear(), d30.getMonth(), d30.getDate());
+        return { start: s, end: todayStr };
+      }
       case 'this-month':
         return { start: localDate(y, m, 1), end: localDate(y, m, lastDay(y, m)) };
-      case 'last-month':
-        return { start: localDate(y, m - 1, 1), end: localDate(y, m - 1, lastDay(y, m - 1)) };
+      case 'last-month': {
+        // Use Date constructor to handle January rollback correctly
+        const prev = new Date(y, m - 1, 1);
+        const py = prev.getFullYear(), pm = prev.getMonth();
+        return { start: localDate(py, pm, 1), end: localDate(py, pm, lastDay(py, pm)) };
+      }
       case 'this-year':
         return { start: `${y}-01-01`, end: `${y}-12-31` };
       default:
@@ -92,7 +104,7 @@ export class Transactions {
     });
   });
 
-  // Group by date with improved labels
+  // Group by date
   grouped = computed(() => {
     const groups = new Map<string, Transaction[]>();
     for (const t of this.filtered()) {
@@ -173,7 +185,7 @@ export class Transactions {
 
   hasActiveFilters = computed(() =>
     this.filterType() !== 'all' ||
-    this.filterDateRange() !== 'this-month' ||
+    this.filterDateRange() !== 'last-30' ||
     !!this.filterAccountId() ||
     !!this.filterCategoryId() ||
     !!this.search()
@@ -181,7 +193,7 @@ export class Transactions {
 
   resetFilters() {
     this.filterType.set('all');
-    this.filterDateRange.set('this-month');
+    this.filterDateRange.set('last-30');
     this.filterAccountId.set('');
     this.filterCategoryId.set('');
     this.search.set('');
@@ -190,15 +202,18 @@ export class Transactions {
   // ── View panel ────────────────────────────────────────────
   openView(tx: Transaction) {
     this.viewing.set(tx);
+    document.body.style.overflow = 'hidden';
   }
 
   closeView() {
     this.viewing.set(null);
+    document.body.style.overflow = '';
   }
 
   editFromView() {
     const tx = this.viewing();
     this.viewing.set(null);
+    document.body.style.overflow = '';
     if (tx) {
       this.editing.set(tx);
       this.formOpen.set(true);

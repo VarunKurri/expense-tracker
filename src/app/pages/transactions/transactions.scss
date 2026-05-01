@@ -40,6 +40,21 @@
   &:hover { background: var(--green-hi); }
 }
 
+.btn-outline {
+  padding: 9px 18px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg-2);
+  font-weight: 600;
+  font-size: 13.5px;
+  font-family: inherit;
+  border: 1.5px solid var(--line);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+  &:hover { border-color: var(--fg-3); color: var(--fg); }
+}
+
 /* ── TOTALS ────────────────────────────────────────────────── */
 .totals-row {
   display: grid;
@@ -354,26 +369,25 @@
 
   .empty-icon { font-size: 40px; opacity: 0.4; margin-bottom: 4px; }
   h3 { font-size: 18px; font-weight: 600; color: var(--fg); margin: 0; }
-  p { color: var(--fg-3); font-size: 14px; margin: 0 0 8px; }
+  p { color: var(--fg-3); font-size: 14px; margin: 0 0 4px; }
 }
 
 /* ── VIEW PANEL ────────────────────────────────────────────── */
 .view-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(4px);
   z-index: 50;
   animation: fadeIn 0.2s ease;
 }
 
+/* Mobile-first: slide up from bottom */
 .view-panel {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  max-width: 560px;
-  margin: 0 auto;
   background: var(--surface-hi);
   border-radius: 24px 24px 0 0;
   border: 1px solid var(--line);
@@ -381,6 +395,31 @@
   z-index: 51;
   padding: 0 0 40px;
   animation: slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Desktop: centered floating modal */
+@media (min-width: 640px) {
+  .view-panel {
+    bottom: auto;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 480px;
+    max-height: 85vh;
+    overflow-y: auto;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.04),
+      0 8px 24px rgba(0,0,0,0.12),
+      0 24px 64px rgba(0,0,0,0.1);
+    animation: popIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* Hide the drag handle on desktop — it's a modal, not a sheet */
+  .view-handle {
+    display: none;
+  }
 }
 
 .view-handle {
@@ -395,7 +434,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px 0;
+  padding: 16px 20px 0;
 }
 
 .view-close {
@@ -523,6 +562,11 @@
   to   { transform: translateY(0); opacity: 1; }
 }
 
+@keyframes popIn {
+  from { transform: translate(-50%, -48%) scale(0.97); opacity: 0; }
+  to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
 /* ── RESPONSIVE ────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
@@ -543,10 +587,5 @@
     .search-wrap { min-width: unset; }
     .filter-select { width: 100%; }
     .chips { justify-content: center; }
-  }
-
-  .view-panel {
-    border-radius: 20px 20px 0 0;
-    max-width: 100%;
   }
 }
