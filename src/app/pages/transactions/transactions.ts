@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { TransactionService } from '../../services/transaction.service';
 import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
@@ -23,6 +24,7 @@ export class Transactions {
   private txService = inject(TransactionService);
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
+  private route = inject(ActivatedRoute);
   quickAdd = inject(QuickAddService);
 
   // Modal state
@@ -238,6 +240,13 @@ export class Transactions {
   }
 
   constructor() {
+    // Pre-filter by account when navigated from account detail "View all"
+    const accountId = this.route.snapshot.queryParamMap.get('accountId');
+    if (accountId) {
+      this.filterAccountId.set(accountId);
+      this.filterDateRange.set('all'); // show full history for this account
+    }
+
     effect(() => {
       if (this.quickAdd.open()) {
         setTimeout(() => {

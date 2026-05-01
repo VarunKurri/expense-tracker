@@ -29,9 +29,10 @@
     font-variant-numeric: tabular-nums;
     color: var(--fg);
 
-    &.asset   { color: var(--green); }
+    &.asset     { color: var(--green); }
     &.liability { color: var(--red); }
-    &.negative  { color: var(--red); }
+    // Net worth is always neutral — carrying a credit card balance
+    // is normal, not an error state. Never show net worth in red.
   }
 
   &.highlight .stat-value { font-size: 26px; }

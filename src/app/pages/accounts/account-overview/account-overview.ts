@@ -9,13 +9,13 @@ import { Confirm } from '../../../components/confirm/confirm';
 import { Account } from '../../../models';
 
 @Component({
-  selector: 'app-account-detail',
+  selector: 'app-account-overview',
   standalone: true,
   imports: [CommonModule, AccountForm, Confirm],
-  templateUrl: './account-detail.html',
-  styleUrl: './account-detail.scss'
+  templateUrl: './account-overview.html',
+  styleUrl: './account-overview.scss'
 })
-export class AccountDetail {
+export class AccountOverview {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private accountService = inject(AccountService);
@@ -33,49 +33,34 @@ export class AccountDetail {
   balance = computed(() => {
     const a = this.account();
     if (!a) return 0;
-    const txDelta = this.txService.balanceForAccount(a.id!);
-    if (a.type === 'credit') return a.openingBalance - txDelta;
-    return (a.openingBalance || 0) + txDelta;
+    const delta = this.txService.balanceForAccount(a.id!);
+    return (a.openingBalance || 0) + delta;
   });
 
-  availableCredit = computed(() => {
+  // This month's income and expenses for this account
+  monthlyStats = computed(() => {
     const a = this.account();
-    if (!a?.creditLimit) return 0;
-    return a.creditLimit - this.balance();
+    if (!a?.id) return { income: 0, expenses: 0 };
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const monthStart = `${y}-${m}-01`;
+    const monthEnd = `${y}-${m}-${String(new Date(y, now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+
+    let income = 0, expenses = 0;
+    for (const t of this.txService.transactions()) {
+      if (t.date < monthStart || t.date > monthEnd) continue;
+      const belongsToAccount = t.type === 'transfer'
+        ? t.fromAccountId === a.id || t.toAccountId === a.id
+        : t.accountId === a.id;
+      if (!belongsToAccount) continue;
+      if (t.type === 'income') income += t.amount;
+      if (t.type === 'expense') expenses += t.amount;
+    }
+    return { income, expenses };
   });
 
-  utilizationPct = computed(() => {
-    const a = this.account();
-    if (!a?.creditLimit) return 0;
-    return Math.min(100, Math.round((this.balance() / a.creditLimit) * 100));
-  });
-
-  paymentDueDate = computed(() => {
-    const a = this.account();
-    if (!a?.paymentDueDay) return null;
-    const today = new Date();
-    const due = new Date(today.getFullYear(), today.getMonth(), a.paymentDueDay);
-    if (due < today) due.setMonth(due.getMonth() + 1);
-    return due.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  });
-
-  statementDate = computed(() => {
-    const a = this.account();
-    if (!a?.statementClosingDay) return null;
-    const today = new Date();
-    const closing = new Date(today.getFullYear(), today.getMonth(), a.statementClosingDay);
-    if (closing < today) closing.setMonth(closing.getMonth() + 1);
-    return closing.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  });
-
-  utilizationColor = computed(() => {
-    const pct = this.utilizationPct();
-    if (pct >= 80) return 'var(--red)';
-    if (pct >= 60) return 'var(--amber)';
-    return 'var(--green)';
-  });
-
-  // Last 8 transactions for this account, sorted newest first
+  // Last 8 transactions for this account
   recentTransactions = computed(() => {
     const a = this.account();
     if (!a?.id) return [];
@@ -90,7 +75,28 @@ export class AccountDetail {
       .slice(0, 8);
   });
 
-  // Helpers for the recent transactions list
+  typeLabel = computed(() => {
+    const type = this.account()?.type;
+    const map: Record<string, string> = {
+      checking: 'Checking',
+      savings: 'Savings',
+      cash: 'Cash',
+      investment: 'Investment',
+    };
+    return map[type || ''] || 'Account';
+  });
+
+  typeIcon = computed(() => {
+    const type = this.account()?.type;
+    const map: Record<string, string> = {
+      checking: '🏦',
+      savings: '🏦',
+      cash: '💵',
+      investment: '📈',
+    };
+    return map[type || ''] || '💰';
+  });
+
   categoryFor(id?: string) {
     if (!id) return null;
     return this.categoryService.categories().find(c => c.id === id);
@@ -124,8 +130,6 @@ export class AccountDetail {
   viewAllTransactions() {
     const a = this.account();
     if (!a?.id) return;
-    // Navigate to transactions — the account filter will be handled by query param
-    // If your router supports it; otherwise just navigate to /transactions
     this.router.navigate(['/transactions'], { queryParams: { accountId: a.id } });
   }
 

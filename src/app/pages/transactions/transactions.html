@@ -168,9 +168,8 @@
 
                 <div class="tx-right">
                   <div class="tx-amount"
-                       [class.pos]="tx.type === 'income'"
-                       [class.neg]="tx.type === 'expense'"
-                       [class.neu]="tx.type === 'transfer'">
+                       [class.pos]="tx.type === 'income' || tx.type === 'transfer'"
+                       [class.neg]="tx.type === 'expense'">
                     @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
                     @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
                     @else { {{ formatCurrency(tx.amount) }} }
@@ -208,9 +207,8 @@
       <!-- Amount -->
       <div class="view-amount-wrap">
         <div class="view-amount"
-             [class.pos]="tx.type === 'income'"
-             [class.neg]="tx.type === 'expense'"
-             [class.neu]="tx.type === 'transfer'">
+             [class.pos]="tx.type === 'income' || tx.type === 'transfer'"
+             [class.neg]="tx.type === 'expense'">
           @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
           @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
           @else { {{ formatCurrency(tx.amount) }} }

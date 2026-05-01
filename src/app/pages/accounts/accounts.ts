@@ -1,5 +1,6 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { AccountService } from '../../services/account.service';
 import { TransactionService } from '../../services/transaction.service';
 import { AccountForm } from './account-form/account-form';
@@ -16,12 +17,13 @@ import { Account } from '../../models';
   styleUrl: './accounts.scss'
 })
 export class Accounts {
-  accountSvc    = inject(AccountService);
+  private router = inject(Router);
+  accountSvc     = inject(AccountService);
   transactionSvc = inject(TransactionService);
 
-  formOpen       = signal(false);
-  editingAccount = signal<Account | null>(null);
-  confirmOpen    = signal(false);
+  formOpen        = signal(false);
+  editingAccount  = signal<Account | null>(null);
+  confirmOpen     = signal(false);
   accountToDelete = signal<Account | null>(null);
 
   activeAccounts = computed(() =>
@@ -45,7 +47,6 @@ export class Accounts {
     let total = 0;
     for (const a of this.activeAccounts()) {
       const bal = this.balanceFor(a);
-      // Credit cards are never assets (unless overpaid, which is rare)
       if (a.type === 'credit') continue;
       if (bal > 0) total += bal;
     }
@@ -57,23 +58,34 @@ export class Accounts {
     for (const a of this.activeAccounts()) {
       const bal = this.balanceFor(a);
       if (a.type === 'credit' && bal > 0) {
-        // Credit card balance owed = liability
         total += bal;
       } else if (a.type !== 'credit' && bal < 0) {
-        // Overdraft on a checking/savings = liability
         total += Math.abs(bal);
       }
     }
     return total;
   });
 
-  openNewForm() {
-    this.editingAccount.set(null);
-    this.formOpen.set(true);
+  netWorth = computed(() => this.assets() - this.liabilities());
+
+  formatCurrency(n: number): string {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD',
+      maximumFractionDigits: 0   // no cents in the subtitle — cleaner
+    }).format(Math.abs(n));
   }
 
-  openEditForm(account: Account) {
-    this.editingAccount.set(account);
+  // Navigate to the appropriate detail page based on account type
+  openAccount(account: Account) {
+    if (account.type === 'credit') {
+      this.router.navigate(['/accounts', account.id]);
+    } else {
+      this.router.navigate(['/accounts/overview', account.id]);
+    }
+  }
+
+  openNewForm() {
+    this.editingAccount.set(null);
     this.formOpen.set(true);
   }
 

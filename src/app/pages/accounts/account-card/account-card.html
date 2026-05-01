@@ -1,6 +1,10 @@
 <div class="card" (click)="onClick()">
   <div class="card-head">
-    <div class="card-emoji">{{ account.icon || '🏦' }}</div>
+    <div class="card-emoji"
+         [style.background]="(account.color || '#22c55e') + '22'"
+         [style.border-color]="(account.color || '#22c55e') + '44'">
+      {{ account.icon || '🏦' }}
+    </div>
     <span class="card-type">{{ typeLabel }}</span>
   </div>
 

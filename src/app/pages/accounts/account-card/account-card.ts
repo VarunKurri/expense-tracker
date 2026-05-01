@@ -47,7 +47,7 @@ export class AccountCard {
     if (this.isCredit) {
       this.router.navigate(['/accounts', this.account.id]);
     } else {
-      this.edit.emit(this.account);
+      this.router.navigate(['/accounts/overview', this.account.id]);
     }
   }
 }

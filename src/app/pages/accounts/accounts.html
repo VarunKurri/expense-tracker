@@ -2,7 +2,14 @@
   <div class="header-row">
     <div>
       <h1>Accounts</h1>
-      <p class="hint">Manage your bank accounts, credit cards, and cash</p>
+      <p class="hint">
+        {{ activeAccounts().length }} {{ activeAccounts().length === 1 ? 'account' : 'accounts' }}
+        @if (netWorth() >= 0) {
+          · +{{ formatCurrency(netWorth()) }} net
+        } @else {
+          · −{{ formatCurrency(netWorth()) }} net
+        }
+      </p>
     </div>
     <button class="btn-primary" (click)="openNewForm()">+ New Account</button>
   </div>
@@ -23,7 +30,7 @@
           [account]="account"
           [balance]="balanceFor(account)"
           [availableCredit]="availableCreditFor(account)"
-          (edit)="openEditForm($event)" />
+          (edit)="openAccount($event)" />
       }
     </div>
   }

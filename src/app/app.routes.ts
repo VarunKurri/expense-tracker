@@ -11,6 +11,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/accounts/accounts').then(m => m.Accounts)
   },
   {
+    path: 'accounts/overview/:id',
+    loadComponent: () => import('./pages/accounts/account-overview/account-overview').then(m => m.AccountOverview)
+  },
+  {
     path: 'accounts/:id',
     loadComponent: () => import('./pages/accounts/account-detail/account-detail').then(m => m.AccountDetail)
   },
@@ -31,11 +35,11 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/analysis/analysis').then(m => m.Analysis)
   },
   {
-  path: 'import',
+    path: 'import',
     loadComponent: () => import('./pages/import/import').then(m => m.Import)
   },
   {
-  path: 'settings',
+    path: 'settings',
     loadComponent: () => import('./pages/settings/settings').then(m => m.Settings)
   },
   { path: '**', redirectTo: 'dashboard' }

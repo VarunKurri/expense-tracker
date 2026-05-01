@@ -3,9 +3,7 @@
 
     <!-- BACK + ACTIONS -->
     <div class="top-bar">
-      <button class="back-btn" (click)="goBack()">
-        ← Accounts
-      </button>
+      <button class="back-btn" (click)="goBack()">← Accounts</button>
       <button class="btn-primary" (click)="formOpen.set(true)">Edit</button>
     </div>
 
@@ -13,9 +11,9 @@
     <div class="hero-card">
       <div class="hero-top">
         <div class="hero-icon"
-             [style.background]="(a.color || '#8b5cf6') + '22'"
-             [style.border-color]="(a.color || '#8b5cf6') + '33'">
-          {{ a.icon || '💳' }}
+             [style.background]="(a.color || '#22c55e') + '22'"
+             [style.border-color]="(a.color || '#22c55e') + '33'">
+          {{ a.icon || typeIcon() }}
         </div>
         <div class="hero-info">
           <div class="hero-name">{{ a.name }}</div>
@@ -27,92 +25,59 @@
           }
         </div>
         <div class="hero-badge"
-             [style.background]="(a.color || '#8b5cf6') + '22'"
-             [style.color]="a.color || '#8b5cf6'">
-          Credit Card
+             [style.background]="(a.color || '#22c55e') + '22'"
+             [style.color]="a.color || '#22c55e'">
+          {{ typeLabel() }}
         </div>
       </div>
 
+      <!-- Balance -->
       <div class="hero-balance">
         <div class="balance-label">Current balance</div>
-        <div class="balance-value"
-             [class.safe]="balance() < (a.creditLimit || 9999) * 0.6"
-             [class.warn]="balance() >= (a.creditLimit || 9999) * 0.6 && balance() < (a.creditLimit || 9999) * 0.8"
-             [class.danger]="balance() >= (a.creditLimit || 9999) * 0.8">
-          {{ formatCurrency(balance()) }}
+        <div class="balance-value" [class.pos]="balance() >= 0" [class.neg]="balance() < 0">
+          {{ balance() < 0 ? '−' : '' }}{{ formatCurrency(balance()) }}
         </div>
-        <div class="balance-sub">of {{ formatCurrency(a.creditLimit || 0) }} limit</div>
       </div>
-
-      <!-- UTILIZATION BAR -->
-      @if (a.creditLimit) {
-        <div class="util-bar">
-          <div class="util-fill"
-               [style.width]="utilizationPct() + '%'"
-               [style.background]="utilizationColor()"></div>
-        </div>
-        <div class="util-label">
-          <span>{{ utilizationPct() }}% utilized</span>
-          <span class="util-avail">{{ formatCurrency(availableCredit()) }} available</span>
-        </div>
-      }
     </div>
 
-    <!-- STATS GRID -->
+    <!-- THIS MONTH STATS -->
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Available credit</div>
-        <div class="stat-value green">{{ formatCurrency(availableCredit()) }}</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Credit limit</div>
-        <div class="stat-value">{{ formatCurrency(a.creditLimit || 0) }}</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Minimum payment</div>
-        <div class="stat-value">{{ a.minimumPayment != null ? formatCurrency(a.minimumPayment) : 'Check app' }}</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Autopay</div>
-        <div class="stat-value" [class.green]="a.autopayEnabled">
-          {{ a.autopayEnabled ? 'Enabled ✓' : 'Disabled' }}
+        <div class="stat-label">Money in · this month</div>
+        <div class="stat-value green">
+          @if (monthlyStats().income > 0) { +{{ formatCurrency(monthlyStats().income) }} }
+          @else { {{ formatCurrency(0) }} }
         </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Money out · this month</div>
+        <div class="stat-value red">
+          @if (monthlyStats().expenses > 0) { −{{ formatCurrency(monthlyStats().expenses) }} }
+          @else { {{ formatCurrency(0) }} }
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Net this month</div>
+        @let net = monthlyStats().income - monthlyStats().expenses;
+        <div class="stat-value" [class.green]="net >= 0" [class.red]="net < 0">
+          {{ net >= 0 ? '+' : '−' }}{{ formatCurrency(net) }}
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Opening balance</div>
+        <div class="stat-value">{{ formatCurrency(a.openingBalance || 0) }}</div>
       </div>
     </div>
 
-    <!-- PAYMENT SCHEDULE -->
-    <div class="dates-card">
-      <div class="dates-title">Payment schedule</div>
-      <div class="dates-row">
-        <div class="date-item">
-          <div class="date-label">Statement closes</div>
-          <div class="date-value">{{ statementDate() || '—' }}</div>
-          @if (a.statementClosingDay) {
-            <div class="date-sub">Day {{ a.statementClosingDay }} of each month</div>
-          }
-        </div>
-        <div class="dates-divider"></div>
-        <div class="date-item">
-          <div class="date-label">Payment due</div>
-          <div class="date-value">{{ paymentDueDate() || '—' }}</div>
-          @if (a.paymentDueDay) {
-            <div class="date-sub">Day {{ a.paymentDueDay }} of each month</div>
-          }
-        </div>
-      </div>
-    </div>
-
-    <!-- RECENT TRANSACTIONS -->
+    <!-- RECENT ACTIVITY -->
     <div class="recent-section">
       <div class="recent-header">
         <div class="recent-title">Recent activity</div>
         @if (recentTransactions().length > 0) {
-          <button class="view-all-btn" (click)="viewAllTransactions()">
-            View all →
-          </button>
+          <button class="view-all-btn" (click)="viewAllTransactions()">View all →</button>
         }
       </div>
 
@@ -126,7 +91,6 @@
           @for (tx of recentTransactions(); track tx.id; let last = $last) {
             <div class="recent-row" [class.last]="last">
 
-              <!-- Icon -->
               <div class="recent-icon-wrap"
                    [class.income]="tx.type === 'income'"
                    [class.transfer]="tx.type === 'transfer'">
@@ -141,7 +105,6 @@
                 }
               </div>
 
-              <!-- Main -->
               <div class="recent-main">
                 @if (tx.type === 'transfer') {
                   <div class="recent-tx-title">Transfer</div>
@@ -159,13 +122,12 @@
                 }
               </div>
 
-              <!-- Amount -->
               <div class="recent-amount"
-                  [class.pos]="tx.type === 'income' || tx.type === 'transfer'"
-                  [class.neg]="tx.type === 'expense'">
+                   [class.pos]="tx.type === 'income' || tx.type === 'transfer'"
+                   [class.neg]="tx.type === 'expense'">
                 @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
                 @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
-                @else { {{ formatCurrency(tx.amount) }} }
+                @else { +{{ formatCurrency(tx.amount) }} }
               </div>
 
             </div>

@@ -25,7 +25,6 @@
   cursor: pointer;
   padding: 6px 0;
   transition: color 0.18s ease;
-
   &:hover { color: var(--fg); }
 }
 
@@ -40,7 +39,6 @@
   border: none;
   cursor: pointer;
   transition: background 0.18s ease;
-
   &:hover { background: var(--green-hi); }
 }
 
@@ -75,10 +73,7 @@
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-.hero-info {
-  flex: 1;
-  min-width: 0;
-}
+.hero-info { flex: 1; min-width: 0; }
 
 .hero-name {
   font-size: 20px;
@@ -122,40 +117,8 @@
   font-variant-numeric: tabular-nums;
   color: var(--fg);
 
-  &.safe   { color: var(--fg); }
-  &.warn   { color: var(--amber); }
-  &.danger { color: var(--red); }
-}
-
-.balance-sub {
-  font-size: 13px;
-  color: var(--fg-3);
-}
-
-.util-bar {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--bg-3);
-  overflow: hidden;
-}
-
-.util-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.4s ease, background 0.4s ease;
-}
-
-.util-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--fg-3);
-  font-variant-numeric: tabular-nums;
-}
-
-.util-avail {
-  font-weight: 500;
-  color: var(--fg);
+  &.pos { color: var(--fg); }
+  &.neg { color: var(--red); }
 }
 
 /* ── STATS GRID ────────────────────────────────────────────── */
@@ -191,66 +154,10 @@
   color: var(--fg);
 
   &.green { color: var(--green); }
+  &.red   { color: var(--red); }
 }
 
-/* ── DATES CARD ────────────────────────────────────────────── */
-.dates-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 20px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.dates-title {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-4);
-}
-
-.dates-row {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
-
-.date-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.date-label {
-  font-size: 11.5px;
-  color: var(--fg-3);
-  font-weight: 500;
-}
-
-.date-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--fg);
-  letter-spacing: -0.01em;
-}
-
-.date-sub {
-  font-size: 11px;
-  color: var(--fg-4);
-}
-
-.dates-divider {
-  width: 1px;
-  height: 52px;
-  background: var(--line);
-  flex-shrink: 0;
-}
-
-/* ── RECENT TRANSACTIONS ───────────────────────────────────── */
+/* ── RECENT ACTIVITY ───────────────────────────────────────── */
 .recent-section {
   display: flex;
   flex-direction: column;
@@ -282,7 +189,6 @@
   cursor: pointer;
   padding: 4px 0;
   transition: opacity 0.18s ease;
-
   &:hover { opacity: 0.7; }
 }
 
@@ -332,14 +238,8 @@
   font-size: 16px;
   flex-shrink: 0;
 
-  &.income {
-    background: var(--green-bg);
-    border-color: transparent;
-  }
-
-  &.transfer {
-    background: var(--bg-3);
-  }
+  &.income   { background: var(--green-bg); border-color: transparent; }
+  &.transfer { background: var(--bg-3); }
 }
 
 .recent-icon {
@@ -350,9 +250,7 @@
   color: var(--fg-3);
 }
 
-.recent-main {
-  min-width: 0;
-}
+.recent-main { min-width: 0; }
 
 .recent-tx-title {
   font-size: 13.5px;
@@ -383,7 +281,6 @@
 
   &.pos { color: var(--green); }
   &.neg { color: var(--fg); }
-  &.neu { color: var(--fg-3); }
 }
 
 /* ── RESPONSIVE ────────────────────────────────────────────── */
@@ -391,15 +288,4 @@
   .page { padding: 20px 16px 40px; }
   .stats-grid { grid-template-columns: 1fr; }
   .balance-value { font-size: 36px; }
-
-  .dates-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-  }
-
-  .dates-divider {
-    width: 100%;
-    height: 1px;
-  }
 }
