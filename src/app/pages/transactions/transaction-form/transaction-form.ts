@@ -7,6 +7,7 @@ import { FormsModule } from '@angular/forms';
 import { Modal } from '../../../components/modal/modal';
 import { AccountService } from '../../../services/account.service';
 import { CategoryService } from '../../../services/category.service';
+import { BillService } from '../../../services/bill.service';
 import { Transaction, TransactionType } from '../../../models';
 import { QuickAddService } from '../../../services/quick-add.service';
 
@@ -20,6 +21,7 @@ import { QuickAddService } from '../../../services/quick-add.service';
 export class TransactionForm implements OnChanges {
   accounts = inject(AccountService);
   categories = inject(CategoryService);
+  billService = inject(BillService);
   private quickAddService = inject(QuickAddService);
 
   @Input() open = false;
@@ -28,16 +30,22 @@ export class TransactionForm implements OnChanges {
   @Output() saved = new EventEmitter<Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>>();
   @Output() deleteRequested = new EventEmitter<void>();
 
+  // Core transaction fields
   type: TransactionType = 'expense';
   amount: number = 0;
   date: string = new Date().toISOString().slice(0, 10);
   notes: string = '';
   merchant: string = '';
   accountId: string = '';
-  categoryId: string = '';
+  categoryId = signal('');  // signal so isSubscription() reacts reactively
   fromAccountId: string = '';
   toAccountId: string = '';
   refunded = false;
+
+  // Bill fields — shown when Subscriptions category is selected
+  billFrequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly' = 'monthly';
+  billNextDueDate: string = '';
+  billAutopay: boolean = true;
 
   submitting = signal(false);
 
@@ -49,6 +57,13 @@ export class TransactionForm implements OnChanges {
   activeAccounts = computed(() =>
     this.accounts.accounts().filter(a => !a.archived)
   );
+
+  // True when selected category is "Subscriptions" (or contains "subscription")
+  isSubscription = computed(() => {
+    if (!this.categoryId()) return false;
+    const cat = this.categories.categories().find(c => c.id === this.categoryId());
+    return cat?.name.toLowerCase().includes('subscription') ?? false;
+  });
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['open'] && this.open) {
@@ -64,7 +79,7 @@ export class TransactionForm implements OnChanges {
       this.notes = this.transaction.notes || '';
       this.merchant = this.transaction.merchant || '';
       this.accountId = this.transaction.accountId || '';
-      this.categoryId = this.transaction.categoryId || '';
+      this.categoryId.set(this.transaction.categoryId || '');
       this.fromAccountId = this.transaction.fromAccountId || '';
       this.toAccountId = this.transaction.toAccountId || '';
       this.refunded = this.transaction.refunded || false;
@@ -76,24 +91,40 @@ export class TransactionForm implements OnChanges {
       this.merchant = '';
       const first = this.activeAccounts()[0];
       this.accountId = first?.id || '';
-      this.categoryId = '';
+      this.categoryId.set('');
       this.fromAccountId = first?.id || '';
       const second = this.activeAccounts()[1];
       this.toAccountId = second?.id || '';
     }
 
-    // Reset textarea height after load (next tick so DOM is ready)
+    // Default bill fields
+    this.billFrequency = 'monthly';
+    this.billNextDueDate = this.nextMonthDate(this.date);
+    this.billAutopay = true;
+
     setTimeout(() => this.resetNotesHeight(), 0);
   }
 
-  /** Auto-grow the notes textarea as the user types */
+  // When category changes, update nextDueDate default from current date
+  onCategoryChange(val: string) {
+    this.categoryId.set(val);
+    if (this.isSubscription()) {
+      this.billNextDueDate = this.nextMonthDate(this.date);
+    }
+  }
+
+  private nextMonthDate(fromDate: string): string {
+    const d = new Date(fromDate + 'T00:00:00');
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+
   onNotesInput(event: Event) {
     const el = event.target as HTMLTextAreaElement;
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   }
 
-  /** Reset textarea to its natural collapsed height (e.g. when form reloads) */
   private resetNotesHeight() {
     const el = document.querySelector<HTMLTextAreaElement>('textarea[name="notes"]');
     if (!el) return;
@@ -105,10 +136,10 @@ export class TransactionForm implements OnChanges {
 
   setType(t: TransactionType) {
     this.type = t;
-    this.categoryId = '';
+    this.categoryId.set('');
   }
 
-  save() {
+  async save() {
     if (!this.amount || this.amount <= 0) {
       alert('Amount must be greater than zero');
       return;
@@ -133,16 +164,43 @@ export class TransactionForm implements OnChanges {
     } else {
       if (!this.accountId) { alert('Select an account'); return; }
       if (!this.merchant.trim()) { alert('Merchant / source is required'); return; }
+
+      // Emit the transaction first
       this.saved.emit({
         type: this.type,
         amount: Number(this.amount),
         date: this.date,
         merchant: this.merchant.trim(),
         accountId: this.accountId,
-        ...(this.categoryId ? { categoryId: this.categoryId } : {}),
+        ...(this.categoryId() ? { categoryId: this.categoryId() } : {}),
         ...(this.notes.trim() ? { notes: this.notes.trim() } : {}),
         refunded: this.refunded,
       });
+
+      // If Subscriptions category selected, auto-create bill if one doesn't exist yet
+      if (this.isSubscription() && this.merchant.trim() && !this.transaction) {
+        const name = this.merchant.trim();
+        const existing = this.billService.bills().find(
+          b => b.name.toLowerCase() === name.toLowerCase()
+        );
+        if (!existing) {
+          try {
+            await this.billService.add({
+              name,
+              amount: Number(this.amount),
+              frequency: this.billFrequency,
+              nextDueDate: this.billNextDueDate || this.nextMonthDate(this.date),
+              accountId: this.accountId,
+              categoryId: this.categoryId(),
+              autopayEnabled: this.billAutopay,
+              icon: '📄',
+              active: true,
+            });
+          } catch (err) {
+            console.warn('Could not auto-create bill:', err);
+          }
+        }
+      }
     }
   }
 }

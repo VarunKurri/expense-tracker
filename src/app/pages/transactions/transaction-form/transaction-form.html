@@ -53,7 +53,10 @@
         </div>
         <div class="field">
           <span class="label-sm">Category</span>
-          <select class="input-field" [(ngModel)]="categoryId" name="categoryId">
+          <select class="input-field"
+                  [ngModel]="categoryId()"
+                  name="categoryId"
+                  (ngModelChange)="onCategoryChange($event)">
             <option value="">Uncategorized</option>
             @for (c of filteredCategories(); track c.id) {
               <option [value]="c.id">{{ c.icon }} {{ c.name }}</option>
@@ -87,14 +90,58 @@
       </div>
     }
 
-    <!-- DATE — full width own row -->
+    <!-- DATE -->
     <div class="field">
       <span class="label-sm">Date</span>
       <input class="input-field" type="date"
              [(ngModel)]="date" name="date" />
     </div>
 
-    <!-- NOTES — full width, auto-growing textarea -->
+    <!-- RECURRING BILL SECTION — slides in when Subscriptions category selected -->
+    @if (isSubscription() && type === 'expense' && !transaction) {
+      <div class="recurring-section">
+        <div class="recurring-header">
+          <div class="recurring-header-left">
+            <span class="recurring-icon">🔁</span>
+            <div>
+              <div class="recurring-title">Recurring bill</div>
+              <div class="recurring-sub">Will be added to Bills & Subscriptions</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <span class="label-sm">Frequency</span>
+            <select class="input-field" [(ngModel)]="billFrequency" name="billFrequency">
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+          <div class="field">
+            <span class="label-sm">Next due date</span>
+            <input class="input-field" type="date"
+                   [(ngModel)]="billNextDueDate" name="billNextDueDate" />
+          </div>
+        </div>
+
+        <div class="autopay-row">
+          <div>
+            <div class="autopay-label">Autopay enabled</div>
+            <div class="autopay-sub">Bill is paid automatically each cycle</div>
+          </div>
+          <button type="button"
+                  class="toggle"
+                  [class.on]="billAutopay"
+                  (click)="billAutopay = !billAutopay">
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- NOTES -->
     <div class="field">
       <span class="label-sm">Notes <span class="label-optional">(optional)</span></span>
       <textarea
@@ -107,7 +154,7 @@
       </textarea>
     </div>
 
-    <!-- REFUNDED TOGGLE — only show when editing an expense -->
+    <!-- REFUNDED TOGGLE -->
     @if (transaction && type === 'expense') {
       <div class="refunded-row">
         <div>
@@ -132,7 +179,7 @@
       <div class="actions-right">
         <button class="btn-ghost" (click)="closed.emit()">Cancel</button>
         <button class="btn-primary" (click)="save()" [disabled]="submitting()">
-          {{ transaction ? 'Save changes' : 'Add transaction' }}
+          {{ transaction ? 'Save changes' : (isSubscription() ? 'Add transaction & bill' : 'Add transaction') }}
         </button>
       </div>
     </div>

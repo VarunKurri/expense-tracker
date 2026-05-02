@@ -5,13 +5,14 @@ import { TransactionService } from '../../services/transaction.service';
 import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
 import { BillForm } from './bill-form/bill-form';
+import { TransactionForm } from '../transactions/transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { Bill, Transaction } from '../../models';
 
 @Component({
   selector: 'app-bills',
   standalone: true,
-  imports: [CommonModule, BillForm, Confirm],
+  imports: [CommonModule, BillForm, TransactionForm, Confirm],
   templateUrl: './bills.html',
   styleUrl: './bills.scss'
 })
@@ -31,12 +32,72 @@ export class Bills {
   importDone = signal(false);
   markingPaid = signal<string | null>(null);
 
+  // Transaction view panel — view first, then edit on button click
+  viewingTx = signal<Transaction | null>(null);
+  editingTx = signal<Transaction | null>(null);
+  txFormOpen = signal(false);
+  viewTxConfirmOpen = signal(false);
+  txToDelete = signal<Transaction | null>(null);
+
+  openTxView(tx: Transaction) {
+    this.viewingTx.set(tx);
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeTxView() {
+    this.viewingTx.set(null);
+    document.body.style.overflow = '';
+  }
+
+  editFromTxView() {
+    const tx = this.viewingTx();
+    this.viewingTx.set(null);
+    document.body.style.overflow = '';
+    if (tx) {
+      this.editingTx.set(tx);
+      this.txFormOpen.set(true);
+    }
+  }
+
+  closeTxForm() {
+    this.txFormOpen.set(false);
+    this.editingTx.set(null);
+  }
+
+  async handleTxSave(data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
+    const tx = this.editingTx();
+    if (!tx?.id) return;
+    try {
+      await this.txService.update(tx.id, data);
+      this.closeTxForm();
+    } catch (err) {
+      alert('Failed: ' + (err as Error).message);
+    }
+  }
+
+  askTxDelete() {
+    this.txToDelete.set(this.editingTx());
+    this.txFormOpen.set(false);
+    this.viewTxConfirmOpen.set(true);
+  }
+
+  async confirmTxDelete() {
+    const tx = this.txToDelete();
+    if (!tx?.id) return;
+    try {
+      await this.txService.remove(tx.id);
+    } finally {
+      this.viewTxConfirmOpen.set(false);
+      this.txToDelete.set(null);
+      this.editingTx.set(null);
+    }
+  }
+
   // Group bills by status
   overdue = computed(() => this.billService.overdueBills());
   upcoming = computed(() => this.billService.upcomingBills(30));
 
   futureBills = computed(() => {
-    const today = new Date().toISOString().slice(0, 10);
     const future = new Date();
     future.setDate(future.getDate() + 30);
     const futureStr = future.toISOString().slice(0, 10);
@@ -49,12 +110,14 @@ export class Bills {
     this.billService.bills().filter(b => !b.active)
   );
 
-  // All active bills (for the "All Active" section)
   activeBills = computed(() =>
     this.billService.bills().filter(b => b.active)
   );
 
-  // Payment history — subscription transactions matching bill names or category
+  // Payment history — transactions that are either:
+  // 1. In the Subscriptions category (any subscription-tagged expense), OR
+  // 2. Merchant name matches a known bill name exactly
+  // The Costco issue was a miscategorization — those should not be in Subscriptions.
   paymentHistory = computed(() => {
     const subCat = this.categoryService.categories().find(c =>
       c.name.toLowerCase().includes('subscription')
@@ -74,12 +137,10 @@ export class Bills {
       .sort((a, b) => b.date.localeCompare(a.date));
   });
 
-  // Total spent on subscriptions all time
   totalHistorySpent = computed(() =>
     this.paymentHistory().reduce((s, t) => s + t.amount, 0)
   );
 
-  // Group payment history by month
   groupedHistory = computed(() => {
     const groups = new Map<string, Transaction[]>();
     for (const tx of this.paymentHistory()) {
@@ -91,7 +152,7 @@ export class Bills {
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([month, items]) => ({
         month,
-        label: new Date(month + '-01').toLocaleDateString('en-US', {
+        label: new Date(month + '-01T00:00:00').toLocaleDateString('en-US', {
           month: 'long', year: 'numeric'
         }),
         items,
@@ -112,6 +173,9 @@ export class Bills {
       }, 0);
   });
 
+  // Yearly cost at current rate
+  totalYearly = computed(() => this.totalMonthly() * 12);
+
   // ── Import from existing subscription transactions ────────
   async importFromTransactions() {
     this.importing.set(true);
@@ -124,12 +188,10 @@ export class Bills {
         return;
       }
 
-      // Get all subscription transactions
       const subTxs = this.txService.transactions().filter(t =>
         t.type === 'expense' && t.categoryId === subCat.id && t.merchant
       );
 
-      // Deduplicate by merchant name
       const seen = new Set<string>();
       const existing = new Set(this.billService.bills().map(b => b.name.toLowerCase()));
       let added = 0;
@@ -143,7 +205,7 @@ export class Bills {
         await this.billService.add({
           name,
           amount: tx.amount,
-          frequency: 'monthly',    // default — user can edit
+          frequency: 'monthly',
           nextDueDate: this.nextMonthDate(tx.date),
           accountId: tx.accountId,
           categoryId: subCat.id,
@@ -166,7 +228,6 @@ export class Bills {
   private nextMonthDate(fromDate: string): string {
     const d = new Date(fromDate + 'T00:00:00');
     d.setMonth(d.getMonth() + 1);
-    // Keep same day of month
     return d.toISOString().slice(0, 10);
   }
 
@@ -175,7 +236,6 @@ export class Bills {
     if (!bill.id) return;
     this.markingPaid.set(bill.id);
     try {
-      // 1. Create expense transaction
       await this.txService.add({
         type: 'expense',
         amount: bill.amount,
@@ -186,7 +246,6 @@ export class Bills {
         notes: `${bill.frequency} bill — autopaid`,
       });
 
-      // 2. Advance next due date
       const nextDate = this.billService.nextDueDate(bill);
       await this.billService.update(bill.id, { nextDueDate: nextDate });
 
@@ -246,6 +305,11 @@ export class Bills {
   }
 
   // ── Helpers ───────────────────────────────────────────────
+  categoryFor(id?: string) {
+    if (!id) return null;
+    return this.categoryService.categories().find(c => c.id === id) || null;
+  }
+
   accountName(id?: string): string {
     if (!id) return '';
     const a = this.accountService.accounts().find(a => a.id === id);
@@ -258,10 +322,39 @@ export class Bills {
     return a?.icon || '';
   }
 
+  // Find best icon for a history transaction —
+  // try bill name match first, then category icon, then generic
+  historyIcon(tx: Transaction): string {
+    const byName = this.billService.bills().find(b =>
+      b.name.toLowerCase() === (tx.merchant || '').toLowerCase()
+    );
+    if (byName?.icon && byName.icon !== '📄') return byName.icon;
+
+    const cat = this.categoryService.categories().find(c => c.id === tx.categoryId);
+    if (cat?.icon) return cat.icon;
+
+    return '📄';
+  }
+
   formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-US', {
       style: 'currency', currency: 'USD'
     }).format(n);
+  }
+
+  // No cents for subtitle/summary numbers — cleaner
+  formatCurrencyRounded(n: number): string {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD',
+      maximumFractionDigits: 0
+    }).format(n);
+  }
+
+  formatFullDate(date: string): string {
+    const d = new Date(date + 'T00:00:00');
+    return d.toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
   }
 
   formatDate(date: string): string {
@@ -284,5 +377,10 @@ export class Bills {
       quarterly: 'Quarterly', yearly: 'Yearly'
     };
     return map[f] || f;
+  }
+
+  // Safe local date parsing for the date pipe workaround
+  localDate(dateStr: string): Date {
+    return new Date(dateStr + 'T00:00:00');
   }
 }

@@ -151,6 +151,7 @@
   &.overdue-row { border-color: rgba(255, 77, 94, 0.3); }
 }
 
+/* Default icon */
 .bill-icon {
   width: 44px;
   height: 44px;
@@ -164,6 +165,13 @@
   flex-shrink: 0;
 }
 
+/* Red-tinted icon for overdue bills — urgency at a glance */
+.overdue-icon {
+  background: var(--red-bg);
+  border-color: rgba(255, 77, 94, 0.25);
+}
+
+/* Date box for upcoming/future bills */
 .bill-date-box {
   width: 44px;
   height: 44px;
@@ -175,6 +183,16 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+/* Green accent on the soonest-due bill — green bg + green border matching overdue red pattern */
+.date-box-accent {
+  background: var(--green-bg);
+  border-color: rgba(34, 197, 94, 0.35);
+
+  .bill-day  { color: var(--green); }
+  .bill-mon  { color: var(--green); opacity: 0.7; }
 }
 
 .bill-day {
@@ -292,16 +310,6 @@
   flex-wrap: wrap;
   justify-content: center;
   margin-top: 8px;
-}
-
-/* ── RESPONSIVE ────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .page { padding: 20px 16px 40px; }
-  .page-head { flex-direction: column; align-items: stretch; }
-  .head-actions { flex-direction: column; }
-  .btn-primary, .btn-ghost { width: 100%; text-align: center; justify-content: center; }
-  .summary-bar { flex-wrap: wrap; gap: 16px; }
-  .summary-divider { display: none; }
 }
 
 /* ── ALL ACTIVE GRID ───────────────────────────────────────── */
@@ -433,6 +441,7 @@
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);
   transition: background 0.18s ease;
+  cursor: pointer;
 
   &:last-child { border-bottom: none; }
   &:hover { background: var(--bg-3); }
@@ -478,8 +487,194 @@
   white-space: nowrap;
 }
 
+/* ── RESPONSIVE ────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .active-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .page { padding: 20px 16px 40px; }
+  .page-head { flex-direction: column; align-items: stretch; }
+  .head-actions { flex-direction: column; }
+  .btn-primary, .btn-ghost { width: 100%; text-align: center; }
+  .summary-bar { flex-wrap: wrap; gap: 16px; }
+  .summary-divider { display: none; }
+  .active-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── TRANSACTION VIEW PANEL ────────────────────────────────── */
+.view-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  animation: fadeIn 0.2s ease;
+}
+
+.view-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface-hi);
+  border-radius: 24px 24px 0 0;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  z-index: 51;
+  padding: 0 0 40px;
+  animation: slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (min-width: 640px) {
+  .view-panel {
+    bottom: auto;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 480px;
+    max-height: 85vh;
+    overflow-y: auto;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.04),
+      0 8px 24px rgba(0,0,0,0.12),
+      0 24px 64px rgba(0,0,0,0.1);
+    animation: popIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
+  .view-handle { display: none; }
+}
+
+.view-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  margin: 12px auto 0;
+}
+
+.view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px 0;
+}
+
+.view-edit-btn {
+  padding: 7px 16px;
+  border-radius: 8px;
+  background: var(--green);
+  color: #000;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  transition: background 0.18s ease;
+  &:hover { background: var(--green-hi); }
+}
+
+.view-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  border: none;
+  color: var(--fg-3);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+  &:hover { color: var(--fg); }
+}
+
+.view-amount-wrap {
+  padding: 20px 24px 8px;
+  text-align: center;
+}
+
+.view-amount {
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+
+  &.pos { color: var(--green); }
+  &.neg { color: var(--fg); }
+  &.neu { color: var(--fg-3); }
+}
+
+.view-refunded-badge {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--green-bg);
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.view-details {
+  margin: 16px 20px 0;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.view-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+  gap: 16px;
+  &:last-child { border-bottom: none; }
+}
+
+.view-row-label {
+  font-size: 13px;
+  color: var(--fg-3);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.view-row-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  text-align: right;
+}
+
+.notes-text {
+  color: var(--fg-2);
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+}
+
+.view-type-badge {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  &.expense { background: var(--red-bg); color: var(--red); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes popIn {
+  from { transform: translate(-50%, -48%) scale(0.97); opacity: 0; }
+  to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }

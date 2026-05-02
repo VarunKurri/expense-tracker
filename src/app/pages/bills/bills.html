@@ -2,7 +2,10 @@
   <div class="page-head">
     <div>
       <h1>Bills & Subscriptions</h1>
-      <p class="sub">Track your recurring payments and due dates</p>
+      <p class="sub">
+        {{ activeBills().length }} {{ activeBills().length === 1 ? 'bill' : 'bills' }}
+        · {{ formatCurrencyRounded(totalMonthly()) }}/mo
+      </p>
     </div>
     <div class="head-actions">
       @if (!importDone() && billService.bills().length === 0) {
@@ -24,14 +27,13 @@
     <div class="summary-divider"></div>
     <div class="summary-stat">
       <div class="summary-label">Active bills</div>
-      <div class="summary-value">{{ billService.bills().length }}</div>
+      <!-- Fixed: was bills().length which included inactive -->
+      <div class="summary-value">{{ activeBills().length }}</div>
     </div>
     <div class="summary-divider"></div>
     <div class="summary-stat">
-      <div class="summary-label">Due this month</div>
-      <div class="summary-value" [class.warn]="upcoming().length > 0">
-        {{ upcoming().length }}
-      </div>
+      <div class="summary-label">Yearly cost</div>
+      <div class="summary-value">{{ formatCurrency(totalYearly()) }}</div>
     </div>
   </div>
 
@@ -43,7 +45,8 @@
     <div class="bills-list">
       @for (bill of overdue(); track bill.id) {
         <div class="bill-row overdue-row" (click)="openEdit(bill)">
-          <div class="bill-icon">{{ bill.icon || '📄' }}</div>
+          <!-- Red-tinted icon for urgency -->
+          <div class="bill-icon overdue-icon">{{ bill.icon || '📄' }}</div>
           <div class="bill-main">
             <div class="bill-name">{{ bill.name }}</div>
             <div class="bill-meta">
@@ -75,14 +78,13 @@
       <span class="section-title">Upcoming · next 30 days</span>
     </div>
     <div class="bills-list">
-      @for (bill of upcoming(); track bill.id) {
+      @for (bill of upcoming(); track bill.id; let first = $first) {
         <div class="bill-row" (click)="openEdit(bill)">
-          <div class="bill-date-box">
-            <div class="bill-day">
-              {{ bill.nextDueDate | date:'d' }}
-            </div>
+          <!-- Accent date box on the soonest-due bill -->
+          <div class="bill-date-box" [class.date-box-accent]="first">
+            <div class="bill-day">{{ localDate(bill.nextDueDate).getDate() }}</div>
             <div class="bill-mon">
-              {{ bill.nextDueDate | date:'MMM' | uppercase }}
+              {{ localDate(bill.nextDueDate).toLocaleDateString('en-US', { month: 'short' }).toUpperCase() }}
             </div>
           </div>
           <div class="bill-main">
@@ -123,8 +125,10 @@
       @for (bill of futureBills(); track bill.id) {
         <div class="bill-row" (click)="openEdit(bill)">
           <div class="bill-date-box">
-            <div class="bill-day">{{ bill.nextDueDate | date:'d' }}</div>
-            <div class="bill-mon">{{ bill.nextDueDate | date:'MMM' | uppercase }}</div>
+            <div class="bill-day">{{ localDate(bill.nextDueDate).getDate() }}</div>
+            <div class="bill-mon">
+              {{ localDate(bill.nextDueDate).toLocaleDateString('en-US', { month: 'short' }).toUpperCase() }}
+            </div>
           </div>
           <div class="bill-main">
             <div class="bill-name">{{ bill.name }}</div>
@@ -203,16 +207,13 @@
         </div>
         <div class="history-list">
           @for (tx of group.items; track tx.id) {
-            <div class="history-row">
-              <div class="history-icon">
-                {{ billService.bills().find(b =>
-                  b.name.toLowerCase() === (tx.merchant || '').toLowerCase()
-                )?.icon || '📄' }}
-              </div>
+            <div class="history-row" (click)="openTxView(tx)">
+              <!-- Fixed: uses historyIcon() which tries bill name, then category, then generic -->
+              <div class="history-icon">{{ historyIcon(tx) }}</div>
               <div class="history-main">
                 <div class="history-name">{{ tx.merchant }}</div>
                 <div class="history-meta">
-                  {{ tx.date | date:'MMM d, yyyy' }}
+                  {{ localDate(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }}
                   @if (accountName(tx.accountId)) {
                     · {{ accountName(tx.accountId) }}
                   }
@@ -228,7 +229,100 @@
 
 </div>
 
-<!-- MODALS -->
+<!-- ── TRANSACTION VIEW PANEL (exact same as transactions page) ── -->
+@if (viewingTx()) {
+  <div class="view-backdrop" (click)="closeTxView()"></div>
+  <div class="view-panel">
+    <div class="view-handle"></div>
+
+    <div class="view-header">
+      <button class="view-close" (click)="closeTxView()">✕</button>
+      <button class="view-edit-btn" (click)="editFromTxView()">Edit</button>
+    </div>
+
+    @if (viewingTx(); as tx) {
+      <div class="view-amount-wrap">
+        <div class="view-amount"
+             [class.pos]="tx.type === 'income'"
+             [class.neg]="tx.type === 'expense'"
+             [class.neu]="tx.type === 'transfer'">
+          @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
+          @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
+          @else { {{ formatCurrency(tx.amount) }} }
+        </div>
+        @if (tx.refunded) {
+          <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
+        }
+      </div>
+
+      <div class="view-details">
+        @if (tx.type !== 'transfer') {
+          <div class="view-row">
+            <span class="view-row-label">
+              {{ tx.type === 'income' ? 'Source' : 'Merchant' }}
+            </span>
+            <span class="view-row-value">{{ tx.merchant || '—' }}</span>
+          </div>
+        }
+        <div class="view-row">
+          <span class="view-row-label">Date</span>
+          <span class="view-row-value">{{ formatFullDate(tx.date) }}</span>
+        </div>
+        @if (tx.type === 'transfer') {
+          <div class="view-row">
+            <span class="view-row-label">From</span>
+            <span class="view-row-value">{{ accountName(tx.fromAccountId) }}</span>
+          </div>
+          <div class="view-row">
+            <span class="view-row-label">To</span>
+            <span class="view-row-value">{{ accountName(tx.toAccountId) }}</span>
+          </div>
+        } @else {
+          <div class="view-row">
+            <span class="view-row-label">Account</span>
+            <span class="view-row-value">{{ accountName(tx.accountId) }}</span>
+          </div>
+          @if (categoryFor(tx.categoryId); as cat) {
+            <div class="view-row">
+              <span class="view-row-label">Category</span>
+              <span class="view-row-value">{{ cat.icon }} {{ cat.name }}</span>
+            </div>
+          }
+        }
+        @if (tx.notes) {
+          <div class="view-row view-row-notes">
+            <span class="view-row-label">Notes</span>
+            <span class="view-row-value notes-text">{{ tx.notes }}</span>
+          </div>
+        }
+        <div class="view-row">
+          <span class="view-row-label">Type</span>
+          <span class="view-row-value view-type-badge" [class]="tx.type">
+            {{ tx.type === 'income' ? 'Income' : tx.type === 'expense' ? 'Expense' : 'Transfer' }}
+          </span>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+<!-- TRANSACTION EDIT FORM -->
+<app-transaction-form
+  [open]="txFormOpen()"
+  [transaction]="editingTx()"
+  (closed)="closeTxForm()"
+  (saved)="handleTxSave($event)"
+  (deleteRequested)="askTxDelete()" />
+
+<app-confirm
+  [open]="viewTxConfirmOpen()"
+  title="Delete transaction?"
+  message="This cannot be undone."
+  confirmText="Delete"
+  (confirmed)="confirmTxDelete()"
+  (cancelled)="viewTxConfirmOpen.set(false)" />
+
+<!-- BILL MODALS -->
 <app-bill-form
   [open]="formOpen()"
   [bill]="editing()"
