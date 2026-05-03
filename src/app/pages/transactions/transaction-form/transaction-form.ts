@@ -33,14 +33,22 @@ export class TransactionForm implements OnChanges {
   // Core transaction fields
   type: TransactionType = 'expense';
   amount: number = 0;
-  date: string = new Date().toISOString().slice(0, 10);
+  date: string = this.localDateString();
   notes: string = '';
   merchant: string = '';
   accountId: string = '';
-  categoryId = signal('');  // signal so isSubscription() reacts reactively
+  categoryId = signal('');
   fromAccountId: string = '';
   toAccountId: string = '';
   refunded = false;
+
+  // Returns today's date as YYYY-MM-DD in LOCAL time — never UTC
+  private localDateString(d: Date = new Date()): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
 
   // Bill fields — shown when Subscriptions category is selected
   billFrequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly' = 'monthly';
@@ -86,7 +94,7 @@ export class TransactionForm implements OnChanges {
     } else {
       this.type = this.quickAddService.defaultType() || 'expense';
       this.amount = 0;
-      this.date = new Date().toISOString().slice(0, 10);
+      this.date = this.localDateString(); // local date, not UTC
       this.notes = '';
       this.merchant = '';
       const first = this.activeAccounts()[0];
@@ -116,7 +124,7 @@ export class TransactionForm implements OnChanges {
   private nextMonthDate(fromDate: string): string {
     const d = new Date(fromDate + 'T00:00:00');
     d.setMonth(d.getMonth() + 1);
-    return d.toISOString().slice(0, 10);
+    return this.localDateString(d);
   }
 
   onNotesInput(event: Event) {

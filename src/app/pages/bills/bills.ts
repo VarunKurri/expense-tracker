@@ -9,6 +9,8 @@ import { TransactionForm } from '../transactions/transaction-form/transaction-fo
 import { Confirm } from '../../components/confirm/confirm';
 import { Bill, Transaction } from '../../models';
 
+type BillTab = 'active' | 'paused';
+
 @Component({
   selector: 'app-bills',
   standalone: true,
@@ -32,7 +34,10 @@ export class Bills {
   importDone = signal(false);
   markingPaid = signal<string | null>(null);
 
-  // Transaction view panel — view first, then edit on button click
+  // Tab state
+  activeTab = signal<BillTab>('active');
+
+  // Transaction view panel
   viewingTx = signal<Transaction | null>(null);
   editingTx = signal<Transaction | null>(null);
   txFormOpen = signal(false);
@@ -93,9 +98,14 @@ export class Bills {
     }
   }
 
-  // Group bills by status
-  overdue = computed(() => this.billService.overdueBills());
-  upcoming = computed(() => this.billService.upcomingBills(30));
+  // ── Bill groups — only active bills in the live sections ──
+  overdue = computed(() =>
+    this.billService.overdueBills().filter(b => b.active)
+  );
+
+  upcoming = computed(() =>
+    this.billService.upcomingBills(30).filter(b => b.active)
+  );
 
   futureBills = computed(() => {
     const future = new Date();
@@ -106,18 +116,15 @@ export class Bills {
     );
   });
 
-  inactiveBills = computed(() =>
-    this.billService.bills().filter(b => !b.active)
-  );
-
   activeBills = computed(() =>
     this.billService.bills().filter(b => b.active)
   );
 
-  // Payment history — transactions that are either:
-  // 1. In the Subscriptions category (any subscription-tagged expense), OR
-  // 2. Merchant name matches a known bill name exactly
-  // The Costco issue was a miscategorization — those should not be in Subscriptions.
+  pausedBills = computed(() =>
+    this.billService.bills().filter(b => !b.active)
+  );
+
+  // Payment history
   paymentHistory = computed(() => {
     const subCat = this.categoryService.categories().find(c =>
       c.name.toLowerCase().includes('subscription')
@@ -173,10 +180,9 @@ export class Bills {
       }, 0);
   });
 
-  // Yearly cost at current rate
   totalYearly = computed(() => this.totalMonthly() * 12);
 
-  // ── Import from existing subscription transactions ────────
+  // ── Import ────────────────────────────────────────────────
   async importFromTransactions() {
     this.importing.set(true);
     try {
@@ -184,42 +190,30 @@ export class Bills {
         c.name.toLowerCase().includes('subscription')
       );
       if (!subCat?.id) {
-        alert('No "Subscriptions" category found. Make sure it exists in your categories.');
+        alert('No "Subscriptions" category found.');
         return;
       }
-
       const subTxs = this.txService.transactions().filter(t =>
         t.type === 'expense' && t.categoryId === subCat.id && t.merchant
       );
-
       const seen = new Set<string>();
       const existing = new Set(this.billService.bills().map(b => b.name.toLowerCase()));
       let added = 0;
-
       for (const tx of subTxs) {
         const name = tx.merchant!.trim();
         const key = name.toLowerCase();
         if (seen.has(key) || existing.has(key)) continue;
         seen.add(key);
-
         await this.billService.add({
-          name,
-          amount: tx.amount,
-          frequency: 'monthly',
+          name, amount: tx.amount, frequency: 'monthly',
           nextDueDate: this.nextMonthDate(tx.date),
-          accountId: tx.accountId,
-          categoryId: subCat.id,
-          autopayEnabled: true,
-          icon: '📄',
-          active: true,
+          accountId: tx.accountId, categoryId: subCat.id,
+          autopayEnabled: true, icon: '📄', active: true,
         });
         added++;
       }
-
       this.importDone.set(true);
-      if (added === 0) {
-        alert('No new subscription bills to import — all already exist.');
-      }
+      if (added === 0) alert('No new subscription bills to import.');
     } finally {
       this.importing.set(false);
     }
@@ -228,7 +222,14 @@ export class Bills {
   private nextMonthDate(fromDate: string): string {
     const d = new Date(fromDate + 'T00:00:00');
     d.setMonth(d.getMonth() + 1);
-    return d.toISOString().slice(0, 10);
+    return this.localDateString(d);
+  }
+
+  private localDateString(d: Date = new Date()): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   // ── Mark as paid ──────────────────────────────────────────
@@ -239,16 +240,14 @@ export class Bills {
       await this.txService.add({
         type: 'expense',
         amount: bill.amount,
-        date: new Date().toISOString().slice(0, 10),
+        date: this.localDateString(),
         merchant: bill.name,
         accountId: bill.accountId,
         categoryId: bill.categoryId,
         notes: `${bill.frequency} bill — autopaid`,
       });
-
       const nextDate = this.billService.nextDueDate(bill);
       await this.billService.update(bill.id, { nextDueDate: nextDate });
-
     } catch (err) {
       alert('Failed: ' + (err as Error).message);
     } finally {
@@ -322,44 +321,34 @@ export class Bills {
     return a?.icon || '';
   }
 
-  // Find best icon for a history transaction —
-  // try bill name match first, then category icon, then generic
   historyIcon(tx: Transaction): string {
     const byName = this.billService.bills().find(b =>
       b.name.toLowerCase() === (tx.merchant || '').toLowerCase()
     );
     if (byName?.icon && byName.icon !== '📄') return byName.icon;
-
     const cat = this.categoryService.categories().find(c => c.id === tx.categoryId);
     if (cat?.icon) return cat.icon;
-
     return '📄';
   }
 
   formatCurrency(n: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency', currency: 'USD'
-    }).format(n);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
   }
 
-  // No cents for subtitle/summary numbers — cleaner
   formatCurrencyRounded(n: number): string {
     return new Intl.NumberFormat('en-US', {
-      style: 'currency', currency: 'USD',
-      maximumFractionDigits: 0
+      style: 'currency', currency: 'USD', maximumFractionDigits: 0
     }).format(n);
   }
 
   formatFullDate(date: string): string {
-    const d = new Date(date + 'T00:00:00');
-    return d.toLocaleDateString('en-US', {
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
   }
 
   formatDate(date: string): string {
-    const d = new Date(date + 'T00:00:00');
-    return d.toLocaleDateString('en-US', {
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric'
     });
   }
@@ -373,13 +362,11 @@ export class Bills {
 
   frequencyLabel(f: string): string {
     const map: Record<string, string> = {
-      weekly: 'Weekly', monthly: 'Monthly',
-      quarterly: 'Quarterly', yearly: 'Yearly'
+      weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly'
     };
     return map[f] || f;
   }
 
-  // Safe local date parsing for the date pipe workaround
   localDate(dateStr: string): Date {
     return new Date(dateStr + 'T00:00:00');
   }

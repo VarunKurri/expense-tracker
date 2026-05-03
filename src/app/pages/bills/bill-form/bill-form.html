@@ -77,6 +77,26 @@
               (click)="autopayEnabled = !autopayEnabled"></button>
     </div>
 
+    <!-- Pause toggle — only shown when editing an existing bill -->
+    @if (bill) {
+      <div class="pause-row" [class.paused]="!active">
+        <div>
+          <div class="pause-label">
+            {{ active ? 'Pause this bill' : 'Bill is paused' }}
+          </div>
+          <div class="pause-sub">
+            {{ active
+              ? 'Hides from overdue & upcoming. History is kept.'
+              : 'Reactivate to track due dates again.' }}
+          </div>
+        </div>
+        <button type="button" class="toggle"
+                [class.on]="!active"
+                [class.toggle-amber]="!active"
+                (click)="active = !active"></button>
+      </div>
+    }
+
     <div class="field">
       <label class="label-sm">Notes (optional)</label>
       <input class="input-field" [(ngModel)]="notes" name="notes"

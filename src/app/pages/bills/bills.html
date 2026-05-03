@@ -5,6 +5,9 @@
       <p class="sub">
         {{ activeBills().length }} {{ activeBills().length === 1 ? 'bill' : 'bills' }}
         · {{ formatCurrencyRounded(totalMonthly()) }}/mo
+        @if (pausedBills().length > 0) {
+          · {{ pausedBills().length }} paused
+        }
       </p>
     </div>
     <div class="head-actions">
@@ -27,7 +30,6 @@
     <div class="summary-divider"></div>
     <div class="summary-stat">
       <div class="summary-label">Active bills</div>
-      <!-- Fixed: was bills().length which included inactive -->
       <div class="summary-value">{{ activeBills().length }}</div>
     </div>
     <div class="summary-divider"></div>
@@ -37,209 +39,243 @@
     </div>
   </div>
 
-  <!-- OVERDUE -->
-  @if (overdue().length > 0) {
-    <div class="section-header">
-      <span class="section-title overdue">⚠️ Overdue</span>
-    </div>
-    <div class="bills-list">
-      @for (bill of overdue(); track bill.id) {
-        <div class="bill-row overdue-row" (click)="openEdit(bill)">
-          <!-- Red-tinted icon for urgency -->
-          <div class="bill-icon overdue-icon">{{ bill.icon || '📄' }}</div>
-          <div class="bill-main">
-            <div class="bill-name">{{ bill.name }}</div>
-            <div class="bill-meta">
-              {{ frequencyLabel(bill.frequency) }}
-              @if (accountName(bill.accountId)) {
-                · {{ accountName(bill.accountId) }}
-              }
-            </div>
-          </div>
-          <div class="bill-right">
-            <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
-            <div class="bill-due overdue-text">
-              {{ Math.abs(daysUntil(bill.nextDueDate)) }}d overdue
-            </div>
-            <button class="mark-paid-btn"
-                    (click)="$event.stopPropagation(); markPaid(bill)"
-                    [disabled]="markingPaid() === bill.id">
-              {{ markingPaid() === bill.id ? '…' : 'Mark paid' }}
-            </button>
-          </div>
-        </div>
+  <!-- TABS -->
+  <div class="bill-tabs">
+    <button class="bill-tab"
+            [class.active]="activeTab() === 'active'"
+            (click)="activeTab.set('active')">
+      Active
+      @if (activeBills().length > 0) {
+        <span class="tab-count">{{ activeBills().length }}</span>
       }
-    </div>
-  }
-
-  <!-- UPCOMING (next 30 days) -->
-  @if (upcoming().length > 0) {
-    <div class="section-header">
-      <span class="section-title">Upcoming · next 30 days</span>
-    </div>
-    <div class="bills-list">
-      @for (bill of upcoming(); track bill.id; let first = $first) {
-        <div class="bill-row" (click)="openEdit(bill)">
-          <!-- Accent date box on the soonest-due bill -->
-          <div class="bill-date-box" [class.date-box-accent]="first">
-            <div class="bill-day">{{ localDate(bill.nextDueDate).getDate() }}</div>
-            <div class="bill-mon">
-              {{ localDate(bill.nextDueDate).toLocaleDateString('en-US', { month: 'short' }).toUpperCase() }}
-            </div>
-          </div>
-          <div class="bill-main">
-            <div class="bill-name">{{ bill.name }}</div>
-            <div class="bill-meta">
-              {{ frequencyLabel(bill.frequency) }}
-              @if (accountName(bill.accountId)) {
-                · {{ accountName(bill.accountId) }}
-              }
-              @if (bill.autopayEnabled) {
-                · <span class="autopay-chip">Autopay</span>
-              }
-            </div>
-          </div>
-          <div class="bill-right">
-            <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
-            <div class="bill-due">
-              @if (daysUntil(bill.nextDueDate) === 0) { Due today }
-              @else { {{ daysUntil(bill.nextDueDate) }}d left }
-            </div>
-            <button class="mark-paid-btn"
-                    (click)="$event.stopPropagation(); markPaid(bill)"
-                    [disabled]="markingPaid() === bill.id">
-              {{ markingPaid() === bill.id ? '…' : 'Mark paid' }}
-            </button>
-          </div>
-        </div>
+    </button>
+    <button class="bill-tab"
+            [class.active]="activeTab() === 'paused'"
+            (click)="activeTab.set('paused')">
+      Paused
+      @if (pausedBills().length > 0) {
+        <span class="tab-count paused">{{ pausedBills().length }}</span>
       }
-    </div>
-  }
+    </button>
+  </div>
 
-  <!-- FUTURE (beyond 30 days) -->
-  @if (futureBills().length > 0) {
-    <div class="section-header">
-      <span class="section-title">Later</span>
-    </div>
-    <div class="bills-list">
-      @for (bill of futureBills(); track bill.id) {
-        <div class="bill-row" (click)="openEdit(bill)">
-          <div class="bill-date-box">
-            <div class="bill-day">{{ localDate(bill.nextDueDate).getDate() }}</div>
-            <div class="bill-mon">
-              {{ localDate(bill.nextDueDate).toLocaleDateString('en-US', { month: 'short' }).toUpperCase() }}
-            </div>
-          </div>
-          <div class="bill-main">
-            <div class="bill-name">{{ bill.name }}</div>
-            <div class="bill-meta">
-              {{ frequencyLabel(bill.frequency) }}
-              @if (accountName(bill.accountId)) {
-                · {{ accountName(bill.accountId) }}
-              }
-            </div>
-          </div>
-          <div class="bill-right">
-            <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
-          </div>
-        </div>
-      }
-    </div>
-  }
+  <!-- ── ACTIVE TAB ─────────────────────────────────────────── -->
+  @if (activeTab() === 'active') {
 
-  <!-- EMPTY STATE -->
-  @if (billService.bills().length === 0 && !importing()) {
-    <div class="empty">
-      <div class="empty-icon">📄</div>
-      <h3>No bills yet</h3>
-      <p>Import your subscriptions from existing transactions or add bills manually.</p>
-      <div class="empty-actions">
-        <button class="btn-ghost" (click)="importFromTransactions()">
-          ⬇ Import from transactions
-        </button>
-        <button class="btn-primary" (click)="openNew()">+ Add manually</button>
+    <!-- OVERDUE -->
+    @if (overdue().length > 0) {
+      <div class="section-header">
+        <span class="section-title overdue">⚠️ Overdue</span>
       </div>
-    </div>
-  }
+      <div class="bills-list">
+        @for (bill of overdue(); track bill.id) {
+          <div class="bill-row overdue-row" (click)="openEdit(bill)">
+            <div class="bill-icon overdue-icon">{{ bill.icon || '📄' }}</div>
+            <div class="bill-main">
+              <div class="bill-name">{{ bill.name }}</div>
+              <div class="bill-meta">
+                {{ frequencyLabel(bill.frequency) }}
+                @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
+              </div>
+            </div>
+            <div class="bill-right">
+              <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
+              <div class="bill-due overdue-text">
+                {{ Math.abs(daysUntil(bill.nextDueDate)) }}d overdue
+              </div>
+              <button class="mark-paid-btn"
+                      (click)="$event.stopPropagation(); markPaid(bill)"
+                      [disabled]="markingPaid() === bill.id">
+                {{ markingPaid() === bill.id ? '…' : 'Mark paid' }}
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
 
-  <!-- ALL ACTIVE BILLS -->
-  @if (activeBills().length > 0) {
-    <div class="section-header" style="margin-top: 8px;">
-      <span class="section-title">All active · {{ activeBills().length }}</span>
-    </div>
-    <div class="active-grid">
-      @for (bill of activeBills(); track bill.id) {
-        <div class="active-card" (click)="openEdit(bill)">
-          <div class="active-card-top">
-            <div class="active-icon">{{ bill.icon || '📄' }}</div>
-            <div class="active-freq">{{ frequencyLabel(bill.frequency) }}</div>
+    <!-- UPCOMING -->
+    @if (upcoming().length > 0) {
+      <div class="section-header">
+        <span class="section-title">Upcoming · next 30 days</span>
+      </div>
+      <div class="bills-list">
+        @for (bill of upcoming(); track bill.id; let first = $first) {
+          <div class="bill-row" (click)="openEdit(bill)">
+            <div class="bill-date-box" [class.date-box-accent]="first">
+              <div class="bill-day">{{ localDate(bill.nextDueDate).getDate() }}</div>
+              <div class="bill-mon">
+                {{ localDate(bill.nextDueDate).toLocaleDateString('en-US', { month: 'short' }).toUpperCase() }}
+              </div>
+            </div>
+            <div class="bill-main">
+              <div class="bill-name">{{ bill.name }}</div>
+              <div class="bill-meta">
+                {{ frequencyLabel(bill.frequency) }}
+                @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
+                @if (bill.autopayEnabled) { · <span class="autopay-chip">Autopay</span> }
+              </div>
+            </div>
+            <div class="bill-right">
+              <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
+              <div class="bill-due">
+                @if (daysUntil(bill.nextDueDate) === 0) { Due today }
+                @else { {{ daysUntil(bill.nextDueDate) }}d left }
+              </div>
+              <button class="mark-paid-btn"
+                      (click)="$event.stopPropagation(); markPaid(bill)"
+                      [disabled]="markingPaid() === bill.id">
+                {{ markingPaid() === bill.id ? '…' : 'Mark paid' }}
+              </button>
+            </div>
           </div>
-          <div class="active-name">{{ bill.name }}</div>
-          <div class="active-amount">{{ formatCurrency(bill.amount) }}</div>
-          <div class="active-meta">
-            @if (accountIcon(bill.accountId)) {
-              {{ accountIcon(bill.accountId) }}
-            }
-            @if (bill.autopayEnabled) {
-              <span class="autopay-chip">Autopay</span>
-            }
+        }
+      </div>
+    }
+
+    <!-- LATER -->
+    @if (futureBills().length > 0) {
+      <div class="section-header">
+        <span class="section-title">Later</span>
+      </div>
+      <div class="bills-list">
+        @for (bill of futureBills(); track bill.id) {
+          <div class="bill-row" (click)="openEdit(bill)">
+            <div class="bill-date-box">
+              <div class="bill-day">{{ localDate(bill.nextDueDate).getDate() }}</div>
+              <div class="bill-mon">
+                {{ localDate(bill.nextDueDate).toLocaleDateString('en-US', { month: 'short' }).toUpperCase() }}
+              </div>
+            </div>
+            <div class="bill-main">
+              <div class="bill-name">{{ bill.name }}</div>
+              <div class="bill-meta">
+                {{ frequencyLabel(bill.frequency) }}
+                @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
+              </div>
+            </div>
+            <div class="bill-right">
+              <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
+            </div>
           </div>
-          <div class="active-next">
-            Next · {{ formatDate(bill.nextDueDate) }}
+        }
+      </div>
+    }
+
+    <!-- EMPTY STATE -->
+    @if (billService.bills().length === 0 && !importing()) {
+      <div class="empty">
+        <div class="empty-icon">📄</div>
+        <h3>No bills yet</h3>
+        <p>Import your subscriptions from existing transactions or add bills manually.</p>
+        <div class="empty-actions">
+          <button class="btn-ghost" (click)="importFromTransactions()">⬇ Import from transactions</button>
+          <button class="btn-primary" (click)="openNew()">+ Add manually</button>
+        </div>
+      </div>
+    }
+
+    <!-- ALL ACTIVE GRID -->
+    @if (activeBills().length > 0) {
+      <div class="section-header" style="margin-top: 8px;">
+        <span class="section-title">All subscriptions · {{ activeBills().length }}</span>
+      </div>
+      <div class="active-grid">
+        @for (bill of activeBills(); track bill.id) {
+          <div class="active-card" (click)="openEdit(bill)">
+            <div class="active-card-top">
+              <div class="active-icon">{{ bill.icon || '📄' }}</div>
+              <div class="active-freq">{{ frequencyLabel(bill.frequency) }}</div>
+            </div>
+            <div class="active-name">{{ bill.name }}</div>
+            <div class="active-amount">{{ formatCurrency(bill.amount) }}</div>
+            <div class="active-meta">
+              @if (accountIcon(bill.accountId)) { {{ accountIcon(bill.accountId) }} }
+              @if (bill.autopayEnabled) { <span class="autopay-chip">Autopay</span> }
+            </div>
+            <div class="active-next">Next · {{ formatDate(bill.nextDueDate) }}</div>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- PAYMENT HISTORY -->
+    @if (paymentHistory().length > 0) {
+      <div class="section-header" style="margin-top: 8px;">
+        <span class="section-title">Payment history</span>
+        <span class="section-total">{{ formatCurrency(totalHistorySpent()) }} total</span>
+      </div>
+      @for (group of groupedHistory(); track group.month) {
+        <div class="history-group">
+          <div class="history-month-hdr">
+            <span>{{ group.label }}</span>
+            <span class="history-month-total">{{ formatCurrency(group.total) }}</span>
+          </div>
+          <div class="history-list">
+            @for (tx of group.items; track tx.id) {
+              <div class="history-row" (click)="openTxView(tx)">
+                <div class="history-icon">{{ historyIcon(tx) }}</div>
+                <div class="history-main">
+                  <div class="history-name">{{ tx.merchant }}</div>
+                  <div class="history-meta">
+                    {{ localDate(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }}
+                    @if (accountName(tx.accountId)) { · {{ accountName(tx.accountId) }} }
+                  </div>
+                </div>
+                <div class="history-amount">{{ formatCurrency(tx.amount) }}</div>
+              </div>
+            }
           </div>
         </div>
       }
-    </div>
+    }
+
   }
 
-  <!-- PAYMENT HISTORY -->
-  @if (paymentHistory().length > 0) {
-    <div class="section-header" style="margin-top: 8px;">
-      <span class="section-title">Payment history</span>
-      <span class="section-total">{{ formatCurrency(totalHistorySpent()) }} total</span>
-    </div>
-
-    @for (group of groupedHistory(); track group.month) {
-      <div class="history-group">
-        <div class="history-month-hdr">
-          <span>{{ group.label }}</span>
-          <span class="history-month-total">{{ formatCurrency(group.total) }}</span>
-        </div>
-        <div class="history-list">
-          @for (tx of group.items; track tx.id) {
-            <div class="history-row" (click)="openTxView(tx)">
-              <!-- Fixed: uses historyIcon() which tries bill name, then category, then generic -->
-              <div class="history-icon">{{ historyIcon(tx) }}</div>
-              <div class="history-main">
-                <div class="history-name">{{ tx.merchant }}</div>
-                <div class="history-meta">
-                  {{ localDate(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }}
-                  @if (accountName(tx.accountId)) {
-                    · {{ accountName(tx.accountId) }}
-                  }
-                </div>
+  <!-- ── PAUSED TAB ──────────────────────────────────────────── -->
+  @if (activeTab() === 'paused') {
+    @if (pausedBills().length === 0) {
+      <div class="empty">
+        <div class="empty-icon">⏸️</div>
+        <h3>No paused bills</h3>
+        <p>When you pause a bill it will appear here. History is always kept.</p>
+      </div>
+    } @else {
+      <div class="section-header">
+        <span class="section-title">Paused · {{ pausedBills().length }}</span>
+      </div>
+      <div class="bills-list">
+        @for (bill of pausedBills(); track bill.id) {
+          <div class="bill-row paused-row" (click)="openEdit(bill)">
+            <div class="bill-icon paused-icon">{{ bill.icon || '📄' }}</div>
+            <div class="bill-main">
+              <div class="bill-name">{{ bill.name }}</div>
+              <div class="bill-meta">
+                {{ frequencyLabel(bill.frequency) }}
+                @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
+                <span class="paused-chip">Paused</span>
               </div>
-              <div class="history-amount">{{ formatCurrency(tx.amount) }}</div>
             </div>
-          }
-        </div>
+            <div class="bill-right">
+              <div class="bill-amount bill-amount-muted">{{ formatCurrency(bill.amount) }}</div>
+            </div>
+          </div>
+        }
       </div>
     }
   }
 
 </div>
 
-<!-- ── TRANSACTION VIEW PANEL (exact same as transactions page) ── -->
+<!-- TRANSACTION VIEW PANEL -->
 @if (viewingTx()) {
   <div class="view-backdrop" (click)="closeTxView()"></div>
   <div class="view-panel">
     <div class="view-handle"></div>
-
     <div class="view-header">
       <button class="view-close" (click)="closeTxView()">✕</button>
       <button class="view-edit-btn" (click)="editFromTxView()">Edit</button>
     </div>
-
     @if (viewingTx(); as tx) {
       <div class="view-amount-wrap">
         <div class="view-amount"
@@ -254,13 +290,10 @@
           <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
         }
       </div>
-
       <div class="view-details">
         @if (tx.type !== 'transfer') {
           <div class="view-row">
-            <span class="view-row-label">
-              {{ tx.type === 'income' ? 'Source' : 'Merchant' }}
-            </span>
+            <span class="view-row-label">{{ tx.type === 'income' ? 'Source' : 'Merchant' }}</span>
             <span class="view-row-value">{{ tx.merchant || '—' }}</span>
           </div>
         }
