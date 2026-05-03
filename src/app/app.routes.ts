@@ -31,6 +31,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/budgets/budgets').then(m => m.Budgets)
   },
   {
+    path: 'budgets/:categoryId/:month',
+    loadComponent: () => import('./pages/budgets/budget-detail/budget-detail').then(m => m.BudgetDetail)
+  },
+  {
     path: 'analysis',
     loadComponent: () => import('./pages/analysis/analysis').then(m => m.Analysis)
   },

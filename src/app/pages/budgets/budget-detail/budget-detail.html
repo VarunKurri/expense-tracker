@@ -1,0 +1,202 @@
+@if (category(); as cat) {
+  <div class="page">
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+      <button class="back-btn" (click)="goBack()">← Budgets</button>
+    </div>
+
+    <!-- HERO CARD -->
+    <div class="hero-card" [class.hero-warn]="status() === 'warn'" [class.hero-over]="status() === 'over'">
+      <div class="hero-top">
+        <div class="hero-icon"
+             [class.icon-ok]="status() === 'ok' && pct() > 0"
+             [class.icon-warn]="status() === 'warn'"
+             [class.icon-over]="status() === 'over'">
+          {{ cat.icon || '📦' }}
+        </div>
+        <div class="hero-info">
+          <div class="hero-name">{{ cat.name }}</div>
+          <div class="hero-meta">{{ monthLabel() }} · Resets {{ resetDate() }}</div>
+        </div>
+        @if (status() === 'over') {
+          <div class="status-badge over">Over budget</div>
+        } @else if (status() === 'warn') {
+          <div class="status-badge warn">75%+ used</div>
+        }
+      </div>
+
+      <!-- Spent amount -->
+      <div class="hero-spent-wrap">
+        <div class="hero-spent"
+             [class.spent-ok]="status() === 'ok'"
+             [class.spent-warn]="status() === 'warn'"
+             [class.spent-over]="status() === 'over'">
+          {{ formatCurrency(spent()) }}
+        </div>
+        <div class="hero-limit">
+          of {{ budget() ? formatCurrency(budget()!.amount) : '—' }} budget
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      @if (budget()) {
+        <div class="hero-bar-wrap">
+          <div class="hero-bar-fill"
+               [class.bar-warn]="status() === 'warn'"
+               [class.bar-over]="status() === 'over'"
+               [style.width]="pct() + '%'">
+          </div>
+        </div>
+        <div class="hero-bar-labels">
+          <span [class.text-warn]="status() === 'warn'"
+                [class.text-over]="status() === 'over'">
+            {{ pct() }}% used
+          </span>
+          @if (remaining() >= 0) {
+            <span class="text-remaining">{{ formatCurrency(remaining()) }} remaining</span>
+          } @else {
+            <span class="text-over">{{ formatCurrency(Math.abs(remaining())) }} over</span>
+          }
+        </div>
+      }
+    </div>
+
+    <!-- STATS ROW -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Transactions</div>
+        <div class="stat-value">{{ spendingTransactions().length }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg per transaction</div>
+        <div class="stat-value">
+          {{ spendingTransactions().length > 0 ? formatCurrency(spent() / spendingTransactions().length) : '—' }}
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Largest spend</div>
+        <div class="stat-value">
+          {{ spendingTransactions().length > 0 ? formatCurrency(Math.max(...spendingTransactions().map(t => t.amount))) : '—' }}
+        </div>
+      </div>
+    </div>
+
+    <!-- TRANSACTIONS LIST -->
+    <div class="section-header">
+      <span class="section-title">Transactions this month</span>
+    </div>
+
+    @if (transactions().length === 0) {
+      <div class="empty">
+        <div class="empty-icon">📭</div>
+        <p>No transactions in {{ cat.name }} for {{ monthLabel() }}</p>
+      </div>
+    } @else {
+      <div class="tx-card">
+        @for (tx of transactions(); track tx.id; let last = $last) {
+          <div class="tx-row"
+               [class.last]="last"
+               [class.tx-refunded]="excludeRefunded && tx.refunded"
+               (click)="openTxView(tx)">
+
+            <div class="tx-icon-wrap">
+              {{ cat.icon || '📦' }}
+            </div>
+
+            <div class="tx-main">
+              <div class="tx-title">{{ tx.merchant || 'Untitled' }}</div>
+              <div class="tx-meta">
+                {{ formatDate(tx.date) }} · {{ accountName(tx.accountId) }}
+              </div>
+            </div>
+
+            <div class="tx-right">
+              <div class="tx-amount" [class.tx-amount-muted]="excludeRefunded && tx.refunded">
+                −{{ formatCurrency(tx.amount) }}
+              </div>
+              @if (tx.refunded) {
+                <span class="refunded-badge">↩ Refunded</span>
+              }
+            </div>
+
+          </div>
+        }
+      </div>
+    }
+
+  </div>
+} @else {
+  <div class="page">
+    <button class="back-btn" (click)="goBack()">← Budgets</button>
+    <p style="color: var(--fg-3); padding: 40px 0;">Budget not found.</p>
+  </div>
+}
+
+<!-- TRANSACTION VIEW PANEL -->
+@if (viewingTx()) {
+  <div class="view-backdrop" (click)="closeTxView()"></div>
+  <div class="view-panel">
+    <div class="view-handle"></div>
+    <div class="view-header">
+      <button class="view-close" (click)="closeTxView()">✕</button>
+      <button class="view-edit-btn" (click)="editFromTxView()">Edit</button>
+    </div>
+
+    @if (viewingTx(); as tx) {
+      <div class="view-amount-wrap">
+        <div class="view-amount neg">−{{ formatCurrency(tx.amount) }}</div>
+        @if (tx.refunded) {
+          <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
+        }
+      </div>
+
+      <div class="view-details">
+        <div class="view-row">
+          <span class="view-row-label">Merchant</span>
+          <span class="view-row-value">{{ tx.merchant || '—' }}</span>
+        </div>
+        <div class="view-row">
+          <span class="view-row-label">Date</span>
+          <span class="view-row-value">{{ formatFullDate(tx.date) }}</span>
+        </div>
+        <div class="view-row">
+          <span class="view-row-label">Account</span>
+          <span class="view-row-value">{{ accountName(tx.accountId) }}</span>
+        </div>
+        @if (categoryFor(tx.categoryId); as cat) {
+          <div class="view-row">
+            <span class="view-row-label">Category</span>
+            <span class="view-row-value">{{ cat.icon }} {{ cat.name }}</span>
+          </div>
+        }
+        @if (tx.notes) {
+          <div class="view-row view-row-notes">
+            <span class="view-row-label">Notes</span>
+            <span class="view-row-value notes-text">{{ tx.notes }}</span>
+          </div>
+        }
+        <div class="view-row">
+          <span class="view-row-label">Type</span>
+          <span class="view-row-value view-type-badge expense">Expense</span>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+<!-- EDIT FORM -->
+<app-transaction-form
+  [open]="txFormOpen()"
+  [transaction]="editingTx()"
+  (closed)="closeTxForm()"
+  (saved)="handleTxSave($event)"
+  (deleteRequested)="askTxDelete()" />
+
+<app-confirm
+  [open]="txConfirmOpen()"
+  title="Delete transaction?"
+  message="This cannot be undone."
+  confirmText="Delete"
+  (confirmed)="confirmTxDelete()"
+  (cancelled)="txConfirmOpen.set(false)" />

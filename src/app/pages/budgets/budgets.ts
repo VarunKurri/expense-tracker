@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { BudgetService } from '../../services/budget.service';
 import { CategoryService } from '../../services/category.service';
 import { TransactionService } from '../../services/transaction.service';
@@ -18,14 +19,6 @@ interface BudgetRow {
   status: 'ok' | 'warn' | 'over';
 }
 
-interface MonthSummary {
-  month: string;
-  label: string;
-  totalBudget: number;
-  totalSpent: number;
-  pct: number;
-}
-
 @Component({
   selector: 'app-budgets',
   standalone: true,
@@ -34,11 +27,12 @@ interface MonthSummary {
   styleUrl: './budgets.scss'
 })
 export class Budgets {
-  Math = Math
+  Math = Math;
 
   budgetService = inject(BudgetService);
   categoryService = inject(CategoryService);
   txService = inject(TransactionService);
+  private router = inject(Router);
 
   formOpen = signal(false);
   editing = signal<Budget | null>(null);
@@ -47,17 +41,33 @@ export class Budgets {
   preselectedCategoryId = signal('');
   preselectedMonth = signal('');
 
-  // Selected month for the main view
   selectedMonth = signal(new Date().toISOString().slice(0, 7));
 
-  // Available months (last 6 + next 3)
+  // Exclude refunded transactions from budget calculations
+  excludeRefunded = signal(true);
+
+  // Current month string e.g. "2026-05"
+  private currentMonth = new Date().toISOString().slice(0, 7);
+
+  // Is the selected month in the past?
+  isPastMonth = computed(() => this.selectedMonth() < this.currentMonth);
+
+  // Is the selected month in the future?
+  isFutureMonth = computed(() => this.selectedMonth() > this.currentMonth);
+
+  // "Resets May 1" — first day of the month after selectedMonth
+  resetDate = computed(() => {
+    const [y, m] = this.selectedMonth().split('-').map(Number);
+    const next = new Date(y, m, 1); // JS month is 0-based, so m (not m-1) = next month
+    return next.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  });
+
   availableMonths = computed(() => {
     const months: { value: string; label: string }[] = [];
     const seen = new Set<string>();
-
     for (let i = -5; i <= 3; i++) {
       const d = new Date();
-      d.setDate(1); // normalize to 1st to avoid month overflow
+      d.setDate(1);
       d.setMonth(d.getMonth() + i);
       const value = d.toISOString().slice(0, 7);
       if (seen.has(value)) continue;
@@ -70,7 +80,6 @@ export class Budgets {
     return months;
   });
 
-  // Budget rows for selected month
   budgetRows = computed((): BudgetRow[] => {
     const month = this.selectedMonth();
     const defaults = this.budgetService.defaultBudgets();
@@ -90,7 +99,8 @@ export class Budgets {
         .filter(t =>
           t.type === 'expense' &&
           t.categoryId === budget.categoryId &&
-          t.date.startsWith(month)
+          t.date.startsWith(month) &&
+          !(this.excludeRefunded() && t.refunded)
         )
         .reduce((s, t) => s + t.amount, 0);
 
@@ -109,10 +119,17 @@ export class Budgets {
       });
     }
 
-    return rows.sort((a, b) => b.pct - a.pct);
+    // Sort: over first, then warn, then by pct desc, then by amount desc for ties at 0%
+    return rows.sort((a, b) => {
+      const statusOrder = { over: 0, warn: 1, ok: 2 };
+      if (statusOrder[a.status] !== statusOrder[b.status]) {
+        return statusOrder[a.status] - statusOrder[b.status];
+      }
+      if (b.pct !== a.pct) return b.pct - a.pct;
+      return b.budget.amount - a.budget.amount;
+    });
   });
 
-  // Totals for selected month
   totals = computed(() => {
     const rows = this.budgetRows();
     return {
@@ -121,6 +138,18 @@ export class Budgets {
       over: rows.filter(r => r.status === 'over').length,
       warn: rows.filter(r => r.status === 'warn').length,
     };
+  });
+
+  // Dynamic subtitle: "May 2026 · $20 of $3,900"
+  subtitle = computed(() => {
+    const month = this.selectedMonth();
+    const [y, m] = month.split('-').map(Number);
+    const label = new Date(y, m - 1, 1).toLocaleDateString('en-US', {
+      month: 'long', year: 'numeric'
+    });
+    const t = this.totals();
+    if (t.budget === 0) return label;
+    return `${label} · ${this.formatCurrency(t.spent)} of ${this.formatCurrency(t.budget)}`;
   });
 
   formatCurrency(n: number): string {
@@ -137,10 +166,17 @@ export class Budgets {
   }
 
   isCurrentMonth(month: string): boolean {
-    return month === new Date().toISOString().slice(0, 7);
+    return month === this.currentMonth;
   }
 
-  // CRUD
+  // Navigate to budget detail page
+  openDetail(categoryId: string) {
+    this.router.navigate(
+      ['/budgets', categoryId, this.selectedMonth()],
+      { queryParams: { excludeRefunded: this.excludeRefunded() } }
+    );
+  }
+
   openNew() {
     this.editing.set(null);
     this.preselectedCategoryId.set('');
@@ -156,9 +192,21 @@ export class Budgets {
   }
 
   openOverride(categoryId: string) {
-    this.editing.set(null);
-    this.preselectedCategoryId.set(categoryId);
-    this.preselectedMonth.set(this.selectedMonth());
+    // Look up the effective budget for this category/month and edit it
+    const existing = this.budgetService.getBudgetForCategory(
+      categoryId, this.selectedMonth()
+    );
+    if (existing) {
+      // Edit the existing budget (sets it as a month override if it isn't already)
+      this.editing.set(existing);
+      this.preselectedCategoryId.set(categoryId);
+      this.preselectedMonth.set(this.selectedMonth());
+    } else {
+      // No budget yet — open new form pre-filled for this category + month
+      this.editing.set(null);
+      this.preselectedCategoryId.set(categoryId);
+      this.preselectedMonth.set(this.selectedMonth());
+    }
     this.formOpen.set(true);
   }
 
