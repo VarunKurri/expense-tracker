@@ -7,6 +7,8 @@ import { FormsModule } from '@angular/forms';
 import { TransactionService } from '../../services/transaction.service';
 import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
+import { TransactionForm } from '../transactions/transaction-form/transaction-form';
+import { Confirm } from '../../components/confirm/confirm';
 import { Transaction } from '../../models';
 import {
   Chart, ChartData, ChartOptions,
@@ -28,7 +30,7 @@ type RangeKey = 'this-month' | 'last-month' | '3-months' | 'this-year' | 'all';
 @Component({
   selector: 'app-analysis',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TransactionForm, Confirm],
   templateUrl: './analysis.html',
   styleUrl: './analysis.scss'
 })
@@ -43,6 +45,76 @@ export class Analysis implements AfterViewInit, OnDestroy {
   private donutChart: Chart | null = null;
   private barChart: Chart | null = null;
   private chartsReady = false;
+
+  // ── Transaction view/edit panel ────────────────────────────
+  viewingTx = signal<Transaction | null>(null);
+  editingTx = signal<Transaction | null>(null);
+  txFormOpen = signal(false);
+  txConfirmOpen = signal(false);
+  txToDelete = signal<Transaction | null>(null);
+
+  // Which merchant row is expanded to show all transactions
+  expandedMerchant = signal<string | null>(null);
+
+  toggleMerchant(name: string) {
+    this.expandedMerchant.set(
+      this.expandedMerchant() === name ? null : name
+    );
+  }
+
+  openTxView(tx: Transaction) {
+    this.viewingTx.set(tx);
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeTxView() {
+    this.viewingTx.set(null);
+    document.body.style.overflow = '';
+  }
+
+  editFromTxView() {
+    const tx = this.viewingTx();
+    this.viewingTx.set(null);
+    document.body.style.overflow = '';
+    if (tx) {
+      this.editingTx.set(tx);
+      this.txFormOpen.set(true);
+    }
+  }
+
+  closeTxForm() {
+    this.txFormOpen.set(false);
+    this.editingTx.set(null);
+  }
+
+  async handleTxSave(data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
+    const tx = this.editingTx();
+    if (!tx?.id) return;
+    try {
+      await this.txService.update(tx.id, data);
+      this.closeTxForm();
+    } catch (err) {
+      alert('Failed: ' + (err as Error).message);
+    }
+  }
+
+  askTxDelete() {
+    this.txToDelete.set(this.editingTx());
+    this.txFormOpen.set(false);
+    this.txConfirmOpen.set(true);
+  }
+
+  async confirmTxDelete() {
+    const tx = this.txToDelete();
+    if (!tx?.id) return;
+    try {
+      await this.txService.remove(tx.id);
+    } finally {
+      this.txConfirmOpen.set(false);
+      this.txToDelete.set(null);
+      this.editingTx.set(null);
+    }
+  }
 
   // ── Filters ────────────────────────────────────────────────
   range = signal<RangeKey>('this-month');
@@ -77,20 +149,11 @@ export class Analysis implements AfterViewInit, OnDestroy {
 
     switch (this.range()) {
       case 'this-month':
-        return {
-          start: localDate(y, m, 1),
-          end:   localDate(y, m, lastDay(y, m))
-        };
+        return { start: localDate(y, m, 1), end: localDate(y, m, lastDay(y, m)) };
       case 'last-month':
-        return {
-          start: localDate(y, m - 1, 1),
-          end:   localDate(y, m - 1, lastDay(y, m - 1))
-        };
+        return { start: localDate(y, m - 1, 1), end: localDate(y, m - 1, lastDay(y, m - 1)) };
       case '3-months':
-        return {
-          start: localDate(y, m - 2, 1),
-          end:   localDate(y, m, lastDay(y, m))
-        };
+        return { start: localDate(y, m - 2, 1), end: localDate(y, m, lastDay(y, m)) };
       case 'this-year':
         return { start: `${y}-01-01`, end: `${y}-12-31` };
       default:
@@ -115,13 +178,8 @@ export class Analysis implements AfterViewInit, OnDestroy {
     });
   });
 
-  expenses = computed(() =>
-    this.filtered().filter(t => t.type === 'expense')
-  );
-
-  income = computed(() =>
-    this.filtered().filter(t => t.type === 'income')
-  );
+  expenses = computed(() => this.filtered().filter(t => t.type === 'expense'));
+  income = computed(() => this.filtered().filter(t => t.type === 'income'));
 
   // ── KPIs ───────────────────────────────────────────────────
   totalExpenses = computed(() =>
@@ -141,8 +199,17 @@ export class Analysis implements AfterViewInit, OnDestroy {
 
   savingsRate = computed(() => {
     const inc = this.totalIncome();
-    if (!inc) return null;
+    if (!inc) return null;  // meaningless without income
     return Math.round(((inc - this.totalExpenses()) / inc) * 100);
+  });
+
+  // Human-readable savings rate context
+  savingsRateLabel = computed(() => {
+    if (this.totalIncome() === 0) return 'No income this period';
+    const rate = this.savingsRate();
+    if (rate === null) return '';
+    if (rate > 0) return `Saving ${rate}% of income`;
+    return `Spending ${Math.abs(rate)}% more than income`;
   });
 
   topCategory = computed(() => {
@@ -167,12 +234,10 @@ export class Analysis implements AfterViewInit, OnDestroy {
   categoryBreakdown = computed(() => {
     const byCat = new Map<string, number>();
     const total = this.totalExpenses();
-
     for (const t of this.expenses()) {
       const key = t.categoryId || '__none__';
       byCat.set(key, (byCat.get(key) || 0) + t.amount);
     }
-
     return [...byCat.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
@@ -191,44 +256,52 @@ export class Analysis implements AfterViewInit, OnDestroy {
       });
   });
 
-  // ── Top merchants ──────────────────────────────────────────
+  // ── Top merchants — tracks all transactions per merchant for correct latest pick
   topMerchants = computed(() => {
-    const byMerchant = new Map<string, { amount: number; count: number }>();
+    const byMerchant = new Map<string, { amount: number; txs: Transaction[] }>();
     for (const t of this.expenses()) {
       const key = t.merchant || 'Unknown';
-      const existing = byMerchant.get(key) || { amount: 0, count: 0 };
-      byMerchant.set(key, {
-        amount: existing.amount + t.amount,
-        count: existing.count + 1
-      });
+      const existing = byMerchant.get(key);
+      if (!existing) {
+        byMerchant.set(key, { amount: t.amount, txs: [t] });
+      } else {
+        existing.amount += t.amount;
+        existing.txs.push(t);
+      }
     }
     return [...byMerchant.entries()]
       .sort((a, b) => b[1].amount - a[1].amount)
       .slice(0, 10)
-      .map(([name, data], i) => ({
-        rank: i + 1,
-        name,
-        amount: Math.round(data.amount * 100) / 100,
-        count: data.count
-      }));
+      .map(([name, data], i) => {
+        // Sort by date desc, then by amount desc for same-date ties
+        const sorted = [...data.txs].sort((a, b) => {
+          if (b.date !== a.date) return b.date.localeCompare(a.date);
+          return b.amount - a.amount;
+        });
+        return {
+          rank: i + 1,
+          name,
+          amount: Math.round(data.amount * 100) / 100,
+          count: data.txs.length,
+          lastTx: sorted[0],
+          txs: sorted   // all transactions, newest first
+        };
+      });
   });
 
-  // ── Monthly trend data (for bar chart) ────────────────────
+  // ── Monthly trend data ─────────────────────────────────────
   monthlyTrend = computed(() => {
     const now = new Date();
     const months = new Map<string, { income: number; expenses: number }>();
-
     let numMonths = 6;
     if (this.range() === 'this-year') numMonths = 12;
     if (this.range() === 'all') numMonths = 12;
 
     for (let i = numMonths - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      // Use local year/month instead of toISOString() which shifts to UTC
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, '0');
-      const key = `${y}-${m}`;
-      months.set(key, { income: 0, expenses: 0 });
+      months.set(`${y}-${m}`, { income: 0, expenses: 0 });
     }
 
     for (const t of this.txService.transactions()) {
@@ -241,29 +314,31 @@ export class Analysis implements AfterViewInit, OnDestroy {
 
     return [...months.entries()].map(([month, data]) => {
       const [y, m] = month.split('-').map(Number);
-      const label = new Date(y, m - 1, 1)
-        .toLocaleDateString('en-US', { month: 'short' });
+      const label = new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short' });
       return {
-        month,
-        label,
+        month, label,
         income: Math.round(data.income * 100) / 100,
         expenses: Math.round(data.expenses * 100) / 100,
       };
     });
   });
 
-  // ── All expense categories for exclusion filter ────────────
   allExpenseCategories = computed(() =>
     this.categoryService.categories().filter(c => c.kind === 'expense')
   );
 
+  // Dynamic subtitle
+  subtitle = computed(() => {
+    const label = this.ranges.find(r => r.value === this.range())?.label || '';
+    const spent = this.totalExpenses();
+    if (!spent) return label;
+    return `${label} · ${this.formatCurrency(spent)} spent`;
+  });
+
   toggleCategoryExclusion(categoryId: string) {
     const current = new Set(this.excludedCategories());
-    if (current.has(categoryId)) {
-      current.delete(categoryId);
-    } else {
-      current.add(categoryId);
-    }
+    if (current.has(categoryId)) current.delete(categoryId);
+    else current.add(categoryId);
     this.excludedCategories.set(current);
   }
 
@@ -271,11 +346,9 @@ export class Analysis implements AfterViewInit, OnDestroy {
     return this.excludedCategories().has(categoryId);
   }
 
-  // ── Format helpers ─────────────────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────
   formatCurrency(n: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency', currency: 'USD'
-    }).format(Math.abs(n));
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.abs(n));
   }
 
   formatCurrencyShort(n: number): string {
@@ -283,10 +356,32 @@ export class Analysis implements AfterViewInit, OnDestroy {
     return '$' + Math.round(n);
   }
 
+  formatFullDate(date: string): string {
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  }
+
+  formatDate(date: string): string {
+    const d = new Date(date + 'T00:00:00');
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.getTime() === today.getTime()) return 'Today';
+    if (d.getTime() === yesterday.getTime()) return 'Yesterday';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
   accountName(id?: string): string {
-    if (!id) return '';
+    if (!id) return '—';
     const a = this.accountService.accounts().find(a => a.id === id);
-    return a ? `${a.icon} ${a.name}` : '';
+    return a ? `${a.icon} ${a.name}` : '—';
+  }
+
+  categoryFor(id?: string) {
+    if (!id) return null;
+    return this.categoryService.categories().find(c => c.id === id) || null;
   }
 
   activeAccounts = computed(() =>
@@ -296,7 +391,6 @@ export class Analysis implements AfterViewInit, OnDestroy {
   // ── Charts ─────────────────────────────────────────────────
   constructor() {
     effect(() => {
-      // React to data changes and update charts
       const catData = this.categoryBreakdown();
       const trendData = this.monthlyTrend();
       if (this.chartsReady) {
@@ -326,9 +420,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
   private initDonut() {
     const ctx = this.donutCanvas?.nativeElement?.getContext('2d');
     if (!ctx) return;
-
     const data = this.categoryBreakdown();
-
     this.donutChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
@@ -348,7 +440,6 @@ export class Analysis implements AfterViewInit, OnDestroy {
         plugins: {
           legend: { display: false },
           tooltip: {
-            // Position tooltip outside the chart
             position: 'nearest',
             yAlign: 'bottom',
             callbacks: {
@@ -368,9 +459,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
   private initBar() {
     const ctx = this.barCanvas?.nativeElement?.getContext('2d');
     if (!ctx) return;
-
     const data = this.monthlyTrend();
-
     this.barChart = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -379,7 +468,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
           {
             label: 'Income',
             data: data.map(d => d.income),
-            backgroundColor: 'rgba(128, 128, 128, 0.5)', // neutral grey works in both modes
+            backgroundColor: 'rgba(128, 128, 128, 0.5)',
             borderColor: 'rgba(128, 128, 128, 0.8)',
             borderWidth: 1,
             borderRadius: 4,
@@ -403,32 +492,23 @@ export class Analysis implements AfterViewInit, OnDestroy {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (ctx) =>
-                ` ${ctx.dataset.label}: ${this.formatCurrency(ctx.raw as number)}`
+              label: (ctx) => ` ${ctx.dataset.label}: ${this.formatCurrency(ctx.raw as number)}`
             }
           }
         },
         scales: {
-          x: {
-            grid: { display: false },
-            border: { display: false },
-            ticks: { color: '#8A8A92', font: { size: 11 } }
-          },
+          x: { grid: { display: false }, border: { display: false }, ticks: { color: '#8A8A92', font: { size: 11 } } },
           y: {
             grid: { color: 'rgba(128,128,128,0.1)' },
             border: { display: false },
-            ticks: {
-              color: '#8A8A92',
-              font: { size: 11 },
-              callback: (val) => this.formatCurrencyShort(val as number)
-            }
+            ticks: { color: '#8A8A92', font: { size: 11 }, callback: (val) => this.formatCurrencyShort(val as number) }
           }
         }
       }
     });
   }
 
-  private updateDonut(data: typeof this.categoryBreakdown extends () => infer R ? R : never) {
+  private updateDonut(data: ReturnType<typeof this.categoryBreakdown>) {
     if (!this.donutChart) return;
     this.donutChart.data.labels = data.map(d => d.name);
     this.donutChart.data.datasets[0].data = data.map(d => d.amount);
@@ -436,7 +516,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
     this.donutChart.update('none');
   }
 
-  private updateBar(data: typeof this.monthlyTrend extends () => infer R ? R : never) {
+  private updateBar(data: ReturnType<typeof this.monthlyTrend>) {
     if (!this.barChart) return;
     this.barChart.data.labels = data.map(d => d.label);
     this.barChart.data.datasets[0].data = data.map(d => d.income);

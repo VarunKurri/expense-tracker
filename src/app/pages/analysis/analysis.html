@@ -4,10 +4,9 @@
   <div class="page-head">
     <div>
       <h1>Analysis</h1>
-      <p class="sub">Trends and patterns across your spend</p>
+      <p class="sub">{{ subtitle() }}</p>
     </div>
     <div class="head-actions">
-      <!-- Time range -->
       <div class="range-pills">
         @for (r of ranges; track r.value) {
           <button class="range-pill"
@@ -37,10 +36,11 @@
       {{ excludeRefunded() ? '✓ Excluding refunded' : 'Include refunded' }}
     </button>
 
+    <!-- No emoji — clean text button -->
     <button class="filter-btn"
             [class.active]="excludedCategories().size > 0"
             (click)="showCategoryFilter.set(!showCategoryFilter())">
-      🎛 Exclude categories
+      Exclude categories
       @if (excludedCategories().size > 0) {
         <span class="filter-badge">{{ excludedCategories().size }}</span>
       }
@@ -70,34 +70,34 @@
       <div class="kpi-value">{{ formatCurrency(avgMonthlySpend()) }}</div>
       <div class="kpi-sub">across selected period</div>
     </div>
-
     <div class="kpi-card">
       <div class="kpi-label">Top category</div>
       @if (topCategory(); as top) {
         <div class="kpi-value kpi-cat">
-          <span>{{ top.icon }}</span>
-          {{ top.name }}
+          <span>{{ top.icon }}</span>{{ top.name }}
         </div>
         <div class="kpi-sub">{{ formatCurrency(top.amount) }}</div>
       } @else {
         <div class="kpi-value muted">—</div>
       }
     </div>
-
     <div class="kpi-card">
       <div class="kpi-label">Savings rate</div>
-      @if (savingsRate() !== null) {
+      @if (totalIncome() === 0) {
+        <div class="kpi-value muted">—</div>
+        <div class="kpi-sub">No income this period</div>
+      } @else if (savingsRate() !== null) {
         <div class="kpi-value"
              [class.positive]="savingsRate()! > 0"
              [class.negative]="savingsRate()! < 0">
           {{ savingsRate() }}%
         </div>
+        <div class="kpi-sub">{{ savingsRateLabel() }}</div>
       } @else {
         <div class="kpi-value muted">—</div>
+        <div class="kpi-sub">income vs expenses</div>
       }
-      <div class="kpi-sub">period-over-period</div>
     </div>
-
     <div class="kpi-card">
       <div class="kpi-label">Largest expense</div>
       @if (largestExpense(); as big) {
@@ -116,13 +116,14 @@
         <div class="chart-card-title">Monthly trend</div>
         <div class="chart-card-sub">Income vs spending</div>
       </div>
+      <!-- Legend with actual colored swatches -->
       <div class="chart-legend">
         <div class="legend-item">
-          <div class="legend-dot income-dot"></div>
+          <div class="legend-swatch income-swatch"></div>
           <span>Income</span>
         </div>
         <div class="legend-item">
-          <div class="legend-dot spending-dot"></div>
+          <div class="legend-swatch spending-swatch"></div>
           <span>Spending</span>
         </div>
       </div>
@@ -135,7 +136,7 @@
   <!-- BOTTOM GRID -->
   <div class="bottom-grid">
 
-    <!-- TOP MERCHANTS -->
+    <!-- TOP MERCHANTS — rows are now clickable -->
     <div class="card-panel">
       <div class="panel-head">
         <div class="panel-title">Top merchants</div>
@@ -146,15 +147,43 @@
       }
       <div class="merchants-list">
         @for (m of topMerchants(); track m.name) {
-          <div class="merchant-row">
-            <div class="merchant-rank">{{ m.rank.toString().padStart(2, '0') }}</div>
-            <div class="merchant-info">
-              <div class="merchant-name">{{ m.name }}</div>
-              <div class="merchant-count">
-                {{ m.count }} transaction{{ m.count === 1 ? '' : 's' }}
+          <div class="merchant-item">
+
+            <!-- Main row — click to expand if multiple, open view if single -->
+            <div class="merchant-row"
+                 [class.expanded]="expandedMerchant() === m.name"
+                 (click)="m.count === 1 ? openTxView(m.lastTx) : toggleMerchant(m.name)">
+              <div class="merchant-rank">{{ m.rank.toString().padStart(2, '0') }}</div>
+              <div class="merchant-info">
+                <div class="merchant-name">{{ m.name }}</div>
+                <div class="merchant-count">
+                  {{ m.count }} transaction{{ m.count === 1 ? '' : 's' }}
+                </div>
+              </div>
+              <div class="merchant-right">
+                <div class="merchant-amount">{{ formatCurrency(m.amount) }}</div>
+                @if (m.count > 1) {
+                  <div class="merchant-chevron"
+                       [class.open]="expandedMerchant() === m.name">
+                    ›
+                  </div>
+                }
               </div>
             </div>
-            <div class="merchant-amount">{{ formatCurrency(m.amount) }}</div>
+
+            <!-- Expandable transaction list -->
+            @if (m.count > 1 && expandedMerchant() === m.name) {
+              <div class="merchant-txs">
+                @for (tx of m.txs; track tx.id) {
+                  <div class="merchant-tx-row" (click)="openTxView(tx)">
+                    <div class="merchant-tx-date">{{ formatDate(tx.date) }}</div>
+                    <div class="merchant-tx-account">{{ accountName(tx.accountId) }}</div>
+                    <div class="merchant-tx-amount">−{{ formatCurrency(tx.amount) }}</div>
+                  </div>
+                }
+              </div>
+            }
+
           </div>
         }
       </div>
@@ -164,10 +193,8 @@
     <div class="card-panel">
       <div class="panel-head">
         <div class="panel-title">Where it went</div>
-        <div class="panel-sub">{{ formatCurrency(totalExpenses()) }} total</div>
+        <div class="panel-sub">{{ formatCurrency(totalExpenses()) }} total · top 8 categories</div>
       </div>
-
-      <!-- DONUT CHART -->
       <div class="donut-wrap">
         <div class="donut-container">
           <canvas #donutCanvas></canvas>
@@ -177,8 +204,6 @@
           </div>
         </div>
       </div>
-
-      <!-- CATEGORY BARS -->
       <div class="cat-list">
         @for (cat of categoryBreakdown(); track cat.id) {
           <div class="cat-row">
@@ -202,3 +227,70 @@
   </div>
 
 </div>
+
+<!-- ── TRANSACTION VIEW PANEL ─────────────────────────────── -->
+@if (viewingTx()) {
+  <div class="view-backdrop" (click)="closeTxView()"></div>
+  <div class="view-panel">
+    <div class="view-handle"></div>
+    <div class="view-header">
+      <button class="view-close" (click)="closeTxView()">✕</button>
+      <button class="view-edit-btn" (click)="editFromTxView()">Edit</button>
+    </div>
+
+    @if (viewingTx(); as tx) {
+      <div class="view-amount-wrap">
+        <div class="view-amount neg">−{{ formatCurrency(tx.amount) }}</div>
+        @if (tx.refunded) {
+          <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
+        }
+      </div>
+      <div class="view-details">
+        <div class="view-row">
+          <span class="view-row-label">Merchant</span>
+          <span class="view-row-value">{{ tx.merchant || '—' }}</span>
+        </div>
+        <div class="view-row">
+          <span class="view-row-label">Date</span>
+          <span class="view-row-value">{{ formatFullDate(tx.date) }}</span>
+        </div>
+        <div class="view-row">
+          <span class="view-row-label">Account</span>
+          <span class="view-row-value">{{ accountName(tx.accountId) }}</span>
+        </div>
+        @if (categoryFor(tx.categoryId); as cat) {
+          <div class="view-row">
+            <span class="view-row-label">Category</span>
+            <span class="view-row-value">{{ cat.icon }} {{ cat.name }}</span>
+          </div>
+        }
+        @if (tx.notes) {
+          <div class="view-row view-row-notes">
+            <span class="view-row-label">Notes</span>
+            <span class="view-row-value notes-text">{{ tx.notes }}</span>
+          </div>
+        }
+        <div class="view-row">
+          <span class="view-row-label">Type</span>
+          <span class="view-row-value view-type-badge expense">Expense</span>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+<!-- TRANSACTION EDIT FORM -->
+<app-transaction-form
+  [open]="txFormOpen()"
+  [transaction]="editingTx()"
+  (closed)="closeTxForm()"
+  (saved)="handleTxSave($event)"
+  (deleteRequested)="askTxDelete()" />
+
+<app-confirm
+  [open]="txConfirmOpen()"
+  title="Delete transaction?"
+  message="This cannot be undone."
+  confirmText="Delete"
+  (confirmed)="confirmTxDelete()"
+  (cancelled)="txConfirmOpen.set(false)" />
