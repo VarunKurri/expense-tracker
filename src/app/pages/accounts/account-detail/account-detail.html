@@ -124,7 +124,7 @@
       } @else {
         <div class="recent-card">
           @for (tx of recentTransactions(); track tx.id; let last = $last) {
-            <div class="recent-row" [class.last]="last">
+            <div class="recent-row" [class.last]="last" (click)="openTxView(tx)">
 
               <!-- Icon -->
               <div class="recent-icon-wrap"
@@ -198,3 +198,91 @@
     <p style="color: var(--fg-3); padding: 40px 0;">Account not found.</p>
   </div>
 }
+
+<!-- TRANSACTION VIEW PANEL -->
+@if (viewingTx()) {
+  <div class="view-backdrop" (click)="closeTxView()"></div>
+  <div class="view-panel">
+    <div class="view-handle"></div>
+    <div class="view-header">
+      <button class="view-close" (click)="closeTxView()">✕</button>
+      <button class="view-edit-btn" (click)="editFromTxView()">Edit</button>
+    </div>
+    @if (viewingTx(); as tx) {
+      <div class="view-amount-wrap">
+        <div class="view-amount"
+             [class.pos]="tx.type === 'income'"
+             [class.neg]="tx.type === 'expense'"
+             [class.neu]="tx.type === 'transfer'">
+          @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
+          @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
+          @else { {{ formatCurrency(tx.amount) }} }
+        </div>
+        @if (tx.refunded) {
+          <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
+        }
+      </div>
+      <div class="view-details">
+        @if (tx.type !== 'transfer') {
+          <div class="view-row">
+            <span class="view-row-label">{{ tx.type === 'income' ? 'Source' : 'Merchant' }}</span>
+            <span class="view-row-value">{{ tx.merchant || '—' }}</span>
+          </div>
+        }
+        <div class="view-row">
+          <span class="view-row-label">Date</span>
+          <span class="view-row-value">{{ formatFullDate(tx.date) }}</span>
+        </div>
+        @if (tx.type === 'transfer') {
+          <div class="view-row">
+            <span class="view-row-label">From</span>
+            <span class="view-row-value">{{ accountName(tx.fromAccountId) }}</span>
+          </div>
+          <div class="view-row">
+            <span class="view-row-label">To</span>
+            <span class="view-row-value">{{ accountName(tx.toAccountId) }}</span>
+          </div>
+        } @else {
+          <div class="view-row">
+            <span class="view-row-label">Account</span>
+            <span class="view-row-value">{{ accountName(tx.accountId) }}</span>
+          </div>
+          @if (categoryFor(tx.categoryId); as cat) {
+            <div class="view-row">
+              <span class="view-row-label">Category</span>
+              <span class="view-row-value">{{ cat.icon }} {{ cat.name }}</span>
+            </div>
+          }
+        }
+        @if (tx.notes) {
+          <div class="view-row view-row-notes">
+            <span class="view-row-label">Notes</span>
+            <span class="view-row-value notes-text">{{ tx.notes }}</span>
+          </div>
+        }
+        <div class="view-row">
+          <span class="view-row-label">Type</span>
+          <span class="view-row-value view-type-badge" [class]="tx.type">
+            {{ tx.type === 'income' ? 'Income' : tx.type === 'expense' ? 'Expense' : 'Transfer' }}
+          </span>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+<!-- TRANSACTION EDIT FORM -->
+<app-transaction-form
+  [open]="txFormOpen()"
+  [transaction]="editingTx()"
+  (closed)="closeTxForm()"
+  (saved)="handleTxSave($event)"
+  (deleteRequested)="askTxDelete()" />
+
+<app-confirm
+  [open]="viewTxConfirmOpen()"
+  title="Delete transaction?"
+  message="This cannot be undone."
+  confirmText="Delete"
+  (confirmed)="confirmTxDelete()"
+  (cancelled)="viewTxConfirmOpen.set(false)" />

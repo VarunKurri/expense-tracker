@@ -28,6 +28,7 @@
     letter-spacing: -0.03em;
     font-variant-numeric: tabular-nums;
     color: var(--fg);
+    white-space: nowrap;
 
     &.asset     { color: var(--green); }
     &.liability { color: var(--red); }

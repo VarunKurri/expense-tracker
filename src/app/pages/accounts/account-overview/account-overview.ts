@@ -5,14 +5,15 @@ import { AccountService } from '../../../services/account.service';
 import { TransactionService } from '../../../services/transaction.service';
 import { CategoryService } from '../../../services/category.service';
 import { AccountForm } from '../account-form/account-form';
+import { TransactionForm } from '../../transactions/transaction-form/transaction-form';
 import { Confirm } from '../../../components/confirm/confirm';
-import { Account } from '../../../models';
+import { Account, Transaction } from '../../../models';
 import { ToastService } from '../../../services/toast.service';
 
 @Component({
   selector: 'app-account-overview',
   standalone: true,
-  imports: [CommonModule, AccountForm, Confirm],
+  imports: [CommonModule, AccountForm, TransactionForm, Confirm],
   templateUrl: './account-overview.html',
   styleUrl: './account-overview.scss'
 })
@@ -26,6 +27,13 @@ export class AccountOverview {
 
   formOpen = signal(false);
   confirmOpen = signal(false);
+
+  // Transaction view panel
+  viewingTx = signal<Transaction | null>(null);
+  editingTx = signal<Transaction | null>(null);
+  txFormOpen = signal(false);
+  viewTxConfirmOpen = signal(false);
+  txToDelete = signal<Transaction | null>(null);
 
   account = computed(() => {
     const id = this.route.snapshot.paramMap.get('id');
@@ -99,6 +107,62 @@ export class AccountOverview {
     return map[type || ''] || '💰';
   });
 
+  // Transaction view panel methods
+  openTxView(tx: Transaction) {
+    this.viewingTx.set(tx);
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeTxView() {
+    this.viewingTx.set(null);
+    document.body.style.overflow = '';
+  }
+
+  editFromTxView() {
+    const tx = this.viewingTx();
+    this.viewingTx.set(null);
+    document.body.style.overflow = '';
+    if (tx) {
+      this.editingTx.set(tx);
+      this.txFormOpen.set(true);
+    }
+  }
+
+  closeTxForm() {
+    this.txFormOpen.set(false);
+    this.editingTx.set(null);
+  }
+
+  async handleTxSave(data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
+    const tx = this.editingTx();
+    if (!tx?.id) return;
+    try {
+      await this.txService.update(tx.id, data);
+      this.closeTxForm();
+    } catch (err) {
+      this.toastService.error('Failed. Please try again.');
+    }
+  }
+
+  askTxDelete() {
+    this.txToDelete.set(this.editingTx());
+    this.txFormOpen.set(false);
+    this.viewTxConfirmOpen.set(true);
+  }
+
+  async confirmTxDelete() {
+    const tx = this.txToDelete();
+    if (!tx?.id) return;
+    try {
+      await this.txService.remove(tx.id);
+    } finally {
+      this.viewTxConfirmOpen.set(false);
+      this.txToDelete.set(null);
+      this.editingTx.set(null);
+    }
+  }
+
+  // Helpers
   categoryFor(id?: string) {
     if (!id) return null;
     return this.categoryService.categories().find(c => c.id === id);
@@ -125,6 +189,12 @@ export class AccountOverview {
     if (d.getTime() === today.getTime()) return 'Today';
     if (d.getTime() === yesterday.getTime()) return 'Yesterday';
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  formatFullDate(date: string): string {
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+      month: 'long', day: 'numeric', year: 'numeric'
+    });
   }
 
   goBack() { this.router.navigate(['/accounts']); }
