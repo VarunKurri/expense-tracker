@@ -7,6 +7,7 @@ import { CategoryService } from '../../../services/category.service';
 import { AccountForm } from '../account-form/account-form';
 import { Confirm } from '../../../components/confirm/confirm';
 import { Account } from '../../../models';
+import { ToastService } from '../../../services/toast.service';
 
 @Component({
   selector: 'app-account-overview',
@@ -16,6 +17,7 @@ import { Account } from '../../../models';
   styleUrl: './account-overview.scss'
 })
 export class AccountOverview {
+  private toastService = inject(ToastService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private accountService = inject(AccountService);
@@ -140,7 +142,7 @@ export class AccountOverview {
       await this.accountService.update(a.id, data);
       this.formOpen.set(false);
     } catch (err) {
-      alert('Failed: ' + (err as Error).message);
+      this.toastService.error('Failed. Please try again.');
     }
   }
 

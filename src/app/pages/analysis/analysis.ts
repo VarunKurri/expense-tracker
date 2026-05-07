@@ -10,6 +10,7 @@ import { CategoryService } from '../../services/category.service';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { Transaction } from '../../models';
+import { ToastService } from '../../services/toast.service';
 import {
   Chart, ChartData, ChartOptions,
   ArcElement, DoughnutController,
@@ -35,6 +36,7 @@ type RangeKey = 'this-month' | 'last-month' | '3-months' | 'this-year' | 'all';
   styleUrl: './analysis.scss'
 })
 export class Analysis implements AfterViewInit, OnDestroy {
+  private toastService = inject(ToastService);
   private txService = inject(TransactionService);
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
@@ -94,7 +96,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
       await this.txService.update(tx.id, data);
       this.closeTxForm();
     } catch (err) {
-      alert('Failed: ' + (err as Error).message);
+      this.toastService.error('Failed. Please try again.');
     }
   }
 

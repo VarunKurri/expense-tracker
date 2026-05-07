@@ -10,6 +10,7 @@ import { CategoryService } from '../../../services/category.service';
 import { BillService } from '../../../services/bill.service';
 import { Transaction, TransactionType } from '../../../models';
 import { QuickAddService } from '../../../services/quick-add.service';
+import { ToastService } from '../../../services/toast.service';
 
 @Component({
   selector: 'app-transaction-form',
@@ -22,6 +23,7 @@ export class TransactionForm implements OnChanges {
   accounts = inject(AccountService);
   categories = inject(CategoryService);
   billService = inject(BillService);
+  private toastService = inject(ToastService);
   private quickAddService = inject(QuickAddService);
 
   @Input() open = false;
@@ -149,16 +151,16 @@ export class TransactionForm implements OnChanges {
 
   async save() {
     if (!this.amount || this.amount <= 0) {
-      alert('Amount must be greater than zero');
+      this.toastService.error('Amount must be greater than zero');
       return;
     }
     if (this.type === 'transfer') {
       if (!this.fromAccountId || !this.toAccountId) {
-        alert('Select both accounts');
+        this.toastService.error('Please select both accounts');
         return;
       }
       if (this.fromAccountId === this.toAccountId) {
-        alert('From and To accounts must be different');
+        this.toastService.error('From and To must be different accounts');
         return;
       }
       this.saved.emit({
@@ -170,8 +172,8 @@ export class TransactionForm implements OnChanges {
         ...(this.notes.trim() ? { notes: this.notes.trim() } : {}),
       });
     } else {
-      if (!this.accountId) { alert('Select an account'); return; }
-      if (!this.merchant.trim()) { alert('Merchant / source is required'); return; }
+      if (!this.accountId) { this.toastService.error('Please select an account'); return; }
+      if (!this.merchant.trim()) { this.toastService.error('Merchant or source is required'); return; }
 
       // Emit the transaction first
       this.saved.emit({

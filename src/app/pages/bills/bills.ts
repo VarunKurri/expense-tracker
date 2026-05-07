@@ -8,6 +8,7 @@ import { BillForm } from './bill-form/bill-form';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { Bill, Transaction } from '../../models';
+import { ToastService } from '../../services/toast.service';
 
 type BillTab = 'active' | 'paused';
 
@@ -19,6 +20,7 @@ type BillTab = 'active' | 'paused';
   styleUrl: './bills.scss'
 })
 export class Bills {
+  private toastService = inject(ToastService);
   Math = Math;
 
   billService = inject(BillService);
@@ -76,7 +78,7 @@ export class Bills {
       await this.txService.update(tx.id, data);
       this.closeTxForm();
     } catch (err) {
-      alert('Failed: ' + (err as Error).message);
+      this.toastService.error('Failed. Please try again.');
     }
   }
 
@@ -190,7 +192,7 @@ export class Bills {
         c.name.toLowerCase().includes('subscription')
       );
       if (!subCat?.id) {
-        alert('No "Subscriptions" category found.');
+        this.toastService.error('No "Subscriptions" category found.');
         return;
       }
       const subTxs = this.txService.transactions().filter(t =>
@@ -213,7 +215,7 @@ export class Bills {
         added++;
       }
       this.importDone.set(true);
-      if (added === 0) alert('No new subscription bills to import.');
+      if (added === 0) this.toastService.error('No new subscription bills to import.');
     } finally {
       this.importing.set(false);
     }
@@ -249,7 +251,7 @@ export class Bills {
       const nextDate = this.billService.nextDueDate(bill);
       await this.billService.update(bill.id, { nextDueDate: nextDate });
     } catch (err) {
-      alert('Failed: ' + (err as Error).message);
+      this.toastService.error('Failed. Please try again.');
     } finally {
       this.markingPaid.set(null);
     }
@@ -281,7 +283,7 @@ export class Bills {
       }
       this.closeForm();
     } catch (err) {
-      alert('Failed: ' + (err as Error).message);
+      this.toastService.error('Failed. Please try again.');
     }
   }
 

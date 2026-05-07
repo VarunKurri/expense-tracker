@@ -1,11 +1,12 @@
 import {
   Component, EventEmitter, Input, Output,
-  OnChanges, SimpleChanges, signal
+  OnChanges, SimpleChanges, signal, inject
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Modal } from '../../../components/modal/modal';
 import { Account, AccountType } from '../../../models';
+import { ToastService } from '../../../services/toast.service';
 
 @Component({
   selector: 'app-account-form',
@@ -15,6 +16,7 @@ import { Account, AccountType } from '../../../models';
   styleUrl: './account-form.scss'
 })
 export class AccountForm implements OnChanges {
+  private toastService = inject(ToastService);
   @Input() open = false;
   @Input() account: Account | null = null;
   @Output() closed = new EventEmitter<void>();
@@ -99,7 +101,7 @@ export class AccountForm implements OnChanges {
 
   async save() {
     if (!this.name.trim()) {
-      alert('Account name is required');
+      this.toastService.error('Account name is required');
       return;
     }
     this.submitting.set(true);

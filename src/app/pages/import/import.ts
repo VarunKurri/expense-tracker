@@ -5,6 +5,7 @@ import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
 import { TransactionService } from '../../services/transaction.service';
 import { Transaction } from '../../models';
+import { ToastService } from '../../services/toast.service';
 
 interface ParsedRow {
   type: 'expense' | 'income' | 'transfer';
@@ -33,6 +34,7 @@ interface ParsedRow {
   styleUrl: './import.scss'
 })
 export class Import {
+  private toastService = inject(ToastService);
   private router = inject(Router);
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
@@ -340,7 +342,7 @@ export class Import {
   // ── Preview & Import ──────────────────────────────────────
   goToPreview() {
     if (this.allRows().length === 0) {
-      alert('Upload at least one CSV file first');
+      this.toastService.error('Please upload at least one CSV file');
       return;
     }
     this.step.set('preview');
@@ -378,7 +380,7 @@ export class Import {
         added++;
       }
     }
-    alert(`✅ Added ${added} new categories. ${newCats.length - added} already existed.`);
+    this.toastService.success(`Added ${added} new categories. ${newCats.length - added} already existed.`);
   }
   
   async runImport() {
@@ -412,7 +414,7 @@ export class Import {
       this.importedCount.set(count);
       this.step.set('done');
     } catch (err) {
-      alert('Import failed: ' + (err as Error).message);
+      this.toastService.error('Import failed. Please try again.');
     } finally {
       this.importing.set(false);
     }

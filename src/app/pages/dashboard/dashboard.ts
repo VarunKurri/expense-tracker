@@ -7,7 +7,11 @@ import { CategoryService } from '../../services/category.service';
 import { BillService } from '../../services/bill.service';
 import { BudgetService } from '../../services/budget.service';
 import { QuickAddService } from '../../services/quick-add.service';
-import { Account } from '../../models';
+import { TransactionForm } from '../transactions/transaction-form/transaction-form';
+import { BillForm } from '../bills/bill-form/bill-form';
+import { Confirm } from '../../components/confirm/confirm';
+import { ToastService } from '../../services/toast.service';
+import { Account, Bill, Transaction } from '../../models';
 import {
   Chart, ArcElement, DoughnutController,
   CategoryScale, LinearScale, BarElement, BarController,
@@ -25,7 +29,7 @@ Chart.register(
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TransactionForm, BillForm, Confirm],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -37,6 +41,8 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   private budgetService = inject(BudgetService);
   private quickAddService = inject(QuickAddService);
   private router = inject(Router);
+  private toastService = inject(ToastService);
+  Math = Math
 
   @ViewChild('miniDonutCanvas') miniDonutCanvas!: ElementRef<HTMLCanvasElement>;
   private miniDonut: Chart | null = null;
@@ -47,141 +53,196 @@ export class Dashboard implements AfterViewInit, OnDestroy {
 
   activeRange = signal<'7D' | '30D' | '90D' | 'YTD'>('30D');
 
+  testToasts() {
+    this.toastService.success('Transaction saved successfully');
+    setTimeout(() => this.toastService.error('Failed to load data'), 1000);
+    setTimeout(() => this.toastService.info('Syncing your accounts…'), 2000);
+  }
+
+  // ── Transaction view panel ────────────────────────────────
+  viewingTx = signal<Transaction | null>(null);
+  editingTx = signal<Transaction | null>(null);
+  txFormOpen = signal(false);
+  txConfirmOpen = signal(false);
+  txToDelete = signal<Transaction | null>(null);
+
+  openTxView(tx: Transaction) {
+    this.viewingTx.set(tx);
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeTxView() {
+    this.viewingTx.set(null);
+    document.body.style.overflow = '';
+  }
+
+  editFromTxView() {
+    const tx = this.viewingTx();
+    this.viewingTx.set(null);
+    document.body.style.overflow = '';
+    if (tx) { this.editingTx.set(tx); this.txFormOpen.set(true); }
+  }
+
+  closeTxForm() { this.txFormOpen.set(false); this.editingTx.set(null); }
+
+  async handleTxSave(data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
+    const tx = this.editingTx();
+    if (!tx?.id) return;
+    try { await this.txService.update(tx.id, data); this.closeTxForm(); }
+    catch (err) { this.toastService.error('Failed. Please try again.'); }
+  }
+
+  askTxDelete() {
+    this.txToDelete.set(this.editingTx());
+    this.txFormOpen.set(false);
+    this.txConfirmOpen.set(true);
+  }
+
+  async confirmTxDelete() {
+    const tx = this.txToDelete();
+    if (!tx?.id) return;
+    try { await this.txService.remove(tx.id); }
+    finally { this.txConfirmOpen.set(false); this.txToDelete.set(null); this.editingTx.set(null); }
+  }
+
+  // ── Bill edit form ────────────────────────────────────────
+  editingBill = signal<Bill | null>(null);
+  billFormOpen = signal(false);
+  billConfirmOpen = signal(false);
+  billToDelete = signal<Bill | null>(null);
+
+  openBillEdit(bill: Bill) {
+    this.editingBill.set(bill);
+    this.billFormOpen.set(true);
+  }
+
+  closeBillForm() { this.billFormOpen.set(false); this.editingBill.set(null); }
+
+  async handleBillSave(data: Omit<Bill, 'id' | 'createdAt'>) {
+    const b = this.editingBill();
+    try {
+      if (b?.id) await this.billService.update(b.id, data);
+      this.closeBillForm();
+    } catch (err) { this.toastService.error('Failed. Please try again.'); }
+  }
+
+  askBillDelete() {
+    this.billToDelete.set(this.editingBill());
+    this.billFormOpen.set(false);
+    this.billConfirmOpen.set(true);
+  }
+
+  async confirmBillDelete() {
+    const b = this.billToDelete();
+    if (!b?.id) return;
+    try { await this.billService.remove(b.id); }
+    finally { this.billConfirmOpen.set(false); this.billToDelete.set(null); this.editingBill.set(null); }
+  }
+
+  // ── Account navigation ────────────────────────────────────
+  openAccount(account: Account) {
+    if (account.type === 'credit') {
+      this.router.navigate(['/accounts', account.id]);
+    } else {
+      this.router.navigate(['/accounts/overview', account.id]);
+    }
+  }
+
+  // ── Data ──────────────────────────────────────────────────
   activeAccounts = computed(() =>
     this.accountService.accounts().filter(a => !a.archived)
   );
 
   balanceFor(account: Account): number {
     const txDelta = this.txService.balanceForAccount(account.id!);
-    let balance: number;
-    if (account.type === 'credit') {
-      balance = account.openingBalance - txDelta;
-    } else {
-      balance = (account.openingBalance || 0) + txDelta;
-    }
+    const balance = account.type === 'credit'
+      ? account.openingBalance - txDelta
+      : (account.openingBalance || 0) + txDelta;
     return Math.round(balance * 100) / 100;
   }
 
   netWorth = computed(() => {
-    let assets = 0;
-    let liabilities = 0;
+    let assets = 0, liabilities = 0;
     for (const a of this.activeAccounts()) {
       const bal = this.balanceFor(a);
-      if (a.type === 'credit') {
-        if (bal > 0) liabilities += bal;
-        else assets += Math.abs(bal);
-      } else {
-        if (bal >= 0) assets += bal;
-        else liabilities += Math.abs(bal);
-      }
+      if (a.type === 'credit') { if (bal > 0) liabilities += bal; else assets += Math.abs(bal); }
+      else { if (bal >= 0) assets += bal; else liabilities += Math.abs(bal); }
     }
     return Math.round((assets - liabilities) * 100) / 100;
   });
 
   netWorthChange = computed(() => {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const cutoff = thirtyDaysAgo.toISOString().slice(0, 10);
-    const recentNet = this.txService.transactions()
-      .filter(t => t.date >= cutoff)
-      .reduce((s, t) => {
-        if (t.type === 'income') return s + t.amount;
-        if (t.type === 'expense') return s - t.amount;
-        return s;
-      }, 0);
-    return Math.round(recentNet * 100) / 100;
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    const cutoff = this.localDateString(d);
+    return Math.round(
+      this.txService.transactions()
+        .filter(t => t.date >= cutoff)
+        .reduce((s, t) => {
+          if (t.type === 'income') return s + t.amount;
+          if (t.type === 'expense') return s - t.amount;
+          return s;
+        }, 0) * 100
+    ) / 100;
   });
 
   cashFlowData = computed(() => {
-    // Last 30 days, grouped by day
     const days: { date: string; label: string; income: number; expenses: number }[] = [];
     const now = new Date();
-
     for (let i = 29; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const date = `${y}-${m}-${day}`;
+      const date = this.localDateString(d);
       const label = i % 7 === 0 || i === 0
-        ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        : '';
+        ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
       days.push({ date, label, income: 0, expenses: 0 });
     }
-
     for (const t of this.txService.transactions()) {
       const entry = days.find(d => d.date === t.date);
       if (!entry) continue;
       if (t.type === 'income') entry.income += t.amount;
       if (t.type === 'expense') entry.expenses += t.amount;
     }
-
     return days;
   });
 
-  cashFlowNet = computed(() => {
-    return Math.round(this.cashFlowData()
-      .reduce((s, d) => s + d.income - d.expenses, 0) * 100) / 100;
-  });
-
+  cashFlowNet = computed(() =>
+    Math.round(this.cashFlowData().reduce((s, d) => s + d.income - d.expenses, 0) * 100) / 100
+  );
   cashFlowIncome = computed(() =>
     Math.round(this.cashFlowData().reduce((s, d) => s + d.income, 0) * 100) / 100
   );
-
   cashFlowExpenses = computed(() =>
     Math.round(this.cashFlowData().reduce((s, d) => s + d.expenses, 0) * 100) / 100
   );
 
   private rangeStart = computed((): string => {
     const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
     switch (this.activeRange()) {
-      case '7D': {
-        const d = new Date(now);
-        d.setDate(d.getDate() - 7);
-        return d.toISOString().slice(0, 10);
-      }
-      case '30D': {
-        const d = new Date(now);
-        d.setDate(d.getDate() - 30);
-        return d.toISOString().slice(0, 10);
-      }
-      case '90D': {
-        const d = new Date(now);
-        d.setDate(d.getDate() - 90);
-        return d.toISOString().slice(0, 10);
-      }
-      case 'YTD': return `${y}-01-01`;
+      case '7D':  { const d = new Date(now); d.setDate(d.getDate() - 7);  return this.localDateString(d); }
+      case '30D': { const d = new Date(now); d.setDate(d.getDate() - 30); return this.localDateString(d); }
+      case '90D': { const d = new Date(now); d.setDate(d.getDate() - 90); return this.localDateString(d); }
+      case 'YTD': return `${now.getFullYear()}-01-01`;
     }
   });
 
-  rangeIncome = computed(() => {
-    const start = this.rangeStart();
-    return this.txService.transactions()
-      .filter(t => t.type === 'income' && t.date >= start)
-      .reduce((s, t) => s + t.amount, 0);
-  });
-
-  rangeExpenses = computed(() => {
-    const start = this.rangeStart();
-    return this.txService.transactions()
-      .filter(t => t.type === 'expense' && t.date >= start)
-      .reduce((s, t) => s + t.amount, 0);
-  });
-
+  rangeIncome = computed(() =>
+    this.txService.transactions()
+      .filter(t => t.type === 'income' && t.date >= this.rangeStart())
+      .reduce((s, t) => s + t.amount, 0)
+  );
+  rangeExpenses = computed(() =>
+    this.txService.transactions()
+      .filter(t => t.type === 'expense' && t.date >= this.rangeStart())
+      .reduce((s, t) => s + t.amount, 0)
+  );
   savingsRate = computed(() => {
     const income = this.rangeIncome();
     if (!income) return null;
     return Math.round(((income - this.rangeExpenses()) / income) * 100);
   });
 
-  // Recent transactions — last 8
-  recentTransactions = computed(() =>
-    this.txService.transactions().slice(0, 8)
-  );
+  recentTransactions = computed(() => this.txService.transactions().slice(0, 8));
 
-  // Category for a transaction
   categoryFor(id?: string) {
     if (!id) return null;
     return this.categoryService.categories().find(c => c.id === id);
@@ -193,7 +254,6 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     return a ? a.name : '';
   }
 
-  // Time ago helper
   timeAgo(date: string): string {
     const now = new Date();
     const d = new Date(date + 'T00:00:00');
@@ -203,8 +263,12 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     return `${diff}d ago`;
   }
 
-  // Upcoming bills (next 7 days)
-  upcomingBills = computed(() => this.billService.upcomingBills(7));
+  upcomingBills = computed(() =>
+    this.billService.upcomingBills(7).filter(b => b.active)
+  );
+  overdueBills = computed(() =>
+    this.billService.overdueBills().filter(b => b.active)
+  );
 
   daysUntil(date: string): number {
     const today = new Date();
@@ -213,48 +277,55 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   }
 
-  // Budget summary for current month
-  currentMonth = new Date().toISOString().slice(0, 7);
+  localDate(dateStr: string): Date {
+    return new Date(dateStr + 'T00:00:00');
+  }
+
+  // Local date string — never UTC
+  private localDateString(d: Date = new Date()): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  // currentMonth in local time
+  currentMonth = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  })();
 
   budgetSummary = computed(() => {
     const month = this.currentMonth;
-    const defaults = this.budgetService.defaultBudgets();
-
-    return defaults.map(budget => {
-      const effective = this.budgetService.getBudgetForCategory(budget.categoryId, month);
-      if (!effective) return null;
-      const cat = this.categoryService.categories().find(c => c.id === budget.categoryId);
-      const spent = this.txService.transactions()
-        .filter(t => t.type === 'expense' && t.categoryId === budget.categoryId && t.date.startsWith(month))
-        .reduce((s, t) => s + t.amount, 0);
-      const pct = effective.amount > 0 ? Math.round((spent / effective.amount) * 100) : 0;
-      return {
-        name: cat?.name || 'Unknown',
-        icon: cat?.icon || '📦',
-        spent: Math.round(spent * 100) / 100,
-        budget: effective.amount,
-        pct,
-        status: pct >= 100 ? 'over' : pct >= 75 ? 'warn' : 'ok'
-      };
-    })
-    .filter(Boolean)
-    // Sort by % used descending — most critical first
-    .sort((a, b) => b!.pct - a!.pct)
-    // Show top 4
-    .slice(0, 4);
+    return this.budgetService.defaultBudgets()
+      .map(budget => {
+        const effective = this.budgetService.getBudgetForCategory(budget.categoryId, month);
+        if (!effective) return null;
+        const cat = this.categoryService.categories().find(c => c.id === budget.categoryId);
+        const spent = this.txService.transactions()
+          .filter(t => t.type === 'expense' && t.categoryId === budget.categoryId && t.date.startsWith(month))
+          .reduce((s, t) => s + t.amount, 0);
+        const pct = effective.amount > 0 ? Math.round((spent / effective.amount) * 100) : 0;
+        return {
+          name: cat?.name || 'Unknown', icon: cat?.icon || '📦',
+          spent: Math.round(spent * 100) / 100,
+          budget: effective.amount, pct,
+          status: pct >= 100 ? 'over' : pct >= 75 ? 'warn' : 'ok'
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b!.pct - a!.pct)
+      .slice(0, 4);
   });
 
-  // Mini donut — spending by category this month
   thisMonthExpenses = computed(() => {
-    const month = new Date().toISOString().slice(0, 7);
+    const month = this.currentMonth;
     return this.txService.transactions()
       .filter(t => t.type === 'expense' && t.date.startsWith(month) && !t.refunded);
   });
-
   thisMonthTotal = computed(() =>
     Math.round(this.thisMonthExpenses().reduce((s, t) => s + t.amount, 0) * 100) / 100
   );
-
   categoryBreakdown = computed(() => {
     const byCat = new Map<string, number>();
     for (const t of this.thisMonthExpenses()) {
@@ -263,8 +334,7 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     }
     const total = this.thisMonthTotal();
     return [...byCat.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
+      .sort((a, b) => b[1] - a[1]).slice(0, 6)
       .map(([id, amount]) => {
         const cat = id === '__none__'
           ? { name: 'Other', icon: '📦', color: '#9ca3af' }
@@ -279,44 +349,37 @@ export class Dashboard implements AfterViewInit, OnDestroy {
       });
   });
 
-  // Format helpers
+  // ── Helpers ───────────────────────────────────────────────
   formatWhole(n: number): string {
-    const rounded = Math.round(Math.abs(n) * 100) / 100;
-    return Math.floor(rounded).toLocaleString('en-US');
+    return Math.floor(Math.round(Math.abs(n) * 100) / 100).toLocaleString('en-US');
   }
-
   formatCents(n: number): string {
     const rounded = Math.round(Math.abs(n) * 100) / 100;
-    const cents = Math.round((rounded % 1) * 100);
-    return cents.toString().padStart(2, '0');
+    return Math.round((rounded % 1) * 100).toString().padStart(2, '0');
   }
-
   formatCurrency(n: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency', currency: 'USD'
-    }).format(Math.abs(n));
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.abs(n));
   }
-
   formatCurrencyShort(n: number): string {
     if (n >= 1000) return '$' + (n / 1000).toFixed(1) + 'k';
     return '$' + Math.round(n);
   }
+  formatFullDate(date: string): string {
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  }
 
   isNegative(n: number): boolean { return n < 0; }
   navigate(path: string) { this.router.navigate([path]); }
-
-  setRange(r: string) {
-    this.activeRange.set(r as '7D' | '30D' | '90D' | 'YTD');
-  }
+  setRange(r: string) { this.activeRange.set(r as '7D' | '30D' | '90D' | 'YTD'); }
 
   addMoney() {
     if (!this.router.url.includes('/transactions')) {
       this.router.navigate(['/transactions']).then(() =>
         setTimeout(() => this.quickAddService.trigger('income'), 150)
       );
-    } else {
-      this.quickAddService.trigger('income');
-    }
+    } else { this.quickAddService.trigger('income'); }
   }
 
   addExpense() {
@@ -324,12 +387,10 @@ export class Dashboard implements AfterViewInit, OnDestroy {
       this.router.navigate(['/transactions']).then(() =>
         setTimeout(() => this.quickAddService.trigger('expense'), 150)
       );
-    } else {
-      this.quickAddService.trigger('expense');
-    }
+    } else { this.quickAddService.trigger('expense'); }
   }
 
-  // Mini donut chart
+  // ── Charts ────────────────────────────────────────────────
   constructor() {
     effect(() => {
       const donutData = this.categoryBreakdown();
@@ -342,11 +403,20 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit() {
-    setTimeout(() => {
+    this.initChartsWhenReady();
+  }
+
+  // Retry until canvas elements exist — fixes blank donut on hard refresh
+  private initChartsWhenReady(attempt = 0) {
+    const donutEl = this.miniDonutCanvas?.nativeElement;
+    const flowEl = this.cashFlowCanvas?.nativeElement;
+    if (donutEl && flowEl) {
       this.initMiniDonut();
       this.initCashFlow();
       this.chartsReady = true;
-    }, 200);
+    } else if (attempt < 20) {
+      setTimeout(() => this.initChartsWhenReady(attempt + 1), 100);
+    }
   }
 
   ngOnDestroy() {
@@ -358,61 +428,29 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     const ctx = this.cashFlowCanvas?.nativeElement?.getContext('2d');
     if (!ctx) return;
     const data = this.cashFlowData();
-
     this.cashFlowChart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: data.map(d => d.label),
         datasets: [
-          {
-            label: 'Income',
-            data: data.map(d => d.income),
-            backgroundColor: 'rgba(128,128,128,0.5)',
-            borderRadius: 3,
-            barPercentage: 0.6,
-            categoryPercentage: 0.6,
-          },
-          {
-            label: 'Spending',
-            data: data.map(d => d.expenses),
-            backgroundColor: '#00D64F',
-            borderRadius: 3,
-            barPercentage: 0.6,
-            categoryPercentage: 0.6,
-          }
+          { label: 'Income', data: data.map(d => d.income), backgroundColor: 'rgba(128,128,128,0.5)', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 },
+          { label: 'Spending', data: data.map(d => d.expenses), backgroundColor: '#00D64F', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 }
         ]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              title: (items) => {
-                const idx = items[0].dataIndex;
-                return data[idx].date;
-              },
-              label: (ctx) =>
-                ` ${ctx.dataset.label}: ${this.formatCurrency(ctx.raw as number)}`
+              title: (items) => data[items[0].dataIndex].date,
+              label: (ctx) => ` ${ctx.dataset.label}: ${this.formatCurrency(ctx.raw as number)}`
             }
           }
         },
         scales: {
-          x: {
-            grid: { display: false },
-            border: { display: false },
-            ticks: { color: '#8A8A92', font: { size: 10 }, maxRotation: 0 }
-          },
-          y: {
-            grid: { color: 'rgba(128,128,128,0.1)' },
-            border: { display: false },
-            ticks: {
-              color: '#8A8A92',
-              font: { size: 10 },
-              callback: (val) => this.formatCurrencyShort(val as number)
-            }
-          }
+          x: { grid: { display: false }, border: { display: false }, ticks: { color: '#8A8A92', font: { size: 10 }, maxRotation: 0 } },
+          y: { grid: { color: 'rgba(128,128,128,0.1)' }, border: { display: false }, ticks: { color: '#8A8A92', font: { size: 10 }, callback: (val) => this.formatCurrencyShort(val as number) } }
         }
       }
     });
@@ -434,25 +472,13 @@ export class Dashboard implements AfterViewInit, OnDestroy {
       type: 'doughnut',
       data: {
         labels: data.map(d => d.name),
-        datasets: [{
-          data: data.map(d => d.amount),
-          backgroundColor: data.map(d => d.color),
-          borderWidth: 2,
-          borderColor: 'transparent',
-          hoverOffset: 4,
-        }]
+        datasets: [{ data: data.map(d => d.amount), backgroundColor: data.map(d => d.color), borderWidth: 2, borderColor: 'transparent', hoverOffset: 4 }]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '70%',
+        responsive: true, maintainAspectRatio: false, cutout: '70%',
         plugins: {
           legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` ${ctx.label}: ${this.formatCurrency(ctx.raw as number)}`
-            }
-          }
+          tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${this.formatCurrency(ctx.raw as number)}` } }
         }
       }
     });

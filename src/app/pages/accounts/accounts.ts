@@ -8,6 +8,7 @@ import { AccountCard } from './account-card/account-card';
 import { SummaryBar } from './summary-bar/summary-bar';
 import { Confirm } from '../../components/confirm/confirm';
 import { Account } from '../../models';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-accounts',
@@ -18,6 +19,7 @@ import { Account } from '../../models';
 })
 export class Accounts {
   private router = inject(Router);
+  private toastService = inject(ToastService);
   accountSvc     = inject(AccountService);
   transactionSvc = inject(TransactionService);
 
@@ -104,7 +106,7 @@ export class Accounts {
       }
       this.closeForm();
     } catch (err) {
-      alert('Failed to save account: ' + (err as Error).message);
+      this.toastService.error('Failed to save account. Please try again.');
     }
   }
 
@@ -122,7 +124,7 @@ export class Accounts {
     try {
       await this.accountSvc.remove(account.id);
     } catch (err) {
-      alert('Failed to delete: ' + (err as Error).message);
+      this.toastService.error('Failed to delete. Please try again.');
     } finally {
       this.confirmOpen.set(false);
       this.accountToDelete.set(null);

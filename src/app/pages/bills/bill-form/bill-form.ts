@@ -8,6 +8,7 @@ import { Modal } from '../../../components/modal/modal';
 import { AccountService } from '../../../services/account.service';
 import { CategoryService } from '../../../services/category.service';
 import { Bill, BillFrequency } from '../../../models';
+import { ToastService } from '../../../services/toast.service';
 
 @Component({
   selector: 'app-bill-form',
@@ -17,6 +18,7 @@ import { Bill, BillFrequency } from '../../../models';
   styleUrl: './bill-form.scss'
 })
 export class BillForm implements OnChanges {
+  private toastService = inject(ToastService);
   accounts = inject(AccountService);
   categories = inject(CategoryService);
 
@@ -91,9 +93,9 @@ export class BillForm implements OnChanges {
   }
 
   save() {
-    if (!this.name.trim()) { alert('Name is required'); return; }
-    if (!this.amount || this.amount <= 0) { alert('Amount must be greater than zero'); return; }
-    if (!this.nextDueDate) { alert('Due date is required'); return; }
+    if (!this.name.trim()) { this.toastService.error('Name is required'); return; }
+    if (!this.amount || this.amount <= 0) { this.toastService.error('Amount must be greater than zero'); return; }
+    if (!this.nextDueDate) { this.toastService.error('Due date is required'); return; }
 
     const data: Omit<Bill, 'id' | 'createdAt'> = {
       name: this.name.trim(),

@@ -8,6 +8,7 @@ import { Modal } from '../../../components/modal/modal';
 import { CategoryService } from '../../../services/category.service';
 import { BudgetService } from '../../../services/budget.service';
 import { Budget } from '../../../models';
+import { ToastService } from '../../../services/toast.service';
 
 @Component({
   selector: 'app-budget-form',
@@ -17,6 +18,7 @@ import { Budget } from '../../../models';
   styleUrl: './budget-form.scss'
 })
 export class BudgetForm implements OnChanges {
+  private toastService = inject(ToastService);
   categories = inject(CategoryService);
   budgetService = inject(BudgetService);
 
@@ -69,8 +71,8 @@ export class BudgetForm implements OnChanges {
   }
 
   save() {
-    if (!this.categoryId) { alert('Select a category'); return; }
-    if (!this.amount || this.amount <= 0) { alert('Amount must be greater than zero'); return; }
+    if (!this.categoryId) { this.toastService.error('Please select a category'); return; }
+    if (!this.amount || this.amount <= 0) { this.toastService.error('Amount must be greater than zero'); return; }
 
     const data: Omit<Budget, 'id' | 'createdAt'> = {
       categoryId: this.categoryId,

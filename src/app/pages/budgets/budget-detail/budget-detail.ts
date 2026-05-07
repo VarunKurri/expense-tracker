@@ -8,6 +8,7 @@ import { AccountService } from '../../../services/account.service';
 import { TransactionForm } from '../../transactions/transaction-form/transaction-form';
 import { Confirm } from '../../../components/confirm/confirm';
 import { Transaction } from '../../../models';
+import { ToastService } from '../../../services/toast.service';
 
 @Component({
   selector: 'app-budget-detail',
@@ -17,6 +18,7 @@ import { Transaction } from '../../../models';
   styleUrl: './budget-detail.scss'
 })
 export class BudgetDetail {
+  private toastService = inject(ToastService);
   Math = Math;
 
   private route = inject(ActivatedRoute);
@@ -133,7 +135,7 @@ export class BudgetDetail {
       await this.txService.update(tx.id, data);
       this.closeTxForm();
     } catch (err) {
-      alert('Failed: ' + (err as Error).message);
+      this.toastService.error('Failed. Please try again.');
     }
   }
 

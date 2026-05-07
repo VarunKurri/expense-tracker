@@ -7,6 +7,7 @@ import { CategoryService } from '../../../services/category.service';
 import { AccountForm } from '../account-form/account-form';
 import { Confirm } from '../../../components/confirm/confirm';
 import { Account } from '../../../models';
+import { ToastService } from '../../../services/toast.service';
 
 @Component({
   selector: 'app-account-detail',
@@ -21,6 +22,7 @@ export class AccountDetail {
   private accountService = inject(AccountService);
   private txService = inject(TransactionService);
   private categoryService = inject(CategoryService);
+  private toastService = inject(ToastService);
 
   formOpen = signal(false);
   confirmOpen = signal(false);
@@ -136,7 +138,7 @@ export class AccountDetail {
       await this.accountService.update(a.id, data);
       this.formOpen.set(false);
     } catch (err) {
-      alert('Failed: ' + (err as Error).message);
+      this.toastService.error('Failed. Please try again.');
     }
   }
 

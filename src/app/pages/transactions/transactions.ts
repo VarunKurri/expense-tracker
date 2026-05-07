@@ -9,6 +9,7 @@ import { TransactionForm } from './transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { Transaction } from '../../models';
 import { QuickAddService } from '../../services/quick-add.service';
+import { ToastService } from '../../services/toast.service';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
 type DateRange = 'last-30' | 'this-month' | 'last-month' | 'this-year' | 'all';
@@ -21,6 +22,7 @@ type DateRange = 'last-30' | 'this-month' | 'last-month' | 'this-year' | 'all';
   styleUrl: './transactions.scss',
 })
 export class Transactions {
+  private toastService = inject(ToastService);
   private txService = inject(TransactionService);
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
@@ -267,7 +269,7 @@ export class Transactions {
       }
       this.closeForm();
     } catch (err) {
-      alert('Failed: ' + (err as Error).message);
+      this.toastService.error('Import failed. Please try again.');
     }
   }
 

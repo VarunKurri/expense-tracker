@@ -8,6 +8,7 @@ import { TransactionService } from '../../services/transaction.service';
 import { BudgetForm } from './budget-form/budget-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { Budget } from '../../models';
+import { ToastService } from '../../services/toast.service';
 
 interface BudgetRow {
   budget: Budget;
@@ -27,6 +28,7 @@ interface BudgetRow {
   styleUrl: './budgets.scss'
 })
 export class Budgets {
+  private toastService = inject(ToastService);
   Math = Math;
 
   budgetService = inject(BudgetService);
@@ -225,7 +227,7 @@ export class Budgets {
       }
       this.closeForm();
     } catch (err) {
-      alert('Failed: ' + (err as Error).message);
+      this.toastService.error('Failed. Please try again.');
     }
   }
 

@@ -1,0 +1,105 @@
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  align-items: flex-end;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-radius: 14px;
+  min-width: 260px;
+  max-width: 380px;
+  pointer-events: all;
+  cursor: pointer;
+  animation: toastIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.1);
+  border: 1px solid transparent;
+
+  &.success {
+    background: var(--green);
+    color: #000;
+    border-color: var(--green-hi);
+  }
+
+  &.error {
+    background: var(--red-bg);
+    color: var(--red);
+    border-color: rgba(255, 77, 94, 0.3);
+    background: #1a0608;
+  }
+
+  &.info {
+    background: var(--surface-hi);
+    color: var(--fg);
+    border-color: var(--line);
+  }
+}
+
+.toast-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  .success & { background: rgba(0,0,0,0.15); }
+  .error &   { background: rgba(255, 77, 94, 0.2); color: var(--red); }
+  .info &    { background: var(--bg-3); color: var(--fg-3); }
+}
+
+.toast-msg {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  font-family: inherit;
+
+  .success & { color: #000; font-weight: 600; }
+  .error &   { color: var(--red); }
+  .info &    { color: var(--fg); }
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  opacity: 0.5;
+  padding: 2px;
+  line-height: 1;
+  flex-shrink: 0;
+  font-family: inherit;
+  transition: opacity 0.18s ease;
+
+  .success & { color: #000; }
+  .error &   { color: var(--red); }
+  .info &    { color: var(--fg); }
+
+  &:hover { opacity: 1; }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 480px) {
+  .toast-container {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    align-items: stretch;
+  }
+  .toast { min-width: unset; max-width: unset; }
+}

@@ -36,7 +36,14 @@
     <div class="hero-actions">
       <button class="btn-primary" (click)="addMoney()">+ Add money</button>
       <button class="btn-ghost" (click)="addExpense()">− Add expense</button>
-      <button class="btn-ghost" (click)="navigate('/accounts')">▤ Accounts</button>
+      <!-- Fixed: proper SVG accounts icon matching sidebar nav -->
+      <button class="btn-ghost" (click)="navigate('/accounts')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="2"/>
+          <line x1="2" y1="10" x2="22" y2="10"/>
+        </svg>
+        Accounts
+      </button>
     </div>
   </div>
 
@@ -92,9 +99,14 @@
     </div>
     <div class="accts-strip">
       @for (account of activeAccounts(); track account.id) {
-        <div class="acct-card" (click)="navigate('/accounts')">
+        <!-- Fixed: navigate to account detail page, not /accounts list -->
+        <div class="acct-card" (click)="openAccount(account)">
           <div class="acct-head">
-            <div class="acct-emoji">{{ account.icon || '🏦' }}</div>
+            <div class="acct-emoji"
+                 [style.background]="(account.color || '#22c55e') + '22'"
+                 [style.border-color]="(account.color || '#22c55e') + '33'">
+              {{ account.icon || '🏦' }}
+            </div>
             <span class="acct-type">{{ account.type }}</span>
           </div>
           <div class="acct-name">{{ account.name }}</div>
@@ -152,6 +164,7 @@
             <div class="panel-title">Activity</div>
             <div class="panel-sub-text">Recent transactions</div>
           </div>
+          <!-- View all → goes to transactions page -->
           <button class="panel-link" (click)="navigate('/transactions')">View all →</button>
         </div>
 
@@ -160,13 +173,13 @@
         }
 
         @for (tx of recentTransactions(); track tx.id) {
-          <div class="activity-row" (click)="navigate('/transactions')">
+          <!-- Fixed: click opens view panel, not /transactions page -->
+          <div class="activity-row" (click)="openTxView(tx)">
             <div class="activity-icon"
                 [class.income]="tx.type === 'income'"
                 [class.transfer]="tx.type === 'transfer'">
-              @if (categoryFor(tx.categoryId); as cat) {
-                {{ cat.icon }}
-              } @else if (tx.type === 'income') { ↓ }
+              @if (categoryFor(tx.categoryId); as cat) { {{ cat.icon }} }
+              @else if (tx.type === 'income') { ↓ }
               @else if (tx.type === 'transfer') { ↔ }
               @else { ↑ }
             </div>
@@ -185,9 +198,8 @@
               </div>
             </div>
             <div class="activity-amount"
-                [class.pos]="tx.type === 'income'"
-                [class.neg]="tx.type === 'expense'"
-                [class.neu]="tx.type === 'transfer'">
+                [class.pos]="tx.type === 'income' || tx.type === 'transfer'"
+                [class.neg]="tx.type === 'expense'">
               @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
               @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
               @else { {{ formatCurrency(tx.amount) }} }
@@ -198,7 +210,7 @@
 
     </div>
 
-    <!-- RIGHT COLUMN — single continuous column -->
+    <!-- RIGHT COLUMN -->
     <div class="right-col">
 
       <!-- Where it went -->
@@ -234,22 +246,50 @@
       }
 
       <!-- Upcoming bills -->
-      @if (upcomingBills().length > 0) {
+      @if (upcomingBills().length > 0 || overdueBills().length > 0) {
         <div class="panel">
           <div class="panel-head">
             <div>
               <div class="panel-title">Upcoming</div>
-              <div class="panel-sub-text">
+              <div class="panel-sub-text" style="display:flex; align-items:center; gap:8px;">
                 {{ upcomingBills().length }} bill{{ upcomingBills().length === 1 ? '' : 's' }}
+                @if (overdueBills().length > 0) {
+                  <span class="overdue-badge">{{ overdueBills().length }} overdue</span>
+                }
               </div>
             </div>
+            <!-- View all → goes to bills page -->
             <button class="panel-link" (click)="navigate('/bills')">All →</button>
           </div>
+
+          <!-- Overdue bills shown first -->
+          @for (bill of overdueBills(); track bill.id) {
+            <div class="upcoming-row overdue-bill-row" (click)="openBillEdit(bill)">
+              <div class="upcoming-date overdue-date">
+                <div class="upcoming-day">{{ localDate(bill.nextDueDate).getDate() }}</div>
+                <div class="upcoming-mon">
+                  {{ localDate(bill.nextDueDate).toLocaleDateString('en-US', {month:'short'}).toUpperCase() }}
+                </div>
+              </div>
+              <div class="upcoming-info">
+                <div class="upcoming-name">{{ bill.name }}</div>
+                <div class="upcoming-meta overdue-meta">
+                  {{ Math.abs(daysUntil(bill.nextDueDate)) }}d overdue · {{ bill.frequency }}
+                </div>
+              </div>
+              <div class="upcoming-amount overdue-amount">{{ formatCurrency(bill.amount) }}</div>
+            </div>
+          }
+
+          <!-- Upcoming bills -->
           @for (bill of upcomingBills(); track bill.id) {
-            <div class="upcoming-row" (click)="navigate('/bills')">
+            <!-- Fixed: click opens bill edit form, not /bills page -->
+            <div class="upcoming-row" (click)="openBillEdit(bill)">
               <div class="upcoming-date">
-                <div class="upcoming-day">{{ bill.nextDueDate | date:'d' }}</div>
-                <div class="upcoming-mon">{{ bill.nextDueDate | date:'MMM' | uppercase }}</div>
+                <div class="upcoming-day">{{ localDate(bill.nextDueDate).getDate() }}</div>
+                <div class="upcoming-mon">
+                  {{ localDate(bill.nextDueDate).toLocaleDateString('en-US', {month:'short'}).toUpperCase() }}
+                </div>
               </div>
               <div class="upcoming-info">
                 <div class="upcoming-name">{{ bill.name }}</div>
@@ -270,7 +310,7 @@
         <div class="panel">
           <div class="panel-head">
             <div>
-              <div class="panel-title">Budgets · {{ currentMonth | date:'MMMM' }}</div>
+              <div class="panel-title">Budgets · {{ localDate(currentMonth + '-01').toLocaleDateString('en-US', {month:'long'}) }}</div>
               <div class="panel-sub-text">{{ budgetSummary().length }} tracked</div>
             </div>
             <button class="panel-link" (click)="navigate('/budgets')">Manage →</button>
@@ -302,3 +342,106 @@
   </div>
 
 </div>
+
+<!-- ── TRANSACTION VIEW PANEL ─────────────────────────────── -->
+@if (viewingTx()) {
+  <div class="view-backdrop" (click)="closeTxView()"></div>
+  <div class="view-panel">
+    <div class="view-handle"></div>
+    <div class="view-header">
+      <button class="view-close" (click)="closeTxView()">✕</button>
+      <button class="view-edit-btn" (click)="editFromTxView()">Edit</button>
+    </div>
+    @if (viewingTx(); as tx) {
+      <div class="view-amount-wrap">
+        <div class="view-amount"
+             [class.pos]="tx.type === 'income' || tx.type === 'transfer'"
+             [class.neg]="tx.type === 'expense'">
+          @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
+          @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
+          @else { {{ formatCurrency(tx.amount) }} }
+        </div>
+        @if (tx.refunded) {
+          <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
+        }
+      </div>
+      <div class="view-details">
+        @if (tx.type !== 'transfer') {
+          <div class="view-row">
+            <span class="view-row-label">{{ tx.type === 'income' ? 'Source' : 'Merchant' }}</span>
+            <span class="view-row-value">{{ tx.merchant || '—' }}</span>
+          </div>
+        }
+        <div class="view-row">
+          <span class="view-row-label">Date</span>
+          <span class="view-row-value">{{ formatFullDate(tx.date) }}</span>
+        </div>
+        @if (tx.type === 'transfer') {
+          <div class="view-row">
+            <span class="view-row-label">From</span>
+            <span class="view-row-value">{{ accountName(tx.fromAccountId) }}</span>
+          </div>
+          <div class="view-row">
+            <span class="view-row-label">To</span>
+            <span class="view-row-value">{{ accountName(tx.toAccountId) }}</span>
+          </div>
+        } @else {
+          <div class="view-row">
+            <span class="view-row-label">Account</span>
+            <span class="view-row-value">{{ accountName(tx.accountId) }}</span>
+          </div>
+          @if (categoryFor(tx.categoryId); as cat) {
+            <div class="view-row">
+              <span class="view-row-label">Category</span>
+              <span class="view-row-value">{{ cat.icon }} {{ cat.name }}</span>
+            </div>
+          }
+        }
+        @if (tx.notes) {
+          <div class="view-row">
+            <span class="view-row-label">Notes</span>
+            <span class="view-row-value notes-text">{{ tx.notes }}</span>
+          </div>
+        }
+        <div class="view-row">
+          <span class="view-row-label">Type</span>
+          <span class="view-row-value view-type-badge" [class]="tx.type">
+            {{ tx.type === 'income' ? 'Income' : tx.type === 'expense' ? 'Expense' : 'Transfer' }}
+          </span>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+<!-- TRANSACTION EDIT FORM -->
+<app-transaction-form
+  [open]="txFormOpen()"
+  [transaction]="editingTx()"
+  (closed)="closeTxForm()"
+  (saved)="handleTxSave($event)"
+  (deleteRequested)="askTxDelete()" />
+
+<app-confirm
+  [open]="txConfirmOpen()"
+  title="Delete transaction?"
+  message="This cannot be undone."
+  confirmText="Delete"
+  (confirmed)="confirmTxDelete()"
+  (cancelled)="txConfirmOpen.set(false)" />
+
+<!-- BILL EDIT FORM -->
+<app-bill-form
+  [open]="billFormOpen()"
+  [bill]="editingBill()"
+  (closed)="closeBillForm()"
+  (saved)="handleBillSave($event)"
+  (deleteRequested)="askBillDelete()" />
+
+<app-confirm
+  [open]="billConfirmOpen()"
+  title="Delete bill?"
+  [message]="'Permanently delete &quot;' + (billToDelete()?.name || '') + '&quot;?'"
+  confirmText="Delete"
+  (confirmed)="confirmBillDelete()"
+  (cancelled)="billConfirmOpen.set(false)" />

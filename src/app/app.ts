@@ -4,7 +4,9 @@ import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
 import { SeedService } from './services/seed.service';
 import { ThemeService } from './services/theme.service';
+import { ToastService } from './services/toast.service';
 import { Icon } from './components/icon/icon';
+import { Toast } from './components/toast/toast';
 import { QuickAddService } from './services/quick-add.service';
 import { BillService } from './services/bill.service';
 
@@ -18,7 +20,7 @@ interface NavItem {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, Icon],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, Icon, Toast],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -26,11 +28,13 @@ export class App {
   auth = inject(AuthService);
   seed = inject(SeedService);
   themeService = inject(ThemeService);
+  toastService = inject(ToastService);
   private router = inject(Router);
   quickAddService = inject(QuickAddService);
   billService = inject(BillService);
 
   sidebarOpen = signal(false);
+  signingIn = signal(false);
 
   nav = computed((): NavItem[] => [
     { path: '/dashboard',    label: 'Home',         iconName: 'home' },
@@ -42,16 +46,6 @@ export class App {
     { path: '/analysis',     label: 'Analysis',     iconName: 'analysis' },
   ]);
 
-  // Stroke-based SVG paths, 20×20 viewBox
-  // readonly navIcons: Record<string, string> = {
-  //   dashboard:    'M2 2h7v7H2zm9 0h7v7h-7zM2 11h7v7H2zm9 0h7v7h-7z',
-  //   accounts:     'M2 8a2 2 0 012-2h12a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V8zm0 3h16M6 15h4',
-  //   transactions: 'M4 8l3-4 3 4M7 4v9M10 12l3 4 3-4M13 16V7',
-  //   bills:        'M5 6h10M5 10h10M5 14h6',
-  //   budgets:      'M10 2a8 8 0 100 16A8 8 0 0010 2zm0 5a3 3 0 100 6 3 3 0 000-6z',
-  //   analysis:     'M2.5 15.5l5-6.5 4 4 5.5-8M15 5h3.5v3.5',
-  // };
-
   constructor() {
     effect(async () => {
       if (this.auth.user()) {
@@ -61,7 +55,6 @@ export class App {
   }
 
   onNavClick() {
-    // Close sidebar on mobile after navigation
     if (window.innerWidth < 769) {
       this.sidebarOpen.set(false);
     }
@@ -78,11 +71,18 @@ export class App {
   }
 
   async signIn() {
-    try { await this.auth.signInWithGoogle(); }
-    catch (err) { alert('Sign in failed: ' + (err as Error).message); }
+    if (this.signingIn()) return;
+    this.signingIn.set(true);
+    try {
+      await this.auth.signInWithGoogle();
+      // null return = user cancelled popup, no toast needed
+    } catch (err) {
+      this.toastService.error('Sign in failed. Please try again.');
+    } finally {
+      this.signingIn.set(false);
+    }
   }
 
   signOut() { this.auth.signOut(); }
-
   toggleSidebar() { this.sidebarOpen.update(v => !v); }
 }
