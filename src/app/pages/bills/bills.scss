@@ -178,6 +178,7 @@
   border-radius: 999px;
   font-size: 10.5px;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .bill-amount-muted {
@@ -305,7 +306,16 @@
   margin-top: 3px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.bill-meta-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .autopay-chip {
@@ -315,6 +325,7 @@
   border-radius: 999px;
   font-size: 10.5px;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .bill-right {
