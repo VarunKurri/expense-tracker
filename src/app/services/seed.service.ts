@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
@@ -8,7 +8,7 @@ export class SeedService {
   private db   = inject(Firestore);
   private auth = inject(AuthService);
 
-  // Prevents multiple concurrent or repeated seed calls in the same session
+  // Prevents multiple concurrent calls within the same session
   private seeding = false;
 
   async seedIfEmpty() {
@@ -19,7 +19,12 @@ export class SeedService {
       const user = this.auth.user();
       if (!user) return;
 
-      // Query Firestore directly — the signal may not have loaded yet
+      // One-time sentinel: once written, seeding never runs again for this user
+      // even if all accounts are later deleted.
+      const sentinelRef = doc(this.db, `users/${user.uid}/meta/seed`);
+      const sentinelSnap = await getDoc(sentinelRef);
+      if (sentinelSnap.exists()) return;
+
       const accountsSnap = await getDocs(collection(this.db, `users/${user.uid}/accounts`));
       if (accountsSnap.empty) {
         const ref = collection(this.db, `users/${user.uid}/accounts`);
@@ -60,8 +65,11 @@ export class SeedService {
           await addDoc(ref, { ...c, kind: 'income', createdAt: Date.now() });
         }
       }
+
+      // Mark this user as seeded so the block above never runs again
+      await setDoc(sentinelRef, { seededAt: Date.now() });
     } finally {
-      // Keep seeded=true so subsequent effect() firings are ignored this session
+      // Keep seeding=true so repeated effect() firings are ignored this session
     }
   }
 }
