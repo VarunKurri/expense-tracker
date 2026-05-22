@@ -161,11 +161,12 @@
 
               <!-- Amount -->
               <div class="recent-amount"
-                  [class.pos]="tx.type === 'income' || tx.type === 'transfer'"
-                  [class.neg]="tx.type === 'expense'">
+                  [class.pos]="tx.type === 'income' || (tx.type === 'transfer' && isTransferIn(tx))"
+                  [class.neg]="tx.type === 'expense' || (tx.type === 'transfer' && !isTransferIn(tx))">
                 @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
                 @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
-                @else { {{ formatCurrency(tx.amount) }} }
+                @else if (isTransferIn(tx)) { +{{ formatCurrency(tx.amount) }} }
+                @else { −{{ formatCurrency(tx.amount) }} }
               </div>
 
             </div>
