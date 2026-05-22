@@ -335,6 +335,7 @@
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  color: var(--fg);
 
   &.pos { color: var(--green); }
   &.neg { color: var(--fg); }
