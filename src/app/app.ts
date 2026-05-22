@@ -9,6 +9,7 @@ import { Icon } from './components/icon/icon';
 import { Toast } from './components/toast/toast';
 import { QuickAddService } from './services/quick-add.service';
 import { BillService } from './services/bill.service';
+import { AutopayService } from './services/autopay.service';
 
 interface NavItem {
   path: string;
@@ -32,6 +33,7 @@ export class App {
   private router = inject(Router);
   quickAddService = inject(QuickAddService);
   billService = inject(BillService);
+  private autopayService = inject(AutopayService);
 
   sidebarOpen = signal(false);
   signingIn = signal(false);
@@ -50,6 +52,7 @@ export class App {
     effect(async () => {
       if (this.auth.user()) {
         setTimeout(() => this.seed.seedIfEmpty(), 500);
+        setTimeout(() => this.autopayService.processOverdueBills(), 1000);
       }
     });
   }

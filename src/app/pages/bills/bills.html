@@ -100,9 +100,9 @@
         <span class="section-title">Upcoming · next 30 days</span>
       </div>
       <div class="bills-list">
-        @for (bill of upcoming(); track bill.id; let first = $first) {
+        @for (bill of upcoming(); track bill.id) {
           <div class="bill-row" (click)="openEdit(bill)">
-            <div class="bill-date-box" [class.date-box-accent]="first">
+            <div class="bill-date-box" [class.date-box-accent]="daysUntil(bill.nextDueDate) <= 1">
               <div class="bill-day">{{ localDate(bill.nextDueDate).getDate() }}</div>
               <div class="bill-mon">
                 {{ localDate(bill.nextDueDate).toLocaleDateString('en-US', { month: 'short' }).toUpperCase() }}

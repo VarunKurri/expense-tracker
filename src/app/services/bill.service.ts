@@ -40,7 +40,7 @@ export class BillService {
 
   overdueBills() {
     const today = new Date().toISOString().slice(0, 10);
-    return this.bills().filter(b => b.active && b.nextDueDate < today);
+    return this.bills().filter(b => b.active && !b.autopayEnabled && b.nextDueDate < today);
   }
 
   nextDueDate(bill: Bill): string {
