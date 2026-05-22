@@ -111,9 +111,11 @@
             <div class="bill-main">
               <div class="bill-name">{{ bill.name }}</div>
               <div class="bill-meta">
-                {{ frequencyLabel(bill.frequency) }}
-                @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
-                @if (bill.autopayEnabled) { · <span class="autopay-chip">Autopay</span> }
+                <span class="bill-meta-text">
+                  {{ frequencyLabel(bill.frequency) }}
+                  @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
+                </span>
+                @if (bill.autopayEnabled) { <span class="autopay-chip">Autopay</span> }
               </div>
             </div>
             <div class="bill-right">
@@ -251,8 +253,10 @@
             <div class="bill-main">
               <div class="bill-name">{{ bill.name }}</div>
               <div class="bill-meta">
-                {{ frequencyLabel(bill.frequency) }}
-                @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
+                <span class="bill-meta-text">
+                  {{ frequencyLabel(bill.frequency) }}
+                  @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
+                </span>
                 <span class="paused-chip">Paused</span>
               </div>
             </div>
