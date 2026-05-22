@@ -155,6 +155,10 @@ export class AccountDetail {
     }
   }
 
+  isTransferIn(tx: Transaction): boolean {
+    return tx.toAccountId === this.account()?.id;
+  }
+
   // Helpers
   categoryFor(id?: string) {
     if (!id) return null;
