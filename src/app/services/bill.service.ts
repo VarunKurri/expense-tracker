@@ -29,17 +29,17 @@ export class BillService {
 
   // Upcoming bills — due within next 30 days
   upcomingBills(days = 30) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     const future = new Date();
     future.setDate(future.getDate() + days);
-    const futureStr = future.toISOString().slice(0, 10);
+    const futureStr = localDateString(future);
     return this.bills().filter(b =>
       b.active && b.nextDueDate >= today && b.nextDueDate <= futureStr
     );
   }
 
   overdueBills() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     return this.bills().filter(b => b.active && !b.autopayEnabled && b.nextDueDate < today);
   }
 
@@ -84,4 +84,8 @@ export class BillService {
     if (!user) throw new Error('Not signed in');
     await deleteDoc(doc(this.db, `users/${user.uid}/bills/${id}`));
   }
+}
+
+function localDateString(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
