@@ -26,12 +26,15 @@ export class AutopayService {
     const today = localDateString();
 
     try {
+      // Snapshot bills synchronously before any await — avoids any post-await staleness
+      const bills = this.billService.bills();
+
       const sentinelRef = doc(this.db, `users/${user.uid}/meta/autopay-v3`);
       const sentinel = await getDoc(sentinelRef);
       if (sentinel.exists() && sentinel.data()['lastProcessed'] === today) return;
 
       let anyError = false;
-      for (const bill of this.billService.bills()) {
+      for (const bill of bills) {
         if (!bill.active || !bill.autopayEnabled || !bill.id) continue;
         if (bill.nextDueDate > today) continue;
 

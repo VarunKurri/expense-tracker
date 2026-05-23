@@ -1,9 +1,10 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BillService } from '../../services/bill.service';
 import { TransactionService } from '../../services/transaction.service';
 import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
+import { AutopayService } from '../../services/autopay.service';
 import { BillForm } from './bill-form/bill-form';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
@@ -21,12 +22,23 @@ type BillTab = 'active' | 'paused';
 })
 export class Bills {
   private toastService = inject(ToastService);
+  private autopayService = inject(AutopayService);
   Math = Math;
 
   billService = inject(BillService);
   txService = inject(TransactionService);
   accountService = inject(AccountService);
   categoryService = inject(CategoryService);
+
+  constructor() {
+    // Re-check autopay every time the Bills page loads and bills are available.
+    // This is a reliable secondary trigger — the sentinel prevents double-processing.
+    effect(() => {
+      if (this.billService.bills().length > 0) {
+        untracked(() => this.autopayService.runIfNeeded());
+      }
+    });
+  }
 
   formOpen = signal(false);
   editing = signal<Bill | null>(null);
