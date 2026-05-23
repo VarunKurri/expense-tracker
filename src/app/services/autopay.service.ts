@@ -12,24 +12,25 @@ export class AutopayService {
   private txService = inject(TransactionService);
   private billService = inject(BillService);
 
-  private ranToday = false;
+  private running = false;
 
   // Called from App component effect once bills signal is populated
   async runIfNeeded() {
-    if (this.ranToday) return;
-    this.ranToday = true;
+    if (this.running) return;
+    this.running = true;
 
     const user = this.auth.user();
-    if (!user) { this.ranToday = false; return; }
+    if (!user) { this.running = false; return; }
 
     // Use local date, not UTC — avoids false "tomorrow" result in US evening hours
     const today = localDateString();
 
     try {
-      const sentinelRef = doc(this.db, `users/${user.uid}/meta/autopay-v2`);
+      const sentinelRef = doc(this.db, `users/${user.uid}/meta/autopay-v3`);
       const sentinel = await getDoc(sentinelRef);
       if (sentinel.exists() && sentinel.data()['lastProcessed'] === today) return;
 
+      let anyError = false;
       for (const bill of this.billService.bills()) {
         if (!bill.active || !bill.autopayEnabled || !bill.id) continue;
         if (bill.nextDueDate > today) continue;
@@ -51,13 +52,18 @@ export class AutopayService {
           await this.billService.update(bill.id, { nextDueDate: nextDate });
         } catch (err) {
           console.error(`Autopay: failed to process "${bill.name}"`, err);
+          anyError = true;
         }
       }
 
-      await setDoc(sentinelRef, { lastProcessed: today });
+      // Only mark as done if everything succeeded — lets failed bills retry next load
+      if (!anyError) {
+        await setDoc(sentinelRef, { lastProcessed: today });
+      }
     } catch (err) {
       console.error('Autopay: error, will retry next load', err);
-      this.ranToday = false;
+    } finally {
+      this.running = false;
     }
   }
 }
