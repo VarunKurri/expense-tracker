@@ -1,4 +1,4 @@
-import { Injectable, inject, effect, untracked } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { AuthService } from './auth.service';
@@ -14,26 +14,16 @@ export class AutopayService {
 
   private ranToday = false;
 
-  constructor() {
-    // Fires whenever auth.user() or billService.bills() change.
-    // Waits for both to be ready before processing — no setTimeout needed.
-    effect(() => {
-      const user = this.auth.user();
-      const bills = this.billService.bills();
-      if (!user || bills.length === 0 || this.ranToday) return;
-      untracked(() => this.run());
-    });
-  }
-
-  private async run() {
-    // Synchronously guard before any await so parallel effect firings can't double-run
+  // Called from App component effect once bills signal is populated
+  async runIfNeeded() {
     if (this.ranToday) return;
     this.ranToday = true;
 
     const user = this.auth.user();
     if (!user) { this.ranToday = false; return; }
 
-    const today = new Date().toISOString().slice(0, 10);
+    // Use local date, not UTC — avoids false "tomorrow" result in US evening hours
+    const today = localDateString();
 
     try {
       const sentinelRef = doc(this.db, `users/${user.uid}/meta/autopay-v2`);
@@ -66,8 +56,13 @@ export class AutopayService {
 
       await setDoc(sentinelRef, { lastProcessed: today });
     } catch (err) {
-      console.error('Autopay: sentinel error, will retry next load', err);
+      console.error('Autopay: error, will retry next load', err);
       this.ranToday = false;
     }
   }
+}
+
+function localDateString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

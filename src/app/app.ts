@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect } from '@angular/core';
+import { Component, inject, signal, computed, effect, untracked } from '@angular/core';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
@@ -49,9 +49,20 @@ export class App {
   ]);
 
   constructor() {
+    // Seed default data once after login
     effect(async () => {
       if (this.auth.user()) {
         setTimeout(() => this.seed.seedIfEmpty(), 500);
+      }
+    });
+
+    // Autopay: fires when both user AND bills signal are populated.
+    // Component effects are guaranteed to run; service-constructor effects are not.
+    effect(() => {
+      const user = this.auth.user();
+      const bills = this.billService.bills();
+      if (user && bills.length > 0) {
+        untracked(() => this.autopayService.runIfNeeded());
       }
     });
   }
