@@ -52,7 +52,6 @@ export class App {
     effect(async () => {
       if (this.auth.user()) {
         setTimeout(() => this.seed.seedIfEmpty(), 500);
-        setTimeout(() => this.autopayService.processOverdueBills(), 1000);
       }
     });
   }
