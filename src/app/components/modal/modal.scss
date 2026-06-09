@@ -68,32 +68,89 @@
 
 @media (max-width: 768px) {
   .backdrop {
-    padding: 16px 12px calc(12px + env(safe-area-inset-bottom));
-    align-items: flex-end;
+    padding: 16px;
+    align-items: center;
+    justify-content: center;
   }
 
   .modal {
-    max-height: 80vh;
-    border-radius: 20px 20px 12px 12px;
+    width: calc(100% - 16px);
+    max-width: 440px;
+    max-height: 85vh;
+    border-radius: 20px;
 
     &::before {
-      content: '';
-      display: block;
-      width: 36px;
-      height: 4px;
-      background: var(--line-strong);
-      border-radius: 2px;
-      margin: 8px auto 0;
-      flex-shrink: 0;
+      display: none;
     }
   }
 
   .modal-header {
-    padding: 10px 20px 14px;
+    padding: 16px 20px;
   }
 
   .modal-body {
     padding: 16px 20px;
+
+    ::ng-deep {
+      .input-field, .input {
+        padding: 9px 12px !important;
+        font-size: 13.5px !important;
+      }
+      .field {
+        gap: 5px !important;
+      }
+      .label-sm {
+        font-size: 11px !important;
+      }
+      .amount-field {
+        padding: 6px 4px 4px !important;
+      }
+      .amount-input {
+        font-size: 32px !important;
+      }
+      .amount-curr {
+        font-size: 22px !important;
+      }
+      .type-seg {
+        padding: 3px !important;
+      }
+      .type-btn {
+        padding: 8px 10px !important;
+        font-size: 13px !important;
+      }
+      .notes-textarea {
+        min-height: 36px !important;
+      }
+      .actions, .modal-actions {
+        padding-top: 12px !important;
+        margin-top: 4px !important;
+      }
+      .btn-primary, .btn-ghost, .btn-danger {
+        padding: 8px 14px !important;
+        font-size: 13px !important;
+      }
+      .icon-opt {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 16px !important;
+      }
+      .color-opt {
+        width: 28px !important;
+        height: 28px !important;
+      }
+      .preview-card {
+        padding: 10px 12px !important;
+        gap: 10px !important;
+      }
+      .preview-emoji {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 16px !important;
+      }
+      .preview-bal {
+        font-size: 15px !important;
+      }
+    }
   }
 }
 
