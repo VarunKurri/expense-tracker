@@ -37,7 +37,7 @@ export class TransactionForm implements OnChanges {
   amount: number = 0;
   date: string = this.localDateString();
   notes: string = '';
-  merchant: string = '';
+  merchant = signal('');
   accountId: string = '';
   categoryId = signal('');
   fromAccountId: string = '';
@@ -75,6 +75,12 @@ export class TransactionForm implements OnChanges {
     return cat?.name.toLowerCase().includes('subscription') ?? false;
   });
 
+  hasExistingBill = computed(() => {
+    const term = this.merchant().trim().toLowerCase();
+    if (!term) return false;
+    return this.billService.bills().some(b => b.name && b.name.toLowerCase() === term);
+  });
+
   ngOnChanges(changes: SimpleChanges) {
     if (changes['open'] && this.open) {
       this.load();
@@ -87,7 +93,7 @@ export class TransactionForm implements OnChanges {
       this.amount = this.transaction.amount;
       this.date = this.transaction.date;
       this.notes = this.transaction.notes || '';
-      this.merchant = this.transaction.merchant || '';
+      this.merchant.set(this.transaction.merchant || '');
       this.accountId = this.transaction.accountId || '';
       this.categoryId.set(this.transaction.categoryId || '');
       this.fromAccountId = this.transaction.fromAccountId || '';
@@ -98,7 +104,7 @@ export class TransactionForm implements OnChanges {
       this.amount = 0;
       this.date = this.localDateString(); // local date, not UTC
       this.notes = '';
-      this.merchant = '';
+      this.merchant.set('');
       const first = this.activeAccounts()[0];
       this.accountId = first?.id || '';
       this.categoryId.set('');
@@ -173,14 +179,14 @@ export class TransactionForm implements OnChanges {
       });
     } else {
       if (!this.accountId) { this.toastService.error('Please select an account'); return; }
-      if (!this.merchant.trim()) { this.toastService.error('Merchant or source is required'); return; }
+      if (!this.merchant().trim()) { this.toastService.error('Merchant or source is required'); return; }
 
       // Emit the transaction first
       this.saved.emit({
         type: this.type,
         amount: Number(this.amount),
         date: this.date,
-        merchant: this.merchant.trim(),
+        merchant: this.merchant().trim(),
         accountId: this.accountId,
         ...(this.categoryId() ? { categoryId: this.categoryId() } : {}),
         ...(this.notes.trim() ? { notes: this.notes.trim() } : {}),
@@ -188,8 +194,8 @@ export class TransactionForm implements OnChanges {
       });
 
       // If Subscriptions category selected, auto-create bill if one doesn't exist yet
-      if (this.isSubscription() && this.merchant.trim() && !this.transaction) {
-        const name = this.merchant.trim();
+      if (this.isSubscription() && this.merchant().trim() && !this.transaction) {
+        const name = this.merchant().trim();
         const existing = this.billService.bills().find(
           b => b.name.toLowerCase() === name.toLowerCase()
         );

@@ -37,7 +37,9 @@
       <div class="field">
         <span class="label-sm">{{ type === 'income' ? 'Source' : 'Merchant' }}</span>
         <input class="input-field"
-               [(ngModel)]="merchant" name="merchant"
+               [ngModel]="merchant()"
+               (ngModelChange)="merchant.set($event)"
+               name="merchant"
                [placeholder]="type === 'income' ? 'e.g. Company Payroll' : 'e.g. Valero Gas'" />
       </div>
 
@@ -98,7 +100,7 @@
     </div>
 
     <!-- RECURRING BILL SECTION — slides in when Subscriptions category selected -->
-    @if (isSubscription() && type === 'expense' && !transaction) {
+    @if (isSubscription() && type === 'expense' && !transaction && !hasExistingBill()) {
       <div class="recurring-section">
         <div class="recurring-header">
           <div class="recurring-header-left">
@@ -179,7 +181,7 @@
       <div class="actions-right">
         <button class="btn-ghost" (click)="closed.emit()">Cancel</button>
         <button class="btn-primary" (click)="save()" [disabled]="submitting()">
-          {{ transaction ? 'Save changes' : (isSubscription() ? 'Add transaction & bill' : 'Add transaction') }}
+          {{ transaction ? 'Save changes' : (isSubscription() && !hasExistingBill() ? 'Add transaction & bill' : 'Add transaction') }}
         </button>
       </div>
     </div>

@@ -126,11 +126,13 @@
                 @if (daysUntil(bill.nextDueDate) === 0) { Due today }
                 @else { {{ daysUntil(bill.nextDueDate) }}d left }
               </div>
-              <button class="mark-paid-btn"
-                      (click)="$event.stopPropagation(); markPaid(bill)"
-                      [disabled]="markingPaid() === bill.id">
-                {{ markingPaid() === bill.id ? '…' : 'Mark paid' }}
-              </button>
+              @if (!bill.autopayEnabled) {
+                <button class="mark-paid-btn"
+                        (click)="$event.stopPropagation(); markPaid(bill)"
+                        [disabled]="markingPaid() === bill.id">
+                  {{ markingPaid() === bill.id ? '…' : 'Mark paid' }}
+                </button>
+              }
             </div>
           </div>
         }
