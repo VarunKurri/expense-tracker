@@ -1,23 +1,29 @@
-import { Injectable, inject, NgZone } from '@angular/core';
+import { Injectable, inject, NgZone, signal } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
   collection, query, orderBy, onSnapshot,
-  addDoc, updateDoc, deleteDoc, doc
+  addDoc, updateDoc, doc, getDoc
 } from 'firebase/firestore';
-import { Observable, of, switchMap } from 'rxjs';
+import { Observable, of, switchMap, combineLatest } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
+import { EncryptionService } from './encryption.service';
 import { Account } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class AccountService {
   private db = inject(Firestore);
   private auth = inject(AuthService);
+  private encryption = inject(EncryptionService);
   private ngZone = inject(NgZone);
+  error = signal<string | null>(null);
 
-  private accounts$: Observable<Account[]> = toObservable(this.auth.user).pipe(
-    switchMap(user => {
-      if (!user) return of([]);
+  private accounts$: Observable<Account[]> = combineLatest([
+    toObservable(this.auth.user),
+    toObservable(this.encryption.unlocked),
+  ]).pipe(
+    switchMap(([user, unlocked]) => {
+      if (!user || !unlocked) return of([]);
       const q = query(
         collection(this.db, `users/${user.uid}/accounts`),
         orderBy('createdAt', 'asc')
@@ -25,11 +31,24 @@ export class AccountService {
       return new Observable<Account[]>(sub => {
         const unsub = onSnapshot(
           q,
-          snap => this.ngZone.run(() =>
-            sub.next(snap.docs.map(d => ({ id: d.id, ...d.data() } as Account)))
-          ),
+          async snap => {
+            try {
+              const accounts = await Promise.all(
+                snap.docs.map(async d => ({ id: d.id, ...(await this.encryption.decryptDoc<Account>(d.data())) }))
+              );
+              this.ngZone.run(() => {
+                this.error.set(null);
+                sub.next(accounts);
+              });
+            } catch (err: any) {
+              this.ngZone.run(() => {
+                this.error.set(err?.message || 'Could not decrypt accounts.');
+                sub.next([]);
+              });
+            }
+          },
           err => this.ngZone.run(() => {
-            console.error('accounts error:', err.message);
+            this.error.set(err.message || 'Could not load accounts.');
             sub.next([]);
           })
         );
@@ -43,21 +62,24 @@ export class AccountService {
   async add(account: Omit<Account, 'id' | 'createdAt'>) {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
-    await addDoc(collection(this.db, `users/${user.uid}/accounts`), {
+    const data = {
       ...account, createdAt: Date.now()
-    });
+    };
+    await addDoc(collection(this.db, `users/${user.uid}/accounts`), await this.encryption.encryptForWrite(data));
   }
 
   async update(id: string, patch: Partial<Account>) {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
-    await updateDoc(doc(this.db, `users/${user.uid}/accounts/${id}`), patch);
+    const ref = doc(this.db, `users/${user.uid}/accounts/${id}`);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error('Account not found');
+    const current = await this.encryption.decryptDoc<Account>(snap.data());
+    await updateDoc(ref, await this.encryption.encryptForWrite({ ...current, ...patch }) as any);
   }
 
   async remove(id: string) {
-    const user = this.auth.user();
-    if (!user) throw new Error('Not signed in');
-    await deleteDoc(doc(this.db, `users/${user.uid}/accounts/${id}`));
+    await this.update(id, { archived: true });
   }
 
   getById(id: string): Account | undefined {

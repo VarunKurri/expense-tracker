@@ -175,30 +175,42 @@ export class Import {
   // ── CSV Parser ────────────────────────────────────────────
   private parseCSV(text: string): string[][] {
     const rows: string[][] = [];
-    const lines = text.split('\n');
+    let row: string[] = [];
+    let cell = '';
+    let inQuotes = false;
 
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      const cells: string[] = [];
-      let current = '';
-      let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      const next = text[i + 1];
 
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') {
-          inQuotes = !inQuotes;
-        } else if (ch === ',' && !inQuotes) {
-          cells.push(current.trim());
-          current = '';
+      if (ch === '"') {
+        if (inQuotes && next === '"') {
+          cell += '"';
+          i++;
         } else {
-          current += ch;
+          inQuotes = !inQuotes;
         }
+      } else if (ch === ',' && !inQuotes) {
+        row.push(cell.trim());
+        cell = '';
+      } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+        if (ch === '\r' && next === '\n') i++;
+        row.push(cell.trim());
+        if (row.some(value => value.length > 0)) rows.push(row);
+        row = [];
+        cell = '';
+      } else {
+        cell += ch;
       }
-      cells.push(current.trim());
-      rows.push(cells);
     }
 
+    row.push(cell.trim());
+    if (row.some(value => value.length > 0)) rows.push(row);
     return rows;
+  }
+
+  private hasHeaders(header: string[], required: string[]): boolean {
+    return required.every(name => header.includes(name));
   }
 
   // ── File readers ──────────────────────────────────────────
@@ -237,7 +249,12 @@ export class Import {
 
   // ── Parsers ───────────────────────────────────────────────
   private parseExpenses(rows: string[][]): ParsedRow[] {
+    if (rows.length === 0) return [];
     const header = rows[0];
+    if (!this.hasHeaders(header, ['Name', 'Account', 'Amount', 'Budget Category', 'Date'])) {
+      this.toastService.error('Expense CSV is missing required columns.');
+      return [];
+    }
     const idx = {
       name: header.indexOf('Name'),
       account: header.indexOf('Account'),
@@ -275,7 +292,12 @@ export class Import {
   }
 
   private parseIncome(rows: string[][]): ParsedRow[] {
+    if (rows.length === 0) return [];
     const header = rows[0];
+    if (!this.hasHeaders(header, ['Name', 'Account', 'Amount', 'Date'])) {
+      this.toastService.error('Income CSV is missing required columns.');
+      return [];
+    }
     const idx = {
       name: header.indexOf('Name'),
       account: header.indexOf('Account'),
@@ -306,7 +328,12 @@ export class Import {
   }
 
   private parseTransfers(rows: string[][]): ParsedRow[] {
+    if (rows.length === 0) return [];
     const header = rows[0];
+    if (!this.hasHeaders(header, ['Transfer', 'Amount', 'Date', 'From', 'To'])) {
+      this.toastService.error('Transfer CSV is missing required columns.');
+      return [];
+    }
     const idx = {
       name: header.indexOf('Transfer'),
       amount: header.indexOf('Amount'),
@@ -384,10 +411,22 @@ export class Import {
   }
   
   async runImport() {
+    if (this.warningRows().length > 0) {
+      this.toastService.error('Fix rows with warnings before importing.');
+      return;
+    }
+
     this.importing.set(true);
-    let count = 0;
 
     try {
+      const existingKeys = new Set(
+        this.txService.transactions().map(t =>
+          `${t.type}|${t.date}|${t.amount}|${(t.merchant || '').toLowerCase()}|${t.accountId || ''}|${t.fromAccountId || ''}|${t.toAccountId || ''}`
+        )
+      );
+      const newKeys = new Set<string>();
+      const txs: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>[] = [];
+
       for (const row of this.allRows()) {
         const tx: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> = {
           type: row.type,
@@ -407,11 +446,14 @@ export class Import {
           if (row.refunded) tx.refunded = true;
         }
 
-        await this.txService.add(tx);
-        count++;
+        const key = `${tx.type}|${tx.date}|${tx.amount}|${(tx.merchant || '').toLowerCase()}|${tx.accountId || ''}|${tx.fromAccountId || ''}|${tx.toAccountId || ''}`;
+        if (existingKeys.has(key) || newKeys.has(key)) continue;
+        newKeys.add(key);
+        txs.push(tx);
       }
 
-      this.importedCount.set(count);
+      await this.txService.addMany(txs);
+      this.importedCount.set(txs.length);
       this.step.set('done');
     } catch (err) {
       this.toastService.error('Import failed. Please try again.');

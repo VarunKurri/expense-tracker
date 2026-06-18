@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed, effect, untracked } from '@angular/core';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { AuthService } from './services/auth.service';
 import { SeedService } from './services/seed.service';
 import { ThemeService } from './services/theme.service';
@@ -10,6 +11,7 @@ import { Toast } from './components/toast/toast';
 import { QuickAddService } from './services/quick-add.service';
 import { BillService } from './services/bill.service';
 import { AutopayService } from './services/autopay.service';
+import { EncryptionService } from './services/encryption.service';
 
 interface NavItem {
   path: string;
@@ -21,7 +23,7 @@ interface NavItem {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, Icon, Toast],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, Icon, Toast],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -34,9 +36,15 @@ export class App {
   quickAddService = inject(QuickAddService);
   billService = inject(BillService);
   private autopayService = inject(AutopayService);
+  encryption = inject(EncryptionService);
 
   sidebarOpen = signal(false);
   signingIn = signal(false);
+  authMode = signal<'signin' | 'signup' | 'reset'>('signin');
+  email = signal('');
+  password = signal('');
+  displayName = signal('');
+  encryptionPassphrase = signal('');
 
   nav = computed((): NavItem[] => [
     { path: '/dashboard',    label: 'Home',         iconName: 'home' },
@@ -49,10 +57,25 @@ export class App {
   ]);
 
   constructor() {
-    // Seed default data once after login
+    effect(() => {
+      const user = this.auth.user();
+      if (user) {
+        this.encryption.refreshProfileState().catch(err => {
+          this.toastService.error(err?.message || 'Could not check encrypted data access.');
+        });
+      } else {
+        this.encryption.lock();
+      }
+    });
+
+    // Seed default data once encrypted data is unlocked.
     effect(async () => {
       if (this.auth.user()) {
-        setTimeout(() => this.seed.seedIfEmpty(), 500);
+        const unlocked = this.encryption.unlocked();
+        if (unlocked) {
+          await this.encryption.migrateUserData();
+          setTimeout(() => this.seed.seedIfEmpty(), 500);
+        }
       }
     });
 
@@ -61,7 +84,7 @@ export class App {
     effect(() => {
       const user = this.auth.user();
       const bills = this.billService.bills();
-      if (user && bills.length > 0) {
+      if (user && this.encryption.unlocked() && bills.length > 0) {
         untracked(() => this.autopayService.runIfNeeded());
       }
     });
@@ -96,6 +119,68 @@ export class App {
     }
   }
 
-  signOut() { this.auth.signOut(); }
+  async signInWithEmail() {
+    if (this.signingIn()) return;
+    this.signingIn.set(true);
+    try {
+      await this.auth.signInWithEmail(this.email().trim(), this.password());
+    } catch (err: any) {
+      this.toastService.error(err?.message || 'Sign in failed. Please try again.');
+    } finally {
+      this.signingIn.set(false);
+    }
+  }
+
+  async signUpWithEmail() {
+    if (this.signingIn()) return;
+    this.signingIn.set(true);
+    try {
+      await this.auth.signUpWithEmail(
+        this.email().trim(),
+        this.password(),
+        this.displayName().trim()
+      );
+    } catch (err: any) {
+      this.toastService.error(err?.message || 'Sign up failed. Please try again.');
+    } finally {
+      this.signingIn.set(false);
+    }
+  }
+
+  async resetPassword() {
+    if (!this.email().trim()) {
+      this.toastService.error('Enter your email address first.');
+      return;
+    }
+    this.signingIn.set(true);
+    try {
+      await this.auth.sendPasswordReset(this.email().trim());
+      this.toastService.success('Password reset email sent.');
+      this.authMode.set('signin');
+    } catch (err: any) {
+      this.toastService.error(err?.message || 'Could not send reset email.');
+    } finally {
+      this.signingIn.set(false);
+    }
+  }
+
+  async unlockData() {
+    if (this.signingIn()) return;
+    this.signingIn.set(true);
+    try {
+      await this.encryption.unlock(this.encryptionPassphrase());
+      this.encryptionPassphrase.set('');
+      this.toastService.success('Encrypted data unlocked.');
+    } catch (err: any) {
+      this.toastService.error(err?.message || 'Could not unlock encrypted data.');
+    } finally {
+      this.signingIn.set(false);
+    }
+  }
+
+  signOut() {
+    this.encryption.lock();
+    this.auth.signOut();
+  }
   toggleSidebar() { this.sidebarOpen.update(v => !v); }
 }

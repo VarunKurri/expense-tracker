@@ -213,6 +213,130 @@
   line-height: 1.55;
 }
 
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  span {
+    color: var(--fg-3);
+    font-size: 12px;
+    font-weight: 600;
+  }
+}
+
+.auth-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 14px;
+  background: var(--green);
+  color: #000;
+  font-weight: 700;
+  font-size: 15px;
+  margin-top: 4px;
+
+  &:hover {
+    background: var(--green-hi);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0, 214, 79, 0.25);
+  }
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--fg-4);
+  font-size: 12px;
+
+  &::before,
+  &::after {
+    content: '';
+    height: 1px;
+    flex: 1;
+    background: var(--line);
+  }
+}
+
+.auth-switches {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+
+  button {
+    color: var(--fg-3);
+    font-size: 12.5px;
+    font-weight: 600;
+
+    &:hover { color: var(--fg); }
+  }
+}
+
+.unlock-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+}
+
+.unlock-card {
+  width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+
+  h1 {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  p {
+    color: var(--fg-3);
+    font-size: 14px;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  label span {
+    color: var(--fg-3);
+    font-size: 12px;
+    font-weight: 600;
+  }
+}
+
+.text-btn {
+  align-self: center;
+  color: var(--fg-3);
+  font-size: 13px;
+  font-weight: 600;
+
+  &:hover { color: var(--fg); }
+}
+
 /* ── RESPONSIVE LOGIN ───────────────────────── */
 @media (max-width: 900px) {
   .login-shell {

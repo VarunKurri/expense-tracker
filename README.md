@@ -1,59 +1,69 @@
-# ExpenseTracker
+# Trackr
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.7.
+Trackr is an Angular personal finance app for accounts, transactions, bills, budgets, imports, and spending analysis. It uses Firebase Authentication and Firestore, with client-side encryption for finance records.
 
-## Development server
+## Features
 
-To start a local development server, run:
+- Google sign-in and email/password sign-in.
+- Password reset email flow.
+- Per-user Firestore data under `users/{uid}`.
+- Client-side AES-GCM encryption for finance collections before data is written to Firestore.
+- Accounts, transactions, bills, budgets, dashboard charts, analysis, and CSV import.
+- PWA service worker configuration for production builds.
 
-```bash
-ng serve
-```
-
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Local Setup
 
 ```bash
-ng generate component component-name
+npm install
+npm start
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+Open `http://localhost:4200/`.
+
+Build and test:
 
 ```bash
-ng generate --help
+npm run build
+npm test
 ```
 
-## Building
+## Firebase Setup
 
-To build the project run:
+1. Create a Firebase project.
+2. Enable Authentication providers:
+   - Google
+   - Email/Password
+3. Create a Firestore database.
+4. Copy `.firebaserc.example` to `.firebaserc` and set your project id.
+5. Confirm `src/environments/environment.ts` and `src/environments/environment.prod.ts` point to your Firebase project.
+6. Deploy Firestore rules:
 
 ```bash
-ng build
+firebase deploy --only firestore:rules
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+## Security Model
 
-## Running unit tests
+Firestore rules in `firestore.rules` ensure signed-in users can only read and write their own path:
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
+```text
+users/{uid}/...
 ```
 
-## Running end-to-end tests
+Those rules prevent User A from reading User B data. They do not, by themselves, hide plaintext from the Firebase console or database exports.
 
-For end-to-end (e2e) testing, run:
+Trackr also encrypts finance records client-side. After login, users unlock a local encryption key with a passphrase. Sensitive documents in `accounts`, `transactions`, `categories`, `bills`, and `budgets` are stored as encrypted payloads. Minimal metadata such as dates/timestamps may remain plaintext for sorting and app operation.
 
-```bash
-ng e2e
-```
+Important: password reset only restores Firebase account access. It cannot recover a forgotten encryption passphrase.
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+## Existing Plaintext Data
 
-## Additional Resources
+When an existing user unlocks encryption, Trackr migrates plaintext finance documents in their user collections into encrypted documents. Back up Firestore before rolling this out to real users.
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## CSV Import
+
+The import flow validates required headers, handles quoted CSV fields, blocks rows with warnings, skips duplicate transactions, and writes imported transactions in batches.
+
+## PWA Notes
+
+Production builds register the Angular service worker. Offline UI can load from cache, but finance writes are only considered synced after Firestore confirms them.

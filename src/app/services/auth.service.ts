@@ -2,7 +2,9 @@ import { Injectable, inject } from '@angular/core';
 import {
   Auth, GoogleAuthProvider,
   signInWithPopup, signInWithRedirect, getRedirectResult,
-  signOut, user
+  signOut, user, createUserWithEmailAndPassword,
+  signInWithEmailAndPassword, sendPasswordResetEmail,
+  updateProfile
 } from '@angular/fire/auth';
 import { toSignal } from '@angular/core/rxjs-interop';
 
@@ -45,7 +47,50 @@ export class AuthService {
     }
   }
 
+  async signUpWithEmail(email: string, password: string, displayName?: string) {
+    try {
+      const credential = await createUserWithEmailAndPassword(this.auth, email, password);
+      if (displayName?.trim()) {
+        await updateProfile(credential.user, { displayName: displayName.trim() });
+      }
+      return credential;
+    } catch (err) {
+      throw new Error(this.friendlyAuthError(err));
+    }
+  }
+
+  async signInWithEmail(email: string, password: string) {
+    try {
+      return await signInWithEmailAndPassword(this.auth, email, password);
+    } catch (err) {
+      throw new Error(this.friendlyAuthError(err));
+    }
+  }
+
+  async sendPasswordReset(email: string) {
+    try {
+      await sendPasswordResetEmail(this.auth, email);
+    } catch (err) {
+      throw new Error(this.friendlyAuthError(err));
+    }
+  }
+
   signOut() {
     return signOut(this.auth);
+  }
+
+  friendlyAuthError(err: any): string {
+    const code = err?.code || '';
+    const map: Record<string, string> = {
+      'auth/email-already-in-use': 'That email is already registered.',
+      'auth/invalid-email': 'Enter a valid email address.',
+      'auth/invalid-credential': 'Email or password is incorrect.',
+      'auth/user-not-found': 'No account exists for that email.',
+      'auth/wrong-password': 'Email or password is incorrect.',
+      'auth/weak-password': 'Use a password with at least 6 characters.',
+      'auth/too-many-requests': 'Too many attempts. Please wait and try again.',
+      'auth/network-request-failed': 'Network error. Check your connection and try again.',
+    };
+    return map[code] || 'Authentication failed. Please try again.';
   }
 }

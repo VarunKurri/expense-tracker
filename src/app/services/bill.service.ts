@@ -1,26 +1,55 @@
-import { Injectable, inject, EnvironmentInjector, runInInjectionContext } from '@angular/core';
+import { Injectable, inject, NgZone, signal } from '@angular/core';
 import {
-  Firestore, collection, collectionData, addDoc,
-  updateDoc, deleteDoc, doc, query, orderBy
+  Firestore, collection, addDoc,
+  updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc
 } from '@angular/fire/firestore';
-import { Observable, of, switchMap } from 'rxjs';
+import { Observable, of, switchMap, combineLatest } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
+import { EncryptionService } from './encryption.service';
 import { Bill, BillFrequency } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class BillService {
   private db = inject(Firestore);
   private auth = inject(AuthService);
-  private injector = inject(EnvironmentInjector);
+  private encryption = inject(EncryptionService);
+  private ngZone = inject(NgZone);
+  error = signal<string | null>(null);
 
-  private bills$: Observable<Bill[]> = toObservable(this.auth.user).pipe(
-    switchMap(user => {
-      if (!user) return of([]);
-      return runInInjectionContext(this.injector, () => {
+  private bills$: Observable<Bill[]> = combineLatest([
+    toObservable(this.auth.user),
+    toObservable(this.encryption.unlocked),
+  ]).pipe(
+    switchMap(([user, unlocked]) => {
+      if (!user || !unlocked) return of([]);
+      return new Observable<Bill[]>(sub => {
         const ref = collection(this.db, `users/${user.uid}/bills`);
         const q = query(ref, orderBy('nextDueDate', 'asc'));
-        return collectionData(q, { idField: 'id' }) as Observable<Bill[]>;
+        const unsub = onSnapshot(
+          q,
+          async snap => {
+            try {
+              const bills = await Promise.all(
+                snap.docs.map(async d => ({ id: d.id, ...(await this.encryption.decryptDoc<Bill>(d.data())) }))
+              );
+              this.ngZone.run(() => {
+                this.error.set(null);
+                sub.next(bills);
+              });
+            } catch (err: any) {
+              this.ngZone.run(() => {
+                this.error.set(err?.message || 'Could not decrypt bills.');
+                sub.next([]);
+              });
+            }
+          },
+          err => this.ngZone.run(() => {
+            this.error.set(err.message || 'Could not load bills.');
+            sub.next([]);
+          })
+        );
+        return unsub;
       });
     })
   );
@@ -70,13 +99,17 @@ export class BillService {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
     const ref = collection(this.db, `users/${user.uid}/bills`);
-    await addDoc(ref, { ...bill, createdAt: Date.now() });
+    await addDoc(ref, await this.encryption.encryptForWrite({ ...bill, createdAt: Date.now() }));
   }
 
   async update(id: string, patch: Partial<Bill>) {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
-    await updateDoc(doc(this.db, `users/${user.uid}/bills/${id}`), patch);
+    const ref = doc(this.db, `users/${user.uid}/bills/${id}`);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error('Bill not found');
+    const current = await this.encryption.decryptDoc<Bill>(snap.data());
+    await updateDoc(ref, await this.encryption.encryptForWrite({ ...current, ...patch }) as any);
   }
 
   async remove(id: string) {

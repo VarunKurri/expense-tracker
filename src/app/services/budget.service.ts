@@ -1,26 +1,55 @@
-import { Injectable, inject, EnvironmentInjector, runInInjectionContext } from '@angular/core';
+import { Injectable, inject, NgZone, signal } from '@angular/core';
 import {
-  Firestore, collection, collectionData, addDoc,
-  updateDoc, deleteDoc, doc, query, orderBy
+  Firestore, collection, addDoc,
+  updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, getDoc
 } from '@angular/fire/firestore';
-import { Observable, of, switchMap } from 'rxjs';
+import { Observable, of, switchMap, combineLatest } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
+import { EncryptionService } from './encryption.service';
 import { Budget } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class BudgetService {
   private db = inject(Firestore);
   private auth = inject(AuthService);
-  private injector = inject(EnvironmentInjector);
+  private encryption = inject(EncryptionService);
+  private ngZone = inject(NgZone);
+  error = signal<string | null>(null);
 
-  private budgets$: Observable<Budget[]> = toObservable(this.auth.user).pipe(
-    switchMap(user => {
-      if (!user) return of([]);
-      return runInInjectionContext(this.injector, () => {
+  private budgets$: Observable<Budget[]> = combineLatest([
+    toObservable(this.auth.user),
+    toObservable(this.encryption.unlocked),
+  ]).pipe(
+    switchMap(([user, unlocked]) => {
+      if (!user || !unlocked) return of([]);
+      return new Observable<Budget[]>(sub => {
         const ref = collection(this.db, `users/${user.uid}/budgets`);
         const q = query(ref, orderBy('createdAt', 'asc'));
-        return collectionData(q, { idField: 'id' }) as Observable<Budget[]>;
+        const unsub = onSnapshot(
+          q,
+          async snap => {
+            try {
+              const budgets = await Promise.all(
+                snap.docs.map(async d => ({ id: d.id, ...(await this.encryption.decryptDoc<Budget>(d.data())) }))
+              );
+              this.ngZone.run(() => {
+                this.error.set(null);
+                sub.next(budgets);
+              });
+            } catch (err: any) {
+              this.ngZone.run(() => {
+                this.error.set(err?.message || 'Could not decrypt budgets.');
+                sub.next([]);
+              });
+            }
+          },
+          err => this.ngZone.run(() => {
+            this.error.set(err.message || 'Could not load budgets.');
+            sub.next([]);
+          })
+        );
+        return unsub;
       });
     })
   );
@@ -51,13 +80,17 @@ export class BudgetService {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
     const ref = collection(this.db, `users/${user.uid}/budgets`);
-    await addDoc(ref, { ...budget, createdAt: Date.now() });
+    await addDoc(ref, await this.encryption.encryptForWrite({ ...budget, createdAt: Date.now() }));
   }
 
   async update(id: string, patch: Partial<Budget>) {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
-    await updateDoc(doc(this.db, `users/${user.uid}/budgets/${id}`), patch);
+    const ref = doc(this.db, `users/${user.uid}/budgets/${id}`);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error('Budget not found');
+    const current = await this.encryption.decryptDoc<Budget>(snap.data());
+    await updateDoc(ref, await this.encryption.encryptForWrite({ ...current, ...patch }) as any);
   }
 
   async remove(id: string) {
