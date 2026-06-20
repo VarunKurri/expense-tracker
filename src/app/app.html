@@ -184,6 +184,11 @@
 
       <nav class="nav">
         <div class="nav-section">Money</div>
+        <button class="nav-item nav-command" type="button" (click)="openCommandPalette()">
+          <app-icon name="search" [size]="17" class="nav-icon" />
+          <span>Command</span>
+          <span class="nav-kbd">K</span>
+        </button>
         @for (item of nav(); track item.path) {
           <a [routerLink]="item.path"
              routerLinkActive="active"
@@ -249,6 +254,9 @@
           <div class="brand-mark" style="width:26px;height:26px;border-radius:7px;font-size:13px;">T</div>
           <span class="brand-name">Trackr</span>
         </div>
+        <button class="topbar-search" (click)="openCommandPalette()" title="Open command palette">
+          <app-icon name="search" [size]="16" />
+        </button>
         <button class="topbar-add" (click)="quickAdd()">
           <svg width="16" height="16" viewBox="0 0 20 20" fill="none"
                stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -261,5 +269,51 @@
         <router-outlet />
       </main>
     </div>
+
+    @if (commandPaletteOpen()) {
+      <div class="command-backdrop" (click)="closeCommandPalette()">
+        <section class="command-panel"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="Command palette"
+                 (click)="$event.stopPropagation()">
+          <div class="command-search">
+            <app-icon name="search" [size]="18" />
+            <input class="command-input"
+                   type="text"
+                   autocomplete="off"
+                   spellcheck="false"
+                   placeholder="Search actions or pages"
+                   [ngModel]="commandQuery()"
+                   (ngModelChange)="onCommandQueryChange($event)"
+                   (keydown.arrowDown)="$event.preventDefault(); moveCommandSelection(1)"
+                   (keydown.arrowUp)="$event.preventDefault(); moveCommandSelection(-1)"
+                   (keydown.enter)="$event.preventDefault(); runActiveCommand()" />
+          </div>
+
+          <div class="command-list" role="listbox">
+            @for (command of filteredCommands(); track command.id; let i = $index) {
+              <button class="command-item"
+                      type="button"
+                      role="option"
+                      [class.active]="i === activeCommandIndex()"
+                      [attr.aria-selected]="i === activeCommandIndex()"
+                      (mouseenter)="activeCommandIndex.set(i)"
+                      (click)="runCommand(command)">
+                <span class="command-icon">
+                  <app-icon [name]="command.iconName" [size]="17" />
+                </span>
+                <span class="command-copy">
+                  <span class="command-label">{{ command.label }}</span>
+                  <span class="command-hint">{{ command.hint }}</span>
+                </span>
+              </button>
+            } @empty {
+              <div class="command-empty">No matching commands</div>
+            }
+          </div>
+        </section>
+      </div>
+    }
   </div>
 }

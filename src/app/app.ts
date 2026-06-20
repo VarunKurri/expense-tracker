@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect, untracked } from '@angular/core';
+import { Component, HostListener, inject, signal, computed, effect, untracked } from '@angular/core';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -18,6 +18,15 @@ interface NavItem {
   label: string;
   iconName: string;
   badge?: number | null;
+}
+
+interface CommandItem {
+  id: string;
+  label: string;
+  hint: string;
+  iconName: string;
+  keywords: string;
+  action: () => void;
 }
 
 @Component({
@@ -45,6 +54,9 @@ export class App {
   password = signal('');
   displayName = signal('');
   encryptionPassphrase = signal('');
+  commandPaletteOpen = signal(false);
+  commandQuery = signal('');
+  activeCommandIndex = signal(0);
 
   nav = computed((): NavItem[] => [
     { path: '/dashboard',    label: 'Home',         iconName: 'home' },
@@ -55,6 +67,75 @@ export class App {
     { path: '/budgets',      label: 'Budgets',      iconName: 'budgets' },
     { path: '/analysis',     label: 'Analysis',     iconName: 'analysis' },
   ]);
+
+  commands = computed((): CommandItem[] => [
+    {
+      id: 'add-expense',
+      label: 'Add expense',
+      hint: 'Create a new expense transaction',
+      iconName: 'receipt',
+      keywords: 'new add quick expense spend transaction merchant',
+      action: () => this.quickAdd('expense'),
+    },
+    {
+      id: 'add-income',
+      label: 'Add income',
+      hint: 'Record paycheck, interest, or other income',
+      iconName: 'cash',
+      keywords: 'new add quick income paycheck salary transaction',
+      action: () => this.quickAdd('income'),
+    },
+    {
+      id: 'add-transfer',
+      label: 'Add transfer',
+      hint: 'Move money between accounts',
+      iconName: 'tx',
+      keywords: 'new add quick transfer move transaction account',
+      action: () => this.quickAdd('transfer'),
+    },
+    ...this.nav().map(item => ({
+      id: `go-${item.path}`,
+      label: `Go to ${item.label}`,
+      hint: item.path,
+      iconName: item.iconName,
+      keywords: `${item.label} ${item.path} navigate open page`,
+      action: () => this.navigateTo(item.path),
+    })),
+    {
+      id: 'go-import',
+      label: 'Go to Import',
+      hint: 'Upload CSV transactions',
+      iconName: 'arrowDown',
+      keywords: 'import upload csv transactions mint monarch',
+      action: () => this.navigateTo('/import'),
+    },
+    {
+      id: 'go-settings',
+      label: 'Go to Settings',
+      hint: 'Manage app preferences',
+      iconName: 'settings',
+      keywords: 'settings preferences account profile',
+      action: () => this.navigateTo('/settings'),
+    },
+    {
+      id: 'toggle-theme',
+      label: `Switch to ${this.themeService.theme() === 'dark' ? 'light' : 'dark'} mode`,
+      hint: 'Toggle the app theme',
+      iconName: this.themeService.theme() === 'dark' ? 'sun' : 'moon',
+      keywords: 'theme dark light mode appearance',
+      action: () => this.themeService.toggle(),
+    },
+  ]);
+
+  filteredCommands = computed(() => {
+    const query = this.commandQuery().trim().toLowerCase();
+    const commands = this.commands();
+    if (!query) return commands;
+    return commands.filter(command => {
+      const haystack = `${command.label} ${command.hint} ${command.keywords}`.toLowerCase();
+      return query.split(/\s+/).every(token => haystack.includes(token));
+    });
+  });
 
   constructor() {
     effect(() => {
@@ -96,13 +177,68 @@ export class App {
     }
   }
 
-  quickAdd() {
+  quickAdd(type: 'expense' | 'income' | 'transfer' | null = null) {
+    this.closeCommandPalette();
     if (!this.router.url.includes('/transactions')) {
       this.router.navigate(['/transactions']).then(() => {
-        setTimeout(() => this.quickAddService.trigger(), 150);
+        setTimeout(() => this.quickAddService.trigger(type), 150);
       });
     } else {
-      this.quickAddService.trigger();
+      this.quickAddService.trigger(type);
+    }
+  }
+
+  openCommandPalette() {
+    if (!this.auth.user() || !this.encryption.unlocked()) return;
+    this.commandQuery.set('');
+    this.activeCommandIndex.set(0);
+    this.commandPaletteOpen.set(true);
+    setTimeout(() => document.querySelector<HTMLInputElement>('.command-input')?.focus(), 0);
+  }
+
+  closeCommandPalette() {
+    this.commandPaletteOpen.set(false);
+    this.commandQuery.set('');
+    this.activeCommandIndex.set(0);
+  }
+
+  onCommandQueryChange(value: string) {
+    this.commandQuery.set(value);
+    this.activeCommandIndex.set(0);
+  }
+
+  moveCommandSelection(delta: number) {
+    const commands = this.filteredCommands();
+    if (commands.length === 0) return;
+    const next = (this.activeCommandIndex() + delta + commands.length) % commands.length;
+    this.activeCommandIndex.set(next);
+  }
+
+  runActiveCommand() {
+    const command = this.filteredCommands()[this.activeCommandIndex()];
+    if (!command) return;
+    this.runCommand(command);
+  }
+
+  runCommand(command: CommandItem) {
+    this.closeCommandPalette();
+    command.action();
+  }
+
+  private navigateTo(path: string) {
+    this.router.navigate([path]);
+    this.sidebarOpen.set(false);
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  handleGlobalKeydown(event: KeyboardEvent) {
+    const key = event.key.toLowerCase();
+    if ((event.metaKey || event.ctrlKey) && key === 'k') {
+      event.preventDefault();
+      this.commandPaletteOpen() ? this.closeCommandPalette() : this.openCommandPalette();
+    } else if (event.key === 'Escape' && this.commandPaletteOpen()) {
+      event.preventDefault();
+      this.closeCommandPalette();
     }
   }
 

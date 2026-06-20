@@ -480,14 +480,19 @@
   display: flex;
   align-items: center;
   gap: 11px;
+  width: 100%;
   padding: 9px 12px;
   border-radius: 10px;
   text-decoration: none;
   color: var(--fg-3);
   font-size: 14px;
   font-weight: 500;
+  font-family: inherit;
   transition: all 0.18s ease;
   cursor: pointer;
+  border: 0;
+  background: transparent;
+  text-align: left;
 
   &:hover { background: var(--surface); color: var(--fg); }
 
@@ -498,6 +503,25 @@
   }
 
   .nav-icon { flex-shrink: 0; }
+}
+
+.nav-command {
+  margin-bottom: 4px;
+}
+
+.nav-kbd {
+  margin-left: auto;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  color: var(--fg-4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
 }
 
 .nav-badge {
@@ -684,6 +708,23 @@
   &:hover { background: var(--green-hi); }
 }
 
+.topbar-search {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+
+  &:hover { background: var(--surface-hi); }
+}
+
 /* ============================================
    MAIN CONTENT
    ============================================ */
@@ -691,6 +732,123 @@
   flex: 1;
   overflow-x: hidden;
   background: var(--bg);
+}
+
+/* ============================================
+   COMMAND PALETTE
+   ============================================ */
+.command-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 88px 20px 20px;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.command-panel {
+  width: min(100%, 600px);
+  max-height: min(620px, calc(100vh - 120px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg-2);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+}
+
+.command-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg-3);
+}
+
+.command-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 15px;
+
+  &::placeholder {
+    color: var(--fg-4);
+  }
+}
+
+.command-list {
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.command-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &.active,
+  &:hover {
+    background: var(--surface-hi);
+  }
+}
+
+.command-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.command-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.command-label {
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.command-hint {
+  color: var(--fg-4);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-empty {
+  padding: 28px 16px;
+  color: var(--fg-4);
+  font-size: 13px;
+  text-align: center;
 }
 
 /* ============================================
@@ -712,6 +870,20 @@
 
   .overlay { display: block; }
   .topbar  { display: flex; }
+
+  .topbar-brand {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .command-backdrop {
+    padding: 72px 12px 12px;
+  }
+
+  .command-panel {
+    max-height: calc(100vh - 88px);
+    border-radius: 14px;
+  }
 }
 
 @media (min-width: 769px) {

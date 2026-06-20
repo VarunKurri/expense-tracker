@@ -98,4 +98,19 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Create encryption passphrase');
   });
+
+  it('opens the command palette for unlocked users', () => {
+    authUser.set({ email: 'user@example.com' });
+    unlocked.set(true);
+    hasProfile.set(true);
+    fixture.detectChanges();
+
+    fixture.componentInstance.openCommandPalette();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Add expense');
+    expect(compiled.textContent).toContain('Go to Transactions');
+    expect(compiled.querySelector('.command-input')).toBeTruthy();
+  });
 });
