@@ -61,23 +61,51 @@
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .template-chip {
   white-space: nowrap;
-  padding: 8px 10px;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--surface);
+  color: var(--fg);
+
+  &:hover {
+    background: var(--surface-hi);
+  }
+}
+
+.template-apply {
+  min-height: 34px;
+  padding: 8px 6px 8px 10px;
   color: var(--fg);
   font-family: inherit;
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.template-delete {
+  width: 34px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-4);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
 
   &:hover {
-    background: var(--surface-hi);
+    color: var(--red);
+    background: var(--red-bg);
   }
 }
 
@@ -403,4 +431,17 @@ select.input-field {
   .amount-curr { font-size: 24px; }
   .amount-input { font-size: 36px; }
   .form-grid { grid-template-columns: 1fr; }
+
+  .template-strip {
+    margin-inline: -2px;
+  }
+
+  .template-chip {
+    max-width: min(260px, 82vw);
+  }
+
+  .template-apply {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }

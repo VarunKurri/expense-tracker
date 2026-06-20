@@ -27,11 +27,20 @@
           <span class="template-strip-label">Templates</span>
           <div class="template-list">
             @for (template of availableTemplates(); track template.id) {
-              <button type="button"
-                      class="template-chip"
-                      (click)="applyTemplate(template)">
-                {{ templateLabel(template) }}
-              </button>
+              <div class="template-chip">
+                <button type="button"
+                        class="template-apply"
+                        (click)="applyTemplate(template)">
+                  {{ templateLabel(template) }}
+                </button>
+                <button type="button"
+                        class="template-delete"
+                        title="Delete template"
+                        aria-label="Delete template"
+                        (click)="deleteTemplate($event, template)">
+                  x
+                </button>
+              </div>
             }
           </div>
         </div>

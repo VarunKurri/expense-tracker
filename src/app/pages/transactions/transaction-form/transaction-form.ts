@@ -193,6 +193,17 @@ export class TransactionForm implements OnChanges {
     setTimeout(() => this.resetNotesHeight(), 0);
   }
 
+  async deleteTemplate(event: Event, template: TransactionTemplate) {
+    event.stopPropagation();
+    if (!template.id) return;
+    try {
+      await this.templateService.remove(template.id);
+      this.toastService.success('Template deleted.');
+    } catch (err) {
+      this.toastService.error('Template could not be deleted.');
+    }
+  }
+
   templateLabel(template: TransactionTemplate): string {
     if (template.type === 'transfer') return template.name;
     const amount = template.amount ? `$${template.amount.toFixed(2)}` : '';

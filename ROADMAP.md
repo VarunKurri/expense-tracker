@@ -22,7 +22,7 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
 - [x] Add saved transaction templates.
   - Why: recurring merchants and repeated transactions should take seconds to enter.
   - Done when: users can save a transaction as a template, reuse it, and edit prefilled fields before saving.
-  - Verified: templates are encrypted in Firestore, available in the new transaction form by type, and compiler/unit checks pass.
+  - Verified: templates are encrypted in Firestore, available in the new transaction form by type, can be deleted from the template strip, and compiler/unit checks pass.
 
 - [ ] Add smart defaults in transaction forms.
   - Why: the app can preselect likely account, category, date, and transaction type from recent usage.
