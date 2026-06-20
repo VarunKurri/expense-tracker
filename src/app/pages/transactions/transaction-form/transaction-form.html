@@ -21,6 +21,21 @@
                 [class.active]="type === 'transfer'"
                 (click)="setType('transfer')">Moved</button>
       </div>
+
+      @if (availableTemplates().length > 0) {
+        <div class="template-strip">
+          <span class="template-strip-label">Templates</span>
+          <div class="template-list">
+            @for (template of availableTemplates(); track template.id) {
+              <button type="button"
+                      class="template-chip"
+                      (click)="applyTemplate(template)">
+                {{ templateLabel(template) }}
+              </button>
+            }
+          </div>
+        </div>
+      }
     }
 
     <!-- AMOUNT -->
@@ -155,6 +170,31 @@
         (input)="onNotesInput($event)">
       </textarea>
     </div>
+
+    @if (!transaction) {
+      <div class="template-save-row">
+        <div>
+          <div class="template-save-label">Save as template</div>
+          <div class="template-save-sub">Reuse these details for future transactions.</div>
+        </div>
+        <button type="button"
+                class="toggle"
+                [class.on]="saveAsTemplate()"
+                (click)="saveAsTemplate.set(!saveAsTemplate())">
+        </button>
+      </div>
+
+      @if (saveAsTemplate()) {
+        <div class="field">
+          <span class="label-sm">Template name</span>
+          <input class="input-field"
+                 [ngModel]="templateName()"
+                 (ngModelChange)="templateName.set($event)"
+                 name="templateName"
+                 [placeholder]="defaultTemplateName()" />
+        </div>
+      }
+    }
 
     <!-- REFUNDED TOGGLE -->
     @if (transaction && type === 'expense') {

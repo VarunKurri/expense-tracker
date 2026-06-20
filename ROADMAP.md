@@ -19,9 +19,10 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
   - Done when: keyboard shortcut opens the palette, results are searchable, and core actions work from anywhere.
   - Verified: Angular tests pass, TypeScript checks pass, dev server runs on `http://localhost:4200/`, and manual browser testing looked good.
 
-- [ ] Add saved transaction templates.
+- [x] Add saved transaction templates.
   - Why: recurring merchants and repeated transactions should take seconds to enter.
   - Done when: users can save a transaction as a template, reuse it, and edit prefilled fields before saving.
+  - Verified: templates are encrypted in Firestore, available in the new transaction form by type, and compiler/unit checks pass.
 
 - [ ] Add smart defaults in transaction forms.
   - Why: the app can preselect likely account, category, date, and transaction type from recent usage.
