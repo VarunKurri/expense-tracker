@@ -24,9 +24,10 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
   - Done when: users can save a transaction as a template, reuse it, and edit prefilled fields before saving.
   - Verified: templates are encrypted in Firestore, available in the new transaction form by type, can be deleted from the template strip, and compiler/unit checks pass.
 
-- [ ] Add smart defaults in transaction forms.
+- [x] Add smart defaults in transaction forms.
   - Why: the app can preselect likely account, category, date, and transaction type from recent usage.
   - Done when: new transactions feel prefilled but still easy to override.
+  - Verified: new forms use recent account/category/transfer defaults, known merchants reuse recent account/category choices, and compiler/unit checks pass.
 
 - [ ] Add inline quick edit for transaction list rows.
   - Why: correcting category, account, date, or amount should not require opening the full details flow.

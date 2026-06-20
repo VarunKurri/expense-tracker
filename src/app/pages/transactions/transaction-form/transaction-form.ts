@@ -9,6 +9,7 @@ import { AccountService } from '../../../services/account.service';
 import { CategoryService } from '../../../services/category.service';
 import { BillService } from '../../../services/bill.service';
 import { TransactionTemplateService } from '../../../services/transaction-template.service';
+import { TransactionService } from '../../../services/transaction.service';
 import { Transaction, TransactionType } from '../../../models';
 import { TransactionTemplate } from '../../../models';
 import { QuickAddService } from '../../../services/quick-add.service';
@@ -26,6 +27,7 @@ export class TransactionForm implements OnChanges {
   categories = inject(CategoryService);
   billService = inject(BillService);
   templateService = inject(TransactionTemplateService);
+  private transactionService = inject(TransactionService);
   private toastService = inject(ToastService);
   private quickAddService = inject(QuickAddService);
 
@@ -118,12 +120,7 @@ export class TransactionForm implements OnChanges {
       this.date = this.localDateString(); // local date, not UTC
       this.notes = '';
       this.merchant.set('');
-      const first = this.activeAccounts()[0];
-      this.accountId = first?.id || '';
-      this.categoryId.set('');
-      this.fromAccountId = first?.id || '';
-      const second = this.activeAccounts()[1];
-      this.toAccountId = second?.id || '';
+      this.applySmartDefaultsForType();
       this.saveAsTemplate.set(false);
       this.templateName.set('');
     }
@@ -167,9 +164,58 @@ export class TransactionForm implements OnChanges {
 
   setType(t: TransactionType) {
     this.type = t;
-    this.categoryId.set('');
+    this.applySmartDefaultsForType();
     this.saveAsTemplate.set(false);
     this.templateName.set('');
+  }
+
+  onMerchantChange(value: string) {
+    this.merchant.set(value);
+    if (this.transaction || this.type === 'transfer') return;
+    const match = this.findRecentMerchantMatch(value);
+    if (!match) return;
+    if (match.accountId && this.activeAccounts().some(a => a.id === match.accountId)) {
+      this.accountId = match.accountId;
+    }
+    if (match.categoryId && this.filteredCategories().some(c => c.id === match.categoryId)) {
+      this.categoryId.set(match.categoryId);
+    }
+  }
+
+  private applySmartDefaultsForType() {
+    const first = this.activeAccounts()[0];
+    const second = this.activeAccounts()[1];
+    const recent = this.findRecentByType(this.type);
+
+    if (this.type === 'transfer') {
+      this.categoryId.set('');
+      this.accountId = '';
+      this.fromAccountId = recent?.fromAccountId || first?.id || '';
+      this.toAccountId = recent?.toAccountId || second?.id || '';
+      if (this.fromAccountId === this.toAccountId) {
+        this.toAccountId = this.activeAccounts().find(a => a.id !== this.fromAccountId)?.id || '';
+      }
+      return;
+    }
+
+    this.fromAccountId = first?.id || '';
+    this.toAccountId = second?.id || '';
+    this.accountId = recent?.accountId || first?.id || '';
+    this.categoryId.set(recent?.categoryId || '');
+  }
+
+  private findRecentByType(type: TransactionType): Transaction | undefined {
+    return this.transactionService.transactions().find(t => t.type === type);
+  }
+
+  private findRecentMerchantMatch(value: string): Transaction | undefined {
+    const term = value.trim().toLowerCase();
+    if (term.length < 2) return undefined;
+    return this.transactionService.transactions().find(t =>
+      t.type === this.type &&
+      !!t.merchant &&
+      t.merchant.trim().toLowerCase() === term
+    );
   }
 
   async applyTemplate(template: TransactionTemplate) {

@@ -62,7 +62,7 @@
         <span class="label-sm">{{ type === 'income' ? 'Source' : 'Merchant' }}</span>
         <input class="input-field"
                [ngModel]="merchant()"
-               (ngModelChange)="merchant.set($event)"
+               (ngModelChange)="onMerchantChange($event)"
                name="merchant"
                [placeholder]="type === 'income' ? 'e.g. Company Payroll' : 'e.g. Valero Gas'" />
       </div>
