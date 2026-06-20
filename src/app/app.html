@@ -254,15 +254,17 @@
           <div class="brand-mark" style="width:26px;height:26px;border-radius:7px;font-size:13px;">T</div>
           <span class="brand-name">Trackr</span>
         </div>
-        <button class="topbar-search" (click)="openCommandPalette()" title="Open command palette">
-          <app-icon name="search" [size]="16" />
-        </button>
-        <button class="topbar-add" (click)="quickAdd()">
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none"
-               stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <path d="M10 4v12M4 10h12"/>
-          </svg>
-        </button>
+        <div class="topbar-actions">
+          <button class="topbar-search" (click)="openCommandPalette()" title="Open command palette">
+            <app-icon name="search" [size]="17" />
+          </button>
+          <button class="topbar-add" (click)="quickAdd()" title="Add transaction">
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none"
+                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M10 4v12M4 10h12"/>
+            </svg>
+          </button>
+        </div>
       </header>
 
       <main class="main">
