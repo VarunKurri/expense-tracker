@@ -29,9 +29,10 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
   - Done when: new transactions feel prefilled but still easy to override.
   - Verified: new forms use recent account/category/transfer defaults, known merchants reuse recent account/category choices, and compiler/unit checks pass.
 
-- [ ] Add inline quick edit for transaction list rows.
+- [x] Add inline quick edit for transaction list rows.
   - Why: correcting category, account, date, or amount should not require opening the full details flow.
   - Done when: common fields can be edited directly and saved with clear success/error feedback.
+  - Verified: transaction rows support inline amount/date/account/category edits, transfers support from/to edits, and compiler/unit checks pass.
 
 - [ ] Add keyboard shortcuts for power users.
   - Why: repeated workflows get much faster with shortcuts for add, save, search, close modal, and navigation.

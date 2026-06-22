@@ -13,6 +13,14 @@ import { ToastService } from '../../services/toast.service';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
 type DateRange = 'last-30' | 'this-month' | 'last-month' | 'this-year' | 'all';
+type QuickEditDraft = {
+  amount: number;
+  date: string;
+  accountId: string;
+  categoryId: string;
+  fromAccountId: string;
+  toAccountId: string;
+};
 
 @Component({
   selector: 'app-transactions',
@@ -35,6 +43,9 @@ export class Transactions {
   viewing = signal<Transaction | null>(null);
   confirmOpen = signal(false);
   toDelete = signal<Transaction | null>(null);
+  quickEditingId = signal<string | null>(null);
+  quickEditDraft = signal<QuickEditDraft | null>(null);
+  quickSaving = signal(false);
 
   // Filter state — default is last 30 days
   filterType = signal<FilterType>('all');
@@ -159,6 +170,10 @@ export class Transactions {
     return this.categoryService.categories().find(c => c.id === id);
   }
 
+  optionLabel(icon: string | undefined, name: string): string {
+    return icon ? `${icon}\u00A0\u00A0${name}` : name;
+  }
+
   formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-US', {
       style: 'currency', currency: 'USD'
@@ -203,8 +218,14 @@ export class Transactions {
     this.search.set('');
   }
 
+  categoriesFor(type: Transaction['type']) {
+    const kind = type === 'income' ? 'income' : 'expense';
+    return this.categoryService.categories().filter(c => c.kind === kind && !c.archived);
+  }
+
   // ── View panel ────────────────────────────────────────────
   openView(tx: Transaction) {
+    if (this.quickEditingId()) return;
     this.viewing.set(tx);
     document.body.style.overflow = 'hidden';
   }
@@ -233,6 +254,81 @@ export class Transactions {
   openEdit(tx: Transaction) {
     this.editing.set(tx);
     this.formOpen.set(true);
+  }
+
+  startQuickEdit(event: Event, tx: Transaction) {
+    event.stopPropagation();
+    this.quickEditingId.set(tx.id || null);
+    this.quickEditDraft.set({
+      amount: tx.amount,
+      date: tx.date,
+      accountId: tx.accountId || '',
+      categoryId: tx.categoryId || '',
+      fromAccountId: tx.fromAccountId || '',
+      toAccountId: tx.toAccountId || '',
+    });
+  }
+
+  cancelQuickEdit(event?: Event) {
+    event?.stopPropagation();
+    this.quickEditingId.set(null);
+    this.quickEditDraft.set(null);
+  }
+
+  updateQuickDraft(patch: Partial<QuickEditDraft>) {
+    const draft = this.quickEditDraft();
+    if (!draft) return;
+    this.quickEditDraft.set({ ...draft, ...patch });
+  }
+
+  async saveQuickEdit(event: Event, tx: Transaction) {
+    event.stopPropagation();
+    const draft = this.quickEditDraft();
+    if (!tx.id || !draft || this.quickSaving()) return;
+    if (!draft.amount || draft.amount <= 0) {
+      this.toastService.error('Amount must be greater than zero');
+      return;
+    }
+    if (!draft.date) {
+      this.toastService.error('Date is required');
+      return;
+    }
+
+    const patch: Partial<Transaction> = {
+      amount: Number(draft.amount),
+      date: draft.date,
+    };
+
+    if (tx.type === 'transfer') {
+      if (!draft.fromAccountId || !draft.toAccountId) {
+        this.toastService.error('Please select both accounts');
+        return;
+      }
+      if (draft.fromAccountId === draft.toAccountId) {
+        this.toastService.error('From and To must be different accounts');
+        return;
+      }
+      patch.fromAccountId = draft.fromAccountId;
+      patch.toAccountId = draft.toAccountId;
+    } else {
+      if (!draft.accountId) {
+        this.toastService.error('Please select an account');
+        return;
+      }
+      patch.accountId = draft.accountId;
+      patch.categoryId = draft.categoryId || undefined;
+    }
+
+    this.quickSaving.set(true);
+    try {
+      await this.txService.update(tx.id, patch);
+      this.toastService.success('Transaction updated.');
+      this.cancelQuickEdit();
+    } catch (err) {
+      this.toastService.error('Could not update transaction.');
+    } finally {
+      this.quickSaving.set(false);
+    }
   }
 
   closeForm() {

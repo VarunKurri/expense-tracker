@@ -129,6 +129,7 @@
           <div class="tx-card">
             @for (tx of group.items; track tx.id; let last = $last) {
               <div class="tx-row"
+                   [class.editing]="quickEditingId() === tx.id"
                    [class.last]="last"
                    (click)="openView(tx)">
 
@@ -149,36 +150,127 @@
                 <div class="tx-main">
                   @if (tx.type === 'transfer') {
                     <div class="tx-title">Transfer</div>
-                    <div class="tx-meta">
-                      {{ accountName(tx.fromAccountId) }}
-                      <span class="tx-arrow">→</span>
-                      {{ accountName(tx.toAccountId) }}
-                    </div>
+                    @if (quickEditingId() === tx.id && quickEditDraft(); as draft) {
+                      <div class="quick-edit-grid" (click)="$event.stopPropagation()">
+                        <label>
+                          <span>Amount</span>
+                          <input class="quick-input" type="number" step="0.01"
+                                 [ngModel]="draft.amount"
+                                 (ngModelChange)="updateQuickDraft({ amount: $event })" />
+                        </label>
+                        <label>
+                          <span>Date</span>
+                          <input class="quick-input" type="date"
+                                 [ngModel]="draft.date"
+                                 (ngModelChange)="updateQuickDraft({ date: $event })" />
+                        </label>
+                        <label>
+                          <span>From</span>
+                          <select class="quick-input"
+                                  [ngModel]="draft.fromAccountId"
+                                  (ngModelChange)="updateQuickDraft({ fromAccountId: $event })">
+                            @for (a of activeAccounts(); track a.id) {
+                              <option [value]="a.id">{{ optionLabel(a.icon, a.name) }}</option>
+                            }
+                          </select>
+                        </label>
+                        <label>
+                          <span>To</span>
+                          <select class="quick-input"
+                                  [ngModel]="draft.toAccountId"
+                                  (ngModelChange)="updateQuickDraft({ toAccountId: $event })">
+                            @for (a of activeAccounts(); track a.id) {
+                              <option [value]="a.id">{{ optionLabel(a.icon, a.name) }}</option>
+                            }
+                          </select>
+                        </label>
+                      </div>
+                    } @else {
+                      <div class="tx-meta">
+                        {{ accountName(tx.fromAccountId) }}
+                        <span class="tx-arrow">→</span>
+                        {{ accountName(tx.toAccountId) }}
+                      </div>
+                    }
                   } @else {
                     <div class="tx-title">{{ tx.merchant || 'Untitled' }}</div>
-                    <div class="tx-meta">
-                      @if (categoryFor(tx.categoryId); as cat) {
-                        <span class="tx-cat-chip">{{ cat.name }}</span>
-                        <span class="tx-dot">·</span>
-                      }
-                      <span>{{ accountName(tx.accountId) }}</span>
-                    </div>
+                    @if (quickEditingId() === tx.id && quickEditDraft(); as draft) {
+                      <div class="quick-edit-grid" (click)="$event.stopPropagation()">
+                        <label>
+                          <span>Amount</span>
+                          <input class="quick-input" type="number" step="0.01"
+                                 [ngModel]="draft.amount"
+                                 (ngModelChange)="updateQuickDraft({ amount: $event })" />
+                        </label>
+                        <label>
+                          <span>Date</span>
+                          <input class="quick-input" type="date"
+                                 [ngModel]="draft.date"
+                                 (ngModelChange)="updateQuickDraft({ date: $event })" />
+                        </label>
+                        <label>
+                          <span>Account</span>
+                          <select class="quick-input"
+                                  [ngModel]="draft.accountId"
+                                  (ngModelChange)="updateQuickDraft({ accountId: $event })">
+                            @for (a of activeAccounts(); track a.id) {
+                              <option [value]="a.id">{{ optionLabel(a.icon, a.name) }}</option>
+                            }
+                          </select>
+                        </label>
+                        <label>
+                          <span>Category</span>
+                          <select class="quick-input"
+                                  [ngModel]="draft.categoryId"
+                                  (ngModelChange)="updateQuickDraft({ categoryId: $event })">
+                            <option value="">Uncategorized</option>
+                            @for (c of categoriesFor(tx.type); track c.id) {
+                              <option [value]="c.id">{{ optionLabel(c.icon, c.name) }}</option>
+                            }
+                          </select>
+                        </label>
+                      </div>
+                    } @else {
+                      <div class="tx-meta">
+                        @if (categoryFor(tx.categoryId); as cat) {
+                          <span class="tx-cat-chip">{{ cat.name }}</span>
+                          <span class="tx-dot">·</span>
+                        }
+                        <span>{{ accountName(tx.accountId) }}</span>
+                      </div>
+                    }
                   }
                 </div>
 
                 <div class="tx-right">
-                  <div class="tx-amount"
-                       [class.pos]="tx.type === 'income'"
-                       [class.neg]="tx.type === 'expense'">
-                    @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
-                    @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
-                    @else { {{ formatCurrency(tx.amount) }} }
-                  </div>
-                  @if (tx.refunded) {
-                    <span class="refunded-badge">↩ Refunded</span>
-                  }
-                  @if (tx.notes) {
-                    <span class="has-notes">📝</span>
+                  @if (quickEditingId() === tx.id) {
+                    <div class="quick-actions" (click)="$event.stopPropagation()">
+                      <button class="quick-save" type="button" [disabled]="quickSaving()" (click)="saveQuickEdit($event, tx)">Save</button>
+                      <button class="quick-cancel" type="button" (click)="cancelQuickEdit($event)">Cancel</button>
+                    </div>
+                  } @else {
+                    <div class="tx-status">
+                      <div class="tx-amount"
+                           [class.pos]="tx.type === 'income'"
+                           [class.neg]="tx.type === 'expense'">
+                        @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
+                        @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
+                        @else { {{ formatCurrency(tx.amount) }} }
+                      </div>
+                      @if (tx.refunded) {
+                        <span class="refunded-badge">↩ Refunded</span>
+                      }
+                      @if (tx.notes) {
+                        <span class="has-notes">📝</span>
+                      }
+                    </div>
+                    <button class="quick-edit-btn"
+                            type="button"
+                            title="Quick edit"
+                            aria-label="Quick edit transaction"
+                            (click)="startQuickEdit($event, tx)">
+                      Edit
+                    </button>
                   }
                 </div>
 

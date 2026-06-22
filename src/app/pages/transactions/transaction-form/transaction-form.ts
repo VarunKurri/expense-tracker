@@ -66,10 +66,10 @@ export class TransactionForm implements OnChanges {
 
   submitting = signal(false);
 
-  filteredCategories = computed(() => {
+  filteredCategories() {
     const kind = this.type === 'income' ? 'income' : 'expense';
     return this.categories.categories().filter(c => c.kind === kind && !c.archived);
-  });
+  }
 
   activeAccounts = computed(() =>
     this.accounts.accounts().filter(a => !a.archived)
@@ -88,11 +88,11 @@ export class TransactionForm implements OnChanges {
     return this.billService.bills().some(b => b.name && b.name.toLowerCase() === term);
   });
 
-  availableTemplates = computed(() =>
-    this.templateService.templates()
+  availableTemplates() {
+    return this.templateService.templates()
       .filter(t => t.type === this.type)
-      .slice(0, 6)
-  );
+      .slice(0, 6);
+  }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['open'] && this.open) {

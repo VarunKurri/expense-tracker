@@ -1,8 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
-import { collection, getDocs, doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, writeBatch, addDoc } from 'firebase/firestore';
 import { AuthService } from './auth.service';
 import { EncryptionService } from './encryption.service';
+import { Category } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class SeedService {
@@ -21,7 +22,11 @@ export class SeedService {
 
       const sentinelRef = doc(this.db, `users/${user.uid}/meta/seed`);
       const sentinelSnap = await getDoc(sentinelRef);
-      if (sentinelSnap.exists()) return;
+      if (sentinelSnap.exists()) {
+        await this.ensurePocketMoneyCategory(user.uid);
+        await this.ensureRefundCategory(user.uid);
+        return;
+      }
 
       const accountsSnap = await getDocs(collection(this.db, `users/${user.uid}/accounts`));
       if (accountsSnap.empty) {
@@ -66,17 +71,66 @@ export class SeedService {
           { name: 'Salary', icon: 'Salary', color: '#10b981' },
           { name: 'Bonus', icon: 'Bonus', color: '#22c55e' },
           { name: 'Interest', icon: 'Interest', color: '#06b6d4' },
+          { name: 'Pocket Money', icon: '💸', color: '#f59e0b' },
+          { name: 'Refund', icon: '↩️', color: '#14b8a6' },
           { name: 'Other Income', icon: 'Income', color: '#84cc16' },
         ];
         for (const c of incomeCats) {
           batch.set(doc(ref), await this.encryption.encryptForWrite({ ...c, kind: 'income', createdAt: Date.now() }));
         }
         await batch.commit();
+      } else {
+        await this.ensurePocketMoneyCategory(user.uid);
+        await this.ensureRefundCategory(user.uid);
       }
 
       await setDoc(sentinelRef, { seededAt: Date.now() });
     } finally {
       this.seeding = false;
     }
+  }
+
+  private async ensurePocketMoneyCategory(uid: string) {
+    const ref = collection(this.db, `users/${uid}/categories`);
+    const snap = await getDocs(ref);
+    for (const item of snap.docs) {
+      const category = await this.encryption.decryptDoc<Category>(item.data());
+      const name = category.name.trim().toLowerCase();
+      if (category.kind === 'income' && (name === 'pocket money' || name === 'gift pocket money')) {
+        if (category.name !== 'Pocket Money' || category.icon !== '💸') {
+          await setDoc(item.ref, await this.encryption.encryptForWrite({
+            ...category,
+            name: 'Pocket Money',
+            icon: '💸',
+          }));
+        }
+        return;
+      }
+    }
+    await addDoc(ref, await this.encryption.encryptForWrite({
+      name: 'Pocket Money',
+      icon: '💸',
+      color: '#f59e0b',
+      kind: 'income',
+      createdAt: Date.now(),
+    }));
+  }
+
+  private async ensureRefundCategory(uid: string) {
+    const ref = collection(this.db, `users/${uid}/categories`);
+    const snap = await getDocs(ref);
+    for (const item of snap.docs) {
+      const category = await this.encryption.decryptDoc<Category>(item.data());
+      if (category.kind === 'income' && category.name.trim().toLowerCase() === 'refund') {
+        return;
+      }
+    }
+    await addDoc(ref, await this.encryption.encryptForWrite({
+      name: 'Refund',
+      icon: '↩️',
+      color: '#14b8a6',
+      kind: 'income',
+      createdAt: Date.now(),
+    }));
   }
 }
