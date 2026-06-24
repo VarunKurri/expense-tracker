@@ -53,6 +53,32 @@ select.input-field {
   gap: 12px;
 }
 
+.mini-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+
+  button {
+    min-height: 36px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: var(--fg-3);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+
+    &.active {
+      color: var(--fg);
+      background: var(--surface-hi);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+  }
+}
+
 .amount-wrap {
   position: relative;
   .curr {
@@ -176,11 +202,22 @@ select.input-field {
     &::after { left: 21px; background: #000; }
   }
 
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
   /* Amber toggle for pause state */
   &.on.toggle-amber {
     background: var(--amber);
     border-color: var(--amber);
     &::after { left: 21px; background: #fff; }
+  }
+}
+
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
   }
 }
 

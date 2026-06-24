@@ -17,6 +17,7 @@ describe('App', () => {
   const hasProfile = signal<boolean | null>(null);
   const busy = signal(false);
   const encryptionError = signal<string | null>(null);
+  const quickAddTrigger = vi.fn();
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -47,7 +48,7 @@ describe('App', () => {
         {
           provide: QuickAddService,
           useValue: {
-            trigger: vi.fn(),
+            trigger: quickAddTrigger,
           },
         },
         { provide: AutopayService, useValue: { runIfNeeded: vi.fn() } },
@@ -72,6 +73,7 @@ describe('App', () => {
     hasProfile.set(null);
     busy.set(false);
     encryptionError.set(null);
+    quickAddTrigger.mockReset();
     fixture = TestBed.createComponent(App);
   });
 
@@ -112,5 +114,46 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Add expense');
     expect(compiled.textContent).toContain('Go to Transactions');
     expect(compiled.querySelector('.command-input')).toBeTruthy();
+  });
+
+  it('opens quick add with single-key shortcuts for unlocked users', () => {
+    authUser.set({ email: 'user@example.com' });
+    unlocked.set(true);
+    hasProfile.set(true);
+    fixture.detectChanges();
+    const quickAddSpy = vi.spyOn(fixture.componentInstance, 'quickAdd').mockImplementation(() => {});
+
+    fixture.componentInstance.handleGlobalKeydown(new KeyboardEvent('keydown', { key: 'n' }));
+
+    expect(quickAddSpy).toHaveBeenCalledWith('expense');
+  });
+
+  it('ignores single-key shortcuts while typing in inputs', () => {
+    authUser.set({ email: 'user@example.com' });
+    unlocked.set(true);
+    hasProfile.set(true);
+    fixture.detectChanges();
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', bubbles: true }));
+
+    expect(quickAddTrigger).not.toHaveBeenCalled();
+    input.remove();
+  });
+
+  it('clicks the visible primary action with the save shortcut', () => {
+    const button = document.createElement('button');
+    button.className = 'btn-primary';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'modal-actions';
+    wrapper.appendChild(button);
+    document.body.appendChild(wrapper);
+    const clickSpy = vi.spyOn(button, 'click');
+
+    fixture.componentInstance.handleGlobalKeydown(new KeyboardEvent('keydown', { key: 's', metaKey: true }));
+
+    expect(clickSpy).toHaveBeenCalled();
+    wrapper.remove();
   });
 });

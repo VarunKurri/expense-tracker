@@ -78,10 +78,11 @@
                   {{ frequencyLabel(bill.frequency) }}
                   @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
                 </span>
+                @if (billModeLabel(bill)) { <span class="manual-chip">{{ billModeLabel(bill) }}</span> }
               </div>
             </div>
             <div class="bill-right">
-              <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
+              <div class="bill-amount">{{ billAmountLabel(bill) }}</div>
               <div class="bill-due overdue-text">
                 {{ Math.abs(daysUntil(bill.nextDueDate)) }}d overdue
               </div>
@@ -118,10 +119,11 @@
                   @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
                 </span>
                 @if (bill.autopayEnabled) { <span class="autopay-chip">Autopay</span> }
+                @if (billModeLabel(bill)) { <span class="manual-chip">{{ billModeLabel(bill) }}</span> }
               </div>
             </div>
             <div class="bill-right">
-              <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
+              <div class="bill-amount">{{ billAmountLabel(bill) }}</div>
               <div class="bill-due">
                 @if (daysUntil(bill.nextDueDate) === 0) { Due today }
                 @else { {{ daysUntil(bill.nextDueDate) }}d left }
@@ -160,10 +162,11 @@
                   {{ frequencyLabel(bill.frequency) }}
                   @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
                 </span>
+                @if (billModeLabel(bill)) { <span class="manual-chip">{{ billModeLabel(bill) }}</span> }
               </div>
             </div>
             <div class="bill-right">
-              <div class="bill-amount">{{ formatCurrency(bill.amount) }}</div>
+              <div class="bill-amount">{{ billAmountLabel(bill) }}</div>
             </div>
           </div>
         }
@@ -196,10 +199,11 @@
               <div class="active-freq">{{ frequencyLabel(bill.frequency) }}</div>
             </div>
             <div class="active-name">{{ bill.name }}</div>
-            <div class="active-amount">{{ formatCurrency(bill.amount) }}</div>
+            <div class="active-amount">{{ billAmountLabel(bill) }}</div>
             <div class="active-meta">
               @if (accountIcon(bill.accountId)) { {{ accountIcon(bill.accountId) }} }
               @if (bill.autopayEnabled) { <span class="autopay-chip">Autopay</span> }
+              @if (billModeLabel(bill)) { <span class="manual-chip">{{ billModeLabel(bill) }}</span> }
             </div>
             <div class="active-next">Next · {{ formatDate(bill.nextDueDate) }}</div>
           </div>
@@ -264,10 +268,11 @@
                   @if (accountName(bill.accountId)) { · {{ accountName(bill.accountId) }} }
                 </span>
                 <span class="paused-chip">Paused</span>
+                @if (billModeLabel(bill)) { <span class="manual-chip">{{ billModeLabel(bill) }}</span> }
               </div>
             </div>
             <div class="bill-right">
-              <div class="bill-amount bill-amount-muted">{{ formatCurrency(bill.amount) }}</div>
+              <div class="bill-amount bill-amount-muted">{{ billAmountLabel(bill) }}</div>
             </div>
           </div>
         }
@@ -353,6 +358,7 @@
 <app-transaction-form
   [open]="txFormOpen()"
   [transaction]="editingTx()"
+  [draft]="paymentDraft()"
   (closed)="closeTxForm()"
   (saved)="handleTxSave($event)"
   (deleteRequested)="askTxDelete()" />

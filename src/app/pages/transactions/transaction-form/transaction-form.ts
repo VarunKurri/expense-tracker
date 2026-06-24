@@ -10,7 +10,7 @@ import { CategoryService } from '../../../services/category.service';
 import { BillService } from '../../../services/bill.service';
 import { TransactionTemplateService } from '../../../services/transaction-template.service';
 import { TransactionService } from '../../../services/transaction.service';
-import { Transaction, TransactionType } from '../../../models';
+import { BillAmountMode, BillDueDateMode, Transaction, TransactionType } from '../../../models';
 import { TransactionTemplate } from '../../../models';
 import { QuickAddService } from '../../../services/quick-add.service';
 import { ToastService } from '../../../services/toast.service';
@@ -33,6 +33,7 @@ export class TransactionForm implements OnChanges {
 
   @Input() open = false;
   @Input() transaction: Transaction | null = null;
+  @Input() draft: Partial<Transaction> | null = null;
   @Output() closed = new EventEmitter<void>();
   @Output() saved = new EventEmitter<Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>>();
   @Output() deleteRequested = new EventEmitter<void>();
@@ -62,6 +63,8 @@ export class TransactionForm implements OnChanges {
   // Bill fields — shown when Subscriptions category is selected
   billFrequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly' = 'monthly';
   billNextDueDate: string = '';
+  billAmountMode: BillAmountMode = 'fixed';
+  billDueDateMode: BillDueDateMode = 'exact';
   billAutopay: boolean = true;
 
   submitting = signal(false);
@@ -121,6 +124,7 @@ export class TransactionForm implements OnChanges {
       this.notes = '';
       this.merchant.set('');
       this.applySmartDefaultsForType();
+      this.applyDraft();
       this.saveAsTemplate.set(false);
       this.templateName.set('');
     }
@@ -128,6 +132,8 @@ export class TransactionForm implements OnChanges {
     // Default bill fields
     this.billFrequency = 'monthly';
     this.billNextDueDate = this.nextMonthDate(this.date);
+    this.billAmountMode = 'fixed';
+    this.billDueDateMode = 'exact';
     this.billAutopay = true;
 
     setTimeout(() => this.resetNotesHeight(), 0);
@@ -141,10 +147,56 @@ export class TransactionForm implements OnChanges {
     }
   }
 
+  setBillAmountMode(mode: BillAmountMode) {
+    this.billAmountMode = mode;
+    this.syncBillAutopay();
+  }
+
+  setBillDueDateMode(mode: BillDueDateMode) {
+    this.billDueDateMode = mode;
+    this.syncBillAutopay();
+  }
+
+  toggleBillAutopay() {
+    if (!this.canAutopayBill()) return;
+    this.billAutopay = !this.billAutopay;
+  }
+
+  canAutopayBill(): boolean {
+    return this.billAmountMode === 'fixed' && this.billDueDateMode === 'exact';
+  }
+
+  billAmountLabel(): string {
+    return this.billAmountMode === 'fixed' ? 'Fixed amount' : 'Variable amount';
+  }
+
+  billDateLabel(): string {
+    return this.billDueDateMode === 'exact' ? 'Exact due date' : 'Flexible monthly reminder';
+  }
+
+  private syncBillAutopay() {
+    if (!this.canAutopayBill()) {
+      this.billAutopay = false;
+    }
+  }
+
   private nextMonthDate(fromDate: string): string {
     const d = new Date(fromDate + 'T00:00:00');
     d.setMonth(d.getMonth() + 1);
     return this.localDateString(d);
+  }
+
+  private applyDraft() {
+    if (!this.draft) return;
+    if (this.draft.type) this.type = this.draft.type;
+    if (typeof this.draft.amount === 'number') this.amount = this.draft.amount;
+    if (this.draft.date) this.date = this.draft.date;
+    if (this.draft.notes) this.notes = this.draft.notes;
+    if (this.draft.merchant) this.merchant.set(this.draft.merchant);
+    if (this.draft.accountId) this.accountId = this.draft.accountId;
+    if (this.draft.categoryId) this.categoryId.set(this.draft.categoryId);
+    if (this.draft.fromAccountId) this.fromAccountId = this.draft.fromAccountId;
+    if (this.draft.toAccountId) this.toAccountId = this.draft.toAccountId;
   }
 
   onNotesInput(event: Event) {
@@ -349,11 +401,13 @@ export class TransactionForm implements OnChanges {
             await this.billService.add({
               name,
               amount: Number(this.amount),
+              amountMode: this.billAmountMode,
               frequency: this.billFrequency,
               nextDueDate: this.billNextDueDate || this.nextMonthDate(this.date),
+              dueDateMode: this.billDueDateMode,
               accountId: this.accountId,
               categoryId: this.categoryId(),
-              autopayEnabled: this.billAutopay,
+              autopayEnabled: this.canAutopayBill() && this.billAutopay,
               icon: '📄',
               active: true,
             });

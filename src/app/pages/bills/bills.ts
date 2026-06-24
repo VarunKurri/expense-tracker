@@ -43,6 +43,8 @@ export class Bills {
   viewingTx = signal<Transaction | null>(null);
   editingTx = signal<Transaction | null>(null);
   txFormOpen = signal(false);
+  payingBill = signal<Bill | null>(null);
+  paymentDraft = signal<Partial<Transaction> | null>(null);
   viewTxConfirmOpen = signal(false);
   txToDelete = signal<Transaction | null>(null);
 
@@ -69,13 +71,25 @@ export class Bills {
   closeTxForm() {
     this.txFormOpen.set(false);
     this.editingTx.set(null);
+    this.payingBill.set(null);
+    this.paymentDraft.set(null);
   }
 
   async handleTxSave(data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
     const tx = this.editingTx();
-    if (!tx?.id) return;
+    const bill = this.payingBill();
     try {
-      await this.txService.update(tx.id, data);
+      if (tx?.id) {
+        await this.txService.update(tx.id, data);
+      } else if (bill?.id) {
+        await this.txService.add(data);
+        await this.billService.update(bill.id, {
+          amount: data.amount,
+          nextDueDate: this.billService.nextDueDate({ ...bill, nextDueDate: data.date }),
+        });
+      } else {
+        return;
+      }
       this.closeTxForm();
     } catch (err) {
       this.toastService.error('Failed. Please try again.');
@@ -208,7 +222,9 @@ export class Bills {
         seen.add(key);
         await this.billService.add({
           name, amount: tx.amount, frequency: 'monthly',
+          amountMode: 'fixed',
           nextDueDate: this.nextMonthDate(tx.date),
+          dueDateMode: 'exact',
           accountId: tx.accountId, categoryId: subCat.id,
           autopayEnabled: true, icon: '📄', active: true,
         });
@@ -237,6 +253,10 @@ export class Bills {
   // ── Mark as paid ──────────────────────────────────────────
   async markPaid(bill: Bill) {
     if (!bill.id) return;
+    if (this.needsManualPaymentForm(bill)) {
+      this.openBillPayment(bill);
+      return;
+    }
     this.markingPaid.set(bill.id);
     try {
       await this.txService.add({
@@ -246,7 +266,7 @@ export class Bills {
         merchant: bill.name,
         accountId: bill.accountId,
         categoryId: bill.categoryId,
-        notes: `${bill.frequency} bill — autopaid`,
+        notes: `${bill.frequency} bill — manual payment`,
       });
       const nextDate = this.billService.nextDueDate(bill);
       await this.billService.update(bill.id, { nextDueDate: nextDate });
@@ -255,6 +275,21 @@ export class Bills {
     } finally {
       this.markingPaid.set(null);
     }
+  }
+
+  openBillPayment(bill: Bill) {
+    this.editingTx.set(null);
+    this.payingBill.set(bill);
+    this.paymentDraft.set({
+      type: 'expense',
+      amount: bill.amount,
+      date: this.localDateString(),
+      merchant: bill.name,
+      accountId: bill.accountId,
+      categoryId: bill.categoryId,
+      notes: this.paymentNote(bill),
+    });
+    this.txFormOpen.set(true);
   }
 
   // ── CRUD ──────────────────────────────────────────────────
@@ -335,6 +370,27 @@ export class Bills {
 
   formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+  }
+
+  billAmountLabel(bill: Bill): string {
+    const base = this.formatCurrency(bill.amount);
+    return bill.amountMode === 'variable' ? `${base} est.` : base;
+  }
+
+  billModeLabel(bill: Bill): string {
+    const parts: string[] = [];
+    if (bill.amountMode === 'variable') parts.push('Variable');
+    if (bill.dueDateMode === 'flexible') parts.push('Flexible');
+    return parts.join(' · ');
+  }
+
+  needsManualPaymentForm(bill: Bill): boolean {
+    return bill.amountMode === 'variable' || bill.dueDateMode === 'flexible';
+  }
+
+  private paymentNote(bill: Bill): string {
+    const mode = this.billModeLabel(bill);
+    return mode ? `${bill.frequency} bill — ${mode.toLowerCase()} manual payment` : `${bill.frequency} bill — manual payment`;
   }
 
   formatCurrencyRounded(n: number): string {

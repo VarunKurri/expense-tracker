@@ -260,6 +260,48 @@ select.input-field {
   background: var(--surface);
 }
 
+.recurring-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mini-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(255,255,255,0.48);
+  border: 1px solid rgba(34, 197, 94, 0.16);
+  border-radius: 11px;
+
+  button {
+    min-height: 36px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: var(--fg-3);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+
+    &.active {
+      color: var(--fg);
+      background: var(--surface);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+  }
+}
+
+.recurring-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.52);
+  border: 1px solid rgba(34, 197, 94, 0.16);
+  color: var(--fg-3);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 /* AUTOPAY ROW inside recurring section */
 .autopay-row {
   display: flex;
@@ -423,6 +465,11 @@ select.input-field {
     border-color: var(--green);
     &::after { left: 21px; background: #000; }
   }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
 }
 
 @media (max-width: 768px) {
@@ -431,6 +478,7 @@ select.input-field {
   .amount-curr { font-size: 24px; }
   .amount-input { font-size: 36px; }
   .form-grid { grid-template-columns: 1fr; }
+  .recurring-choice-grid { grid-template-columns: 1fr; }
 
   .template-strip {
     margin-inline: -2px;

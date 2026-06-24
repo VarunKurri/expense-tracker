@@ -236,10 +236,83 @@ export class App {
     if ((event.metaKey || event.ctrlKey) && key === 'k') {
       event.preventDefault();
       this.commandPaletteOpen() ? this.closeCommandPalette() : this.openCommandPalette();
-    } else if (event.key === 'Escape' && this.commandPaletteOpen()) {
-      event.preventDefault();
-      this.closeCommandPalette();
+      return;
     }
+
+    if ((event.metaKey || event.ctrlKey) && key === 's') {
+      event.preventDefault();
+      this.clickVisiblePrimaryAction();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      if (this.commandPaletteOpen()) {
+        event.preventDefault();
+        this.closeCommandPalette();
+      } else if (this.sidebarOpen()) {
+        event.preventDefault();
+        this.sidebarOpen.set(false);
+      }
+      return;
+    }
+
+    if (!this.auth.user() || !this.encryption.unlocked() || this.isTypingTarget(event.target)) return;
+
+    if (event.key === '/') {
+      event.preventDefault();
+      this.openCommandPalette();
+      return;
+    }
+
+    if (event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+      const route = this.routeForShortcutCode(event.code);
+      if (route) {
+        event.preventDefault();
+        this.navigateTo(route);
+      }
+      return;
+    }
+
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+    if (key === 'n') {
+      event.preventDefault();
+      this.quickAdd('expense');
+    } else if (key === 'i') {
+      event.preventDefault();
+      this.quickAdd('income');
+    } else if (key === 'm') {
+      event.preventDefault();
+      this.quickAdd('transfer');
+    }
+  }
+
+  private isTypingTarget(target: EventTarget | null): boolean {
+    const el = target as HTMLElement | null;
+    if (!el) return false;
+    const tag = el.tagName.toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+  }
+
+  private routeForShortcutCode(code: string): string | null {
+    const routes: Record<string, string> = {
+      Digit1: '/dashboard',
+      Digit2: '/accounts',
+      Digit3: '/transactions',
+      Digit4: '/bills',
+      Digit5: '/budgets',
+      Digit6: '/analysis',
+      Digit7: '/import',
+      Digit8: '/settings',
+    };
+    return routes[code] || null;
+  }
+
+  private clickVisiblePrimaryAction() {
+    const button = document.querySelector<HTMLButtonElement>(
+      '.modal-actions .btn-primary:not(:disabled), .actions .btn-primary:not(:disabled)'
+    );
+    button?.click();
   }
 
   async signIn() {

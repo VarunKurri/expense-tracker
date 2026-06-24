@@ -360,6 +360,10 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.abs(n));
   }
+  billAmountLabel(bill: Bill): string {
+    const base = this.formatCurrency(bill.amount);
+    return bill.amountMode === 'variable' ? `${base} est.` : base;
+  }
   formatCurrencyShort(n: number): string {
     if (n >= 1000) return '$' + (n / 1000).toFixed(1) + 'k';
     return '$' + Math.round(n);

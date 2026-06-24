@@ -7,7 +7,7 @@ import { FormsModule } from '@angular/forms';
 import { Modal } from '../../../components/modal/modal';
 import { AccountService } from '../../../services/account.service';
 import { CategoryService } from '../../../services/category.service';
-import { Bill, BillFrequency } from '../../../models';
+import { Bill, BillAmountMode, BillDueDateMode, BillFrequency } from '../../../models';
 import { ToastService } from '../../../services/toast.service';
 
 @Component({
@@ -30,8 +30,10 @@ export class BillForm implements OnChanges {
 
   name = '';
   amount = 0;
+  amountMode: BillAmountMode = 'fixed';
   frequency: BillFrequency = 'monthly';
   nextDueDate = '';
+  dueDateMode: BillDueDateMode = 'exact';
   accountId = '';
   categoryId = '';
   autopayEnabled = true;
@@ -66,8 +68,10 @@ export class BillForm implements OnChanges {
     if (this.bill) {
       this.name = this.bill.name;
       this.amount = this.bill.amount;
+      this.amountMode = this.bill.amountMode || 'fixed';
       this.frequency = this.bill.frequency;
       this.nextDueDate = this.bill.nextDueDate;
+      this.dueDateMode = this.bill.dueDateMode || 'exact';
       this.accountId = this.bill.accountId || '';
       this.categoryId = this.bill.categoryId || '';
       this.autopayEnabled = this.bill.autopayEnabled;
@@ -77,8 +81,10 @@ export class BillForm implements OnChanges {
     } else {
       this.name = '';
       this.amount = 0;
+      this.amountMode = 'fixed';
       this.frequency = 'monthly';
       this.nextDueDate = new Date().toISOString().slice(0, 10);
+      this.dueDateMode = 'exact';
       this.accountId = this.activeAccounts()[0]?.id || '';
       // Default to Subscriptions category
       const subCat = this.expenseCategories().find(c =>
@@ -92,6 +98,31 @@ export class BillForm implements OnChanges {
     }
   }
 
+  setAmountMode(mode: BillAmountMode) {
+    this.amountMode = mode;
+    this.syncAutopay();
+  }
+
+  setDueDateMode(mode: BillDueDateMode) {
+    this.dueDateMode = mode;
+    this.syncAutopay();
+  }
+
+  toggleAutopay() {
+    if (!this.canAutopay()) return;
+    this.autopayEnabled = !this.autopayEnabled;
+  }
+
+  canAutopay(): boolean {
+    return this.amountMode === 'fixed' && this.dueDateMode === 'exact';
+  }
+
+  private syncAutopay() {
+    if (!this.canAutopay()) {
+      this.autopayEnabled = false;
+    }
+  }
+
   save() {
     if (!this.name.trim()) { this.toastService.error('Name is required'); return; }
     if (!this.amount || this.amount <= 0) { this.toastService.error('Amount must be greater than zero'); return; }
@@ -100,9 +131,11 @@ export class BillForm implements OnChanges {
     const data: Omit<Bill, 'id' | 'createdAt'> = {
       name: this.name.trim(),
       amount: Number(this.amount),
+      amountMode: this.amountMode,
       frequency: this.frequency,
       nextDueDate: this.nextDueDate,
-      autopayEnabled: this.autopayEnabled,
+      dueDateMode: this.dueDateMode,
+      autopayEnabled: this.canAutopay() && this.autopayEnabled,
       icon: this.icon,
       active: this.active,
     };

@@ -277,7 +277,7 @@
                   {{ Math.abs(daysUntil(bill.nextDueDate)) }}d overdue · {{ bill.frequency }}
                 </div>
               </div>
-              <div class="upcoming-amount overdue-amount">{{ formatCurrency(bill.amount) }}</div>
+              <div class="upcoming-amount overdue-amount">{{ billAmountLabel(bill) }}</div>
             </div>
           }
 
@@ -299,7 +299,7 @@
                   · {{ bill.frequency }}
                 </div>
               </div>
-              <div class="upcoming-amount">{{ formatCurrency(bill.amount) }}</div>
+              <div class="upcoming-amount">{{ billAmountLabel(bill) }}</div>
             </div>
           }
         </div>

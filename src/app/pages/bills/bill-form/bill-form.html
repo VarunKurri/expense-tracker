@@ -29,6 +29,39 @@
       </div>
     </div>
 
+    <div class="form-grid">
+      <div class="field">
+        <label class="label-sm">Amount type</label>
+        <div class="mini-seg">
+          <button type="button"
+                  [class.active]="amountMode === 'fixed'"
+                  (click)="setAmountMode('fixed')">
+            Fixed
+          </button>
+          <button type="button"
+                  [class.active]="amountMode === 'variable'"
+                  (click)="setAmountMode('variable')">
+            Variable
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label-sm">Schedule</label>
+        <div class="mini-seg">
+          <button type="button"
+                  [class.active]="dueDateMode === 'exact'"
+                  (click)="setDueDateMode('exact')">
+            Exact
+          </button>
+          <button type="button"
+                  [class.active]="dueDateMode === 'flexible'"
+                  (click)="setDueDateMode('flexible')">
+            Flexible
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="field">
       <label class="label-sm">Next due date</label>
       <input class="input-field" type="date"
@@ -70,11 +103,18 @@
     <div class="autopay-row">
       <div>
         <div class="autopay-label">Autopay enabled</div>
-        <div class="autopay-sub">Bill is paid automatically each cycle</div>
+        <div class="autopay-sub">
+          @if (canAutopay()) {
+            Bill is paid automatically each cycle
+          } @else {
+            Variable or flexible bills are tracked as manual reminders
+          }
+        </div>
       </div>
       <button type="button" class="toggle"
               [class.on]="autopayEnabled"
-              (click)="autopayEnabled = !autopayEnabled"></button>
+              [disabled]="!canAutopay()"
+              (click)="toggleAutopay()"></button>
     </div>
 
     <!-- Pause toggle — only shown when editing an existing bill -->

@@ -136,6 +136,39 @@
           </div>
         </div>
 
+        <div class="recurring-choice-grid">
+          <div class="field">
+            <span class="label-sm">Amount type</span>
+            <div class="mini-seg">
+              <button type="button"
+                      [class.active]="billAmountMode === 'fixed'"
+                      (click)="setBillAmountMode('fixed')">
+                Fixed
+              </button>
+              <button type="button"
+                      [class.active]="billAmountMode === 'variable'"
+                      (click)="setBillAmountMode('variable')">
+                Variable
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="label-sm">Schedule</span>
+            <div class="mini-seg">
+              <button type="button"
+                      [class.active]="billDueDateMode === 'exact'"
+                      (click)="setBillDueDateMode('exact')">
+                Exact
+              </button>
+              <button type="button"
+                      [class.active]="billDueDateMode === 'flexible'"
+                      (click)="setBillDueDateMode('flexible')">
+                Flexible
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div class="form-grid">
           <div class="field">
             <span class="label-sm">Frequency</span>
@@ -156,14 +189,27 @@
         <div class="autopay-row">
           <div>
             <div class="autopay-label">Autopay enabled</div>
-            <div class="autopay-sub">Bill is paid automatically each cycle</div>
+            <div class="autopay-sub">
+              @if (canAutopayBill()) {
+                Bill is paid automatically each cycle
+              } @else {
+                Variable or flexible bills are tracked as manual reminders
+              }
+            </div>
           </div>
           <button type="button"
                   class="toggle"
                   [class.on]="billAutopay"
-                  (click)="billAutopay = !billAutopay">
+                  [disabled]="!canAutopayBill()"
+                  (click)="toggleBillAutopay()">
           </button>
         </div>
+
+        @if (billAmountMode === 'variable' || billDueDateMode === 'flexible') {
+          <div class="recurring-note">
+            {{ billAmountLabel() }} · {{ billDateLabel() }}. The amount is saved as an estimate, and Mark paid will let you adjust the amount/date before logging payment.
+          </div>
+        }
       </div>
     }
 

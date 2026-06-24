@@ -34,9 +34,10 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
   - Done when: common fields can be edited directly and saved with clear success/error feedback.
   - Verified: transaction rows support inline amount/date/account/category edits, transfers support from/to edits, and compiler/unit checks pass.
 
-- [ ] Add keyboard shortcuts for power users.
+- [x] Add keyboard shortcuts for power users.
   - Why: repeated workflows get much faster with shortcuts for add, save, search, close modal, and navigation.
   - Done when: shortcuts are documented in settings and do not conflict with text input.
+  - Verified: global shortcuts support command palette, add expense/income/transfer, visible-form save, Escape close, and Alt-number navigation; Settings documents them and compiler/unit checks pass.
 
 ## Phase 2: Faster Review And Search
 
@@ -87,6 +88,11 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
 - [ ] Add recurring transaction rules.
   - Why: predictable income, transfers, and fixed expenses should not require repeated manual entry.
   - Done when: users can create rules, preview upcoming generated transactions, and pause rules.
+
+- [x] Support flexible recurring subscription bills.
+  - Why: monthly bills like family phone plans can have variable amounts and flexible manual payment dates.
+  - Done when: subscription-created bills and bill edits support fixed/variable amounts, exact/flexible due dates, autopay is restricted to fixed/exact bills, and manual variable payments open a prefilled transaction form before advancing the reminder.
+  - Verified: compiler and unit tests pass.
 
 - [ ] Improve bill detection from transaction history.
   - Why: subscription discovery should find likely bills beyond the current Subscriptions category heuristic.

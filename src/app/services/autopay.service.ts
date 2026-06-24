@@ -29,6 +29,7 @@ export class AutopayService {
       let anyError = false;
       for (const bill of this.billService.bills()) {
         if (!bill.active || !bill.autopayEnabled || !bill.id) continue;
+        if (bill.amountMode === 'variable' || bill.dueDateMode === 'flexible') continue;
         if (this.failedBillIds.has(bill.id)) continue;
         if (bill.nextDueDate > today) continue;
 
