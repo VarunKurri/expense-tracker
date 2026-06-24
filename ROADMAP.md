@@ -46,9 +46,10 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
   - Done when: search results are grouped by type and deep-link to the right detail screen.
   - Verified: command palette search now groups Actions, Transactions, Accounts, Categories, Bills, and Budgets; results deep-link to transaction view, account detail, category-filtered transactions, bill edit, or budget detail, and compiler/unit checks pass.
 
-- [ ] Add advanced transaction filters.
+- [x] Add advanced transaction filters.
   - Why: users need faster ways to answer questions like "large uncategorized expenses this month."
   - Done when: filters support amount range, uncategorized, refunded, account, category, merchant, and custom date ranges.
+  - Verified: Transactions supports custom date ranges, merchant-only filtering, min/max amount, uncategorized/refunded/not-refunded filters, and existing account/category filters; compiler/unit checks pass.
 
 - [ ] Add bulk transaction actions.
   - Why: cleanup is slow one row at a time.

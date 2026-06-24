@@ -12,7 +12,8 @@ import { QuickAddService } from '../../services/quick-add.service';
 import { ToastService } from '../../services/toast.service';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
-type DateRange = 'last-30' | 'this-month' | 'last-month' | 'this-year' | 'all';
+type DateRange = 'last-30' | 'this-month' | 'last-month' | 'this-year' | 'custom' | 'all';
+type SpecialFilter = 'all' | 'uncategorized' | 'refunded' | 'not-refunded';
 type QuickEditDraft = {
   amount: number;
   date: string;
@@ -55,6 +56,13 @@ export class Transactions {
   filterAccountId = signal('');
   filterCategoryId = signal('');
   search = signal('');
+  merchantFilter = signal('');
+  minAmount = signal('');
+  maxAmount = signal('');
+  customStartDate = signal('');
+  customEndDate = signal('');
+  specialFilter = signal<SpecialFilter>('all');
+  advancedFiltersOpen = signal(false);
 
   // Date range bounds
   private dateRange = computed(() => {
@@ -90,6 +98,8 @@ export class Transactions {
       }
       case 'this-year':
         return { start: `${y}-01-01`, end: `${y}-12-31` };
+      case 'custom':
+        return { start: this.customStartDate(), end: this.customEndDate() };
       default:
         return { start: '', end: '' };
     }
@@ -99,10 +109,15 @@ export class Transactions {
   filtered = computed(() => {
     const { start, end } = this.dateRange();
     const q = this.search().toLowerCase();
+    const merchantQuery = this.merchantFilter().trim().toLowerCase();
+    const min = Number(this.minAmount());
+    const max = Number(this.maxAmount());
     return this.txService.transactions().filter(t => {
       if (this.filterType() !== 'all' && t.type !== this.filterType()) return false;
       if (start && t.date < start) return false;
       if (end && t.date > end) return false;
+      if (this.minAmount() && t.amount < min) return false;
+      if (this.maxAmount() && t.amount > max) return false;
       if (this.filterAccountId()) {
         if (t.type === 'transfer') {
           if (t.fromAccountId !== this.filterAccountId() &&
@@ -112,6 +127,10 @@ export class Transactions {
         }
       }
       if (this.filterCategoryId() && t.categoryId !== this.filterCategoryId()) return false;
+      if (this.specialFilter() === 'uncategorized' && (t.type === 'transfer' || !!t.categoryId)) return false;
+      if (this.specialFilter() === 'refunded' && !t.refunded) return false;
+      if (this.specialFilter() === 'not-refunded' && t.refunded) return false;
+      if (merchantQuery && !(t.merchant || '').toLowerCase().includes(merchantQuery)) return false;
       if (q) {
         const merchant = (t.merchant || '').toLowerCase();
         const notes = (t.notes || '').toLowerCase();
@@ -209,7 +228,13 @@ export class Transactions {
     this.filterDateRange() !== 'last-30' ||
     !!this.filterAccountId() ||
     !!this.filterCategoryId() ||
-    !!this.search()
+    !!this.search() ||
+    !!this.merchantFilter() ||
+    !!this.minAmount() ||
+    !!this.maxAmount() ||
+    !!this.customStartDate() ||
+    !!this.customEndDate() ||
+    this.specialFilter() !== 'all'
   );
 
   resetFilters() {
@@ -218,6 +243,12 @@ export class Transactions {
     this.filterAccountId.set('');
     this.filterCategoryId.set('');
     this.search.set('');
+    this.merchantFilter.set('');
+    this.minAmount.set('');
+    this.maxAmount.set('');
+    this.customStartDate.set('');
+    this.customEndDate.set('');
+    this.specialFilter.set('all');
   }
 
   categoriesFor(type: Transaction['type']) {

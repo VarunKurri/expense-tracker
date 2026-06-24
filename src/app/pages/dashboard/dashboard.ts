@@ -303,7 +303,12 @@ export class Dashboard implements AfterViewInit, OnDestroy {
         if (!effective) return null;
         const cat = this.categoryService.categories().find(c => c.id === budget.categoryId);
         const spent = this.txService.transactions()
-          .filter(t => t.type === 'expense' && t.categoryId === budget.categoryId && t.date.startsWith(month))
+          .filter(t =>
+            t.type === 'expense' &&
+            t.categoryId === budget.categoryId &&
+            t.date.startsWith(month) &&
+            !t.refunded
+          )
           .reduce((s, t) => s + t.amount, 0);
         const pct = effective.amount > 0 ? Math.round((spent / effective.amount) * 100) : 0;
         return {
