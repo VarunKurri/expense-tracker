@@ -823,6 +823,19 @@
   min-height: 0;
 }
 
+.command-group-label {
+  padding: 12px 10px 6px;
+  color: var(--fg-4);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+
+  &:first-child {
+    padding-top: 0;
+  }
+}
+
 .command-item {
   width: 100%;
   display: flex;
@@ -836,10 +849,52 @@
   font-family: inherit;
   text-align: left;
   cursor: pointer;
+  position: relative;
 
-  &.active,
   &:hover {
     background: var(--surface-hi);
+  }
+
+  &.active {
+    background: var(--surface);
+    box-shadow:
+      inset 0 0 0 1px var(--line),
+      0 1px 2px rgba(0,0,0,0.04);
+
+    .command-icon {
+      color: var(--fg);
+      background: var(--surface-hi);
+      border-color: var(--line);
+    }
+
+    .command-label {
+      color: var(--fg);
+    }
+  }
+
+  &.more {
+    margin-top: 2px;
+    color: var(--green);
+
+    .command-icon {
+      color: var(--green);
+      background: var(--green-bg);
+      border-color: transparent;
+    }
+
+    .command-label {
+      color: var(--green);
+    }
+
+    &.active {
+      background: var(--surface);
+
+      .command-icon {
+        color: var(--green);
+        background: var(--green-bg);
+        border-color: transparent;
+      }
+    }
   }
 }
 
@@ -927,6 +982,10 @@
 
   .command-list {
     padding: 16px 20px;
+  }
+
+  .command-group-label {
+    padding-inline: 8px;
   }
 
   .command-item {

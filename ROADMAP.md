@@ -41,9 +41,10 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
 
 ## Phase 2: Faster Review And Search
 
-- [ ] Add global search across transactions, accounts, categories, bills, and budgets.
+- [x] Add global search across transactions, accounts, categories, bills, and budgets.
   - Why: users should find financial records by merchant, note, amount, account, category, or bill name.
   - Done when: search results are grouped by type and deep-link to the right detail screen.
+  - Verified: command palette search now groups Actions, Transactions, Accounts, Categories, Bills, and Budgets; results deep-link to transaction view, account detail, category-filtered transactions, bill edit, or budget detail, and compiler/unit checks pass.
 
 - [ ] Add advanced transaction filters.
   - Why: users need faster ways to answer questions like "large uncategorized expenses this month."

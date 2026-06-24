@@ -297,20 +297,25 @@
           </div>
 
           <div class="command-list" role="listbox">
-            @for (command of filteredCommands(); track command.id; let i = $index) {
+            @for (entry of paletteEntries(); track entry.id; let i = $index) {
+              @if (showCommandGroup(i, entry.group)) {
+                <div class="command-group-label">{{ entry.group }}</div>
+              }
               <button class="command-item"
                       type="button"
                       role="option"
+                      [class.more]="entry.tone === 'more'"
                       [class.active]="i === activeCommandIndex()"
+                      [attr.data-command-index]="i"
                       [attr.aria-selected]="i === activeCommandIndex()"
                       (mouseenter)="activeCommandIndex.set(i)"
-                      (click)="runCommand(command)">
+                      (click)="runPaletteEntry(entry)">
                 <span class="command-icon">
-                  <app-icon [name]="command.iconName" [size]="17" />
+                  <app-icon [name]="entry.iconName" [size]="17" />
                 </span>
                 <span class="command-copy">
-                  <span class="command-label">{{ command.label }}</span>
-                  <span class="command-hint">{{ command.hint }}</span>
+                  <span class="command-label">{{ entry.label }}</span>
+                  <span class="command-hint">{{ entry.hint }}</span>
                 </span>
               </button>
             } @empty {

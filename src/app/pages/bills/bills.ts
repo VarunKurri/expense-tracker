@@ -1,5 +1,6 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { BillService } from '../../services/bill.service';
 import { TransactionService } from '../../services/transaction.service';
 import { AccountService } from '../../services/account.service';
@@ -21,6 +22,9 @@ type BillTab = 'active' | 'paused';
 })
 export class Bills {
   private toastService = inject(ToastService);
+  private route = inject(ActivatedRoute);
+  private openedQueryBillId = '';
+  private queryBillId = signal('');
   Math = Math;
 
   billService = inject(BillService);
@@ -47,6 +51,21 @@ export class Bills {
   paymentDraft = signal<Partial<Transaction> | null>(null);
   viewTxConfirmOpen = signal(false);
   txToDelete = signal<Transaction | null>(null);
+
+  constructor() {
+    this.route.queryParamMap.subscribe(params => {
+      this.queryBillId.set(params.get('billId') || '');
+    });
+
+    effect(() => {
+      const billId = this.queryBillId();
+      if (!billId || this.openedQueryBillId === billId) return;
+      const bill = this.billService.bills().find(b => b.id === billId);
+      if (!bill) return;
+      this.openedQueryBillId = billId;
+      setTimeout(() => this.openEdit(bill), 0);
+    });
+  }
 
   openTxView(tx: Transaction) {
     this.viewingTx.set(tx);

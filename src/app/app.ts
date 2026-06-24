@@ -12,6 +12,11 @@ import { QuickAddService } from './services/quick-add.service';
 import { BillService } from './services/bill.service';
 import { AutopayService } from './services/autopay.service';
 import { EncryptionService } from './services/encryption.service';
+import { AccountService } from './services/account.service';
+import { CategoryService } from './services/category.service';
+import { TransactionService } from './services/transaction.service';
+import { BudgetService } from './services/budget.service';
+import { Account } from './models';
 
 interface NavItem {
   path: string;
@@ -26,6 +31,16 @@ interface CommandItem {
   hint: string;
   iconName: string;
   keywords: string;
+  action: () => void;
+}
+
+interface PaletteEntry {
+  id: string;
+  group: string;
+  label: string;
+  hint: string;
+  iconName: string;
+  tone?: 'more';
   action: () => void;
 }
 
@@ -46,6 +61,10 @@ export class App {
   billService = inject(BillService);
   private autopayService = inject(AutopayService);
   encryption = inject(EncryptionService);
+  private accountService = inject(AccountService);
+  private categoryService = inject(CategoryService);
+  private transactionService = inject(TransactionService);
+  private budgetService = inject(BudgetService);
 
   sidebarOpen = signal(false);
   signingIn = signal(false);
@@ -137,6 +156,22 @@ export class App {
     });
   });
 
+  paletteEntries = computed((): PaletteEntry[] => {
+    const query = this.commandQuery().trim().toLowerCase();
+    const entries: PaletteEntry[] = this.filteredCommands()
+      .slice(0, query ? 5 : 20)
+      .map(command => ({ ...command, group: 'Actions' }));
+    if (!query) return entries;
+    return [
+      ...entries,
+      ...this.transactionSearchEntries(query),
+      ...this.accountSearchEntries(query),
+      ...this.categorySearchEntries(query),
+      ...this.billSearchEntries(query),
+      ...this.budgetSearchEntries(query),
+    ];
+  });
+
   constructor() {
     effect(() => {
       const user = this.auth.user();
@@ -208,16 +243,17 @@ export class App {
   }
 
   moveCommandSelection(delta: number) {
-    const commands = this.filteredCommands();
-    if (commands.length === 0) return;
-    const next = (this.activeCommandIndex() + delta + commands.length) % commands.length;
+    const entries = this.paletteEntries();
+    if (entries.length === 0) return;
+    const next = (this.activeCommandIndex() + delta + entries.length) % entries.length;
     this.activeCommandIndex.set(next);
+    setTimeout(() => this.scrollActiveCommandIntoView(), 0);
   }
 
   runActiveCommand() {
-    const command = this.filteredCommands()[this.activeCommandIndex()];
-    if (!command) return;
-    this.runCommand(command);
+    const entry = this.paletteEntries()[this.activeCommandIndex()];
+    if (!entry) return;
+    this.runPaletteEntry(entry);
   }
 
   runCommand(command: CommandItem) {
@@ -225,9 +261,164 @@ export class App {
     command.action();
   }
 
+  runPaletteEntry(entry: PaletteEntry) {
+    this.closeCommandPalette();
+    entry.action();
+  }
+
+  showCommandGroup(index: number, group: string): boolean {
+    const prev = this.paletteEntries()[index - 1];
+    return !prev || prev.group !== group;
+  }
+
+  private scrollActiveCommandIntoView() {
+    document
+      .querySelector<HTMLElement>(`[data-command-index="${this.activeCommandIndex()}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
+  }
+
   private navigateTo(path: string) {
     this.router.navigate([path]);
     this.sidebarOpen.set(false);
+  }
+
+  private navigateToAccount(account: Account) {
+    if (!account.id) return;
+    this.router.navigate([
+      account.type === 'credit' ? '/accounts' : '/accounts/overview',
+      account.id,
+    ]);
+    this.sidebarOpen.set(false);
+  }
+
+  private matchesQuery(query: string, ...values: unknown[]): boolean {
+    const tokens = query.split(/\s+/).filter(Boolean);
+    const haystack = values
+      .filter(v => v !== undefined && v !== null)
+      .join(' ')
+      .toLowerCase();
+    return tokens.every(token => haystack.includes(token));
+  }
+
+  private formatCurrency(n: number): string {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.abs(n));
+  }
+
+  private accountName(id?: string): string {
+    if (!id) return '';
+    return this.accountService.accounts().find(a => a.id === id)?.name || '';
+  }
+
+  private categoryName(id?: string): string {
+    if (!id) return '';
+    return this.categoryService.categories().find(c => c.id === id)?.name || '';
+  }
+
+  private transactionSearchEntries(query: string): PaletteEntry[] {
+    const matches = this.matchingTransactions(query);
+    const searchText = this.commandQuery().trim();
+    const entries: PaletteEntry[] = matches.slice(0, 6).map(tx => ({
+        id: `transaction-${tx.id}`,
+        group: 'Transactions',
+        label: tx.merchant || (tx.type === 'transfer' ? 'Transfer' : 'Untitled transaction'),
+        hint: `${tx.date} · ${this.formatCurrency(tx.amount)}${this.accountName(tx.accountId || tx.fromAccountId) ? ` · ${this.accountName(tx.accountId || tx.fromAccountId)}` : ''}`,
+        iconName: tx.type === 'income' ? 'cash' : tx.type === 'transfer' ? 'tx' : 'receipt',
+        action: () => this.router.navigate(['/transactions'], { queryParams: tx.id ? { txId: tx.id } : { search: tx.merchant || tx.notes || tx.date } }),
+      }));
+
+    if (matches.length > entries.length) {
+      entries.push({
+        id: `transactions-all-${query}`,
+        group: 'Transactions',
+        label: `View all ${matches.length} matching transactions`,
+        hint: 'Open the full transactions list with this search',
+        iconName: 'search',
+        tone: 'more',
+        action: () => this.router.navigate(['/transactions'], { queryParams: { search: searchText } }),
+      });
+    }
+
+    return entries;
+  }
+
+  private matchingTransactions(query: string) {
+    return this.transactionService.transactions()
+      .filter(tx => this.matchesQuery(
+        query,
+        tx.merchant,
+        tx.notes,
+        tx.date,
+        tx.type,
+        tx.amount,
+        this.formatCurrency(tx.amount),
+        this.accountName(tx.accountId || tx.fromAccountId),
+        this.accountName(tx.toAccountId),
+        this.categoryName(tx.categoryId)
+      ));
+  }
+
+  private accountSearchEntries(query: string): PaletteEntry[] {
+    return this.accountService.accounts()
+      .filter(account => !account.archived && this.matchesQuery(query, account.name, account.type, account.institution, account.last4))
+      .slice(0, 6)
+      .map(account => ({
+        id: `account-${account.id}`,
+        group: 'Accounts',
+        label: `${account.icon || ''} ${account.name}`.trim(),
+        hint: [account.institution, account.type, account.last4 ? `••${account.last4}` : ''].filter(Boolean).join(' · '),
+        iconName: 'accounts',
+        action: () => this.navigateToAccount(account),
+      }));
+  }
+
+  private categorySearchEntries(query: string): PaletteEntry[] {
+    return this.categoryService.categories()
+      .filter(category => !category.archived && this.matchesQuery(query, category.name, category.kind))
+      .slice(0, 6)
+      .map(category => ({
+        id: `category-${category.id}`,
+        group: 'Categories',
+        label: `${category.icon || ''} ${category.name}`.trim(),
+        hint: `${category.kind} category`,
+        iconName: category.kind === 'income' ? 'cash' : 'budgets',
+        action: () => this.router.navigate(['/transactions'], { queryParams: category.id ? { categoryId: category.id } : { search: category.name } }),
+      }));
+  }
+
+  private billSearchEntries(query: string): PaletteEntry[] {
+    return this.billService.bills()
+      .filter(bill => this.matchesQuery(query, bill.name, bill.notes, bill.frequency, bill.active ? 'active' : 'paused', bill.amount, this.formatCurrency(bill.amount), this.accountName(bill.accountId), this.categoryName(bill.categoryId)))
+      .slice(0, 6)
+      .map(bill => ({
+        id: `bill-${bill.id}`,
+        group: 'Bills',
+        label: `${bill.icon || ''} ${bill.name}`.trim(),
+        hint: `${this.formatCurrency(bill.amount)} · next ${bill.nextDueDate}`,
+        iconName: 'bills',
+        action: () => this.router.navigate(['/bills'], { queryParams: bill.id ? { billId: bill.id } : {} }),
+      }));
+  }
+
+  private budgetSearchEntries(query: string): PaletteEntry[] {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    return this.budgetService.budgets()
+      .filter(budget => {
+        const category = this.categoryService.categories().find(c => c.id === budget.categoryId);
+        return this.matchesQuery(query, category?.name, budget.amount, this.formatCurrency(budget.amount), budget.month, budget.isDefault ? 'default' : 'override');
+      })
+      .slice(0, 6)
+      .map(budget => {
+        const category = this.categoryService.categories().find(c => c.id === budget.categoryId);
+        const month = budget.month || currentMonth;
+        return {
+          id: `budget-${budget.id}`,
+          group: 'Budgets',
+          label: `${category?.icon || ''} ${category?.name || 'Budget'}`.trim(),
+          hint: `${this.formatCurrency(budget.amount)} · ${budget.isDefault ? 'default' : month}`,
+          iconName: 'budgets',
+          action: () => this.router.navigate(['/budgets', budget.categoryId, month]),
+        };
+      });
   }
 
   @HostListener('window:keydown', ['$event'])

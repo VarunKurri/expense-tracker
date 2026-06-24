@@ -35,6 +35,8 @@ export class Transactions {
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
   private route = inject(ActivatedRoute);
+  private openedQueryTxId = '';
+  private queryTxId = signal('');
   quickAdd = inject(QuickAddService);
 
   // Modal state
@@ -338,12 +340,25 @@ export class Transactions {
   }
 
   constructor() {
-    // Pre-filter by account when navigated from account detail "View all"
-    const accountId = this.route.snapshot.queryParamMap.get('accountId');
-    if (accountId) {
-      this.filterAccountId.set(accountId);
-      this.filterDateRange.set('all'); // show full history for this account
-    }
+    this.route.queryParamMap.subscribe(params => {
+      const accountId = params.get('accountId');
+      const categoryId = params.get('categoryId');
+      const search = params.get('search');
+      const txId = params.get('txId') || '';
+      if (accountId) {
+        this.filterAccountId.set(accountId);
+        this.filterDateRange.set('all');
+      }
+      if (categoryId) {
+        this.filterCategoryId.set(categoryId);
+        this.filterDateRange.set('all');
+      }
+      if (search) {
+        this.search.set(search);
+        this.filterDateRange.set('all');
+      }
+      this.queryTxId.set(txId);
+    });
 
     effect(() => {
       if (this.quickAdd.open()) {
@@ -352,6 +367,15 @@ export class Transactions {
           this.formOpen.set(true);
         }, 0);
       }
+    });
+
+    effect(() => {
+      const txId = this.queryTxId();
+      if (!txId || this.openedQueryTxId === txId) return;
+      const tx = this.txService.transactions().find(t => t.id === txId);
+      if (!tx) return;
+      this.openedQueryTxId = txId;
+      setTimeout(() => this.openView(tx), 0);
     });
   }
 
