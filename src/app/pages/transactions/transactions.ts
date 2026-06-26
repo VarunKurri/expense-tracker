@@ -49,6 +49,12 @@ export class Transactions {
   quickEditingId = signal<string | null>(null);
   quickEditDraft = signal<QuickEditDraft | null>(null);
   quickSaving = signal(false);
+  bulkMode = signal(false);
+  selectedIds = signal<Set<string>>(new Set());
+  bulkCategoryId = signal('');
+  bulkAccountId = signal('');
+  bulkSaving = signal(false);
+  bulkConfirmOpen = signal(false);
 
   // Filter state — default is last 30 days
   filterType = signal<FilterType>('all');
@@ -179,6 +185,35 @@ export class Transactions {
     this.categoryService.categories().filter(c => !c.archived)
   );
 
+  selectedTransactions = computed(() => {
+    const ids = this.selectedIds();
+    return this.txService.transactions().filter(t => !!t.id && ids.has(t.id));
+  });
+
+  selectedCount = computed(() => this.selectedIds().size);
+
+  allFilteredSelected = computed(() => {
+    const ids = this.filtered().map(t => t.id).filter((id): id is string => !!id);
+    return ids.length > 0 && ids.every(id => this.selectedIds().has(id));
+  });
+
+  selectedEditableTransactions = computed(() =>
+    this.selectedTransactions().filter(t => t.type !== 'transfer')
+  );
+
+  bulkCategoryKind = computed((): 'income' | 'expense' | null => {
+    const txs = this.selectedEditableTransactions();
+    if (txs.length === 0) return null;
+    const kind = txs[0].type === 'income' ? 'income' : 'expense';
+    return txs.every(t => (t.type === 'income' ? 'income' : 'expense') === kind) ? kind : null;
+  });
+
+  bulkCategories = computed(() => {
+    const kind = this.bulkCategoryKind();
+    if (!kind) return [];
+    return this.categoryService.categories().filter(c => c.kind === kind && !c.archived);
+  });
+
   // Helpers
   accountName(id?: string): string {
     if (!id) return '—';
@@ -251,6 +286,158 @@ export class Transactions {
     this.specialFilter.set('all');
   }
 
+  isSelected(tx: Transaction): boolean {
+    return !!tx.id && this.selectedIds().has(tx.id);
+  }
+
+  enterBulkMode() {
+    this.bulkMode.set(true);
+    this.quickEditingId.set(null);
+    this.quickEditDraft.set(null);
+  }
+
+  exitBulkMode() {
+    if (this.bulkSaving()) return;
+    this.bulkMode.set(false);
+    this.clearSelection();
+  }
+
+  toggleBulkMode() {
+    if (this.bulkMode()) this.exitBulkMode();
+    else this.enterBulkMode();
+  }
+
+  toggleSelectedTx(tx: Transaction) {
+    if (!tx.id) return;
+    const next = new Set(this.selectedIds());
+    if (next.has(tx.id)) next.delete(tx.id);
+    else next.add(tx.id);
+    this.selectedIds.set(next);
+  }
+
+  toggleSelected(event: Event, tx: Transaction) {
+    event.stopPropagation();
+    this.toggleSelectedTx(tx);
+  }
+
+  selectAllFiltered() {
+    const ids = this.filtered().map(t => t.id).filter((id): id is string => !!id);
+    this.selectedIds.set(new Set(ids));
+  }
+
+  clearSelection() {
+    this.selectedIds.set(new Set());
+    this.bulkCategoryId.set('');
+    this.bulkAccountId.set('');
+  }
+
+  toggleAllFiltered(event: Event) {
+    event.stopPropagation();
+    if (this.allFilteredSelected()) this.clearSelection();
+    else this.selectAllFiltered();
+  }
+
+  private selectedIdsForEditableTransactions(): string[] {
+    return this.selectedEditableTransactions().map(t => t.id).filter((id): id is string => !!id);
+  }
+
+  async applyBulkCategory() {
+    if (this.bulkSaving()) return;
+    const categoryId = this.bulkCategoryId();
+    const ids = this.selectedIdsForEditableTransactions();
+    if (!categoryId) {
+      this.toastService.error('Choose a category first.');
+      return;
+    }
+    if (!this.bulkCategoryKind()) {
+      this.toastService.error('Select only income or only expense transactions to bulk categorize.');
+      return;
+    }
+    if (ids.length === 0) {
+      this.toastService.error('No selected transactions can be categorized.');
+      return;
+    }
+
+    this.bulkSaving.set(true);
+    try {
+      await this.txService.updateMany(ids, { categoryId });
+      this.toastService.success(`Updated ${ids.length} transactions.`);
+      this.clearSelection();
+    } catch (err) {
+      this.toastService.error('Could not update selected transactions.');
+    } finally {
+      this.bulkSaving.set(false);
+    }
+  }
+
+  async applyBulkAccount() {
+    if (this.bulkSaving()) return;
+    const accountId = this.bulkAccountId();
+    const ids = this.selectedIdsForEditableTransactions();
+    if (!accountId) {
+      this.toastService.error('Choose an account first.');
+      return;
+    }
+    if (ids.length === 0) {
+      this.toastService.error('Transfers cannot be moved with bulk account change.');
+      return;
+    }
+
+    this.bulkSaving.set(true);
+    try {
+      await this.txService.updateMany(ids, { accountId });
+      this.toastService.success(`Moved ${ids.length} transactions.`);
+      this.clearSelection();
+    } catch (err) {
+      this.toastService.error('Could not move selected transactions.');
+    } finally {
+      this.bulkSaving.set(false);
+    }
+  }
+
+  async applyBulkRefunded(refunded: boolean) {
+    if (this.bulkSaving()) return;
+    const ids = this.selectedIdsForEditableTransactions();
+    if (ids.length === 0) {
+      this.toastService.error('No selected transactions can be marked refunded.');
+      return;
+    }
+
+    this.bulkSaving.set(true);
+    try {
+      await this.txService.updateMany(ids, { refunded });
+      this.toastService.success(`Updated ${ids.length} transactions.`);
+      this.clearSelection();
+    } catch (err) {
+      this.toastService.error('Could not update selected transactions.');
+    } finally {
+      this.bulkSaving.set(false);
+    }
+  }
+
+  askBulkDelete() {
+    if (this.selectedCount() === 0) return;
+    this.bulkConfirmOpen.set(true);
+  }
+
+  async confirmBulkDelete() {
+    if (this.bulkSaving()) return;
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+
+    this.bulkSaving.set(true);
+    try {
+      await this.txService.removeMany(ids);
+      this.toastService.success(`Deleted ${ids.length} transactions.`);
+      this.clearSelection();
+    } catch (err) {
+      this.toastService.error('Could not delete selected transactions.');
+    } finally {
+      this.bulkSaving.set(false);
+      this.bulkConfirmOpen.set(false);
+    }
+  }
+
   categoriesFor(type: Transaction['type']) {
     const kind = type === 'income' ? 'income' : 'expense';
     return this.categoryService.categories().filter(c => c.kind === kind && !c.archived);
@@ -259,6 +446,10 @@ export class Transactions {
   // ── View panel ────────────────────────────────────────────
   openView(tx: Transaction) {
     if (this.quickEditingId()) return;
+    if (this.bulkMode()) {
+      this.toggleSelectedTx(tx);
+      return;
+    }
     this.viewing.set(tx);
     document.body.style.overflow = 'hidden';
   }
@@ -291,6 +482,7 @@ export class Transactions {
 
   startQuickEdit(event: Event, tx: Transaction) {
     event.stopPropagation();
+    if (this.bulkMode()) return;
     this.quickEditingId.set(tx.id || null);
     this.quickEditDraft.set({
       amount: tx.amount,

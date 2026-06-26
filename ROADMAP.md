@@ -51,9 +51,10 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
   - Done when: filters support amount range, uncategorized, refunded, account, category, merchant, and custom date ranges.
   - Verified: Transactions supports custom date ranges, merchant-only filtering, min/max amount, uncategorized/refunded/not-refunded filters, and existing account/category filters; compiler/unit checks pass.
 
-- [ ] Add bulk transaction actions.
+- [x] Add bulk transaction actions.
   - Why: cleanup is slow one row at a time.
   - Done when: users can select many transactions and bulk categorize, move account, mark refunded, or delete.
+  - Verified: Transactions supports an explicit bulk edit mode with select all visible, per-row selection, grouped bulk category/account/refund/delete actions, bulk delete confirmation, and compiler/unit checks pass.
 
 - [ ] Add duplicate review after import.
   - Why: skipping duplicates silently is safe, but users need confidence and control.

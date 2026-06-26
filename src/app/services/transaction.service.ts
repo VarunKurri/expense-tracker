@@ -120,6 +120,53 @@ availableCredit(account: Account): number {
     await updateDoc(ref, await this.encryption.encryptForWrite({ ...current, ...patch, updatedAt: Date.now() }) as any);
   }
 
+  async updateMany(ids: string[], patch: Partial<Transaction>) {
+    const user = this.auth.user();
+    if (!user) throw new Error('Not signed in');
+    if (ids.length === 0) return;
+
+    let batch = writeBatch(this.db);
+    let count = 0;
+    const now = Date.now();
+
+    for (const id of ids) {
+      const ref = doc(this.db, `users/${user.uid}/transactions/${id}`);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) continue;
+      const current = await this.encryption.decryptDoc<Transaction>(snap.data());
+      batch.set(ref, await this.encryption.encryptForWrite({ ...current, ...patch, updatedAt: now + count }));
+      count++;
+
+      if (count % 400 === 0) {
+        await batch.commit();
+        batch = writeBatch(this.db);
+      }
+    }
+
+    if (count % 400 !== 0) await batch.commit();
+  }
+
+  async removeMany(ids: string[]) {
+    const user = this.auth.user();
+    if (!user) throw new Error('Not signed in');
+    if (ids.length === 0) return;
+
+    let batch = writeBatch(this.db);
+    let count = 0;
+
+    for (const id of ids) {
+      batch.delete(doc(this.db, `users/${user.uid}/transactions/${id}`));
+      count++;
+
+      if (count % 400 === 0) {
+        await batch.commit();
+        batch = writeBatch(this.db);
+      }
+    }
+
+    if (count % 400 !== 0) await batch.commit();
+  }
+
   async remove(id: string) {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
