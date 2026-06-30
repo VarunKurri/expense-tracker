@@ -1,0 +1,12 @@
+# Compiled output
+lib/
+
+# Dependencies
+node_modules/
+
+# Local env / secrets — never commit
+.env
+.env.*
+!.env.example
+.secret.local
+.runtimeconfig.json

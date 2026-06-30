@@ -9,6 +9,7 @@ import { SummaryBar } from './summary-bar/summary-bar';
 import { Confirm } from '../../components/confirm/confirm';
 import { Account } from '../../models';
 import { ToastService } from '../../services/toast.service';
+import { PlaidService } from '../../services/plaid.service';
 
 @Component({
   selector: 'app-accounts',
@@ -22,6 +23,7 @@ export class Accounts {
   private toastService = inject(ToastService);
   accountSvc     = inject(AccountService);
   transactionSvc = inject(TransactionService);
+  plaidSvc       = inject(PlaidService);
 
   formOpen        = signal(false);
   editingAccount  = signal<Account | null>(null);
@@ -89,6 +91,10 @@ export class Accounts {
   openNewForm() {
     this.editingAccount.set(null);
     this.formOpen.set(true);
+  }
+
+  connectBank() {
+    this.plaidSvc.connectBank();
   }
 
   closeForm() {

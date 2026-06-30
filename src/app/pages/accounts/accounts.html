@@ -11,7 +11,12 @@
         }
       </p>
     </div>
-    <button class="btn-primary" (click)="openNewForm()">+ New Account</button>
+    <div class="header-actions">
+      <button class="btn" (click)="connectBank()" [disabled]="plaidSvc.connecting()">
+        {{ plaidSvc.connecting() ? 'Connecting…' : '🏦 Connect bank account' }}
+      </button>
+      <button class="btn-primary" (click)="openNewForm()">+ New Account</button>
+    </div>
   </div>
 
   <app-summary-bar [assets]="assets()" [liabilities]="liabilities()" />

@@ -156,3 +156,54 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
 - [ ] Add developer documentation for data model, encryption model, and deployment.
   - Why: future changes will be safer if core architecture decisions are easy to find.
   - Done when: docs explain collections, encrypted payload shape, migration, rules, and release steps.
+
+## Phase 7: Plaid Bank Integration
+
+Connect real bank accounts through Plaid so transactions are fetched and categorized automatically instead of entered by hand. This phase introduces a Firebase Cloud Functions backend (the Plaid secret and all Plaid API calls must run server-side) while keeping Plaid item data in Firestore alongside the rest of the app. Sandbox first via an environment variable, then production. Build and verify one item at a time.
+
+- [x] Add Plaid account setup and SDK/client install.
+  - Why: every later step depends on a configured Plaid client and a place for server code to live.
+  - Done when: a `functions/` workspace exists with the `plaid` SDK installed, Firebase Functions v2 is wired into `firebase.json`, and a shared Plaid client defaults to sandbox via a `PLAID_ENV` env var that can flip to production without code changes.
+  - Verified: `functions/` (TypeScript, Functions v2, Node 20) added with `plaid` 29, `firebase-admin`, and `firebase-functions`; `firebase.json` has a `functions` codebase; `functions/src/plaidClient.ts` selects the basePath from `PLAID_ENV` (defaults to sandbox); `npm run build` in `functions/` compiles clean. `.env.example` documents the env/secret keys and `.gitignore` keeps `.env`/secrets out of git.
+
+- [x] Add the backend link-token create endpoint.
+  - Why: Plaid Link needs a short-lived `link_token` that can only be minted server-side with the Plaid secret.
+  - Done when: a callable function returns a `link_token` scoped to the signed-in user (transactions product, US, English).
+  - Verified: `createLinkToken` (`functions/src/index.ts`) is an `onCall` v2 function that rejects unauthenticated calls, uses the caller's uid as `client_user_id`, requests the transactions product (US/English), and optionally sets the webhook from `PLAID_WEBHOOK_URL`; compiles clean. Live sandbox response requires `PLAID_CLIENT_ID`/`PLAID_SECRET` (user-supplied) — exercised during the manual test below.
+
+- [x] Add the frontend Plaid Link UI integration.
+  - Why: users launch Plaid's hosted Link flow to choose and authenticate their bank.
+  - Done when: a "Connect bank account" button opens Plaid Link in sandbox and receives a `public_token` on success.
+  - Verified: `PlaidService` (`src/app/services/plaid.service.ts`) lazy-loads Plaid Link, calls the `createLinkToken` callable, opens Link, and toasts the `public_token` on success; `provideFunctions` added to `app.config.ts`; a "Connect bank account" button added to the Accounts page. `ng build` passes and `firebase`/`@angular/fire` stay at a single v11/v19. End-to-end sandbox connection is the manual test step (needs Plaid sandbox credentials).
+
+- [ ] Exchange the public_token and store the access_token.
+  - Why: the short-lived `public_token` must be swapped for a long-lived `access_token` and persisted so future syncs can run.
+  - Done when: a callable function exchanges the token and writes `users/{uid}/plaidItems/{itemId}` holding the item id, encrypted access token, sync cursor, and institution name.
+
+- [ ] Add the initial transaction sync via /transactions/sync.
+  - Why: after linking, the existing history and balances should appear without manual entry.
+  - Done when: a sync function pulls added/modified/removed transactions, stores the returned cursor, and writes transactions into the user's Firestore collection.
+
+- [ ] Add a webhook endpoint for ongoing transaction sync.
+  - Why: Plaid notifies the app when new transactions are available so data stays current without polling.
+  - Done when: a deployed HTTPS webhook verifies Plaid requests, looks up the affected item, and runs an incremental sync from the stored cursor.
+
+- [ ] Add transaction dedup logic.
+  - Why: Plaid-sourced transactions must not double up with manual entries or repeated syncs.
+  - Done when: transactions carry a `plaidTransactionId` and sync/import skip rows whose Plaid id already exists.
+
+- [ ] Add auto-categorization from Plaid categories with manual override.
+  - Why: imported transactions should land in the user's existing categories instead of an unrelated taxonomy.
+  - Done when: Plaid's `personal_finance_category` maps onto the existing seeded categories, unmapped items fall back to Other, and the user can still re-categorize any transaction.
+
+- [ ] Add connected-accounts management UI.
+  - Why: users need to see which banks are linked and be able to disconnect them.
+  - Done when: a settings/accounts view lists linked institutions and supports disconnecting an item (removing it at Plaid and in Firestore).
+
+- [ ] Add error handling for expired/revoked items and failed syncs.
+  - Why: bank logins expire or get revoked, and syncs can fail; users need a clear path back to working state.
+  - Done when: items needing re-auth surface an update/re-link flow, and failed syncs report a clear status instead of failing silently.
+
+- [ ] Harden Plaid secrets and access-token encryption at rest.
+  - Why: Plaid keys and stored access tokens are sensitive and must never be exposed client-side.
+  - Done when: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, and the token encryption key are provided via Functions secrets/env, and access tokens are AES-256-GCM encrypted before being written to Firestore.
