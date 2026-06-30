@@ -169,12 +169,12 @@ Connect real bank accounts through Plaid so transactions are fetched and categor
 - [x] Add the backend link-token create endpoint.
   - Why: Plaid Link needs a short-lived `link_token` that can only be minted server-side with the Plaid secret.
   - Done when: a callable function returns a `link_token` scoped to the signed-in user (transactions product, US, English).
-  - Verified: `createLinkToken` (`functions/src/index.ts`) is an `onCall` v2 function that rejects unauthenticated calls, uses the caller's uid as `client_user_id`, requests the transactions product (US/English), and optionally sets the webhook from `PLAID_WEBHOOK_URL`; compiles clean. Live sandbox response requires `PLAID_CLIENT_ID`/`PLAID_SECRET` (user-supplied) — exercised during the manual test below.
+  - Verified: `createLinkToken` (`functions/src/index.ts`) is an `onCall` v2 function that rejects unauthenticated calls, uses the caller's uid as `client_user_id`, requests the transactions product (US/English), and optionally sets the webhook from `PLAID_WEBHOOK_URL`. Deployed to Firebase (Blaze) with `PLAID_CLIENT_ID`/`PLAID_SECRET` in Secret Manager and confirmed live: returns a working `link_token` that opens Plaid Link in sandbox.
 
 - [x] Add the frontend Plaid Link UI integration.
   - Why: users launch Plaid's hosted Link flow to choose and authenticate their bank.
   - Done when: a "Connect bank account" button opens Plaid Link in sandbox and receives a `public_token` on success.
-  - Verified: `PlaidService` (`src/app/services/plaid.service.ts`) lazy-loads Plaid Link, calls the `createLinkToken` callable, opens Link, and toasts the `public_token` on success; `provideFunctions` added to `app.config.ts`; a "Connect bank account" button added to the Accounts page. `ng build` passes and `firebase`/`@angular/fire` stay at a single v11/v19. End-to-end sandbox connection is the manual test step (needs Plaid sandbox credentials).
+  - Verified: `PlaidService` (`src/app/services/plaid.service.ts`) lazy-loads Plaid Link, calls the `createLinkToken` callable, opens Link, and toasts the `public_token` on success; `provideFunctions` added to `app.config.ts`; a "Connect bank account" button added to the Accounts page. `ng build` passes and `firebase`/`@angular/fire` stay at a single v11/v19. Confirmed end-to-end in sandbox: connected a 3-account institution with `user_good`/`pass_good` and received a `public-sandbox-…` token in the browser.
 
 - [ ] Exchange the public_token and store the access_token.
   - Why: the short-lived `public_token` must be swapped for a long-lived `access_token` and persisted so future syncs can run.
