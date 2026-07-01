@@ -176,9 +176,10 @@ Connect real bank accounts through Plaid so transactions are fetched and categor
   - Done when: a "Connect bank account" button opens Plaid Link in sandbox and receives a `public_token` on success.
   - Verified: `PlaidService` (`src/app/services/plaid.service.ts`) lazy-loads Plaid Link, calls the `createLinkToken` callable, opens Link, and toasts the `public_token` on success; `provideFunctions` added to `app.config.ts`; a "Connect bank account" button added to the Accounts page. `ng build` passes and `firebase`/`@angular/fire` stay at a single v11/v19. Confirmed end-to-end in sandbox: connected a 3-account institution with `user_good`/`pass_good` and received a `public-sandbox-…` token in the browser.
 
-- [ ] Exchange the public_token and store the access_token.
+- [x] Exchange the public_token and store the access_token.
   - Why: the short-lived `public_token` must be swapped for a long-lived `access_token` and persisted so future syncs can run.
   - Done when: a callable function exchanges the token and writes `users/{uid}/plaidItems/{itemId}` holding the item id, encrypted access token, sync cursor, and institution name.
+  - Verified: `exchangePublicToken` (`functions/src/index.ts`) exchanges the token via `itemPublicTokenExchange`, AES-256-GCM encrypts the access token with `TOKEN_ENC_KEY` (`functions/src/crypto.ts`), and writes `users/{uid}/plaidItems/{itemId}` (itemId, institutionName, encrypted accessToken, empty cursor, status, timestamps); the frontend `onSuccess` now calls it (inside `ngZone.run`). `functions` build and `ng build` both pass. Requires the `TOKEN_ENC_KEY` secret set + redeploy before the live sandbox link/store round-trip is confirmed.
 
 - [ ] Add the initial transaction sync via /transactions/sync.
   - Why: after linking, the existing history and balances should appear without manual entry.

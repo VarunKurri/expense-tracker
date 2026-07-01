@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, NgZone } from '@angular/core';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { ToastService } from './toast.service';
 
@@ -11,10 +11,16 @@ interface CreateLinkTokenResult {
   expiration: string;
 }
 
+interface ExchangeTokenResult {
+  itemId: string;
+  institutionName: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PlaidService {
   private functions = inject(Functions);
   private toast = inject(ToastService);
+  private ngZone = inject(NgZone);
 
   /** True while we are minting a link token / opening Link. */
   connecting = signal(false);
@@ -42,11 +48,9 @@ export class PlaidService {
   }
 
   /**
-   * Open Plaid Link so the user can connect a bank.
-   *
-   * Milestone 1 only proves the round-trip: we mint a link token server-side,
-   * open Link, and confirm we receive a public_token on success. Exchanging the
-   * public_token for an access token comes in the next roadmap item.
+   * Open Plaid Link so the user can connect a bank. On success we exchange the
+   * public_token for a stored access token via the backend, which links the
+   * bank for future syncs.
    */
   async connectBank(): Promise<void> {
     if (this.connecting()) return;
@@ -63,17 +67,18 @@ export class PlaidService {
 
       const handler = (window as any).Plaid.create({
         token: data.link_token,
+        // Plaid invokes these callbacks outside Angular's zone, so wrap UI work
+        // in ngZone.run so toasts/change detection fire reliably.
         onSuccess: (publicToken: string, metadata: any) => {
-          // TODO (next milestone): send publicToken to an exchange function.
-          console.log('Plaid Link success. public_token:', publicToken, metadata);
-          const institution = metadata?.institution?.name || 'your bank';
-          this.toast.success(`Connected to ${institution} (sandbox). Ready for the next step.`);
+          this.ngZone.run(() => this.exchange(publicToken, metadata));
         },
         onExit: (err: any) => {
-          if (err) {
-            console.error('Plaid Link exit error:', err);
-            this.toast.error(err.display_message || err.error_message || 'Bank connection cancelled.');
-          }
+          this.ngZone.run(() => {
+            if (err) {
+              console.error('Plaid Link exit error:', err);
+              this.toast.error(err.display_message || err.error_message || 'Bank connection cancelled.');
+            }
+          });
         },
       });
 
@@ -83,6 +88,25 @@ export class PlaidService {
       this.toast.error(err?.message || 'Could not start bank connection. Please try again.');
     } finally {
       this.connecting.set(false);
+    }
+  }
+
+  /** Send the public_token to the backend to be exchanged and stored. */
+  private async exchange(publicToken: string, metadata: any): Promise<void> {
+    const institutionName = metadata?.institution?.name || 'your bank';
+    try {
+      const exchangeToken = httpsCallable<
+        { public_token: string; institution_name: string },
+        ExchangeTokenResult
+      >(this.functions, 'exchangePublicToken');
+      const { data } = await exchangeToken({
+        public_token: publicToken,
+        institution_name: institutionName,
+      });
+      this.toast.success(`${data.institutionName} connected. Your bank is now linked.`);
+    } catch (err: any) {
+      console.error('exchangePublicToken failed:', err);
+      this.toast.error(`Connected to ${institutionName}, but saving the link failed. Please try again.`);
     }
   }
 }
