@@ -161,6 +161,8 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
 
 Connect real bank accounts through Plaid so transactions are fetched and categorized automatically instead of entered by hand. This phase introduces a Firebase Cloud Functions backend (the Plaid secret and all Plaid API calls must run server-side) while keeping Plaid item data in Firestore alongside the rest of the app. Sandbox first via an environment variable, then production. Build and verify one item at a time.
 
+Sync uses a **zero-knowledge** model so automatic background sync never weakens privacy: server-written transactions are **envelope-encrypted to each user's public key** (server holds only the public key, never a key that can decrypt user data), the private key is unlocked client-side via **passkey (WebAuthn PRF) with a passphrase fallback**, and the server holds only a server-usable Plaid **access token** (the one item it must use to fetch on the user's behalf). Transaction records stay unreadable to the admin; they become readable in the browser after unlock.
+
 - [x] Add Plaid account setup and SDK/client install.
   - Why: every later step depends on a configured Plaid client and a place for server code to live.
   - Done when: a `functions/` workspace exists with the `plaid` SDK installed, Firebase Functions v2 is wired into `firebase.json`, and a shared Plaid client defaults to sandbox via a `PLAID_ENV` env var that can flip to production without code changes.
@@ -181,13 +183,21 @@ Connect real bank accounts through Plaid so transactions are fetched and categor
   - Done when: a callable function exchanges the token and writes `users/{uid}/plaidItems/{itemId}` holding the item id, encrypted access token, sync cursor, and institution name.
   - Verified: `exchangePublicToken` (`functions/src/index.ts`) exchanges the token via `itemPublicTokenExchange`, AES-256-GCM encrypts the access token with `TOKEN_ENC_KEY` (`functions/src/crypto.ts`), and writes `users/{uid}/plaidItems/{itemId}` (itemId, institutionName, encrypted accessToken, empty cursor, status, timestamps); the frontend `onSuccess` now calls it (inside `ngZone.run`). `functions` build and `ng build` both pass. Requires the `TOKEN_ENC_KEY` secret set + redeploy before the live sandbox link/store round-trip is confirmed.
 
+- [ ] Add the zero-knowledge envelope encryption foundation.
+  - Why: automatic background sync needs the server to write encrypted transactions without ever holding a key that can decrypt user data.
+  - Done when: each user has an RSA keypair (public key stored in plaintext at `users/{uid}/meta/keys`, private key wrapped by a master key), the existing passphrase-encrypted data migrates with no bulk re-encryption (the current passphrase-derived key is adopted as the master key), and the client `decryptDoc` handles both symmetric (`__encrypted`) and envelope (`__envelope`) documents. Passphrase unlock keeps working throughout.
+
+- [ ] Add passkey (WebAuthn PRF) unlock with passphrase fallback.
+  - Why: keep the zero-knowledge guarantee (a client-only secret must unlock the private key) while removing passphrase friction.
+  - Done when: users can register and unlock via a passkey using the WebAuthn PRF extension (HKDF-derived key wraps the master key), the passphrase remains a working fallback, and browsers without PRF support fall back to the passphrase cleanly.
+
 - [ ] Add the initial transaction sync via /transactions/sync.
   - Why: after linking, the existing history and balances should appear without manual entry.
-  - Done when: a sync function pulls added/modified/removed transactions, stores the returned cursor, and writes transactions into the user's Firestore collection.
+  - Done when: a sync function pulls added/modified/removed transactions via `transactionsSync`, **envelope-encrypts each transaction to the user's public key**, writes them into the user's Firestore `transactions` collection with plaintext sort fields (`date`, `createdAt`, `updatedAt`) plus `plaidTransactionId`, and persists the returned cursor only after each page's writes succeed.
 
 - [ ] Add a webhook endpoint for ongoing transaction sync.
   - Why: Plaid notifies the app when new transactions are available so data stays current without polling.
-  - Done when: a deployed HTTPS webhook verifies Plaid requests, looks up the affected item, and runs an incremental sync from the stored cursor.
+  - Done when: a deployed HTTPS webhook verifies Plaid requests, looks up the affected item, and runs the same envelope-encrypting incremental sync **unattended** (using the server-usable access token) from the stored cursor; `PLAID_WEBHOOK_URL` is set to the deployed URL so `createLinkToken` registers it.
 
 - [ ] Add transaction dedup logic.
   - Why: Plaid-sourced transactions must not double up with manual entries or repeated syncs.
@@ -195,7 +205,7 @@ Connect real bank accounts through Plaid so transactions are fetched and categor
 
 - [ ] Add auto-categorization from Plaid categories with manual override.
   - Why: imported transactions should land in the user's existing categories instead of an unrelated taxonomy.
-  - Done when: Plaid's `personal_finance_category` maps onto the existing seeded categories, unmapped items fall back to Other, and the user can still re-categorize any transaction.
+  - Done when: Plaid's `personal_finance_category` maps onto the existing seeded categories, unmapped items fall back to Other, and the user can still re-categorize any transaction. Note: because the server cannot read the user's encrypted categories, this mapping runs **client-side** after decrypt (Plaid's `personal_finance_category` is carried in the encrypted payload); the browser assigns `categoryId` and re-encrypts.
 
 - [ ] Add connected-accounts management UI.
   - Why: users need to see which banks are linked and be able to disconnect them.
@@ -205,6 +215,6 @@ Connect real bank accounts through Plaid so transactions are fetched and categor
   - Why: bank logins expire or get revoked, and syncs can fail; users need a clear path back to working state.
   - Done when: items needing re-auth surface an update/re-link flow, and failed syncs report a clear status instead of failing silently.
 
-- [ ] Harden Plaid secrets and access-token encryption at rest.
-  - Why: Plaid keys and stored access tokens are sensitive and must never be exposed client-side.
-  - Done when: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, and the token encryption key are provided via Functions secrets/env, and access tokens are AES-256-GCM encrypted before being written to Firestore.
+- [ ] Harden Plaid secrets and the zero-knowledge encryption model.
+  - Why: Plaid keys and user financial data are sensitive; the server must be able to fetch from Plaid without ever being able to decrypt user data.
+  - Done when: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, and the token encryption key are provided via Functions secrets/env; the Plaid access token is AES-256-GCM encrypted with a server key (the one item the server must decrypt to call Plaid); and all user financial data is envelope-encrypted such that the server stores only the user's public key and never a usable private key (the private key never leaves the client unwrapped).
