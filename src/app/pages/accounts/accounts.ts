@@ -97,6 +97,10 @@ export class Accounts {
     this.plaidSvc.connectBank();
   }
 
+  syncTransactions() {
+    this.plaidSvc.syncTransactions();
+  }
+
   closeForm() {
     this.formOpen.set(false);
     this.editingAccount.set(null);

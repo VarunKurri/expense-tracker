@@ -16,6 +16,12 @@ interface ExchangeTokenResult {
   institutionName: string;
 }
 
+interface SyncResult {
+  added: number;
+  modified: number;
+  removed: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PlaidService {
   private functions = inject(Functions);
@@ -24,6 +30,9 @@ export class PlaidService {
 
   /** True while we are minting a link token / opening Link. */
   connecting = signal(false);
+
+  /** True while a manual transaction sync is running. */
+  syncing = signal(false);
 
   private scriptPromise: Promise<void> | null = null;
 
@@ -107,6 +116,33 @@ export class PlaidService {
     } catch (err: any) {
       console.error('exchangePublicToken failed:', err);
       this.toast.error(`Connected to ${institutionName}, but saving the link failed. Please try again.`);
+    }
+  }
+
+  /**
+   * Manually pull transactions from all linked banks. The server envelope-encrypts
+   * each transaction to this user's public key and writes them to Firestore, where
+   * the app decrypts and displays them.
+   */
+  async syncTransactions(): Promise<void> {
+    if (this.syncing()) return;
+    this.syncing.set(true);
+    try {
+      const sync = httpsCallable<unknown, SyncResult>(this.functions, 'syncTransactions');
+      const { data } = await sync();
+      const changed = data.added + data.modified + data.removed;
+      if (changed === 0) {
+        this.toast.info('Already up to date — no new transactions.');
+      } else {
+        this.toast.success(
+          `Synced: ${data.added} added, ${data.modified} updated, ${data.removed} removed.`,
+        );
+      }
+    } catch (err: any) {
+      console.error('syncTransactions failed:', err);
+      this.toast.error(err?.message || 'Could not sync transactions. Please try again.');
+    } finally {
+      this.syncing.set(false);
     }
   }
 }

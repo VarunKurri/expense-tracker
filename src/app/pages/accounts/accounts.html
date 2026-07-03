@@ -15,6 +15,9 @@
       <button class="btn" (click)="connectBank()" [disabled]="plaidSvc.connecting()">
         {{ plaidSvc.connecting() ? 'Connecting…' : '🏦 Connect bank account' }}
       </button>
+      <button class="btn" (click)="syncTransactions()" [disabled]="plaidSvc.syncing()">
+        {{ plaidSvc.syncing() ? 'Syncing…' : '🔄 Sync transactions' }}
+      </button>
       <button class="btn-primary" (click)="openNewForm()">+ New Account</button>
     </div>
   </div>
