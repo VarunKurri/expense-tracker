@@ -183,9 +183,10 @@ Sync uses a **zero-knowledge** model so automatic background sync never weakens 
   - Done when: a callable function exchanges the token and writes `users/{uid}/plaidItems/{itemId}` holding the item id, encrypted access token, sync cursor, and institution name.
   - Verified: `exchangePublicToken` (`functions/src/index.ts`) exchanges the token via `itemPublicTokenExchange`, AES-256-GCM encrypts the access token with `TOKEN_ENC_KEY` (`functions/src/crypto.ts`), and writes `users/{uid}/plaidItems/{itemId}` (itemId, institutionName, encrypted accessToken, empty cursor, status, timestamps); the frontend `onSuccess` now calls it (inside `ngZone.run`). `functions` build and `ng build` both pass. Requires the `TOKEN_ENC_KEY` secret set + redeploy before the live sandbox link/store round-trip is confirmed.
 
-- [ ] Add the zero-knowledge envelope encryption foundation.
+- [x] Add the zero-knowledge envelope encryption foundation.
   - Why: automatic background sync needs the server to write encrypted transactions without ever holding a key that can decrypt user data.
   - Done when: each user has an RSA keypair (public key stored in plaintext at `users/{uid}/meta/keys`, private key wrapped by a master key), the existing passphrase-encrypted data migrates with no bulk re-encryption (the current passphrase-derived key is adopted as the master key), and the client `decryptDoc` handles both symmetric (`__encrypted`) and envelope (`__envelope`) documents. Passphrase unlock keeps working throughout.
+  - Verified: on unlock, `EncryptionService.ensureKeypair` generates an RSA-OAEP keypair (public key plaintext at `meta/keys`, private key wrapped under the passphrase-derived key) or unwraps the stored one; `decryptDoc` handles `__envelope` docs. `functions/src/crypto.ts` `envelopeEncrypt` (RSA-OAEP + AES-GCM) round-trips with WebCrypto (validated by a local Node interop test incl. wrong-key rejection). Purely additive — existing data/passphrase unlock unchanged. Confirmed live: `meta/keys` created on unlock, re-unlock unwraps cleanly, and server-written envelope transactions decrypt in the app.
 
 - [ ] Add passkey (WebAuthn PRF) unlock with passphrase fallback.
   - Why: keep the zero-knowledge guarantee (a client-only secret must unlock the private key) while removing passphrase friction.
@@ -201,9 +202,10 @@ Sync uses a **zero-knowledge** model so automatic background sync never weakens 
   - Done when: a deployed HTTPS webhook verifies Plaid requests, looks up the affected item, and runs the same envelope-encrypting incremental sync **unattended** (using the server-usable access token) from the stored cursor; `PLAID_WEBHOOK_URL` is set to the deployed URL so `createLinkToken` registers it.
   - Verified: `plaidWebhook` (`onRequest`, `functions/src/index.ts`) verifies Plaid's ES256 JWT (`plaid-verification`) against the fetched key + raw-body SHA-256 (unsigned → 401, non-POST → 405), resolves item_id→uid via the server-only `plaidItemsByItem` index, and runs `syncItem` unattended. Confirmed live in sandbox: connecting a bank fired `TRANSACTIONS/INITIAL_UPDATE`, the webhook verified and synced 42 transactions with no browser action, and a follow-up `HISTORICAL_UPDATE` added 0 (cursor dedup).
 
-- [ ] Add transaction dedup logic.
+- [x] Add transaction dedup logic.
   - Why: Plaid-sourced transactions must not double up with manual entries or repeated syncs.
   - Done when: transactions carry a `plaidTransactionId` and sync/import skip rows whose Plaid id already exists.
+  - Verified: Plaid transactions are written under their `transaction_id` as the Firestore doc id (idempotent) and also carry a plaintext `plaidTransactionId`; re-running sync and the webhook's follow-up `HISTORICAL_UPDATE` both reported `added: 0`, confirming no double-inserts. Manual entries use their own auto-ids so they never collide.
 
 - [ ] Add auto-categorization from Plaid categories with manual override.
   - Why: imported transactions should land in the user's existing categories instead of an unrelated taxonomy.
