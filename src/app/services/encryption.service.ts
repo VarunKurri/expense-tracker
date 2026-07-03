@@ -30,6 +30,18 @@ interface EncryptionMeta {
   createdAt: number;
 }
 
+// Per-user RSA keypair for zero-knowledge envelope encryption. The public key is
+// stored in plaintext so the server can encrypt *to* it during background sync;
+// the private key is wrapped under the master (symmetric) key so only an unlocked
+// client can use it. Stored at `users/{uid}/meta/keys`.
+interface KeyMeta {
+  publicKey: string; // base64 SPKI DER
+  wrappedPrivateKey: string; // base64 — PKCS8 private key encrypted under the master key
+  wrappedPrivateKeyIv: string; // base64
+  version: number;
+  createdAt: number;
+}
+
 const ENCRYPTION_VERSION = 1;
 const VERIFIER_TEXT = 'trackr-encryption-verifier-v1';
 const COLLECTIONS = ['accounts', 'categories', 'transactions', 'transactionTemplates', 'bills', 'budgets'];
@@ -47,6 +59,8 @@ export class EncryptionService {
 
   private key: CryptoKey | null = null;
   private salt: Uint8Array | null = null;
+  // RSA private key (decrypt-only) for reading server-written envelope docs.
+  private privateKey: CryptoKey | null = null;
 
   async refreshProfileState() {
     const user = this.auth.user();
@@ -95,6 +109,7 @@ export class EncryptionService {
         this.salt = salt;
         this.key = key;
         this.hasProfile.set(true);
+        await this.ensureKeypair();
         this.unlocked.set(true);
         return;
       }
@@ -109,6 +124,7 @@ export class EncryptionService {
       this.salt = salt;
       this.key = key;
       this.hasProfile.set(true);
+      await this.ensureKeypair();
       this.unlocked.set(true);
     } catch (err: any) {
       this.lock();
@@ -123,6 +139,7 @@ export class EncryptionService {
   lock() {
     this.key = null;
     this.salt = null;
+    this.privateKey = null;
     this.unlocked.set(false);
     this.error.set(null);
   }
@@ -140,10 +157,94 @@ export class EncryptionService {
   }
 
   async decryptDoc<T>(data: DocumentData): Promise<T> {
+    // Server-written envelope docs (background Plaid sync): unwrap the per-record
+    // AES key with our RSA private key, then AES-GCM decrypt the payload.
+    if (data?.['__envelope']) {
+      if (!this.privateKey) throw new Error('Encrypted data is locked.');
+      const dekBytes = new Uint8Array(
+        await crypto.subtle.decrypt(
+          { name: 'RSA-OAEP' },
+          this.privateKey,
+          this.base64ToBytes(data['encryptedDEK']) as BufferSource,
+        ),
+      );
+      const dek = await crypto.subtle.importKey('raw', dekBytes as BufferSource, { name: 'AES-GCM' }, false, ['decrypt']);
+      // WebCrypto AES-GCM expects ciphertext || tag concatenated.
+      const ciphertext = this.base64ToBytes(data['encryptedPayload']);
+      const tag = this.base64ToBytes(data['tag']);
+      const combined = new Uint8Array(ciphertext.length + tag.length);
+      combined.set(ciphertext);
+      combined.set(tag, ciphertext.length);
+      const decrypted = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: this.base64ToBytes(data['iv']) as BufferSource },
+        dek,
+        combined as BufferSource,
+      );
+      return JSON.parse(new TextDecoder().decode(decrypted)) as T;
+    }
+
     if (!data?.['__encrypted']) return data as T;
     if (!this.key) throw new Error('Encrypted data is locked.');
     const json = await this.decryptStringWithKey(data['encryptedPayload'], data['iv'], this.key);
     return JSON.parse(json) as T;
+  }
+
+  /**
+   * Ensure the user has an RSA keypair for envelope encryption. First unlock
+   * (new or existing user) generates one and stores the public key in plaintext
+   * plus the private key wrapped under the master key; later unlocks unwrap the
+   * stored private key. Never blocks unlock of existing symmetric data — a
+   * keypair hiccup is logged, not fatal.
+   */
+  private async ensureKeypair() {
+    const user = this.auth.user();
+    if (!user || !this.key) return;
+    try {
+      const keysRef = doc(this.db, `users/${user.uid}/meta/keys`);
+      const snap = await getDoc(keysRef);
+
+      if (snap.exists()) {
+        const meta = snap.data() as KeyMeta;
+        const pkcs8Base64 = await this.decryptStringWithKey(meta.wrappedPrivateKey, meta.wrappedPrivateKeyIv, this.key);
+        this.privateKey = await crypto.subtle.importKey(
+          'pkcs8',
+          this.base64ToBytes(pkcs8Base64) as BufferSource,
+          { name: 'RSA-OAEP', hash: 'SHA-256' },
+          false,
+          ['decrypt'],
+        );
+        return;
+      }
+
+      const pair = await crypto.subtle.generateKey(
+        { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+        true,
+        ['encrypt', 'decrypt'],
+      );
+      const spki = new Uint8Array(await crypto.subtle.exportKey('spki', pair.publicKey));
+      const pkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+      const wrapped = await this.encryptStringWithKey(this.bytesToBase64(pkcs8), this.key);
+
+      const meta: KeyMeta = {
+        publicKey: this.bytesToBase64(spki),
+        wrappedPrivateKey: wrapped.ciphertext,
+        wrappedPrivateKeyIv: wrapped.iv,
+        version: ENCRYPTION_VERSION,
+        createdAt: Date.now(),
+      };
+      await setDoc(keysRef, meta);
+      // Keep a decrypt-only handle for this session.
+      this.privateKey = await crypto.subtle.importKey(
+        'pkcs8',
+        pkcs8 as BufferSource,
+        { name: 'RSA-OAEP', hash: 'SHA-256' },
+        false,
+        ['decrypt'],
+      );
+    } catch (err) {
+      // Non-fatal: existing symmetric data still unlocks; only envelope docs need this.
+      console.error('Envelope keypair setup failed:', err);
+    }
   }
 
   async migrateUserData() {
