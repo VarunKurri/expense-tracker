@@ -196,9 +196,10 @@ Sync uses a **zero-knowledge** model so automatic background sync never weakens 
   - Done when: a sync function pulls added/modified/removed transactions via `transactionsSync`, **envelope-encrypts each transaction to the user's public key**, writes them into the user's Firestore `transactions` collection with plaintext sort fields (`date`, `createdAt`, `updatedAt`) plus `plaidTransactionId`, and persists the returned cursor only after each page's writes succeed.
   - Verified: `syncTransactions` callable (`functions/src/index.ts`) pages `transactionsSync` from the stored cursor, envelope-encrypts each transaction to the user's public key, and writes it under the Plaid `transaction_id` (idempotent dedup); cursor advances in the same batch as the page writes. A "🔄 Sync transactions" button (`PlaidService.syncTransactions` + Accounts page) triggers it. Confirmed in sandbox: 42 transactions synced, decrypted in the app, stored as ciphertext (`__envelope`) in Firestore; account link/categorization deferred to their own milestones.
 
-- [ ] Add a webhook endpoint for ongoing transaction sync.
+- [x] Add a webhook endpoint for ongoing transaction sync.
   - Why: Plaid notifies the app when new transactions are available so data stays current without polling.
   - Done when: a deployed HTTPS webhook verifies Plaid requests, looks up the affected item, and runs the same envelope-encrypting incremental sync **unattended** (using the server-usable access token) from the stored cursor; `PLAID_WEBHOOK_URL` is set to the deployed URL so `createLinkToken` registers it.
+  - Verified: `plaidWebhook` (`onRequest`, `functions/src/index.ts`) verifies Plaid's ES256 JWT (`plaid-verification`) against the fetched key + raw-body SHA-256 (unsigned → 401, non-POST → 405), resolves item_id→uid via the server-only `plaidItemsByItem` index, and runs `syncItem` unattended. Confirmed live in sandbox: connecting a bank fired `TRANSACTIONS/INITIAL_UPDATE`, the webhook verified and synced 42 transactions with no browser action, and a follow-up `HISTORICAL_UPDATE` added 0 (cursor dedup).
 
 - [ ] Add transaction dedup logic.
   - Why: Plaid-sourced transactions must not double up with manual entries or repeated syncs.
