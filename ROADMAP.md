@@ -191,9 +191,10 @@ Sync uses a **zero-knowledge** model so automatic background sync never weakens 
   - Why: keep the zero-knowledge guarantee (a client-only secret must unlock the private key) while removing passphrase friction.
   - Done when: users can register and unlock via a passkey using the WebAuthn PRF extension (HKDF-derived key wraps the master key), the passphrase remains a working fallback, and browsers without PRF support fall back to the passphrase cleanly.
 
-- [ ] Add the initial transaction sync via /transactions/sync.
+- [x] Add the initial transaction sync via /transactions/sync.
   - Why: after linking, the existing history and balances should appear without manual entry.
   - Done when: a sync function pulls added/modified/removed transactions via `transactionsSync`, **envelope-encrypts each transaction to the user's public key**, writes them into the user's Firestore `transactions` collection with plaintext sort fields (`date`, `createdAt`, `updatedAt`) plus `plaidTransactionId`, and persists the returned cursor only after each page's writes succeed.
+  - Verified: `syncTransactions` callable (`functions/src/index.ts`) pages `transactionsSync` from the stored cursor, envelope-encrypts each transaction to the user's public key, and writes it under the Plaid `transaction_id` (idempotent dedup); cursor advances in the same batch as the page writes. A "🔄 Sync transactions" button (`PlaidService.syncTransactions` + Accounts page) triggers it. Confirmed in sandbox: 42 transactions synced, decrypted in the app, stored as ciphertext (`__envelope`) in Firestore; account link/categorization deferred to their own milestones.
 
 - [ ] Add a webhook endpoint for ongoing transaction sync.
   - Why: Plaid notifies the app when new transactions are available so data stays current without polling.
