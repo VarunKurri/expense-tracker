@@ -1,8 +1,10 @@
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { CountryCode, Products, PlaidApi, Transaction as PlaidTransaction } from 'plaid';
+import { createHash } from 'crypto';
+import { importJWK, jwtVerify, decodeProtectedHeader } from 'jose';
 import { getPlaidClient } from './plaidClient';
 import { encryptToken, decryptToken, envelopeEncrypt, EncryptedValue } from './crypto';
 
@@ -176,13 +178,14 @@ interface SyncTotals {
  */
 async function syncItem(
   uid: string,
-  itemDoc: FirebaseFirestore.QueryDocumentSnapshot,
+  itemDoc: FirebaseFirestore.DocumentSnapshot,
   client: PlaidApi,
   tokenEncKeyValue: string,
   publicKey: string,
 ): Promise<SyncTotals> {
   const db = getFirestore();
   const item = itemDoc.data();
+  if (!item) return { added: 0, modified: 0, removed: 0 };
   const accessToken = decryptToken(item.accessToken as EncryptedValue, tokenEncKeyValue);
   const txCol = db.collection(`users/${uid}/transactions`);
 
@@ -269,5 +272,96 @@ export const syncTransactions = onCall(
     const uid = request.auth.uid;
     const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
     return syncUser(uid, client, tokenEncKey.value());
+  },
+);
+
+// --- Webhook (ongoing background sync) ----------------------------------------
+
+/** Resolve which user owns a Plaid item via the server-only reverse index. */
+async function uidForItem(itemId: string): Promise<string | null> {
+  const snap = await getFirestore().doc(`plaidItemsByItem/${itemId}`).get();
+  return snap.exists ? ((snap.data()?.uid as string) ?? null) : null;
+}
+
+/**
+ * Verify a Plaid webhook is genuine: the `plaid-verification` header is a JWT
+ * (ES256) signed by Plaid; we fetch the matching key, verify the signature and
+ * freshness, then confirm the JWT's request_body_sha256 matches the raw body.
+ */
+async function verifyPlaidWebhook(
+  token: string | undefined,
+  rawBody: Buffer,
+  client: PlaidApi,
+): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const header = decodeProtectedHeader(token);
+    if (header.alg !== 'ES256' || !header.kid) return false;
+
+    const keyResp = await client.webhookVerificationKeyGet({ key_id: header.kid });
+    const jwk = keyResp.data.key;
+    const publicKey = await importJWK({ kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y } as any, 'ES256');
+
+    const { payload } = await jwtVerify(token, publicKey, { algorithms: ['ES256'], maxTokenAge: '5 min' });
+
+    const bodyHash = createHash('sha256').update(rawBody).digest('hex');
+    return (payload as Record<string, unknown>)['request_body_sha256'] === bodyHash;
+  } catch (err) {
+    console.error('Plaid webhook verification failed:', err);
+    return false;
+  }
+}
+
+/**
+ * Plaid calls this when new transaction data is available. We verify the request,
+ * find the owning user, and run the same envelope-encrypting sync unattended —
+ * no browser required. PLAID_WEBHOOK_URL must point here and be registered on the
+ * item (createLinkToken sets it on new links).
+ */
+export const plaidWebhook = onRequest(
+  { secrets: [plaidClientId, plaidSecret, tokenEncKey] },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).send('Method not allowed');
+      return;
+    }
+
+    const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
+
+    const verified = await verifyPlaidWebhook(
+      req.header('plaid-verification'),
+      req.rawBody,
+      client,
+    );
+    if (!verified) {
+      res.status(401).send('invalid signature');
+      return;
+    }
+
+    const { webhook_type, webhook_code, item_id } = req.body ?? {};
+    console.log('Plaid webhook:', webhook_type, webhook_code, item_id);
+
+    // Only transaction updates drive a sync; ITEM errors are handled by the
+    // re-auth/error milestone.
+    if (webhook_type === 'TRANSACTIONS' && item_id) {
+      try {
+        const uid = await uidForItem(item_id);
+        const publicKey = uid ? await getUserPublicKey(uid) : null;
+        if (uid && publicKey) {
+          const itemDoc = await getFirestore().doc(`users/${uid}/plaidItems/${item_id}`).get();
+          if (itemDoc.exists) {
+            const totals = await syncItem(uid, itemDoc, client, tokenEncKey.value(), publicKey);
+            console.log('Webhook sync complete for', item_id, totals);
+          }
+        } else {
+          console.warn('Webhook: no user/public key for item', item_id);
+        }
+      } catch (err) {
+        console.error('Webhook sync failed for', item_id, err);
+      }
+    }
+
+    // Always ack so Plaid does not retry a request we have accepted.
+    res.status(200).send('ok');
   },
 );
