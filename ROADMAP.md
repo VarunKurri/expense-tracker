@@ -219,9 +219,10 @@ Sync uses a **zero-knowledge** model so automatic background sync never weakens 
   - Why: imported transactions should land in the user's existing categories instead of an unrelated taxonomy.
   - Done when: Plaid's `personal_finance_category` maps onto the existing seeded categories, unmapped items fall back to Other, and the user can still re-categorize any transaction. Note: because the server cannot read the user's encrypted categories, this mapping runs **client-side** after decrypt (Plaid's `personal_finance_category` is carried in the encrypted payload); the browser assigns `categoryId` and re-encrypts.
 
-- [ ] Add connected-accounts management UI.
+- [x] Add connected-accounts management UI.
   - Why: users need to see which banks are linked, disconnect them, and clean up test items.
   - Done when: a settings/accounts view lists linked institutions with status, supports disconnecting an item (removing it at Plaid, deleting the `plaidItems` doc + reverse index, and that item's synced transactions), and maps Plaid accounts to app accounts so synced transactions link to an account and affect balances.
+  - Verified: Accounts page shows a "Linked banks" section with status + Disconnect (confirm dialog); `disconnectPlaidItem` removes the item at Plaid and deletes its `plaidItems` doc, reverse index, and `plaidItemId`-tagged transactions (confirmed: disconnect clears the synced transactions). Account mapping: `getPlaidAccounts` returns the item's accounts; the client auto-creates an app account per Plaid account (tagged `plaidAccountId`/`plaidItemId`) on link and on sync; `TransactionService.transactions` resolves each synced transaction's `accountId` from `plaidAccountId` in-memory so accounts/balances fill in without any rewrite. Auto-created accounts start at openingBalance 0 (balance reflects the synced window; user can set a starting balance).
 
 - [ ] Add error handling for expired/revoked items and failed syncs.
   - Why: bank logins expire or get revoked, and syncs can fail; users need a clear path back to working state.
