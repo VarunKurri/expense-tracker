@@ -9,7 +9,7 @@ import { SummaryBar } from './summary-bar/summary-bar';
 import { Confirm } from '../../components/confirm/confirm';
 import { Account } from '../../models';
 import { ToastService } from '../../services/toast.service';
-import { PlaidService } from '../../services/plaid.service';
+import { PlaidService, PlaidItem } from '../../services/plaid.service';
 
 @Component({
   selector: 'app-accounts',
@@ -29,6 +29,9 @@ export class Accounts {
   editingAccount  = signal<Account | null>(null);
   confirmOpen     = signal(false);
   accountToDelete = signal<Account | null>(null);
+
+  disconnectOpen  = signal(false);
+  itemToDisconnect = signal<PlaidItem | null>(null);
 
   activeAccounts = computed(() =>
     this.accountSvc.accounts().filter(a => !a.archived)
@@ -99,6 +102,23 @@ export class Accounts {
 
   syncTransactions() {
     this.plaidSvc.syncTransactions();
+  }
+
+  askDisconnect(item: PlaidItem) {
+    this.itemToDisconnect.set(item);
+    this.disconnectOpen.set(true);
+  }
+
+  async confirmDisconnect() {
+    const item = this.itemToDisconnect();
+    this.disconnectOpen.set(false);
+    if (item) await this.plaidSvc.disconnect(item);
+    this.itemToDisconnect.set(null);
+  }
+
+  cancelDisconnect() {
+    this.disconnectOpen.set(false);
+    this.itemToDisconnect.set(null);
   }
 
   closeForm() {

@@ -97,6 +97,79 @@
   }
 }
 
+.linked-banks {
+  margin-top: 8px;
+
+  h2 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    margin: 0 0 2px;
+  }
+
+  .hint {
+    color: var(--fg-3);
+    font-size: 13px;
+    margin: 0 0 14px;
+  }
+
+  .bank-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .bank-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+
+  .bank-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .bank-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--fg);
+  }
+
+  .bank-status {
+    font-size: 11.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--surface-hi);
+    color: var(--fg-3);
+    text-transform: capitalize;
+
+    &.warn {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+  }
+
+  .btn-danger-outline {
+    cursor: pointer;
+    white-space: nowrap;
+    color: var(--red);
+    border-color: var(--line);
+    background: transparent;
+
+    &:hover { background: var(--red-bg); }
+    &:disabled { opacity: 0.6; cursor: default; }
+  }
+}
+
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
 

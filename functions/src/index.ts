@@ -126,7 +126,7 @@ async function indexPlaidItem(itemId: string, uid: string): Promise<void> {
 }
 
 /** Map a Plaid transaction onto the app's Transaction shape (as a plain object). */
-function mapPlaidTransaction(t: PlaidTransaction): Record<string, unknown> {
+function mapPlaidTransaction(t: PlaidTransaction, itemId: string): Record<string, unknown> {
   const now = Date.now();
   // Plaid convention: positive amount = money leaving the account (expense),
   // negative = money coming in (income).
@@ -139,6 +139,7 @@ function mapPlaidTransaction(t: PlaidTransaction): Record<string, unknown> {
     createdAt: now,
     updatedAt: now,
     plaidTransactionId: t.transaction_id,
+    plaidItemId: itemId,
     plaidAccountId: t.account_id,
     plaidPersonalFinanceCategory: t.personal_finance_category?.primary,
     plaidPending: t.pending,
@@ -155,11 +156,12 @@ function envelopeDoc(mapped: Record<string, unknown>, publicKey: string) {
     encryptedPayload: env.ciphertext,
     iv: env.iv,
     tag: env.tag,
-    // Plaintext fields for Firestore ordering / dedup (never reveal amounts).
+    // Plaintext fields for Firestore ordering / dedup / cleanup (never reveal amounts).
     date: mapped['date'],
     createdAt: mapped['createdAt'],
     updatedAt: mapped['updatedAt'],
     plaidTransactionId: mapped['plaidTransactionId'],
+    plaidItemId: mapped['plaidItemId'],
   };
 }
 
@@ -199,7 +201,7 @@ async function syncItem(
 
     const batch = db.batch();
     for (const t of [...added, ...modified]) {
-      batch.set(txCol.doc(t.transaction_id), envelopeDoc(mapPlaidTransaction(t), publicKey));
+      batch.set(txCol.doc(t.transaction_id), envelopeDoc(mapPlaidTransaction(t, itemDoc.id), publicKey));
     }
     for (const r of removed) {
       if (r.transaction_id) batch.delete(txCol.doc(r.transaction_id));
@@ -272,6 +274,58 @@ export const syncTransactions = onCall(
     const uid = request.auth.uid;
     const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
     return syncUser(uid, client, tokenEncKey.value());
+  },
+);
+
+/**
+ * Disconnect a linked bank: remove the item at Plaid (stops billing/syncs), then
+ * delete its stored data — the plaidItems doc, the reverse index, and every
+ * transaction tagged with this item_id.
+ */
+export const disconnectPlaidItem = onCall(
+  { secrets: [plaidClientId, plaidSecret, tokenEncKey] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'You must be signed in.');
+    }
+    const uid = request.auth.uid;
+    const itemId = (request.data?.item_id ?? '').toString().trim();
+    if (!itemId) throw new HttpsError('invalid-argument', 'An item_id is required.');
+
+    const db = getFirestore();
+    const itemRef = db.doc(`users/${uid}/plaidItems/${itemId}`);
+    const itemSnap = await itemRef.get();
+    if (!itemSnap.exists) throw new HttpsError('not-found', 'That linked bank was not found.');
+
+    // Best-effort remove at Plaid (ignore if already gone / token invalid).
+    try {
+      const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
+      const accessToken = decryptToken(itemSnap.data()!.accessToken as EncryptedValue, tokenEncKey.value());
+      await client.itemRemove({ access_token: accessToken });
+    } catch (err: any) {
+      console.warn('itemRemove failed (continuing cleanup):', err?.response?.data || err?.message);
+    }
+
+    // Delete this item's synced transactions (plaintext plaidItemId filter).
+    const txSnap = await db
+      .collection(`users/${uid}/transactions`)
+      .where('plaidItemId', '==', itemId)
+      .get();
+    let removedTx = 0;
+    let batch = db.batch();
+    for (const doc of txSnap.docs) {
+      batch.delete(doc.ref);
+      removedTx++;
+      if (removedTx % 400 === 0) {
+        await batch.commit();
+        batch = db.batch();
+      }
+    }
+    batch.delete(itemRef);
+    batch.delete(db.doc(`plaidItemsByItem/${itemId}`));
+    await batch.commit();
+
+    return { removed: true, removedTransactions: removedTx };
   },
 );
 

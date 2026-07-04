@@ -31,6 +31,7 @@ export interface Transaction {
 
   // Plaid sync metadata (set for bank-synced transactions)
   plaidTransactionId?: string;            // Plaid transaction_id; also the Firestore doc id — used for dedup
+  plaidItemId?: string;                   // Plaid item_id (which linked bank) — plaintext on the doc, for disconnect cleanup
   plaidAccountId?: string;                // Plaid account_id, for later mapping to an app account
   plaidPersonalFinanceCategory?: string;  // Plaid personal_finance_category.primary, for client-side categorization
   plaidPending?: boolean;                 // whether Plaid still marks it pending

@@ -1,6 +1,21 @@
 import { Injectable, inject, signal, NgZone } from '@angular/core';
 import { Functions, httpsCallable } from '@angular/fire/functions';
+import { Firestore } from '@angular/fire/firestore';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { Observable, of, switchMap } from 'rxjs';
+import { toSignal, toObservable } from '@angular/core/rxjs-interop';
+import { AuthService } from './auth.service';
 import { ToastService } from './toast.service';
+
+/** A linked bank (Plaid item). Metadata is plaintext; the access token is not stored here. */
+export interface PlaidItem {
+  itemId: string;
+  institutionName: string;
+  status?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  lastError?: string;
+}
 
 // Plaid Link is loaded from Plaid's CDN at runtime (no npm package for the
 // browser SDK), so it attaches itself to window.Plaid.
@@ -25,6 +40,8 @@ interface SyncResult {
 @Injectable({ providedIn: 'root' })
 export class PlaidService {
   private functions = inject(Functions);
+  private db = inject(Firestore);
+  private auth = inject(AuthService);
   private toast = inject(ToastService);
   private ngZone = inject(NgZone);
 
@@ -33,6 +50,26 @@ export class PlaidService {
 
   /** True while a manual transaction sync is running. */
   syncing = signal(false);
+
+  /** item_id currently being disconnected (for per-row button state). */
+  disconnectingId = signal<string | null>(null);
+
+  /** Live list of linked banks (Plaid items). Metadata is plaintext, so no unlock needed. */
+  private items$: Observable<PlaidItem[]> = toObservable(this.auth.user).pipe(
+    switchMap(user => {
+      if (!user) return of<PlaidItem[]>([]);
+      const q = query(collection(this.db, `users/${user.uid}/plaidItems`), orderBy('createdAt', 'asc'));
+      return new Observable<PlaidItem[]>(sub => {
+        const unsub = onSnapshot(
+          q,
+          snap => this.ngZone.run(() => sub.next(snap.docs.map(d => ({ itemId: d.id, ...(d.data() as any) })))),
+          () => this.ngZone.run(() => sub.next([])),
+        );
+        return unsub;
+      });
+    }),
+  );
+  linkedItems = toSignal(this.items$, { initialValue: [] as PlaidItem[] });
 
   private scriptPromise: Promise<void> | null = null;
 
@@ -143,6 +180,30 @@ export class PlaidService {
       this.toast.error(err?.message || 'Could not sync transactions. Please try again.');
     } finally {
       this.syncing.set(false);
+    }
+  }
+
+  /**
+   * Disconnect a linked bank: removes it at Plaid and deletes its stored data
+   * (item, index, and that item's synced transactions).
+   */
+  async disconnect(item: PlaidItem): Promise<void> {
+    if (this.disconnectingId()) return;
+    this.disconnectingId.set(item.itemId);
+    try {
+      const fn = httpsCallable<{ item_id: string }, { removed: boolean; removedTransactions: number }>(
+        this.functions,
+        'disconnectPlaidItem',
+      );
+      const { data } = await fn({ item_id: item.itemId });
+      this.toast.success(
+        `${item.institutionName} disconnected — ${data.removedTransactions} synced transaction(s) removed.`,
+      );
+    } catch (err: any) {
+      console.error('disconnect failed:', err);
+      this.toast.error(err?.message || 'Could not disconnect this bank. Please try again.');
+    } finally {
+      this.disconnectingId.set(null);
     }
   }
 }
