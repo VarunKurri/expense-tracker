@@ -258,7 +258,8 @@ export class EncryptionService {
 
       for (const item of snap.docs) {
         const data = item.data();
-        if (data['__encrypted']) continue;
+        // Already encrypted (symmetric) OR a server-written envelope doc — leave it.
+        if (data['__encrypted'] || data['__envelope']) continue;
         const encrypted = await this.encryptForWrite(data);
         batch.set(item.ref, encrypted);
         count++;
@@ -272,6 +273,51 @@ export class EncryptionService {
 
       if (count > 0) await batch.commit();
     }
+  }
+
+  /**
+   * One-time repair for transactions that an earlier `migrateUserData` double-wrapped:
+   * an envelope (`__envelope`) doc that got symmetrically re-encrypted so it now
+   * decrypts to the envelope wrapper instead of the transaction. We unwrap the outer
+   * symmetric layer and restore the inner envelope doc (no data loss). Gated by a
+   * sentinel so it runs once. Manual (`__encrypted`) transactions decrypt to a normal
+   * transaction (no `__envelope` marker) and are left untouched.
+   */
+  async repairEnvelopeDocs() {
+    const user = this.auth.user();
+    if (!user || !this.key) return;
+
+    const sentinelRef = doc(this.db, `users/${user.uid}/meta/envelopeRepair`);
+    if ((await getDoc(sentinelRef)).exists()) return;
+
+    const snap = await getDocs(collection(this.db, `users/${user.uid}/transactions`));
+    let batch = writeBatch(this.db);
+    let pending = 0;
+    let repaired = 0;
+
+    for (const item of snap.docs) {
+      const data = item.data();
+      if (!data['__encrypted']) continue; // envelope/plaintext docs weren't double-wrapped
+      let inner: any;
+      try {
+        inner = JSON.parse(await this.decryptStringWithKey(data['encryptedPayload'], data['iv'], this.key));
+      } catch {
+        continue; // can't decrypt with this key — not ours to touch
+      }
+      if (inner && inner['__envelope'] === true) {
+        batch.set(item.ref, inner); // restore the proper envelope doc
+        pending++;
+        repaired++;
+        if (pending === 400) {
+          await batch.commit();
+          batch = writeBatch(this.db);
+          pending = 0;
+        }
+      }
+    }
+
+    if (pending > 0) await batch.commit();
+    await setDoc(sentinelRef, { repairedAt: Date.now(), count: repaired });
   }
 
   private sortableMetadata(data: Record<string, any>) {

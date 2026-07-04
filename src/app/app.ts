@@ -190,6 +190,7 @@ export class App {
         const unlocked = this.encryption.unlocked();
         if (unlocked) {
           await this.encryption.migrateUserData();
+          await this.encryption.repairEnvelopeDocs();
           setTimeout(() => this.seed.seedIfEmpty(), 500);
         }
       }
