@@ -207,13 +207,21 @@ Sync uses a **zero-knowledge** model so automatic background sync never weakens 
   - Done when: transactions carry a `plaidTransactionId` and sync/import skip rows whose Plaid id already exists.
   - Verified: Plaid transactions are written under their `transaction_id` as the Firestore doc id (idempotent) and also carry a plaintext `plaidTransactionId`; re-running sync and the webhook's follow-up `HISTORICAL_UPDATE` both reported `added: 0`, confirming no double-inserts. Manual entries use their own auto-ids so they never collide.
 
+- [ ] Reconcile Plaid transactions with existing manual entries.
+  - Why: users who already log transactions by hand (custom merchant, notes, category) must not get duplicates when the same real charge arrives from Plaid.
+  - Done when: at sync time a Plaid transaction that matches an existing manual entry (same date and amount, similar merchant) is merged — preserving the user's category and notes and attaching the Plaid id — instead of inserted as a second row; ambiguous matches are flagged for the user rather than silently merged.
+
+- [ ] Make the initial transaction history window configurable.
+  - Why: the first pull should fetch a sensible amount of history; Plaid defaults to ~90 days and supports up to 730 (24 months), not the full account lifetime.
+  - Done when: `createLinkToken` sets `transactions.days_requested` from a config value (documented in `.env`), adjustable without code changes.
+
 - [ ] Add auto-categorization from Plaid categories with manual override.
   - Why: imported transactions should land in the user's existing categories instead of an unrelated taxonomy.
   - Done when: Plaid's `personal_finance_category` maps onto the existing seeded categories, unmapped items fall back to Other, and the user can still re-categorize any transaction. Note: because the server cannot read the user's encrypted categories, this mapping runs **client-side** after decrypt (Plaid's `personal_finance_category` is carried in the encrypted payload); the browser assigns `categoryId` and re-encrypts.
 
 - [ ] Add connected-accounts management UI.
-  - Why: users need to see which banks are linked and be able to disconnect them.
-  - Done when: a settings/accounts view lists linked institutions and supports disconnecting an item (removing it at Plaid and in Firestore).
+  - Why: users need to see which banks are linked, disconnect them, and clean up test items.
+  - Done when: a settings/accounts view lists linked institutions with status, supports disconnecting an item (removing it at Plaid, deleting the `plaidItems` doc + reverse index, and that item's synced transactions), and maps Plaid accounts to app accounts so synced transactions link to an account and affect balances.
 
 - [ ] Add error handling for expired/revoked items and failed syncs.
   - Why: bank logins expire or get revoked, and syncs can fail; users need a clear path back to working state.
@@ -222,3 +230,7 @@ Sync uses a **zero-knowledge** model so automatic background sync never weakens 
 - [ ] Harden Plaid secrets and the zero-knowledge encryption model.
   - Why: Plaid keys and user financial data are sensitive; the server must be able to fetch from Plaid without ever being able to decrypt user data.
   - Done when: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, and the token encryption key are provided via Functions secrets/env; the Plaid access token is AES-256-GCM encrypted with a server key (the one item the server must decrypt to call Plaid); and all user financial data is envelope-encrypted such that the server stores only the user's public key and never a usable private key (the private key never leaves the client unwrapped).
+
+- [ ] Switch Plaid from sandbox to production for real bank connections.
+  - Why: real banks only work in Plaid production (sandbox is fake institutions); the Trial plan allows production with a 10-Item limit.
+  - Done when: production `PLAID_CLIENT_ID`/`PLAID_SECRET` are set as secrets, `PLAID_ENV=production`, functions redeployed, and a real institution links + syncs end-to-end within the Trial plan's 10-Item limit. Reconciliation and history-window items should ship first so the first real sync merges cleanly.
