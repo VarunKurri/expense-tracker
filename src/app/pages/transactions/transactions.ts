@@ -218,7 +218,8 @@ export class Transactions {
   accountName(id?: string): string {
     if (!id) return '—';
     const a = this.accountService.accounts().find(a => a.id === id);
-    return a ? `${a.icon} ${a.name}` : '—';
+    if (!a) return '—';
+    return a.icon ? `${a.icon} ${a.name}` : a.name;
   }
 
   categoryFor(id?: string) {
