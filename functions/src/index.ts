@@ -278,6 +278,47 @@ export const syncTransactions = onCall(
 );
 
 /**
+ * Return the accounts held under a linked Plaid item (name, mask, type, balance)
+ * so the client can auto-create matching app accounts. Not stored server-side —
+ * the client owns (and encrypts) the app accounts.
+ */
+export const getPlaidAccounts = onCall(
+  { secrets: [plaidClientId, plaidSecret, tokenEncKey] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'You must be signed in.');
+    }
+    const uid = request.auth.uid;
+    const itemId = (request.data?.item_id ?? '').toString().trim();
+    if (!itemId) throw new HttpsError('invalid-argument', 'An item_id is required.');
+
+    const itemSnap = await getFirestore().doc(`users/${uid}/plaidItems/${itemId}`).get();
+    if (!itemSnap.exists) throw new HttpsError('not-found', 'That linked bank was not found.');
+
+    try {
+      const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
+      const accessToken = decryptToken(itemSnap.data()!.accessToken as EncryptedValue, tokenEncKey.value());
+      const resp = await client.accountsGet({ access_token: accessToken });
+      return {
+        accounts: resp.data.accounts.map(a => ({
+          account_id: a.account_id,
+          name: a.name,
+          official_name: a.official_name ?? null,
+          mask: a.mask ?? null,
+          type: a.type,
+          subtype: a.subtype ?? null,
+          current_balance: a.balances?.current ?? null,
+        })),
+      };
+    } catch (err: any) {
+      const plaidError = err?.response?.data;
+      console.error('getPlaidAccounts failed:', plaidError || err);
+      throw new HttpsError('internal', plaidError?.error_message || err?.message || 'Failed to load bank accounts.');
+    }
+  },
+);
+
+/**
  * Disconnect a linked bank: remove the item at Plaid (stops billing/syncs), then
  * delete its stored data — the plaidItems doc, the reverse index, and every
  * transaction tagged with this item_id.

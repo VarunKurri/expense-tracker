@@ -1,4 +1,4 @@
-import { Injectable, inject, NgZone, signal } from '@angular/core';
+import { Injectable, inject, NgZone, signal, computed } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
   collection, query, orderBy, onSnapshot,
@@ -8,6 +8,7 @@ import { Observable, of, switchMap, combineLatest } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
 import { EncryptionService } from './encryption.service';
+import { AccountService } from './account.service';
 import { Transaction } from '../models';
 import { Account } from '../models';
 import { availableCredit, creditCardBalance, transactionDeltaForAccount } from '../utils/finance';
@@ -17,6 +18,7 @@ export class TransactionService {
   private db = inject(Firestore);
   private auth = inject(AuthService);
   private encryption = inject(EncryptionService);
+  private accountSvc = inject(AccountService);
   private ngZone = inject(NgZone);
   error = signal<string | null>(null);
 
@@ -60,7 +62,24 @@ export class TransactionService {
     })
   );
 
-  transactions = toSignal(this.transactions$, { initialValue: [] });
+  private rawTransactions = toSignal(this.transactions$, { initialValue: [] as Transaction[] });
+
+  /**
+   * Transactions with their account resolved. Bank-synced transactions carry a
+   * `plaidAccountId` but no app `accountId`; we fill it in from the auto-created
+   * app account that owns that Plaid account. Done in-memory (never written back),
+   * so it can't conflict with sync or re-encryption.
+   */
+  transactions = computed<Transaction[]>(() => {
+    const txs = this.rawTransactions();
+    const accounts = this.accountSvc.accounts();
+    if (accounts.length === 0) return txs;
+    return txs.map(t => {
+      if (t.accountId || !t.plaidAccountId) return t;
+      const match = accounts.find(a => a.plaidAccountId === t.plaidAccountId);
+      return match?.id ? { ...t, accountId: match.id } : t;
+    });
+  });
 
   balanceForAccount(accountId: string): number {
     return transactionDeltaForAccount(this.transactions(), accountId);

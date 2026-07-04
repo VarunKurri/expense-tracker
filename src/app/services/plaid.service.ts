@@ -5,7 +5,9 @@ import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Observable, of, switchMap } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
+import { AccountService } from './account.service';
 import { ToastService } from './toast.service';
+import { Account, AccountType } from '../models';
 
 /** A linked bank (Plaid item). Metadata is plaintext; the access token is not stored here. */
 export interface PlaidItem {
@@ -15,6 +17,28 @@ export interface PlaidItem {
   createdAt?: number;
   updatedAt?: number;
   lastError?: string;
+}
+
+/** An account under a Plaid item, as returned by the getPlaidAccounts callable. */
+interface PlaidAccount {
+  account_id: string;
+  name: string;
+  official_name: string | null;
+  mask: string | null;
+  type: string;
+  subtype: string | null;
+  current_balance: number | null;
+}
+
+/** Map a Plaid account type/subtype onto an app AccountType. */
+function mapPlaidAccountType(type: string, subtype: string | null): AccountType {
+  if (type === 'credit') return 'credit';
+  if (type === 'investment') return 'investment';
+  if (type === 'depository') {
+    if (subtype === 'savings') return 'savings';
+    return 'checking';
+  }
+  return 'checking';
 }
 
 // Plaid Link is loaded from Plaid's CDN at runtime (no npm package for the
@@ -42,6 +66,7 @@ export class PlaidService {
   private functions = inject(Functions);
   private db = inject(Firestore);
   private auth = inject(AuthService);
+  private accountSvc = inject(AccountService);
   private toast = inject(ToastService);
   private ngZone = inject(NgZone);
 
@@ -149,10 +174,54 @@ export class PlaidService {
         public_token: publicToken,
         institution_name: institutionName,
       });
+      // Auto-create app accounts for this bank so synced transactions have a home.
+      await this.setupAccountsForItem(data.itemId, data.institutionName);
       this.toast.success(`${data.institutionName} connected. Your bank is now linked.`);
     } catch (err: any) {
       console.error('exchangePublicToken failed:', err);
       this.toast.error(`Connected to ${institutionName}, but saving the link failed. Please try again.`);
+    }
+  }
+
+  /**
+   * Create an app account for each Plaid account under an item (idempotent — skips
+   * any Plaid account already linked to an app account). Runs client-side so the
+   * accounts are encrypted with the user's key like all other app data.
+   */
+  private async setupAccountsForItem(itemId: string, institutionName: string): Promise<void> {
+    try {
+      const getAccounts = httpsCallable<{ item_id: string }, { accounts: PlaidAccount[] }>(
+        this.functions,
+        'getPlaidAccounts',
+      );
+      const { data } = await getAccounts({ item_id: itemId });
+      const existing = this.accountSvc.accounts();
+
+      for (const a of data.accounts) {
+        if (existing.some(acc => acc.plaidAccountId === a.account_id)) continue;
+        const account: Omit<Account, 'id' | 'createdAt'> = {
+          name: a.name || `${institutionName} ${a.mask ?? ''}`.trim(),
+          type: mapPlaidAccountType(a.type, a.subtype),
+          openingBalance: 0,
+          currency: 'USD',
+          institution: institutionName,
+          ...(a.mask ? { last4: a.mask } : {}),
+          plaidAccountId: a.account_id,
+          plaidItemId: itemId,
+          archived: false,
+        };
+        await this.accountSvc.add(account);
+      }
+    } catch (err) {
+      // Non-fatal: the bank is still linked; transactions just won't map to an account yet.
+      console.error('setupAccountsForItem failed:', err);
+    }
+  }
+
+  /** Ensure every linked bank has its app accounts created (covers items linked earlier). */
+  private async setupAllAccounts(): Promise<void> {
+    for (const item of this.linkedItems()) {
+      await this.setupAccountsForItem(item.itemId, item.institutionName);
     }
   }
 
@@ -167,6 +236,8 @@ export class PlaidService {
     try {
       const sync = httpsCallable<unknown, SyncResult>(this.functions, 'syncTransactions');
       const { data } = await sync();
+      // Make sure every linked bank's accounts exist (covers items linked earlier).
+      await this.setupAllAccounts();
       const changed = data.added + data.modified + data.removed;
       if (changed === 0) {
         this.toast.info('Already up to date — no new transactions.');
@@ -196,6 +267,10 @@ export class PlaidService {
         'disconnectPlaidItem',
       );
       const { data } = await fn({ item_id: item.itemId });
+      // Remove the app accounts we auto-created for this bank (client-encrypted).
+      for (const acc of this.accountSvc.accounts()) {
+        if (acc.plaidItemId === item.itemId && acc.id) await this.accountSvc.remove(acc.id);
+      }
       this.toast.success(
         `${item.institutionName} disconnected — ${data.removedTransactions} synced transaction(s) removed.`,
       );

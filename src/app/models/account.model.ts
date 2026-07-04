@@ -13,6 +13,10 @@ export interface Account {
   archived?: boolean;
   createdAt: number;
 
+  // Plaid (set for auto-created bank accounts)
+  plaidAccountId?: string;   // links synced transactions (via their plaidAccountId) to this account
+  plaidItemId?: string;      // which linked bank — for cleanup on disconnect
+
   // Credit card specific
   creditLimit?: number;
   statementClosingDay?: number;  // day of month 1-31
