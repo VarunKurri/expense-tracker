@@ -207,9 +207,10 @@ Sync uses a **zero-knowledge** model so automatic background sync never weakens 
   - Done when: transactions carry a `plaidTransactionId` and sync/import skip rows whose Plaid id already exists.
   - Verified: Plaid transactions are written under their `transaction_id` as the Firestore doc id (idempotent) and also carry a plaintext `plaidTransactionId`; re-running sync and the webhook's follow-up `HISTORICAL_UPDATE` both reported `added: 0`, confirming no double-inserts. Manual entries use their own auto-ids so they never collide.
 
-- [ ] Reconcile Plaid transactions with existing manual entries.
+- [x] Reconcile Plaid transactions with existing manual entries.
   - Why: users who already log transactions by hand (custom merchant, notes, category) must not get duplicates when the same real charge arrives from Plaid.
   - Done when: at sync time a Plaid transaction that matches an existing manual entry (same date and amount, similar merchant) is merged — preserving the user's category and notes and attaching the Plaid id — instead of inserted as a second row; ambiguous matches are flagged for the user rather than silently merged.
+  - Verified: `ReconciliationService` matches client-side (same type + exact amount + dates within 3 days, only when exactly one manual candidate qualifies); merge keeps the manual entry and its data, links it (`plaidTransactionId`/item/account), and deletes the duplicate bank row; `cleanupReconciled` runs after sync to drop re-synced duplicates; "keep both" persists to `meta/reconcileIgnore`. A review modal shows each pair side-by-side with per-row Merge / Keep both plus Merge all, surfaced by a banner on the Transactions page. Confirmed in sandbox with a manual entry mirroring a synced transaction.
 
 - [ ] Make the initial transaction history window configurable.
   - Why: the first pull should fetch a sensible amount of history; Plaid defaults to ~90 days and supports up to 730 (24 months), not the full account lifetime.
