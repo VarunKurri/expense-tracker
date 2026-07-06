@@ -9,9 +9,11 @@ import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
 import { EncryptionService } from './encryption.service';
 import { AccountService } from './account.service';
+import { CategoryService } from './category.service';
 import { Transaction } from '../models';
 import { Account } from '../models';
 import { availableCredit, creditCardBalance, transactionDeltaForAccount } from '../utils/finance';
+import { plaidCategoryName } from '../utils/plaid-category-map';
 
 @Injectable({ providedIn: 'root' })
 export class TransactionService {
@@ -19,6 +21,7 @@ export class TransactionService {
   private auth = inject(AuthService);
   private encryption = inject(EncryptionService);
   private accountSvc = inject(AccountService);
+  private categorySvc = inject(CategoryService);
   private ngZone = inject(NgZone);
   error = signal<string | null>(null);
 
@@ -65,19 +68,32 @@ export class TransactionService {
   private rawTransactions = toSignal(this.transactions$, { initialValue: [] as Transaction[] });
 
   /**
-   * Transactions with their account resolved. Bank-synced transactions carry a
-   * `plaidAccountId` but no app `accountId`; we fill it in from the auto-created
-   * app account that owns that Plaid account. Done in-memory (never written back),
-   * so it can't conflict with sync or re-encryption.
+   * Transactions with their account and category resolved for bank-synced rows.
+   * Synced transactions carry `plaidAccountId` / `plaidPersonalFinanceCategory` but
+   * no app `accountId` / `categoryId`; we fill those in from the auto-created account
+   * and the Plaid→category mapping. Resolved in-memory (never written back), so it
+   * can't conflict with sync/re-encryption, and any real value the user set wins.
    */
   transactions = computed<Transaction[]>(() => {
     const txs = this.rawTransactions();
     const accounts = this.accountSvc.accounts();
-    if (accounts.length === 0) return txs;
+    const categories = this.categorySvc.categories();
+
     return txs.map(t => {
-      if (t.accountId || !t.plaidAccountId) return t;
-      const match = accounts.find(a => a.plaidAccountId === t.plaidAccountId);
-      return match?.id ? { ...t, accountId: match.id } : t;
+      let out = t;
+
+      if (!out.accountId && out.plaidAccountId) {
+        const match = accounts.find(a => a.plaidAccountId === out.plaidAccountId);
+        if (match?.id) out = { ...out, accountId: match.id };
+      }
+
+      if (!out.categoryId && out.plaidPersonalFinanceCategory && (out.type === 'income' || out.type === 'expense')) {
+        const name = plaidCategoryName(out.plaidPersonalFinanceCategory, out.type);
+        const cat = categories.find(c => c.name === name && c.kind === out.type);
+        if (cat?.id) out = { ...out, categoryId: cat.id };
+      }
+
+      return out;
     });
   });
 
