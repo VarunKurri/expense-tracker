@@ -1,0 +1,55 @@
+<app-modal [open]="open" title="Review possible duplicates" size="lg" (closed)="closed.emit()">
+  @if (reconcile.matches().length === 0) {
+    <p class="empty">No duplicates to review. 🎉</p>
+  } @else {
+    <div class="review-head">
+      <p class="hint">
+        {{ reconcile.matches().length }} bank transaction(s) look like entries you already added.
+        Merging keeps <strong>your</strong> details (merchant, notes, category) and removes the duplicate bank row.
+      </p>
+      <button class="btn primary" (click)="mergeAll()" [disabled]="reconcile.busy()">Merge all</button>
+    </div>
+
+    <div class="match-list">
+      @for (m of reconcile.matches(); track m.plaid.id) {
+        <div class="match-card">
+          <div class="sides">
+            <div class="side keep">
+              <div class="side-label">Your entry · kept</div>
+              <div class="side-merchant">{{ m.manual.merchant || 'Untitled' }}</div>
+              <div class="side-meta">
+                <span class="chip">{{ categoryName(m.manual.categoryId) }}</span>
+                <span>{{ formatDate(m.manual.date) }}</span>
+              </div>
+              @if (m.manual.notes) {
+                <div class="side-notes">"{{ m.manual.notes }}"</div>
+              }
+              <div class="side-amount" [class.neg]="m.manual.type === 'expense'">
+                {{ m.manual.type === 'expense' ? '−' : '+' }}{{ formatCurrency(m.manual.amount) }}
+              </div>
+            </div>
+
+            <div class="link-icon">🔗</div>
+
+            <div class="side drop">
+              <div class="side-label">From your bank · removed on merge</div>
+              <div class="side-merchant">{{ m.plaid.merchant || 'Unknown' }}</div>
+              <div class="side-meta">
+                <span>{{ accountName(m.plaid.accountId) }}</span>
+                <span>{{ formatDate(m.plaid.date) }}</span>
+              </div>
+              <div class="side-amount" [class.neg]="m.plaid.type === 'expense'">
+                {{ m.plaid.type === 'expense' ? '−' : '+' }}{{ formatCurrency(m.plaid.amount) }}
+              </div>
+            </div>
+          </div>
+
+          <div class="match-actions">
+            <button class="btn ghost" (click)="keepBoth(m)" [disabled]="reconcile.busy()">Keep both</button>
+            <button class="btn primary" (click)="merge(m)" [disabled]="reconcile.busy()">Merge</button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</app-modal>

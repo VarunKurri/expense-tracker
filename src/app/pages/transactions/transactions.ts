@@ -7,9 +7,11 @@ import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
 import { TransactionForm } from './transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
+import { ReconcileReview } from '../../components/reconcile-review/reconcile-review';
 import { Transaction } from '../../models';
 import { QuickAddService } from '../../services/quick-add.service';
 import { ToastService } from '../../services/toast.service';
+import { ReconciliationService } from '../../services/reconciliation.service';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
 type DateRange = 'last-30' | 'this-month' | 'last-month' | 'this-year' | 'custom' | 'all';
@@ -26,7 +28,7 @@ type QuickEditDraft = {
 @Component({
   selector: 'app-transactions',
   standalone: true,
-  imports: [CommonModule, FormsModule, TransactionForm, Confirm],
+  imports: [CommonModule, FormsModule, TransactionForm, Confirm, ReconcileReview],
   templateUrl: './transactions.html',
   styleUrl: './transactions.scss',
 })
@@ -39,6 +41,8 @@ export class Transactions {
   private openedQueryTxId = '';
   private queryTxId = signal('');
   quickAdd = inject(QuickAddService);
+  reconcile = inject(ReconciliationService);
+  reconcileOpen = signal(false);
 
   // Modal state
   formOpen = signal(false);

@@ -1068,3 +1068,25 @@
     min-height: 36px;
   }
 }
+
+.reconcile-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+
+  .rb-text {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13.5px;
+    color: var(--fg);
+  }
+
+  .rb-icon { font-size: 16px; }
+  .btn-primary { flex-shrink: 0; }
+}

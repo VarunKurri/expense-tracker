@@ -16,6 +16,20 @@
     </div>
   </div>
 
+  <!-- RECONCILE BANNER -->
+  @if (reconcile.matches().length > 0) {
+    <div class="reconcile-banner">
+      <div class="rb-text">
+        <span class="rb-icon">🔗</span>
+        <span>
+          <strong>{{ reconcile.matches().length }} possible duplicate(s)</strong>
+          between your entries and bank sync.
+        </span>
+      </div>
+      <button class="btn-primary" (click)="reconcileOpen.set(true)">Review</button>
+    </div>
+  }
+
   <!-- TOTALS -->
   <div class="totals-row">
     <div class="total-card">
@@ -540,3 +554,7 @@
   confirmText="Delete selected"
   (confirmed)="confirmBulkDelete()"
   (cancelled)="bulkConfirmOpen.set(false)" />
+
+<app-reconcile-review
+  [open]="reconcileOpen()"
+  (closed)="reconcileOpen.set(false)" />

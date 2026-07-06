@@ -6,6 +6,7 @@ import { Observable, of, switchMap } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
 import { AccountService } from './account.service';
+import { ReconciliationService } from './reconciliation.service';
 import { ToastService } from './toast.service';
 import { Account, AccountType } from '../models';
 
@@ -67,6 +68,7 @@ export class PlaidService {
   private db = inject(Firestore);
   private auth = inject(AuthService);
   private accountSvc = inject(AccountService);
+  private reconcileSvc = inject(ReconciliationService);
   private toast = inject(ToastService);
   private ngZone = inject(NgZone);
 
@@ -238,6 +240,8 @@ export class PlaidService {
       const { data } = await sync();
       // Make sure every linked bank's accounts exist (covers items linked earlier).
       await this.setupAllAccounts();
+      // Remove bank rows that duplicate an already-merged manual entry.
+      await this.reconcileSvc.cleanupReconciled();
       const changed = data.added + data.modified + data.removed;
       if (changed === 0) {
         this.toast.info('Already up to date — no new transactions.');
