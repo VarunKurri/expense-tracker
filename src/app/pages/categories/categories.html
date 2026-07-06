@@ -29,7 +29,9 @@
               <span class="cat-count">{{ txCount(c.id) }} txn</span>
             </div>
             <div class="cat-actions">
-              <span class="merge-into">Merge into</span>
+              <button class="btn keep" (click)="makeDefault(c)" [disabled]="busy()">Make default</button>
+              <span class="sep">or</span>
+              <span class="merge-into">merge into</span>
               <select
                 class="input-field"
                 [ngModel]="selectedTarget(c)"

@@ -38,8 +38,23 @@ export class Categories {
   defaults = computed(() => this.categorySvc.categories().filter(c => this.isDefault(c)));
 
   private isDefault(c: Category): boolean {
+    if (c.isDefault) return true;
     const names = c.kind === 'income' ? DEFAULT_INCOME : DEFAULT_EXPENSE;
     return names.includes(c.name);
+  }
+
+  /** Promote a custom category to a kept default (no merge). */
+  async makeDefault(c: Category) {
+    if (!c.id) return;
+    this.busy.set(true);
+    try {
+      await this.categorySvc.update(c.id, { isDefault: true });
+      this.toast.success(`"${c.name}" is now a default category.`);
+    } catch (err: any) {
+      this.toast.error(err?.message || 'Could not update this category.');
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Default categories of the same kind, as merge targets. */
