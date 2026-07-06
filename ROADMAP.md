@@ -216,9 +216,14 @@ Sync uses a **zero-knowledge** model so automatic background sync never weakens 
   - Why: the first pull should fetch a sensible amount of history; Plaid defaults to ~90 days and supports up to 730 (24 months), not the full account lifetime.
   - Done when: `createLinkToken` sets `transactions.days_requested` from a config value (documented in `.env`), adjustable without code changes.
 
-- [ ] Add auto-categorization from Plaid categories with manual override.
+- [x] Add auto-categorization from Plaid categories with manual override.
   - Why: imported transactions should land in the user's existing categories instead of an unrelated taxonomy.
   - Done when: Plaid's `personal_finance_category` maps onto the existing seeded categories, unmapped items fall back to Other, and the user can still re-categorize any transaction. Note: because the server cannot read the user's encrypted categories, this mapping runs **client-side** after decrypt (Plaid's `personal_finance_category` is carried in the encrypted payload); the browser assigns `categoryId` and re-encrypts.
+  - Verified: `utils/plaid-category-map.ts` maps Plaid PFC primary → app category name (fallback Other / Other Income); `TransactionService.transactions` resolves a synced transaction's `categoryId` in-memory by matching that name + kind, only when the category is blank, so a user-set category always wins. Confirmed in sandbox: synced transactions show mapped chips (Dining, Shopping, Gas, …), are filterable by category, and manual re-categorization sticks. Refinement noted: using Plaid's `detailed` category could split Groceries from Dining.
+
+- [ ] Add a category cleanup / merge tool.
+  - Why: users who added extra custom categories (or want to consolidate) need to fold them into the defaults without leaving transactions uncategorized.
+  - Done when: a management view lists categories as default vs custom; merging a custom category re-assigns all its transactions to a chosen target category (client-side bulk update) and then deletes the custom category, with a confirmation showing how many transactions move.
 
 - [x] Add connected-accounts management UI.
   - Why: users need to see which banks are linked, disconnect them, and clean up test items.
