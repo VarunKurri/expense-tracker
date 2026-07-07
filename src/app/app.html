@@ -148,6 +148,16 @@
         }
       </div>
 
+      @if (encryption.hasProfile() && encryption.hasPasskey() && encryption.passkeySupported()) {
+        <button class="auth-primary" type="button"
+                (click)="unlockWithPasskey()"
+                [disabled]="encryption.busy()">
+          @if (encryption.busy()) { <div class="btn-spinner"></div> }
+          <span>🔓 Unlock with passkey</span>
+        </button>
+        <div class="unlock-or">or use your passphrase</div>
+      }
+
       <label>
         <span>Encryption passphrase</span>
         <input class="input-field" type="password" autocomplete="current-password"
