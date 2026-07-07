@@ -82,6 +82,47 @@ export class Budgets {
     return months;
   });
 
+  // Budgets whose category no longer exists (e.g. after a category was merged/deleted).
+  // Their amount is intact — they just need re-pointing to a current category.
+  orphanedBudgets = computed(() => {
+    const ids = new Set(this.categoryService.categories().map(c => c.id));
+    return this.budgetService.budgets().filter(b => !ids.has(b.categoryId));
+  });
+
+  expenseCategories = computed(() =>
+    this.categoryService.categories().filter(c => c.kind === 'expense')
+  );
+
+  private reassignTargets = signal<Record<string, string>>({});
+
+  reassignTarget(budgetId: string): string {
+    return this.reassignTargets()[budgetId] ?? this.expenseCategories()[0]?.id ?? '';
+  }
+
+  setReassignTarget(budgetId: string, categoryId: string) {
+    this.reassignTargets.update(m => ({ ...m, [budgetId]: categoryId }));
+  }
+
+  async reassignBudget(b: Budget) {
+    const target = this.reassignTarget(b.id!);
+    if (!b.id || !target) return;
+    try {
+      await this.budgetService.update(b.id, { categoryId: target });
+      this.toastService.success('Budget reassigned.');
+    } catch {
+      this.toastService.error('Could not reassign this budget. Please try again.');
+    }
+  }
+
+  async removeOrphan(b: Budget) {
+    if (!b.id) return;
+    try {
+      await this.budgetService.remove(b.id);
+    } catch {
+      this.toastService.error('Could not delete this budget. Please try again.');
+    }
+  }
+
   budgetRows = computed((): BudgetRow[] => {
     const month = this.selectedMonth();
     const defaults = this.budgetService.defaultBudgets();

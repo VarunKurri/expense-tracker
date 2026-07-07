@@ -376,3 +376,50 @@
   .summary-divider { display: none; }
   .budget-grid { grid-template-columns: 1fr; }
 }
+.orphan-panel {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--red-bg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.orphan-head {
+  font-size: 13px;
+  color: var(--fg);
+  line-height: 1.5;
+}
+
+.orphan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  flex-wrap: wrap;
+}
+
+.orphan-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  .orphan-amount { font-weight: 600; font-size: 14px; color: var(--fg); }
+  .orphan-tag { font-size: 12px; color: var(--fg-3); }
+}
+
+.orphan-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  .input-field { min-width: 150px; }
+  .btn { cursor: pointer; }
+  .btn.danger { color: var(--red); }
+}

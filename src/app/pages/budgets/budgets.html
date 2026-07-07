@@ -34,6 +34,35 @@
     </button>
   </div>
 
+  <!-- ORPHANED BUDGETS (category was merged/deleted) -->
+  @if (orphanedBudgets().length > 0) {
+    <div class="orphan-panel">
+      <div class="orphan-head">
+        ⚠️ {{ orphanedBudgets().length }} budget(s) point to a category that no longer exists.
+        Reassign each to a current category (the amount is kept) or delete it.
+      </div>
+      @for (b of orphanedBudgets(); track b.id) {
+        <div class="orphan-row">
+          <div class="orphan-info">
+            <span class="orphan-amount">{{ formatCurrencyFull(b.amount) }}/mo</span>
+            <span class="orphan-tag">{{ b.isDefault ? 'every month' : b.month }}</span>
+          </div>
+          <div class="orphan-actions">
+            <select class="input-field"
+                    [ngModel]="reassignTarget(b.id!)"
+                    (ngModelChange)="setReassignTarget(b.id!, $event)">
+              @for (c of expenseCategories(); track c.id) {
+                <option [value]="c.id">{{ c.name }}</option>
+              }
+            </select>
+            <button class="btn" (click)="reassignBudget(b)">Reassign</button>
+            <button class="btn danger" (click)="removeOrphan(b)">Delete</button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
   <!-- PAST MONTH BANNER -->
   @if (isPastMonth()) {
     <div class="month-banner past">
