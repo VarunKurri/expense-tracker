@@ -125,18 +125,18 @@ export class PlaidService {
    * public_token for a stored access token via the backend, which links the
    * bank for future syncs.
    */
-  async connectBank(): Promise<void> {
+  async connectBank(daysRequested?: number): Promise<void> {
     if (this.connecting()) return;
     this.connecting.set(true);
 
     try {
       await this.loadLinkScript();
 
-      const createLinkToken = httpsCallable<unknown, CreateLinkTokenResult>(
+      const createLinkToken = httpsCallable<{ days_requested?: number }, CreateLinkTokenResult>(
         this.functions,
         'createLinkToken',
       );
-      const { data } = await createLinkToken();
+      const { data } = await createLinkToken({ days_requested: daysRequested });
 
       const handler = (window as any).Plaid.create({
         token: data.link_token,

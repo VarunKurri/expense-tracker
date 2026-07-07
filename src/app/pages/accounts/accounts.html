@@ -83,6 +83,39 @@
     (confirmed)="confirmDisconnect()"
     (cancelled)="cancelDisconnect()" />
 
+  <app-modal
+    [open]="connectChooserOpen()"
+    title="Connect a bank"
+    size="sm"
+    (closed)="connectChooserOpen.set(false)">
+    <p class="connect-hint">How much transaction history should we import?</p>
+    <div class="history-options">
+      @for (opt of [
+        { v: '30', label: 'Last 30 days' },
+        { v: '90', label: 'Last 90 days' },
+        { v: '180', label: 'Last 6 months' },
+        { v: '365', label: 'Last 1 year' },
+        { v: '730', label: 'Last 2 years (max)' },
+        { v: 'custom', label: 'From a specific date…' }
+      ]; track opt.v) {
+        <label class="history-option" [class.active]="historyChoice() === opt.v">
+          <input type="radio" name="hist" [value]="opt.v"
+                 [ngModel]="historyChoice()" (ngModelChange)="historyChoice.set($event)" />
+          <span>{{ opt.label }}</span>
+        </label>
+      }
+      @if (historyChoice() === 'custom') {
+        <input type="date" class="input-field" [max]="todayStr"
+               [ngModel]="customStartDate()" (ngModelChange)="customStartDate.set($event)" />
+        <p class="connect-note">Plaid provides at most 24 months of history, so earlier dates are capped at 2 years.</p>
+      }
+    </div>
+    <div class="connect-actions">
+      <button class="btn ghost" (click)="connectChooserOpen.set(false)">Cancel</button>
+      <button class="btn primary" (click)="continueConnect()" [disabled]="plaidSvc.connecting()">Continue</button>
+    </div>
+  </app-modal>
+
   <app-confirm
     [open]="confirmOpen()"
     title="Delete account?"

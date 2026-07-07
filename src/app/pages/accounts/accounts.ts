@@ -1,5 +1,6 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AccountService } from '../../services/account.service';
 import { TransactionService } from '../../services/transaction.service';
@@ -7,6 +8,7 @@ import { AccountForm } from './account-form/account-form';
 import { AccountCard } from './account-card/account-card';
 import { SummaryBar } from './summary-bar/summary-bar';
 import { Confirm } from '../../components/confirm/confirm';
+import { Modal } from '../../components/modal/modal';
 import { Account } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { PlaidService, PlaidItem } from '../../services/plaid.service';
@@ -14,7 +16,7 @@ import { PlaidService, PlaidItem } from '../../services/plaid.service';
 @Component({
   selector: 'app-accounts',
   standalone: true,
-  imports: [CommonModule, AccountForm, AccountCard, SummaryBar, Confirm],
+  imports: [CommonModule, FormsModule, AccountForm, AccountCard, SummaryBar, Confirm, Modal],
   templateUrl: './accounts.html',
   styleUrl: './accounts.scss'
 })
@@ -32,6 +34,12 @@ export class Accounts {
 
   disconnectOpen  = signal(false);
   itemToDisconnect = signal<PlaidItem | null>(null);
+
+  // Connect flow: choose how much history to import before opening Plaid Link.
+  connectChooserOpen = signal(false);
+  historyChoice = signal<'30' | '90' | '180' | '365' | '730' | 'custom'>('90');
+  customStartDate = signal('');
+  todayStr = new Date().toISOString().slice(0, 10);
 
   activeAccounts = computed(() =>
     this.accountSvc.accounts().filter(a => !a.archived)
@@ -97,7 +105,26 @@ export class Accounts {
   }
 
   connectBank() {
-    this.plaidSvc.connectBank();
+    this.historyChoice.set('90');
+    this.customStartDate.set('');
+    this.connectChooserOpen.set(true);
+  }
+
+  private daysFromChoice(): number {
+    const choice = this.historyChoice();
+    if (choice === 'custom') {
+      const d = this.customStartDate();
+      if (!d) return 90;
+      const days = Math.ceil((Date.now() - new Date(d + 'T00:00:00').getTime()) / 86_400_000);
+      return Math.min(730, Math.max(1, days));
+    }
+    return Number(choice);
+  }
+
+  continueConnect() {
+    const days = this.daysFromChoice();
+    this.connectChooserOpen.set(false);
+    this.plaidSvc.connectBank(days);
   }
 
   syncTransactions() {

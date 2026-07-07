@@ -35,6 +35,10 @@ export const createLinkToken = onCall({ secrets: [plaidClientId, plaidSecret] },
   const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
   const webhook = plaidWebhookUrl.value();
 
+  // How much history to request, in days. Plaid supports 1..730 (24 months).
+  const raw = Math.floor(Number(request.data?.days_requested));
+  const daysRequested = Number.isFinite(raw) ? Math.min(730, Math.max(1, raw)) : 90;
+
   try {
     const resp = await client.linkTokenCreate({
       user: { client_user_id: uid },
@@ -42,6 +46,7 @@ export const createLinkToken = onCall({ secrets: [plaidClientId, plaidSecret] },
       products: [Products.Transactions],
       country_codes: [CountryCode.Us],
       language: 'en',
+      transactions: { days_requested: daysRequested },
       // Webhook is configured here so Plaid knows where to send ongoing sync
       // notifications once the webhook function exists. Omitted while unset.
       ...(webhook ? { webhook } : {}),
