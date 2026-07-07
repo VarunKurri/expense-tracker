@@ -140,3 +140,6 @@
 .settings-row.static:hover { background: inherit; }
 .text-btn.danger { color: var(--red); background: none; border: none; cursor: pointer; font-size: 13px; }
 .text-btn.danger:disabled { opacity: 0.5; cursor: default; }
+
+.settings-row .btn { cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.settings-row .btn:disabled { opacity: 0.55; cursor: default; }
