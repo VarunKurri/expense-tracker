@@ -188,9 +188,10 @@ Sync uses a **zero-knowledge** model so automatic background sync never weakens 
   - Done when: each user has an RSA keypair (public key stored in plaintext at `users/{uid}/meta/keys`, private key wrapped by a master key), the existing passphrase-encrypted data migrates with no bulk re-encryption (the current passphrase-derived key is adopted as the master key), and the client `decryptDoc` handles both symmetric (`__encrypted`) and envelope (`__envelope`) documents. Passphrase unlock keeps working throughout.
   - Verified: on unlock, `EncryptionService.ensureKeypair` generates an RSA-OAEP keypair (public key plaintext at `meta/keys`, private key wrapped under the passphrase-derived key) or unwraps the stored one; `decryptDoc` handles `__envelope` docs. `functions/src/crypto.ts` `envelopeEncrypt` (RSA-OAEP + AES-GCM) round-trips with WebCrypto (validated by a local Node interop test incl. wrong-key rejection). Purely additive — existing data/passphrase unlock unchanged. Confirmed live: `meta/keys` created on unlock, re-unlock unwraps cleanly, and server-written envelope transactions decrypt in the app.
 
-- [ ] Add passkey (WebAuthn PRF) unlock with passphrase fallback.
-  - Why: keep the zero-knowledge guarantee (a client-only secret must unlock the private key) while removing passphrase friction.
-  - Done when: users can register and unlock via a passkey using the WebAuthn PRF extension (HKDF-derived key wraps the master key), the passphrase remains a working fallback, and browsers without PRF support fall back to the passphrase cleanly.
+- [x] Reduce unlock friction while keeping the passphrase as the encryption secret.
+  - Why: keep the zero-knowledge guarantee (a client-only secret must unlock the key) while removing passphrase friction on trusted devices.
+  - Done when: unlocking is easy on a trusted device without weakening the model or the passphrase's role as the sole recovery secret.
+  - Verified: prototyped passkey (WebAuthn PRF) unlock but **removed it** after review — it wraps the *same* master key the passphrase derives, so it's convenience-only (not a new security factor) and PRF support is fragile. Replaced with **"remember this device"**: the non-extractable master key is stored in IndexedDB (`utils/device-key-store.ts`) so the device auto-unlocks; usable but not exportable, cleared via Settings → Security → Forget. Passphrase stays as the encryption secret and the only recovery path (email OTP can't recover a zero-knowledge key — it would require the server to hold it). KDF hardening + encrypted recovery moved to the hardening item below.
 
 - [x] Add the initial transaction sync via /transactions/sync.
   - Why: after linking, the existing history and balances should appear without manual entry.
