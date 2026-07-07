@@ -18,37 +18,6 @@
     </div>
 
     <div class="settings-section">
-      <div class="settings-section-title">Security</div>
-      @if (!encryption.passkeySupported()) {
-        <div class="settings-row static">
-          <div class="settings-icon">🔑</div>
-          <div class="settings-info">
-            <div class="settings-label">Passkey unlock</div>
-            <div class="settings-sub">This browser doesn't support passkey encryption (WebAuthn PRF). Keep using your passphrase.</div>
-          </div>
-        </div>
-      } @else if (encryption.hasPasskey()) {
-        <div class="settings-row static">
-          <div class="settings-icon">🔑</div>
-          <div class="settings-info">
-            <div class="settings-label">Passkey unlock · enabled</div>
-            <div class="settings-sub">You can unlock with your passkey (Touch ID / Face ID). Your passphrase still works as backup.</div>
-          </div>
-          <button class="text-btn danger" [disabled]="busy()" (click)="removePasskey()">Remove</button>
-        </div>
-      } @else {
-        <div class="settings-row" (click)="setupPasskey()">
-          <div class="settings-icon">🔑</div>
-          <div class="settings-info">
-            <div class="settings-label">Set up passkey unlock</div>
-            <div class="settings-sub">Unlock with Touch ID / Face ID instead of typing your passphrase (passphrase stays as backup).</div>
-          </div>
-          <div class="settings-arrow">{{ busy() ? '…' : '›' }}</div>
-        </div>
-      }
-    </div>
-
-    <div class="settings-section">
       <div class="settings-section-title">Keyboard shortcuts</div>
       <div class="shortcut-panel">
         <div class="shortcut-row">

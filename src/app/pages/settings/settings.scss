@@ -135,8 +135,3 @@
     }
   }
 }
-
-.settings-row.static { cursor: default; }
-.settings-row.static:hover { background: inherit; }
-.text-btn.danger { color: var(--red); background: none; border: none; cursor: pointer; font-size: 13px; }
-.text-btn.danger:disabled { opacity: 0.5; cursor: default; }

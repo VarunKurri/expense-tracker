@@ -6,13 +6,10 @@ import {
   getDoc,
   getDocs,
   setDoc,
-  updateDoc,
-  deleteField,
   writeBatch,
   DocumentData,
 } from 'firebase/firestore';
 import { AuthService } from './auth.service';
-import { PasskeyService, PasskeyRecord } from './passkey.service';
 
 export interface EncryptedDocument {
   __encrypted: true;
@@ -53,25 +50,17 @@ const COLLECTIONS = ['accounts', 'categories', 'transactions', 'transactionTempl
 export class EncryptionService {
   private db = inject(Firestore);
   private auth = inject(AuthService);
-  private passkey = inject(PasskeyService);
 
   unlocked = signal(false);
   busy = signal(false);
   error = signal<string | null>(null);
   hasProfile = signal<boolean | null>(null);
-  hasPasskey = signal(false); // a passkey is registered for this account
   userReady = computed(() => !!this.auth.user() && this.unlocked());
 
   private key: CryptoKey | null = null;
   private salt: Uint8Array | null = null;
-  // Raw master-key bytes, kept in memory while unlocked so a passkey can wrap them.
-  private masterKeyRaw: Uint8Array | null = null;
   // RSA private key (decrypt-only) for reading server-written envelope docs.
   private privateKey: CryptoKey | null = null;
-
-  passkeySupported(): boolean {
-    return this.passkey.isSupported();
-  }
 
   async refreshProfileState() {
     const user = this.auth.user();
@@ -84,9 +73,6 @@ export class EncryptionService {
     try {
       const snap = await getDoc(doc(this.db, `users/${user.uid}/meta/encryption`));
       this.hasProfile.set(snap.exists());
-      // meta/keys is plaintext (public key + passkey record) — readable before unlock.
-      const keysSnap = await getDoc(doc(this.db, `users/${user.uid}/meta/keys`));
-      this.hasPasskey.set(!!keysSnap.data()?.['passkey']);
     } catch (err: any) {
       const message = this.friendlyEncryptionError(err);
       this.error.set(message);
@@ -110,7 +96,7 @@ export class EncryptionService {
 
       if (!metaSnap.exists()) {
         const salt = crypto.getRandomValues(new Uint8Array(16));
-        const { key, raw } = await this.deriveMasterKey(passphrase, salt);
+        const key = await this.deriveKey(passphrase, salt);
         const verifier = await this.encryptStringWithKey(VERIFIER_TEXT, key);
         const meta: EncryptionMeta = {
           salt: this.bytesToBase64(salt),
@@ -122,7 +108,6 @@ export class EncryptionService {
         await setDoc(metaRef, meta);
         this.salt = salt;
         this.key = key;
-        this.masterKeyRaw = raw;
         this.hasProfile.set(true);
         await this.ensureKeypair();
         this.unlocked.set(true);
@@ -131,14 +116,13 @@ export class EncryptionService {
 
       const meta = metaSnap.data() as EncryptionMeta;
       const salt = this.base64ToBytes(meta.salt);
-      const { key, raw } = await this.deriveMasterKey(passphrase, salt);
+      const key = await this.deriveKey(passphrase, salt);
       const verifier = await this.decryptStringWithKey(meta.verifier, meta.verifierIv, key);
       if (verifier !== VERIFIER_TEXT) {
         throw new Error('Encryption passphrase is incorrect.');
       }
       this.salt = salt;
       this.key = key;
-      this.masterKeyRaw = raw;
       this.hasProfile.set(true);
       await this.ensureKeypair();
       this.unlocked.set(true);
@@ -152,71 +136,9 @@ export class EncryptionService {
     }
   }
 
-  /**
-   * Unlock with a passkey: authenticate, unwrap the master key, and open the vault.
-   * The unwrapped key is verified against the stored verifier before use.
-   */
-  async unlockWithPasskey() {
-    const user = this.auth.user();
-    if (!user) throw new Error('Not signed in');
-    this.busy.set(true);
-    this.error.set(null);
-    try {
-      const keysSnap = await getDoc(doc(this.db, `users/${user.uid}/meta/keys`));
-      const record = keysSnap.data()?.['passkey'] as PasskeyRecord | undefined;
-      if (!record) throw new Error('No passkey is set up for this account.');
-      const raw = await this.passkey.unlock(record);
-      await this.unlockWithMasterKey(raw);
-    } catch (err: any) {
-      this.lock();
-      const message = err?.message || 'Passkey unlock failed. Use your passphrase.';
-      this.error.set(message);
-      throw new Error(message);
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  /** Register a passkey for the currently-unlocked vault (wraps the master key). */
-  async registerPasskey() {
-    const user = this.auth.user();
-    if (!user) throw new Error('Not signed in');
-    if (!this.masterKeyRaw) throw new Error('Unlock first to set up a passkey.');
-    const record = await this.passkey.register(user.uid, user.email ?? user.uid, this.masterKeyRaw);
-    await setDoc(doc(this.db, `users/${user.uid}/meta/keys`), { passkey: record }, { merge: true });
-    this.hasPasskey.set(true);
-  }
-
-  /** Remove the registered passkey (passphrase unlock is unaffected). */
-  async removePasskey() {
-    const user = this.auth.user();
-    if (!user) return;
-    await updateDoc(doc(this.db, `users/${user.uid}/meta/keys`), { passkey: deleteField() });
-    this.hasPasskey.set(false);
-  }
-
-  /** Open the vault from raw master-key bytes (passkey / remembered device). */
-  private async unlockWithMasterKey(raw: Uint8Array) {
-    const user = this.auth.user();
-    if (!user) throw new Error('Not signed in');
-    const metaSnap = await getDoc(doc(this.db, `users/${user.uid}/meta/encryption`));
-    if (!metaSnap.exists()) throw new Error('No encrypted vault found.');
-    const meta = metaSnap.data() as EncryptionMeta;
-    const key = await crypto.subtle.importKey('raw', raw as BufferSource, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-    const verifier = await this.decryptStringWithKey(meta.verifier, meta.verifierIv, key);
-    if (verifier !== VERIFIER_TEXT) throw new Error('Unlock failed (key mismatch).');
-    this.salt = this.base64ToBytes(meta.salt);
-    this.key = key;
-    this.masterKeyRaw = raw;
-    this.hasProfile.set(true);
-    await this.ensureKeypair();
-    this.unlocked.set(true);
-  }
-
   lock() {
     this.key = null;
     this.salt = null;
-    this.masterKeyRaw = null;
     this.privateKey = null;
     this.unlocked.set(false);
     this.error.set(null);
@@ -407,26 +329,21 @@ export class EncryptionService {
     return metadata;
   }
 
-  // Derive the master key from the passphrase. Returns both an AES-GCM CryptoKey (for
-  // data ops) and the raw bytes (kept in memory so a passkey can wrap them). Uses
-  // deriveBits + import so the raw material is available; same 256-bit PBKDF2 output
-  // as before, so existing data still decrypts.
-  private async deriveMasterKey(passphrase: string, salt: Uint8Array): Promise<{ key: CryptoKey; raw: Uint8Array }> {
+  private async deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
     const material = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(passphrase),
       'PBKDF2',
       false,
-      ['deriveBits']
+      ['deriveKey']
     );
-    const bits = await crypto.subtle.deriveBits(
+    return crypto.subtle.deriveKey(
       { name: 'PBKDF2', salt: salt as BufferSource, iterations: 250000, hash: 'SHA-256' },
       material,
-      256
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
     );
-    const raw = new Uint8Array(bits);
-    const key = await crypto.subtle.importKey('raw', raw as BufferSource, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-    return { key, raw };
   }
 
   private async encryptStringWithKey(plain: string, key: CryptoKey) {

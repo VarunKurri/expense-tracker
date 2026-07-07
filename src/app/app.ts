@@ -579,15 +579,6 @@ export class App {
     }
   }
 
-  async unlockWithPasskey() {
-    try {
-      await this.encryption.unlockWithPasskey();
-      this.toastService.success('Unlocked with passkey.');
-    } catch (err: any) {
-      this.toastService.error(err?.message || 'Passkey unlock failed. Use your passphrase.');
-    }
-  }
-
   signOut() {
     this.encryption.lock();
     this.auth.signOut();
