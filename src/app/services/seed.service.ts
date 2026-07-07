@@ -138,10 +138,13 @@ export class SeedService {
     const ref = collection(this.db, `users/${uid}/categories`);
     const snap = await getDocs(ref);
 
+    // Match by name only (ignoring kind): if a category with this name already
+    // exists in any kind, don't add another. No two defaults share a name, so this
+    // is safe and avoids creating cross-kind duplicates (e.g. "Personal Transfers").
     const existing = new Set<string>();
     for (const item of snap.docs) {
       const c = await this.encryption.decryptDoc<Category>(item.data());
-      existing.add(`${c.kind}:${c.name.trim().toLowerCase()}`);
+      existing.add(c.name.trim().toLowerCase());
     }
 
     const wanted = [
@@ -149,7 +152,7 @@ export class SeedService {
       ...DEFAULT_INCOME_CATEGORIES.map(c => ({ ...c, kind: 'income' as const })),
     ];
     for (const c of wanted) {
-      if (existing.has(`${c.kind}:${c.name.toLowerCase()}`)) continue;
+      if (existing.has(c.name.toLowerCase())) continue;
       await addDoc(ref, await this.encryption.encryptForWrite({
         name: c.name,
         icon: c.icon,
