@@ -54,6 +54,7 @@ export class EncryptionService {
 
   unlocked = signal(false);
   busy = signal(false);
+  booting = signal(true); // initial profile check + device auto-unlock in progress
   error = signal<string | null>(null);
   hasProfile = signal<boolean | null>(null);
   deviceRemembered = signal(false); // this device holds the key locally (auto-unlock)

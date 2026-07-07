@@ -1,6 +1,11 @@
 <app-toast />
 
-@if (!auth.user()) {
+@if (showSplash()) {
+  <div class="boot-splash">
+    <div class="brand-mark" style="width:48px;height:48px;border-radius:15px;font-size:24px;">T</div>
+    <div class="boot-spinner"></div>
+  </div>
+} @else if (!auth.user()) {
   <div class="login-shell">
     <div class="login-left">
       <div class="login-left-content">

@@ -74,6 +74,13 @@ export class App {
   displayName = signal('');
   encryptionPassphrase = signal('');
   rememberThisDevice = signal(false);
+
+  // Show a neutral boot splash until auth resolves and (if this device is
+  // remembered) the auto-unlock attempt finishes — avoids flashing login/unlock.
+  showSplash = computed(() =>
+    !this.auth.resolved()
+    || (!!this.auth.user() && !this.encryption.unlocked() && this.encryption.booting())
+  );
   commandPaletteOpen = signal(false);
   commandQuery = signal('');
   activeCommandIndex = signal(0);
@@ -177,11 +184,13 @@ export class App {
     effect(() => {
       const user = this.auth.user();
       if (user) {
+        this.encryption.booting.set(true);
         this.encryption.refreshProfileState()
           .then(() => this.encryption.tryUnlockFromDevice())
           .catch(err => {
             this.toastService.error(err?.message || 'Could not check encrypted data access.');
-          });
+          })
+          .finally(() => this.encryption.booting.set(false));
       } else {
         this.encryption.lock();
       }

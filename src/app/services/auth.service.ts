@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import {
   Auth, GoogleAuthProvider,
   signInWithPopup, signInWithRedirect, getRedirectResult,
@@ -12,8 +12,16 @@ import { toSignal } from '@angular/core/rxjs-interop';
 export class AuthService {
   private auth = inject(Auth);
   user = toSignal(user(this.auth), { initialValue: null });
+  // False until Firebase reports the initial auth state (so we can show a boot
+  // splash instead of flashing the login page while the session is restoring).
+  resolved = signal(false);
 
   constructor() {
+    const sub = user(this.auth).subscribe(() => {
+      this.resolved.set(true);
+      sub.unsubscribe();
+    });
+
     // Pick up the result when returning from a redirect sign-in
     getRedirectResult(this.auth).catch(() => {
       // Ignore errors here — they surface through the user signal
