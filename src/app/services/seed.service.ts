@@ -5,6 +5,41 @@ import { AuthService } from './auth.service';
 import { EncryptionService } from './encryption.service';
 import { Category } from '../models';
 
+// The canonical default categories every account gets. New accounts are seeded with
+// these; existing accounts are topped up with any they're missing (ensureDefaultCategories).
+const DEFAULT_EXPENSE_CATEGORIES = [
+  { name: 'Groceries', icon: 'Groceries', color: '#10b981' },
+  { name: 'Gas', icon: 'Gas', color: '#f59e0b' },
+  { name: 'Dining', icon: 'Dining', color: '#ef4444' },
+  { name: 'Parking', icon: 'Parking', color: '#6b7280' },
+  { name: 'RideShare', icon: 'Car', color: '#3b82f6' },
+  { name: 'Car', icon: 'Auto', color: '#8b5cf6' },
+  { name: 'Shopping', icon: 'Shopping', color: '#ec4899' },
+  { name: 'Entertainment', icon: 'Entertainment', color: '#f97316' },
+  { name: 'Rent', icon: 'Home', color: '#6366f1' },
+  { name: 'Utilities', icon: 'Utilities', color: '#eab308' },
+  { name: 'Health', icon: 'Health', color: '#14b8a6' },
+  { name: 'Subscriptions', icon: 'Subscriptions', color: '#a855f7' },
+  { name: 'Other', icon: 'Other', color: '#9ca3af' },
+  { name: 'Bank Fees', icon: '🏦', color: '#6b7280' },
+  { name: 'Charity & Gifts', icon: '🎁', color: '#ec4899' },
+  { name: 'Financial Services', icon: '🏛️', color: '#0ea5e9' },
+  { name: 'Fines & Penalties', icon: '⚠️', color: '#ef4444' },
+  { name: 'Personal Care', icon: '🧴', color: '#a855f7' },
+  { name: 'Personal Transfers', icon: '🔄', color: '#3b82f6' },
+  { name: 'Transportation', icon: '🚌', color: '#f59e0b' },
+  { name: 'Travel', icon: '✈️', color: '#14b8a6' },
+];
+
+const DEFAULT_INCOME_CATEGORIES = [
+  { name: 'Salary', icon: 'Salary', color: '#10b981' },
+  { name: 'Bonus', icon: 'Bonus', color: '#22c55e' },
+  { name: 'Interest', icon: 'Interest', color: '#06b6d4' },
+  { name: 'Pocket Money', icon: '💸', color: '#f59e0b' },
+  { name: 'Refund', icon: '↩️', color: '#14b8a6' },
+  { name: 'Other Income', icon: 'Income', color: '#84cc16' },
+];
+
 @Injectable({ providedIn: 'root' })
 export class SeedService {
   private db = inject(Firestore);
@@ -24,7 +59,7 @@ export class SeedService {
       const sentinelSnap = await getDoc(sentinelRef);
       if (sentinelSnap.exists()) {
         await this.ensurePocketMoneyCategory(user.uid);
-        await this.ensureRefundCategory(user.uid);
+        await this.ensureDefaultCategories(user.uid);
         return;
       }
 
@@ -48,40 +83,17 @@ export class SeedService {
       if (categoriesSnap.empty) {
         const ref = collection(this.db, `users/${user.uid}/categories`);
         const batch = writeBatch(this.db);
-        const expenseCats = [
-          { name: 'Groceries', icon: 'Groceries', color: '#10b981' },
-          { name: 'Gas', icon: 'Gas', color: '#f59e0b' },
-          { name: 'Dining', icon: 'Dining', color: '#ef4444' },
-          { name: 'Parking', icon: 'Parking', color: '#6b7280' },
-          { name: 'RideShare', icon: 'Car', color: '#3b82f6' },
-          { name: 'Car', icon: 'Auto', color: '#8b5cf6' },
-          { name: 'Shopping', icon: 'Shopping', color: '#ec4899' },
-          { name: 'Entertainment', icon: 'Entertainment', color: '#f97316' },
-          { name: 'Rent', icon: 'Home', color: '#6366f1' },
-          { name: 'Utilities', icon: 'Utilities', color: '#eab308' },
-          { name: 'Health', icon: 'Health', color: '#14b8a6' },
-          { name: 'Subscriptions', icon: 'Subscriptions', color: '#a855f7' },
-          { name: 'Other', icon: 'Other', color: '#9ca3af' },
-        ];
-        for (const c of expenseCats) {
+        for (const c of DEFAULT_EXPENSE_CATEGORIES) {
           batch.set(doc(ref), await this.encryption.encryptForWrite({ ...c, kind: 'expense', createdAt: Date.now() }));
         }
 
-        const incomeCats = [
-          { name: 'Salary', icon: 'Salary', color: '#10b981' },
-          { name: 'Bonus', icon: 'Bonus', color: '#22c55e' },
-          { name: 'Interest', icon: 'Interest', color: '#06b6d4' },
-          { name: 'Pocket Money', icon: '💸', color: '#f59e0b' },
-          { name: 'Refund', icon: '↩️', color: '#14b8a6' },
-          { name: 'Other Income', icon: 'Income', color: '#84cc16' },
-        ];
-        for (const c of incomeCats) {
+        for (const c of DEFAULT_INCOME_CATEGORIES) {
           batch.set(doc(ref), await this.encryption.encryptForWrite({ ...c, kind: 'income', createdAt: Date.now() }));
         }
         await batch.commit();
       } else {
         await this.ensurePocketMoneyCategory(user.uid);
-        await this.ensureRefundCategory(user.uid);
+        await this.ensureDefaultCategories(user.uid);
       }
 
       await setDoc(sentinelRef, { seededAt: Date.now() });
@@ -116,21 +128,35 @@ export class SeedService {
     }));
   }
 
-  private async ensureRefundCategory(uid: string) {
+  /**
+   * Top up an existing account with any default categories it's missing (matched by
+   * name + kind), so newly-introduced defaults reach accounts that were seeded earlier.
+   * Never removes or renames anything. Since users can't delete categories, this won't
+   * fight an intentional removal.
+   */
+  private async ensureDefaultCategories(uid: string) {
     const ref = collection(this.db, `users/${uid}/categories`);
     const snap = await getDocs(ref);
+
+    const existing = new Set<string>();
     for (const item of snap.docs) {
-      const category = await this.encryption.decryptDoc<Category>(item.data());
-      if (category.kind === 'income' && category.name.trim().toLowerCase() === 'refund') {
-        return;
-      }
+      const c = await this.encryption.decryptDoc<Category>(item.data());
+      existing.add(`${c.kind}:${c.name.trim().toLowerCase()}`);
     }
-    await addDoc(ref, await this.encryption.encryptForWrite({
-      name: 'Refund',
-      icon: '↩️',
-      color: '#14b8a6',
-      kind: 'income',
-      createdAt: Date.now(),
-    }));
+
+    const wanted = [
+      ...DEFAULT_EXPENSE_CATEGORIES.map(c => ({ ...c, kind: 'expense' as const })),
+      ...DEFAULT_INCOME_CATEGORIES.map(c => ({ ...c, kind: 'income' as const })),
+    ];
+    for (const c of wanted) {
+      if (existing.has(`${c.kind}:${c.name.toLowerCase()}`)) continue;
+      await addDoc(ref, await this.encryption.encryptForWrite({
+        name: c.name,
+        icon: c.icon,
+        color: c.color,
+        kind: c.kind,
+        createdAt: Date.now(),
+      }));
+    }
   }
 }

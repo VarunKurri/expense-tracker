@@ -6,14 +6,19 @@
 const EXPENSE_MAP: Record<string, string> = {
   FOOD_AND_DRINK: 'Dining',
   GENERAL_MERCHANDISE: 'Shopping',
-  TRANSPORTATION: 'Gas',
+  HOME_IMPROVEMENT: 'Shopping',
+  TRANSPORTATION: 'Transportation',
+  TRAVEL: 'Travel',
   ENTERTAINMENT: 'Entertainment',
   RENT_AND_UTILITIES: 'Utilities',
   MEDICAL: 'Health',
-  PERSONAL_CARE: 'Health',
-  HOME_IMPROVEMENT: 'Shopping',
-  // GENERAL_SERVICES, TRAVEL, GOVERNMENT_AND_NON_PROFIT, LOAN_PAYMENTS,
-  // BANK_FEES, TRANSFER_OUT, ... -> Other
+  PERSONAL_CARE: 'Personal Care',
+  BANK_FEES: 'Bank Fees',
+  GENERAL_SERVICES: 'Financial Services',
+  LOAN_PAYMENTS: 'Financial Services',
+  GOVERNMENT_AND_NON_PROFIT: 'Charity & Gifts',
+  TRANSFER_OUT: 'Personal Transfers',
+  // Anything else -> Other
 };
 
 /** The app category NAME a Plaid transaction should default to. */
