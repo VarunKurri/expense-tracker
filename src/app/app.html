@@ -161,7 +161,10 @@
           <input type="checkbox"
                  [ngModel]="rememberThisDevice()"
                  (ngModelChange)="rememberThisDevice.set($event)" />
-          <span>Remember this device (skip the passphrase here — use only on your own device)</span>
+          <span class="rd-text">
+            <span class="rd-title">Remember this device</span>
+            <span class="rd-sub">Skips the passphrase on this device. Only use on a device you trust.</span>
+          </span>
         </label>
       }
 
