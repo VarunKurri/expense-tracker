@@ -153,32 +153,56 @@
         }
       </div>
 
-      <label>
-        <span>Encryption passphrase</span>
-        <input class="input-field" type="password" autocomplete="current-password"
-               [ngModel]="encryptionPassphrase()"
-               (ngModelChange)="encryptionPassphrase.set($event)"
-               (keydown.enter)="unlockData()" />
-      </label>
-
-      @if (encryption.hasProfile()) {
-        <label class="remember-device">
-          <input type="checkbox"
-                 [ngModel]="rememberThisDevice()"
-                 (ngModelChange)="rememberThisDevice.set($event)" />
-          <span class="rd-text">
-            <span class="rd-title">Remember this device</span>
-            <span class="rd-sub">Skips the passphrase on this device. Only use on a device you trust.</span>
-          </span>
+      @if (!useRecoveryCode()) {
+        <label>
+          <span>Encryption passphrase</span>
+          <input class="input-field" type="password" autocomplete="current-password"
+                 [ngModel]="encryptionPassphrase()"
+                 (ngModelChange)="encryptionPassphrase.set($event)"
+                 (keydown.enter)="unlockData()" />
         </label>
-      }
 
-      <button class="auth-primary"
-              (click)="unlockData()"
-              [disabled]="signingIn() || encryption.busy() || encryption.hasProfile() === null || !!encryption.error()">
-        @if (signingIn() || encryption.busy()) { <div class="btn-spinner"></div> }
-        <span>{{ encryption.hasProfile() === false ? 'Create encrypted vault' : 'Unlock' }}</span>
-      </button>
+        @if (encryption.hasProfile()) {
+          <label class="remember-device">
+            <input type="checkbox"
+                   [ngModel]="rememberThisDevice()"
+                   (ngModelChange)="rememberThisDevice.set($event)" />
+            <span class="rd-text">
+              <span class="rd-title">Remember this device</span>
+              <span class="rd-sub">Skips the passphrase on this device. Only use on a device you trust.</span>
+            </span>
+          </label>
+        }
+
+        <button class="auth-primary"
+                (click)="unlockData()"
+                [disabled]="signingIn() || encryption.busy() || encryption.hasProfile() === null || !!encryption.error()">
+          @if (signingIn() || encryption.busy()) { <div class="btn-spinner"></div> }
+          <span>{{ encryption.hasProfile() === false ? 'Create encrypted vault' : 'Unlock' }}</span>
+        </button>
+
+        @if (encryption.hasProfile() && encryption.hasRecoveryCode()) {
+          <button class="text-btn" type="button" (click)="useRecoveryCode.set(true)">Forgot passphrase? Use recovery code</button>
+        }
+      } @else {
+        <label>
+          <span>Recovery code</span>
+          <input class="input-field" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+                 [ngModel]="recoveryCodeInput()"
+                 (ngModelChange)="recoveryCodeInput.set($event)"
+                 (keydown.enter)="unlockWithRecoveryCode()" />
+        </label>
+
+        <button class="auth-primary"
+                (click)="unlockWithRecoveryCode()"
+                [disabled]="signingIn() || encryption.busy() || !recoveryCodeInput().trim()">
+          @if (signingIn() || encryption.busy()) { <div class="btn-spinner"></div> }
+          <span>Unlock with recovery code</span>
+        </button>
+
+        <button class="text-btn" type="button" (click)="useRecoveryCode.set(false)">Back to passphrase</button>
+      }
 
       <p class="login-disclaimer">
         Password reset restores account login only. It cannot recover a forgotten encryption passphrase.

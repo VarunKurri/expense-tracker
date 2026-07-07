@@ -143,3 +143,41 @@
 
 .settings-row .btn { cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .settings-row .btn:disabled { opacity: 0.55; cursor: default; }
+
+.settings-label .pill {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.settings-label .pill.on { background: var(--green-bg, rgba(0,214,79,0.15)); color: var(--green); }
+
+.recovery-intro {
+  font-size: 13px;
+  color: var(--fg-3);
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+.recovery-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  text-align: center;
+  color: var(--fg);
+  background: var(--surface-hi);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 12px;
+  word-break: break-all;
+  user-select: all;
+}
+.recovery-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  .btn { cursor: pointer; }
+}

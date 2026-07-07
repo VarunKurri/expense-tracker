@@ -6,6 +6,8 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  updateDoc,
+  deleteField,
   writeBatch,
   DocumentData,
 } from 'firebase/firestore';
@@ -41,7 +43,18 @@ interface KeyMeta {
   wrappedPrivateKeyIv: string; // base64
   version: number;
   createdAt: number;
+  recovery?: RecoveryRecord; // master key wrapped under a recovery-code-derived key
 }
+
+// A recovery code wraps the master key so a forgotten passphrase isn't data loss.
+interface RecoveryRecord {
+  wrappedMasterKey: string; // base64
+  iv: string; // base64
+  salt: string; // base64 — PBKDF2 salt for deriving the KEK from the code
+  createdAt: number;
+}
+
+const RECOVERY_ITERATIONS = 200_000;
 
 const ENCRYPTION_VERSION = 1;
 const VERIFIER_TEXT = 'trackr-encryption-verifier-v1';
@@ -58,10 +71,14 @@ export class EncryptionService {
   error = signal<string | null>(null);
   hasProfile = signal<boolean | null>(null);
   deviceRemembered = signal(false); // this device holds the key locally (auto-unlock)
+  hasRecoveryCode = signal(false);  // a recovery code is set for this account
   userReady = computed(() => !!this.auth.user() && this.unlocked());
 
   private key: CryptoKey | null = null;
   private salt: Uint8Array | null = null;
+  // Raw master-key bytes, held while unlocked via passphrase so a recovery code can
+  // wrap them. Null when unlocked from a stored device key (which is non-extractable).
+  private masterKeyRaw: Uint8Array | null = null;
   // RSA private key (decrypt-only) for reading server-written envelope docs.
   private privateKey: CryptoKey | null = null;
 
@@ -77,6 +94,8 @@ export class EncryptionService {
       const snap = await getDoc(doc(this.db, `users/${user.uid}/meta/encryption`));
       this.hasProfile.set(snap.exists());
       this.deviceRemembered.set(!!(await getDeviceKey(user.uid)));
+      const keysSnap = await getDoc(doc(this.db, `users/${user.uid}/meta/keys`));
+      this.hasRecoveryCode.set(!!(keysSnap.data() as KeyMeta | undefined)?.recovery);
     } catch (err: any) {
       const message = this.friendlyEncryptionError(err);
       this.error.set(message);
@@ -100,7 +119,7 @@ export class EncryptionService {
 
       if (!metaSnap.exists()) {
         const salt = crypto.getRandomValues(new Uint8Array(16));
-        const key = await this.deriveKey(passphrase, salt);
+        const { key, raw } = await this.deriveMasterKey(passphrase, salt);
         const verifier = await this.encryptStringWithKey(VERIFIER_TEXT, key);
         const meta: EncryptionMeta = {
           salt: this.bytesToBase64(salt),
@@ -112,6 +131,7 @@ export class EncryptionService {
         await setDoc(metaRef, meta);
         this.salt = salt;
         this.key = key;
+        this.masterKeyRaw = raw;
         this.hasProfile.set(true);
         await this.ensureKeypair();
         this.unlocked.set(true);
@@ -120,13 +140,14 @@ export class EncryptionService {
 
       const meta = metaSnap.data() as EncryptionMeta;
       const salt = this.base64ToBytes(meta.salt);
-      const key = await this.deriveKey(passphrase, salt);
+      const { key, raw } = await this.deriveMasterKey(passphrase, salt);
       const verifier = await this.decryptStringWithKey(meta.verifier, meta.verifierIv, key);
       if (verifier !== VERIFIER_TEXT) {
         throw new Error('Encryption passphrase is incorrect.');
       }
       this.salt = salt;
       this.key = key;
+      this.masterKeyRaw = raw;
       this.hasProfile.set(true);
       await this.ensureKeypair();
       this.unlocked.set(true);
@@ -143,10 +164,97 @@ export class EncryptionService {
   lock() {
     this.key = null;
     this.salt = null;
+    this.masterKeyRaw = null;
     this.privateKey = null;
     this.unlocked.set(false);
     this.error.set(null);
     // deviceRemembered reflects stored state, not session state — leave it.
+  }
+
+  /**
+   * Create (or replace) a recovery code: generate a high-entropy code, wrap the master
+   * key under a key derived from it, and store the wrapped key. Returns the code to show
+   * ONCE — it isn't stored, so it can't be shown again. Requires a passphrase-unlocked
+   * session (needs the raw master key).
+   */
+  async createRecoveryCode(): Promise<string> {
+    const user = this.auth.user();
+    if (!user) throw new Error('Not signed in');
+    if (!this.masterKeyRaw) {
+      throw new Error('Unlock with your passphrase (not a remembered device) to create a recovery code.');
+    }
+    const code = this.generateRecoveryCode();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const kek = await this.deriveKekFromCode(code, salt);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const wrapped = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, kek, this.masterKeyRaw as BufferSource);
+    const record: RecoveryRecord = {
+      wrappedMasterKey: this.bytesToBase64(new Uint8Array(wrapped)),
+      iv: this.bytesToBase64(iv),
+      salt: this.bytesToBase64(salt),
+      createdAt: Date.now(),
+    };
+    await setDoc(doc(this.db, `users/${user.uid}/meta/keys`), { recovery: record }, { merge: true });
+    this.hasRecoveryCode.set(true);
+    return code;
+  }
+
+  /** Remove the recovery code. Passphrase unlock is unaffected. */
+  async removeRecoveryCode() {
+    const user = this.auth.user();
+    if (!user) return;
+    await updateDoc(doc(this.db, `users/${user.uid}/meta/keys`), { recovery: deleteField() });
+    this.hasRecoveryCode.set(false);
+  }
+
+  /** Unlock with the recovery code (for a forgotten passphrase). */
+  async unlockWithRecoveryCode(code: string) {
+    const user = this.auth.user();
+    if (!user) throw new Error('Not signed in');
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      const keysSnap = await getDoc(doc(this.db, `users/${user.uid}/meta/keys`));
+      const record = (keysSnap.data() as KeyMeta | undefined)?.recovery;
+      if (!record) throw new Error('No recovery code is set for this account.');
+      const kek = await this.deriveKekFromCode(this.normalizeCode(code), this.base64ToBytes(record.salt));
+      let raw: ArrayBuffer;
+      try {
+        raw = await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: this.base64ToBytes(record.iv) as BufferSource },
+          kek,
+          this.base64ToBytes(record.wrappedMasterKey) as BufferSource,
+        );
+      } catch {
+        throw new Error('That recovery code is not correct.');
+      }
+      await this.unlockWithMasterKey(new Uint8Array(raw));
+    } catch (err: any) {
+      this.lock();
+      const message = err?.message || 'Recovery failed.';
+      this.error.set(message);
+      throw new Error(message);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Open the vault from raw master-key bytes, verifying against the stored verifier. */
+  private async unlockWithMasterKey(raw: Uint8Array) {
+    const user = this.auth.user();
+    if (!user) throw new Error('Not signed in');
+    const metaSnap = await getDoc(doc(this.db, `users/${user.uid}/meta/encryption`));
+    if (!metaSnap.exists()) throw new Error('No encrypted vault found.');
+    const meta = metaSnap.data() as EncryptionMeta;
+    const key = await crypto.subtle.importKey('raw', raw as BufferSource, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    const verifier = await this.decryptStringWithKey(meta.verifier, meta.verifierIv, key);
+    if (verifier !== VERIFIER_TEXT) throw new Error('Recovered key does not match this vault.');
+    this.salt = this.base64ToBytes(meta.salt);
+    this.key = key;
+    this.masterKeyRaw = raw;
+    this.hasProfile.set(true);
+    await this.ensureKeypair();
+    this.unlocked.set(true);
   }
 
   /**
@@ -389,16 +497,61 @@ export class EncryptionService {
     return metadata;
   }
 
-  private async deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+  // Derive the master key from the passphrase, returning both the AES-GCM CryptoKey
+  // and the raw bytes (kept so a recovery code can wrap them). Same 256-bit PBKDF2
+  // output as before, so existing data still decrypts.
+  private async deriveMasterKey(passphrase: string, salt: Uint8Array): Promise<{ key: CryptoKey; raw: Uint8Array }> {
     const material = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(passphrase),
       'PBKDF2',
       false,
+      ['deriveBits']
+    );
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt: salt as BufferSource, iterations: 250000, hash: 'SHA-256' },
+      material,
+      256
+    );
+    const raw = new Uint8Array(bits);
+    const key = await crypto.subtle.importKey('raw', raw as BufferSource, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    return { key, raw };
+  }
+
+  // --- Recovery code helpers ---
+
+  /** A 24-char code from 15 random bytes, grouped for readability (Crockford-ish base32). */
+  private generateRecoveryCode(): string {
+    const bytes = crypto.getRandomValues(new Uint8Array(15));
+    const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // Crockford base32 (32 chars, no I/L/O/U)
+    let bitBuffer = 0, bits = 0, out = '';
+    for (const b of bytes) {
+      bitBuffer = (bitBuffer << 8) | b;
+      bits += 8;
+      while (bits >= 5) {
+        bits -= 5;
+        out += alphabet[(bitBuffer >> bits) & 31];
+      }
+    }
+    return (out.match(/.{1,4}/g) || [out]).join('-'); // XXXX-XXXX-...
+  }
+
+  /** Strip formatting/case so a re-typed code matches. */
+  private normalizeCode(code: string): string {
+    return code.replace(/[^a-z0-9]/gi, '').toUpperCase();
+  }
+
+  /** PBKDF2 a recovery code into an AES-GCM key-encryption-key. */
+  private async deriveKekFromCode(code: string, salt: Uint8Array): Promise<CryptoKey> {
+    const material = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(this.normalizeCode(code)),
+      'PBKDF2',
+      false,
       ['deriveKey']
     );
     return crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt: salt as BufferSource, iterations: 250000, hash: 'SHA-256' },
+      { name: 'PBKDF2', salt: salt as BufferSource, iterations: RECOVERY_ITERATIONS, hash: 'SHA-256' },
       material,
       { name: 'AES-GCM', length: 256 },
       false,

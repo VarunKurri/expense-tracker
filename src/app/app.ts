@@ -74,6 +74,8 @@ export class App {
   displayName = signal('');
   encryptionPassphrase = signal('');
   rememberThisDevice = signal(false);
+  useRecoveryCode = signal(false);
+  recoveryCodeInput = signal('');
 
   // Show a neutral boot splash until auth resolves and (if this device is
   // remembered) the auto-unlock attempt finishes — avoids flashing login/unlock.
@@ -590,6 +592,24 @@ export class App {
       this.toastService.success('Encrypted data unlocked.');
     } catch (err: any) {
       this.toastService.error(err?.message || 'Could not unlock encrypted data.');
+    } finally {
+      this.signingIn.set(false);
+    }
+  }
+
+  async unlockWithRecoveryCode() {
+    if (this.signingIn()) return;
+    this.signingIn.set(true);
+    try {
+      await this.encryption.unlockWithRecoveryCode(this.recoveryCodeInput());
+      this.recoveryCodeInput.set('');
+      this.useRecoveryCode.set(false);
+      if (this.rememberThisDevice()) {
+        await this.encryption.rememberDevice().catch(() => {});
+      }
+      this.toastService.success('Unlocked with recovery code. Consider setting a new recovery code in Settings.');
+    } catch (err: any) {
+      this.toastService.error(err?.message || 'Recovery failed.');
     } finally {
       this.signingIn.set(false);
     }

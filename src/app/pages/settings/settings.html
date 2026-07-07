@@ -38,6 +38,26 @@
           <div class="settings-arrow">{{ busy() ? '…' : '›' }}</div>
         </div>
       }
+
+      <div class="settings-row static">
+        <div class="settings-icon">🆘</div>
+        <div class="settings-info">
+          <div class="settings-label">
+            Recovery code
+            @if (encryption.hasRecoveryCode()) { <span class="pill on">Set</span> }
+          </div>
+          <div class="settings-sub">
+            @if (encryption.hasRecoveryCode()) {
+              Unlocks your data if you forget the passphrase. Regenerate to replace it.
+            } @else {
+              A one-time code that can unlock your data if you forget the passphrase.
+            }
+          </div>
+        </div>
+        <button class="btn" [disabled]="busy()" (click)="createRecoveryCode()">
+          {{ encryption.hasRecoveryCode() ? 'Regenerate' : 'Create' }}
+        </button>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -79,3 +99,19 @@
     </div>
   </div>
 </div>
+
+<app-modal
+  [open]="recoveryModalOpen()"
+  title="Save your recovery code"
+  size="sm"
+  (closed)="closeRecoveryModal()">
+  <p class="recovery-intro">
+    Store this somewhere safe (a password manager). It's shown <strong>only once</strong> and is the
+    only way to unlock your data if you forget your passphrase. We can't recover it for you.
+  </p>
+  <div class="recovery-code">{{ generatedCode() }}</div>
+  <div class="recovery-actions">
+    <button class="btn" (click)="copyRecoveryCode()">Copy</button>
+    <button class="btn primary" (click)="closeRecoveryModal()">I've saved it</button>
+  </div>
+</app-modal>
