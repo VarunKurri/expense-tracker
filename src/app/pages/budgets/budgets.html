@@ -44,8 +44,11 @@
       @for (b of orphanedBudgets(); track b.id) {
         <div class="orphan-row">
           <div class="orphan-info">
-            <span class="orphan-amount">{{ formatCurrencyFull(b.amount) }}/mo</span>
-            <span class="orphan-tag">{{ b.isDefault ? 'every month' : b.month }}</span>
+            <div class="orphan-top">
+              <span class="orphan-amount">{{ formatCurrencyFull(b.amount) }}/mo</span>
+              <span class="orphan-tag">{{ b.isDefault ? 'every month' : b.month }}</span>
+            </div>
+            <span class="orphan-sub">Original category was deleted — name unavailable · set on {{ formatShortDate(b.createdAt) }}</span>
           </div>
           <div class="orphan-actions">
             <select class="input-field"

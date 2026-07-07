@@ -208,6 +208,11 @@ export class Budgets {
     }).format(Math.abs(n));
   }
 
+  formatShortDate(ts: number): string {
+    if (!ts) return 'unknown date';
+    return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
   isCurrentMonth(month: string): boolean {
     return month === this.currentMonth;
   }

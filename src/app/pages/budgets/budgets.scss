@@ -406,11 +406,13 @@
 
 .orphan-info {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 3px;
 
+  .orphan-top { display: flex; align-items: center; gap: 10px; }
   .orphan-amount { font-weight: 600; font-size: 14px; color: var(--fg); }
   .orphan-tag { font-size: 12px; color: var(--fg-3); }
+  .orphan-sub { font-size: 11.5px; color: var(--fg-3); }
 }
 
 .orphan-actions {
