@@ -212,9 +212,10 @@ Sync uses a **zero-knowledge** model so automatic background sync never weakens 
   - Done when: at sync time a Plaid transaction that matches an existing manual entry (same date and amount, similar merchant) is merged — preserving the user's category and notes and attaching the Plaid id — instead of inserted as a second row; ambiguous matches are flagged for the user rather than silently merged.
   - Verified: `ReconciliationService` matches client-side (same type + exact amount + dates within 3 days, only when exactly one manual candidate qualifies); merge keeps the manual entry and its data, links it (`plaidTransactionId`/item/account), and deletes the duplicate bank row; `cleanupReconciled` runs after sync to drop re-synced duplicates; "keep both" persists to `meta/reconcileIgnore`. A review modal shows each pair side-by-side with per-row Merge / Keep both plus Merge all, surfaced by a banner on the Transactions page. Confirmed in sandbox with a manual entry mirroring a synced transaction.
 
-- [ ] Make the initial transaction history window configurable.
+- [x] Make the initial transaction history window configurable.
   - Why: the first pull should fetch a sensible amount of history; Plaid defaults to ~90 days and supports up to 730 (24 months), not the full account lifetime.
   - Done when: `createLinkToken` sets `transactions.days_requested` from a config value (documented in `.env`), adjustable without code changes.
+  - Verified: reworked into a per-link user choice — the Connect flow shows a "Connect a bank" modal with presets (30d / 90d / 6mo / 1yr / 2yr) plus a custom start date (converted to days-back, capped at Plaid's 730). `PlaidService.connectBank(daysRequested)` passes it to `createLinkToken`, which clamps to 1..730 and sets `transactions.days_requested` (default 90). Note: sync is always "up to now" (Plaid has no end-date), so a single how-far-back control is the correct model rather than a min/max range.
 
 - [x] Add auto-categorization from Plaid categories with manual override.
   - Why: imported transactions should land in the user's existing categories instead of an unrelated taxonomy.
