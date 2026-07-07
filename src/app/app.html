@@ -156,6 +156,15 @@
                (keydown.enter)="unlockData()" />
       </label>
 
+      @if (encryption.hasProfile()) {
+        <label class="remember-device">
+          <input type="checkbox"
+                 [ngModel]="rememberThisDevice()"
+                 (ngModelChange)="rememberThisDevice.set($event)" />
+          <span>Remember this device (skip the passphrase here — use only on your own device)</span>
+        </label>
+      }
+
       <button class="auth-primary"
               (click)="unlockData()"
               [disabled]="signingIn() || encryption.busy() || encryption.hasProfile() === null || !!encryption.error()">

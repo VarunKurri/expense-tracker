@@ -10,6 +10,7 @@ import {
   DocumentData,
 } from 'firebase/firestore';
 import { AuthService } from './auth.service';
+import { putDeviceKey, getDeviceKey, deleteDeviceKey } from '../utils/device-key-store';
 
 export interface EncryptedDocument {
   __encrypted: true;
@@ -55,6 +56,7 @@ export class EncryptionService {
   busy = signal(false);
   error = signal<string | null>(null);
   hasProfile = signal<boolean | null>(null);
+  deviceRemembered = signal(false); // this device holds the key locally (auto-unlock)
   userReady = computed(() => !!this.auth.user() && this.unlocked());
 
   private key: CryptoKey | null = null;
@@ -73,6 +75,7 @@ export class EncryptionService {
     try {
       const snap = await getDoc(doc(this.db, `users/${user.uid}/meta/encryption`));
       this.hasProfile.set(snap.exists());
+      this.deviceRemembered.set(!!(await getDeviceKey(user.uid)));
     } catch (err: any) {
       const message = this.friendlyEncryptionError(err);
       this.error.set(message);
@@ -142,6 +145,62 @@ export class EncryptionService {
     this.privateKey = null;
     this.unlocked.set(false);
     this.error.set(null);
+    // deviceRemembered reflects stored state, not session state — leave it.
+  }
+
+  /**
+   * "Remember this device": store the master key locally (non-extractable) so this
+   * device can auto-unlock without the passphrase. Only call while unlocked.
+   */
+  async rememberDevice() {
+    const user = this.auth.user();
+    if (!user || !this.key) throw new Error('Unlock first to remember this device.');
+    await putDeviceKey(user.uid, this.key);
+    this.deviceRemembered.set(true);
+  }
+
+  /** Forget this device — clears the locally stored key. Passphrase unlock still works. */
+  async forgetDevice() {
+    const user = this.auth.user();
+    if (!user) return;
+    await deleteDeviceKey(user.uid);
+    this.deviceRemembered.set(false);
+  }
+
+  /**
+   * Auto-unlock from a locally remembered key, if present. Returns whether it unlocked.
+   * A stale/invalid stored key (e.g. after a passphrase change) is cleared and we fall
+   * back to the passphrase.
+   */
+  async tryUnlockFromDevice(): Promise<boolean> {
+    const user = this.auth.user();
+    if (!user || this.unlocked()) return false;
+    try {
+      const key = await getDeviceKey(user.uid);
+      if (!key) return false;
+      await this.unlockWithKey(key);
+      return true;
+    } catch (err) {
+      console.warn('Device auto-unlock failed; clearing remembered key.', err);
+      await this.forgetDevice();
+      return false;
+    }
+  }
+
+  /** Open the vault from a stored CryptoKey, verifying it against the stored verifier. */
+  private async unlockWithKey(key: CryptoKey) {
+    const user = this.auth.user();
+    if (!user) throw new Error('Not signed in');
+    const metaSnap = await getDoc(doc(this.db, `users/${user.uid}/meta/encryption`));
+    if (!metaSnap.exists()) throw new Error('No encrypted vault found.');
+    const meta = metaSnap.data() as EncryptionMeta;
+    const verifier = await this.decryptStringWithKey(meta.verifier, meta.verifierIv, key);
+    if (verifier !== VERIFIER_TEXT) throw new Error('Stored device key no longer matches this vault.');
+    this.salt = this.base64ToBytes(meta.salt);
+    this.key = key;
+    this.hasProfile.set(true);
+    await this.ensureKeypair();
+    this.unlocked.set(true);
   }
 
   async encryptForWrite<T extends Record<string, any>>(data: T): Promise<EncryptedDocument> {

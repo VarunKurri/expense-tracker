@@ -73,6 +73,7 @@ export class App {
   password = signal('');
   displayName = signal('');
   encryptionPassphrase = signal('');
+  rememberThisDevice = signal(false);
   commandPaletteOpen = signal(false);
   commandQuery = signal('');
   activeCommandIndex = signal(0);
@@ -176,9 +177,11 @@ export class App {
     effect(() => {
       const user = this.auth.user();
       if (user) {
-        this.encryption.refreshProfileState().catch(err => {
-          this.toastService.error(err?.message || 'Could not check encrypted data access.');
-        });
+        this.encryption.refreshProfileState()
+          .then(() => this.encryption.tryUnlockFromDevice())
+          .catch(err => {
+            this.toastService.error(err?.message || 'Could not check encrypted data access.');
+          });
       } else {
         this.encryption.lock();
       }
@@ -571,6 +574,10 @@ export class App {
     try {
       await this.encryption.unlock(this.encryptionPassphrase());
       this.encryptionPassphrase.set('');
+      if (this.rememberThisDevice()) {
+        await this.encryption.rememberDevice().catch(() =>
+          this.toastService.error('Unlocked, but could not remember this device.'));
+      }
       this.toastService.success('Encrypted data unlocked.');
     } catch (err: any) {
       this.toastService.error(err?.message || 'Could not unlock encrypted data.');

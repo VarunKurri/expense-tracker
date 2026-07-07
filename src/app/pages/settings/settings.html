@@ -18,6 +18,29 @@
     </div>
 
     <div class="settings-section">
+      <div class="settings-section-title">Security</div>
+      @if (encryption.deviceRemembered()) {
+        <div class="settings-row static">
+          <div class="settings-icon">💻</div>
+          <div class="settings-info">
+            <div class="settings-label">This device is remembered</div>
+            <div class="settings-sub">It skips the passphrase automatically. Anyone with access to this browser profile can open your data — forget it on shared devices.</div>
+          </div>
+          <button class="text-btn danger" [disabled]="busy()" (click)="forgetDevice()">Forget</button>
+        </div>
+      } @else {
+        <div class="settings-row" (click)="rememberDevice()">
+          <div class="settings-icon">💻</div>
+          <div class="settings-info">
+            <div class="settings-label">Remember this device</div>
+            <div class="settings-sub">Skip the passphrase on this device. Use only on your own trusted device.</div>
+          </div>
+          <div class="settings-arrow">{{ busy() ? '…' : '›' }}</div>
+        </div>
+      }
+    </div>
+
+    <div class="settings-section">
       <div class="settings-section-title">Keyboard shortcuts</div>
       <div class="shortcut-panel">
         <div class="shortcut-row">
