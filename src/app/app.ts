@@ -255,12 +255,26 @@ export class App {
 
   openAuth(mode: 'signin' | 'signup') {
     this.authMode.set(mode);
+    this.password.set('');
     this.showAuth.set(true);
+  }
+
+  /**
+   * Switch between sign in / sign up / reset within the same session. Email is
+   * intentionally kept (so a failed sign-in flows into "Forgot password?" with
+   * the address already there); the password is always cleared — carrying a
+   * typed password across modes, or across a logout, is the security issue we
+   * want to avoid.
+   */
+  switchAuthMode(mode: 'signin' | 'signup' | 'reset') {
+    this.authMode.set(mode);
+    this.password.set('');
   }
 
   backToLanding() {
     this.showAuth.set(false);
     this.authMode.set('signin');
+    this.password.set('');
   }
 
   onNavClick() {
@@ -660,6 +674,15 @@ export class App {
   signOut() {
     this.encryption.lock();
     this.auth.signOut();
+    // Clear every sensitive auth-form field so the next visit to sign in/up/reset
+    // never shows a previous session's email, password, or passphrase.
+    this.email.set('');
+    this.password.set('');
+    this.displayName.set('');
+    this.encryptionPassphrase.set('');
+    this.recoveryCodeInput.set('');
+    this.useRecoveryCode.set(false);
+    this.authMode.set('signin');
   }
   toggleSidebar() { this.sidebarOpen.update(v => !v); }
 }

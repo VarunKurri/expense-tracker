@@ -204,10 +204,10 @@
 
         <div class="auth-switches">
           @if (authMode() === 'signin') {
-            <button type="button" (click)="authMode.set('signup')">Create account</button>
-            <button type="button" (click)="authMode.set('reset')">Forgot password?</button>
+            <button type="button" (click)="switchAuthMode('signup')">Create account</button>
+            <button type="button" (click)="switchAuthMode('reset')">Forgot password?</button>
           } @else {
-            <button type="button" (click)="authMode.set('signin')">Back to sign in</button>
+            <button type="button" (click)="switchAuthMode('signin')">Back to sign in</button>
           }
           <button type="button" (click)="backToLanding()">← Back to overview</button>
         </div>
