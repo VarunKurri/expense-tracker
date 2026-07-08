@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { EncryptionService } from '../../services/encryption.service';
 import { BackupService } from '../../services/backup.service';
+import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { Modal } from '../../components/modal/modal';
 
@@ -18,8 +19,16 @@ export class Settings {
   private router = inject(Router);
   encryption = inject(EncryptionService);
   private backup = inject(BackupService);
+  auth = inject(AuthService);
   private toast = inject(ToastService);
   busy = signal(false);
+
+  // Change email (password-provider accounts only): reauthenticate with the
+  // current password, then Firebase emails a confirmation link to the new
+  // address — nothing changes until that link is clicked.
+  changeEmailModalOpen = signal(false);
+  changeEmailPassword = signal('');
+  changeEmailNew = signal('');
 
   // Recovery code shown once after generation.
   recoveryModalOpen = signal(false);
@@ -137,6 +146,37 @@ export class Settings {
       this.toast.success('This device will ask for the passphrase again.');
     } catch (err: any) {
       this.toast.error(err?.message || 'Could not forget this device.');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  openChangeEmail() {
+    this.changeEmailPassword.set('');
+    this.changeEmailNew.set('');
+    this.changeEmailModalOpen.set(true);
+  }
+
+  closeChangeEmail() {
+    this.changeEmailModalOpen.set(false);
+    this.changeEmailPassword.set('');
+    this.changeEmailNew.set('');
+  }
+
+  async submitChangeEmail() {
+    if (this.busy()) return;
+    const newEmail = this.changeEmailNew().trim();
+    if (!newEmail || !this.changeEmailPassword()) {
+      this.toast.error('Enter your current password and the new email.');
+      return;
+    }
+    this.busy.set(true);
+    try {
+      await this.auth.changeEmail(this.changeEmailPassword(), newEmail);
+      this.toast.success(`Confirmation link sent to ${newEmail}. Click it to finish the change.`);
+      this.closeChangeEmail();
+    } catch (err: any) {
+      this.toast.error(err?.message || 'Could not change your email.');
     } finally {
       this.busy.set(false);
     }

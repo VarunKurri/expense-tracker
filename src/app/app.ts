@@ -113,6 +113,16 @@ export class App {
   commandQuery = signal('');
   activeCommandIndex = signal(0);
 
+  // Soft, non-blocking email-verification reminder. Dismissed for the current
+  // session only — a still-unverified address prompts again next sign-in rather
+  // than nagging forever silently.
+  verifyBannerDismissed = signal(false);
+  verifySending = signal(false);
+  verifyChecking = signal(false);
+  showVerifyBanner = computed(() =>
+    !this.auth.isEmailVerified() && !this.verifyBannerDismissed()
+  );
+
   nav = computed((): NavItem[] => [
     { path: '/dashboard',    label: 'Home',         iconName: 'home' },
     { path: '/accounts',     label: 'Accounts',     iconName: 'accounts' },
@@ -671,9 +681,44 @@ export class App {
     }
   }
 
+  async resendVerificationEmail() {
+    if (this.verifySending()) return;
+    this.verifySending.set(true);
+    try {
+      await this.auth.sendVerificationEmail();
+      this.toastService.success('Verification email sent. Check your inbox (and spam folder).');
+    } catch (err: any) {
+      this.toastService.error(err?.message || 'Could not send the verification email.');
+    } finally {
+      this.verifySending.set(false);
+    }
+  }
+
+  async checkVerifiedNow() {
+    if (this.verifyChecking()) return;
+    this.verifyChecking.set(true);
+    try {
+      const verified = await this.auth.refreshEmailVerified();
+      if (verified) {
+        this.toastService.success('Email verified. Thanks!');
+      } else {
+        this.toastService.info('Not verified yet — click the link in the email first.');
+      }
+    } catch (err: any) {
+      this.toastService.error(err?.message || 'Could not check verification status.');
+    } finally {
+      this.verifyChecking.set(false);
+    }
+  }
+
+  dismissVerifyBanner() {
+    this.verifyBannerDismissed.set(true);
+  }
+
   signOut() {
     this.encryption.lock();
     this.auth.signOut();
+    this.verifyBannerDismissed.set(false);
     // Clear every sensitive auth-form field so the next visit to sign in/up/reset
     // never shows a previous session's email, password, or passphrase.
     this.email.set('');

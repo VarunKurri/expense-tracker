@@ -394,6 +394,23 @@
         </div>
       </header>
 
+      @if (showVerifyBanner()) {
+        <div class="verify-banner">
+          <span class="verify-banner-text">
+            📧 Verify your email address to help keep your account recoverable.
+          </span>
+          <div class="verify-banner-actions">
+            <button class="btn sm" [disabled]="verifySending()" (click)="resendVerificationEmail()">
+              {{ verifySending() ? 'Sending…' : 'Resend email' }}
+            </button>
+            <button class="btn sm ghost" [disabled]="verifyChecking()" (click)="checkVerifiedNow()">
+              {{ verifyChecking() ? 'Checking…' : "I've verified" }}
+            </button>
+            <button class="verify-banner-dismiss" (click)="dismissVerifyBanner()" title="Dismiss">✕</button>
+          </div>
+        </div>
+      }
+
       <main class="main">
         <router-outlet />
       </main>

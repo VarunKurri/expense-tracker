@@ -6,6 +6,35 @@
 
   <div class="settings-list">
     <div class="settings-section">
+      <div class="settings-section-title">Account</div>
+      <div class="settings-row static">
+        <div class="settings-icon">✉️</div>
+        <div class="settings-info">
+          <div class="settings-label">
+            {{ auth.user()?.email }}
+            @if (auth.hasPasswordProvider()) {
+              @if (auth.isEmailVerified()) {
+                <span class="pill on">Verified</span>
+              } @else {
+                <span class="pill warn">Unverified</span>
+              }
+            }
+          </div>
+          <div class="settings-sub">
+            @if (auth.hasPasswordProvider()) {
+              Sign in email and password.
+            } @else {
+              Managed by your Google account.
+            }
+          </div>
+        </div>
+        @if (auth.hasPasswordProvider()) {
+          <button class="btn" (click)="openChangeEmail()">Change</button>
+        }
+      </div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-section-title">Data</div>
       <div class="settings-row" (click)="navigate('/import')">
         <div class="settings-icon">📥</div>
@@ -150,6 +179,35 @@
     <button class="btn" (click)="exportModalOpen.set(false)">Cancel</button>
     <button class="btn primary" [disabled]="busy() || exportPassword().length < 8" (click)="exportBackup()">
       {{ busy() ? 'Exporting…' : 'Download backup' }}
+    </button>
+  </div>
+</app-modal>
+
+<app-modal
+  [open]="changeEmailModalOpen()"
+  title="Change email"
+  size="sm"
+  (closed)="closeChangeEmail()">
+  <p class="recovery-intro">
+    Confirm your current password, then enter the new address. We'll email a confirmation
+    link there — your sign-in email only changes once you click it.
+  </p>
+  <label class="modal-field">
+    <span>Current password</span>
+    <input class="input-field" type="password" autocomplete="current-password"
+           [ngModel]="changeEmailPassword()" (ngModelChange)="changeEmailPassword.set($event)" />
+  </label>
+  <label class="modal-field">
+    <span>New email</span>
+    <input class="input-field" type="email" autocomplete="email"
+           [ngModel]="changeEmailNew()" (ngModelChange)="changeEmailNew.set($event)" />
+  </label>
+  <div class="recovery-actions">
+    <button class="btn" (click)="closeChangeEmail()">Cancel</button>
+    <button class="btn primary"
+            [disabled]="busy() || !changeEmailPassword() || !changeEmailNew()"
+            (click)="submitChangeEmail()">
+      {{ busy() ? 'Sending…' : 'Send confirmation link' }}
     </button>
   </div>
 </app-modal>

@@ -153,6 +153,7 @@
   vertical-align: middle;
 }
 .settings-label .pill.on { background: var(--green-bg, rgba(0,214,79,0.15)); color: var(--green); }
+.settings-label .pill.warn { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
 
 .recovery-intro {
   font-size: 13px;

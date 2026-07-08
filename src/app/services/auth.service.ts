@@ -1,10 +1,11 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, computed } from '@angular/core';
 import {
   Auth, GoogleAuthProvider,
   signInWithPopup, signInWithRedirect, getRedirectResult,
   signOut, user, createUserWithEmailAndPassword,
   signInWithEmailAndPassword, sendPasswordResetEmail,
-  updateProfile
+  updateProfile, sendEmailVerification, reload,
+  EmailAuthProvider, reauthenticateWithCredential, verifyBeforeUpdateEmail,
 } from '@angular/fire/auth';
 import { toSignal } from '@angular/core/rxjs-interop';
 
@@ -16,11 +17,29 @@ export class AuthService {
   // splash instead of flashing the login page while the session is restoring).
   resolved = signal(false);
 
+  // Firebase's User object doesn't push emailVerified updates on its own — we
+  // have to call reload() and re-read it. This override lets the "I've verified"
+  // check flip the banner off immediately without waiting for a token refresh.
+  private emailVerifiedOverride = signal<boolean | null>(null);
+
+  hasPasswordProvider = computed(() =>
+    !!this.user()?.providerData.some(p => p.providerId === 'password')
+  );
+
+  // Google-linked accounts are verified by Google already, so this only ever
+  // gates password accounts with an unconfirmed address.
+  isEmailVerified = computed(() =>
+    this.emailVerifiedOverride() ?? this.user()?.emailVerified ?? true
+  );
+
   constructor() {
     const sub = user(this.auth).subscribe(() => {
       this.resolved.set(true);
       sub.unsubscribe();
     });
+    // A fresh user (sign-in, sign-out, or a different account) invalidates any
+    // previous override — start reading emailVerified from the user object again.
+    user(this.auth).subscribe(() => this.emailVerifiedOverride.set(null));
 
     // Pick up the result when returning from a redirect sign-in
     getRedirectResult(this.auth).catch(() => {
@@ -87,6 +106,45 @@ export class AuthService {
     return signOut(this.auth);
   }
 
+  async sendVerificationEmail() {
+    const current = this.auth.currentUser;
+    if (!current) throw new Error('Not signed in');
+    try {
+      await sendEmailVerification(current);
+    } catch (err) {
+      throw new Error(this.friendlyAuthError(err));
+    }
+  }
+
+  /** Re-fetch the user from Firebase and update isEmailVerified immediately. */
+  async refreshEmailVerified(): Promise<boolean> {
+    const current = this.auth.currentUser;
+    if (!current) return false;
+    await reload(current);
+    const verified = current.emailVerified;
+    this.emailVerifiedOverride.set(verified);
+    return verified;
+  }
+
+  /**
+   * Change the account email. Requires the current password to re-authenticate
+   * (Firebase rejects sensitive changes without a recent sign-in). Uses
+   * verifyBeforeUpdateEmail, so the address only takes effect once the user
+   * clicks the confirmation link sent to the NEW address — nothing changes here
+   * until then.
+   */
+  async changeEmail(currentPassword: string, newEmail: string) {
+    const current = this.auth.currentUser;
+    if (!current?.email) throw new Error('Not signed in');
+    try {
+      const credential = EmailAuthProvider.credential(current.email, currentPassword);
+      await reauthenticateWithCredential(current, credential);
+      await verifyBeforeUpdateEmail(current, newEmail.trim());
+    } catch (err) {
+      throw new Error(this.friendlyAuthError(err));
+    }
+  }
+
   friendlyAuthError(err: any): string {
     const code = err?.code || '';
     const map: Record<string, string> = {
@@ -100,6 +158,8 @@ export class AuthService {
       'auth/operation-not-allowed': 'Email/password sign-up is not enabled for this app. Use Google sign-in, or enable it in Firebase.',
       'auth/too-many-requests': 'Too many attempts. Please wait and try again.',
       'auth/network-request-failed': 'Network error. Check your connection and try again.',
+      'auth/requires-recent-login': 'For your security, please sign in again before changing this.',
+      'auth/operation-not-allowed-for-verified-email': 'This email is already verified.',
     };
     return map[code] || `Authentication failed${code ? ` (${code})` : ''}. Please try again.`;
   }

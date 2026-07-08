@@ -5,6 +5,8 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
 ## Recently Completed
 
 - [x] Add Firebase Auth with Google, email/password sign-in, sign-up, and password reset.
+- [x] Add email verification (soft reminder banner, resend + "I've verified") and self-service email change (reauth + confirm-link) for password accounts.
+  - Verified: `AuthService` adds `isEmailVerified`/`hasPasswordProvider` (Google accounts are always verified) and `sendVerificationEmail`/`refreshEmailVerified`/`changeEmail` (reauthenticate, then `verifyBeforeUpdateEmail` so the address only changes once the confirmation link is clicked). A dismissible banner (non-blocking) prompts unverified password accounts to verify; Settings → Account shows the email + Verified/Unverified pill and a Change action for password accounts. `ng build` passes.
 - [x] Add client-side encryption unlock flow for finance records.
 - [x] Add Firestore rules so users can only access `users/{uid}` data.
 - [x] Encrypt accounts, transactions, categories, bills, and budgets before writing to Firestore.
