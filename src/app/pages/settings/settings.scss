@@ -190,3 +190,26 @@
 
   span { font-size: 12px; font-weight: 600; color: var(--fg-3); }
 }
+
+.file-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  .file-btn {
+    cursor: pointer;
+    flex-shrink: 0;
+    margin: 0;
+  }
+
+  .file-name {
+    font-size: 13px;
+    color: var(--fg-4, var(--fg-3));
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+
+    &.chosen { color: var(--fg); }
+  }
+}

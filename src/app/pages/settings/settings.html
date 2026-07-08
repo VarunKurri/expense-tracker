@@ -138,8 +138,8 @@
   size="sm"
   (closed)="exportModalOpen.set(false)">
   <p class="recovery-intro">
-    Choose a password for this backup file. You'll need it to restore — it's separate from your
-    passphrase and we can't recover it.
+    Set a password to protect this backup. You'll need it to restore, so keep it somewhere safe.
+    It's separate from your passphrase and can't be recovered.
   </p>
   <label class="modal-field">
     <span>Backup password</span>
@@ -160,12 +160,19 @@
   size="sm"
   (closed)="importModalOpen.set(false)">
   <p class="recovery-intro">
-    Import a backup file into this account. Existing items with the same id are overwritten; other
-    items are added.
+    Import a backup into this account. Matching items are updated and anything new is added.
   </p>
   <label class="modal-field">
     <span>Backup file</span>
-    <input class="input-field" type="file" accept="application/json,.json" (change)="onImportFile($event)" />
+    <div class="file-picker">
+      <label class="btn file-btn">
+        Choose file
+        <input type="file" accept="application/json,.json" (change)="onImportFile($event)" hidden />
+      </label>
+      <span class="file-name" [class.chosen]="importFileName()">
+        {{ importFileName() || 'No file chosen' }}
+      </span>
+    </div>
   </label>
   <label class="modal-field">
     <span>Backup password</span>
