@@ -96,9 +96,11 @@ export class AuthService {
       'auth/user-not-found': 'No account exists for that email.',
       'auth/wrong-password': 'Email or password is incorrect.',
       'auth/weak-password': 'Use a password with at least 6 characters.',
+      'auth/password-does-not-meet-requirements': 'That password does not meet the requirements. Try a stronger one.',
+      'auth/operation-not-allowed': 'Email/password sign-up is not enabled for this app. Use Google sign-in, or enable it in Firebase.',
       'auth/too-many-requests': 'Too many attempts. Please wait and try again.',
       'auth/network-request-failed': 'Network error. Check your connection and try again.',
     };
-    return map[code] || 'Authentication failed. Please try again.';
+    return map[code] || `Authentication failed${code ? ` (${code})` : ''}. Please try again.`;
   }
 }
