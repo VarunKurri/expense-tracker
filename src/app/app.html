@@ -81,18 +81,35 @@
             </label>
           }
 
+          @if (authMode() === 'signup') {
+            <ul class="pw-checklist">
+              <li [class.met]="pwChecks().length">
+                <span class="pw-dot">@if (pwChecks().length) { ✓ }</span>
+                At least 8 characters
+              </li>
+              <li [class.met]="pwChecks().uppercase">
+                <span class="pw-dot">@if (pwChecks().uppercase) { ✓ }</span>
+                One uppercase letter
+              </li>
+              <li [class.met]="pwChecks().symbol">
+                <span class="pw-dot">@if (pwChecks().symbol) { ✓ }</span>
+                One symbol
+              </li>
+            </ul>
+          }
+
           @if (authMode() === 'reset') {
-            <button class="auth-primary" (click)="resetPassword()" [disabled]="signingIn()">
+            <button class="auth-primary" (click)="resetPassword()" [disabled]="signingIn() || !authFormValid()">
               @if (signingIn()) { <div class="btn-spinner"></div> }
               <span>Send reset email</span>
             </button>
           } @else if (authMode() === 'signup') {
-            <button class="auth-primary" (click)="signUpWithEmail()" [disabled]="signingIn()">
+            <button class="auth-primary" (click)="signUpWithEmail()" [disabled]="signingIn() || !authFormValid()">
               @if (signingIn()) { <div class="btn-spinner"></div> }
               <span>Create account</span>
             </button>
           } @else {
-            <button class="auth-primary" (click)="signInWithEmail()" [disabled]="signingIn()">
+            <button class="auth-primary" (click)="signInWithEmail()" [disabled]="signingIn() || !authFormValid()">
               @if (signingIn()) { <div class="btn-spinner"></div> }
               <span>Sign in</span>
             </button>

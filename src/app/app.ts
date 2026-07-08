@@ -77,6 +77,29 @@ export class App {
   useRecoveryCode = signal(false);
   recoveryCodeInput = signal('');
 
+  // Live password requirement checks (signup) + per-mode form validity, so the
+  // primary auth button visibly enables once the form is complete.
+  pwChecks = computed(() => {
+    const pw = this.password();
+    return {
+      length: pw.length >= 8,
+      uppercase: /[A-Z]/.test(pw),
+      symbol: /[^A-Za-z0-9]/.test(pw),
+    };
+  });
+  passwordValid = computed(() => {
+    const c = this.pwChecks();
+    return c.length && c.uppercase && c.symbol;
+  });
+  private emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email().trim()));
+  authFormValid = computed(() => {
+    switch (this.authMode()) {
+      case 'reset': return this.emailValid();
+      case 'signup': return this.emailValid() && this.passwordValid();
+      default: return this.emailValid() && this.password().length > 0;
+    }
+  });
+
   // Show a neutral boot splash until auth resolves and (if this device is
   // remembered) the auto-unlock attempt finishes — avoids flashing login/unlock.
   showSplash = computed(() =>
