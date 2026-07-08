@@ -119,17 +119,19 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
   - Why: users should be able to add expenses immediately, even without a reliable connection.
   - Done when: new records queue locally, sync later, and show pending/synced status.
 
-- [ ] Add encrypted export and restore.
+- [x] Add encrypted export and restore.
   - Why: users need confidence that they can back up or move their finance history.
   - Done when: export creates encrypted JSON/CSV backup and restore validates schema before importing.
+  - Verified: `BackupService.exportVault` decrypts every collection and downloads an AES-GCM file encrypted under a PBKDF2 backup password (separate from the passphrase); `importVault` decrypts, validates the `trackr-backup` format, and restores by document id (references stay intact), portable to a fresh account. Settings → Data has Export / Restore. Round-trip + wrong-password rejection validated with a local test.
 
 - [ ] Add encryption passphrase rotation.
   - Why: users may need to change the vault passphrase without losing data.
-  - Done when: authenticated users can re-encrypt all records with a new passphrase after confirming the old one.
+  - Done when: authenticated users can re-encrypt all records with a new passphrase after confirming the old one. (Needs the master key decoupled from the passphrase — random DEK wrapped by KEKs — so it's a re-encrypt migration; deferred.)
 
-- [ ] Add recovery guidance for forgotten passphrases.
+- [x] Add recovery guidance for forgotten passphrases.
   - Why: account password reset cannot recover encrypted finance records.
   - Done when: settings clearly explain the tradeoff and offer safe reset/export options where possible.
+  - Verified: a one-time **recovery code** (Settings → Security) wraps the master key so a forgotten passphrase can still unlock via the code (unlock screen "Forgot passphrase? Use recovery code"); the unlock screen also states that account password reset can't recover the passphrase, and encrypted export provides a backup. (Email-OTP recovery is intentionally not offered — it would require the server to hold the key, breaking zero-knowledge.)
 
 - [ ] Add audit log for sensitive actions.
   - Why: deletes, imports, migrations, and passphrase changes need traceability.
