@@ -1131,3 +1131,203 @@
     border-color: var(--green);
   }
 }
+
+/* ── Landing page (logged-out) ─────────────────────────────── */
+.landing {
+  min-height: 100vh;
+  background: #0a0a0a;
+  color: #fff;
+  position: relative;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.landing-grid-bg {
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 70% 10%, rgba(0, 214, 79, 0.16) 0%, transparent 45%),
+    radial-gradient(circle at 15% 70%, rgba(0, 214, 79, 0.08) 0%, transparent 40%);
+  pointer-events: none;
+}
+
+.landing-nav {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px clamp(20px, 5vw, 64px);
+}
+
+.landing-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.landing-wordmark {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.landing-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.landing-cta {
+  padding: 13px 26px;
+  border-radius: 13px;
+  background: var(--green);
+  color: #000;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--green-hi, #2ee06a);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0, 214, 79, 0.3);
+  }
+
+  &.sm { padding: 9px 18px; font-size: 13.5px; border-radius: 11px; }
+}
+
+.landing-ghost {
+  padding: 13px 22px;
+  border-radius: 13px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover { background: rgba(255, 255, 255, 0.08); }
+  &.lg { font-size: 15px; }
+}
+
+.landing-hero {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: clamp(48px, 9vh, 110px) 24px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+
+  h1 {
+    font-size: clamp(38px, 6vw, 64px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.06;
+    margin: 0;
+  }
+
+  p {
+    max-width: 560px;
+    color: rgba(255, 255, 255, 0.65);
+    font-size: clamp(15px, 2vw, 17.5px);
+    line-height: 1.6;
+    margin: 0;
+  }
+}
+
+.landing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 214, 79, 0.35);
+  background: rgba(0, 214, 79, 0.1);
+  color: #7deda5;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.landing-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.landing-trust {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12.5px;
+}
+
+.landing-features {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+  padding: clamp(30px, 6vh, 60px) clamp(20px, 5vw, 64px);
+  max-width: 1180px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.landing-feature {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 18px;
+  padding: 22px 20px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: rgba(0, 214, 79, 0.35);
+    background: rgba(0, 214, 79, 0.05);
+    transform: translateY(-2px);
+  }
+
+  .landing-feature-icon { font-size: 26px; margin-bottom: 12px; }
+
+  h3 {
+    font-size: 15.5px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+
+  p {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 13.5px;
+    line-height: 1.55;
+    margin: 0;
+  }
+}
+
+.landing-footer {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  padding: 26px 24px 30px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12.5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 640px) {
+  .landing-nav { padding-top: 16px; }
+  .landing-hero { padding-top: 40px; }
+  .landing-hero-actions .landing-cta,
+  .landing-hero-actions .landing-ghost { width: 100%; justify-content: center; text-align: center; }
+}

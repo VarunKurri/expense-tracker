@@ -68,6 +68,9 @@ export class App {
 
   sidebarOpen = signal(false);
   signingIn = signal(false);
+  // Logged-out visitors see the marketing landing page first; the auth card
+  // opens on demand (Sign in / Get started).
+  showAuth = signal(false);
   authMode = signal<'signin' | 'signup' | 'reset'>('signin');
   email = signal('');
   password = signal('');
@@ -209,6 +212,12 @@ export class App {
     effect(() => {
       const user = this.auth.user();
       if (user) {
+        // If sign-in happened while the router had no active route (its initial
+        // navigation was cancelled by authGuard), land on the dashboard instead
+        // of a blank outlet.
+        if (this.router.url === '/' || this.router.url === '') {
+          this.router.navigateByUrl('/dashboard');
+        }
         this.encryption.booting.set(true);
         this.encryption.refreshProfileState()
           .then(() => this.encryption.tryUnlockFromDevice())
@@ -242,6 +251,16 @@ export class App {
         untracked(() => this.autopayService.runIfNeeded());
       }
     });
+  }
+
+  openAuth(mode: 'signin' | 'signup') {
+    this.authMode.set(mode);
+    this.showAuth.set(true);
+  }
+
+  backToLanding() {
+    this.showAuth.set(false);
+    this.authMode.set('signin');
   }
 
   onNavClick() {

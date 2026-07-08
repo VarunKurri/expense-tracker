@@ -8,19 +8,19 @@ import { Category } from '../models';
 // The canonical default categories every account gets. New accounts are seeded with
 // these; existing accounts are topped up with any they're missing (ensureDefaultCategories).
 const DEFAULT_EXPENSE_CATEGORIES = [
-  { name: 'Groceries', icon: 'Groceries', color: '#10b981' },
-  { name: 'Gas', icon: 'Gas', color: '#f59e0b' },
-  { name: 'Dining', icon: 'Dining', color: '#ef4444' },
-  { name: 'Parking', icon: 'Parking', color: '#6b7280' },
-  { name: 'RideShare', icon: 'Car', color: '#3b82f6' },
-  { name: 'Car', icon: 'Auto', color: '#8b5cf6' },
-  { name: 'Shopping', icon: 'Shopping', color: '#ec4899' },
-  { name: 'Entertainment', icon: 'Entertainment', color: '#f97316' },
-  { name: 'Rent', icon: 'Home', color: '#6366f1' },
-  { name: 'Utilities', icon: 'Utilities', color: '#eab308' },
-  { name: 'Health', icon: 'Health', color: '#14b8a6' },
-  { name: 'Subscriptions', icon: 'Subscriptions', color: '#a855f7' },
-  { name: 'Other', icon: 'Other', color: '#9ca3af' },
+  { name: 'Groceries', icon: '🛒', color: '#10b981' },
+  { name: 'Gas', icon: '⛽', color: '#f59e0b' },
+  { name: 'Dining', icon: '🍽️', color: '#ef4444' },
+  { name: 'Parking', icon: '🅿️', color: '#6b7280' },
+  { name: 'RideShare', icon: '🚗', color: '#3b82f6' },
+  { name: 'Car', icon: '🔧', color: '#8b5cf6' },
+  { name: 'Shopping', icon: '🛍️', color: '#ec4899' },
+  { name: 'Entertainment', icon: '🎬', color: '#f97316' },
+  { name: 'Rent', icon: '🏠', color: '#6366f1' },
+  { name: 'Utilities', icon: '💡', color: '#eab308' },
+  { name: 'Health', icon: '💊', color: '#14b8a6' },
+  { name: 'Subscriptions', icon: '📺', color: '#a855f7' },
+  { name: 'Other', icon: '📦', color: '#9ca3af' },
   { name: 'Bank Fees', icon: '🏦', color: '#6b7280' },
   { name: 'Charity & Gifts', icon: '🎁', color: '#ec4899' },
   { name: 'Financial Services', icon: '🏛️', color: '#0ea5e9' },
@@ -32,12 +32,12 @@ const DEFAULT_EXPENSE_CATEGORIES = [
 ];
 
 const DEFAULT_INCOME_CATEGORIES = [
-  { name: 'Salary', icon: 'Salary', color: '#10b981' },
-  { name: 'Bonus', icon: 'Bonus', color: '#22c55e' },
-  { name: 'Interest', icon: 'Interest', color: '#06b6d4' },
+  { name: 'Salary', icon: '💼', color: '#10b981' },
+  { name: 'Bonus', icon: '🎁', color: '#22c55e' },
+  { name: 'Interest', icon: '📈', color: '#06b6d4' },
   { name: 'Pocket Money', icon: '💸', color: '#f59e0b' },
   { name: 'Refund', icon: '↩️', color: '#14b8a6' },
-  { name: 'Other Income', icon: 'Income', color: '#84cc16' },
+  { name: 'Other Income', icon: '💰', color: '#84cc16' },
 ];
 
 @Injectable({ providedIn: 'root' })
@@ -69,9 +69,9 @@ export class SeedService {
         const now = Date.now();
         const batch = writeBatch(this.db);
         const accounts = [
-          { name: 'Cash', type: 'cash', openingBalance: 0, currency: 'USD', icon: 'Cash', color: '#10b981', archived: false, createdAt: now },
-          { name: 'Checking', type: 'checking', openingBalance: 0, currency: 'USD', icon: 'Bank', color: '#3b82f6', archived: false, createdAt: now + 1 },
-          { name: 'Credit Card', type: 'credit', openingBalance: 0, currency: 'USD', icon: 'Card', color: '#8b5cf6', archived: false, createdAt: now + 2 },
+          { name: 'Cash', type: 'cash', openingBalance: 0, currency: 'USD', icon: '💵', color: '#10b981', archived: false, createdAt: now },
+          { name: 'Checking', type: 'checking', openingBalance: 0, currency: 'USD', icon: '🏦', color: '#3b82f6', archived: false, createdAt: now + 1 },
+          { name: 'Credit Card', type: 'credit', openingBalance: 0, currency: 'USD', icon: '💳', color: '#8b5cf6', archived: false, createdAt: now + 2 },
         ];
         for (const account of accounts) {
           batch.set(doc(ref), await this.encryption.encryptForWrite(account));

@@ -6,6 +6,73 @@
     <div class="boot-spinner"></div>
   </div>
 } @else if (!auth.user()) {
+  @if (!showAuth()) {
+    <div class="landing">
+      <div class="landing-grid-bg" aria-hidden="true"></div>
+
+      <nav class="landing-nav">
+        <div class="landing-brand">
+          <div class="brand-mark" style="width:38px;height:38px;border-radius:12px;font-size:19px;">T</div>
+          <span class="landing-wordmark">Trackr</span>
+        </div>
+        <div class="landing-nav-actions">
+          <button class="landing-ghost" (click)="openAuth('signin')">Sign in</button>
+          <button class="landing-cta sm" (click)="openAuth('signup')">Get started</button>
+        </div>
+      </nav>
+
+      <header class="landing-hero">
+        <div class="landing-badge">🔒 Zero-knowledge encrypted</div>
+        <h1>Your money, finally<br>under control.</h1>
+        <p>
+          Trackr connects to your bank, pulls in transactions automatically, and sorts them
+          into your budgets. Everything is encrypted on your device, so only you can read it.
+        </p>
+        <div class="landing-hero-actions">
+          <button class="landing-cta" (click)="openAuth('signup')">Get started free</button>
+          <button class="landing-ghost lg" (click)="openAuth('signin')">Sign in</button>
+        </div>
+        <div class="landing-trust">Bank sync by Plaid · Encrypted before it leaves your device</div>
+      </header>
+
+      <section class="landing-features">
+        <div class="landing-feature">
+          <div class="landing-feature-icon">🏦</div>
+          <h3>Automatic bank sync</h3>
+          <p>Link your bank once and new transactions arrive on their own. No manual entry.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="landing-feature-icon">🔐</div>
+          <h3>Private by design</h3>
+          <p>Your records are encrypted with keys only you hold. Not even we can read them.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="landing-feature-icon">🏷️</div>
+          <h3>Smart categorization</h3>
+          <p>Synced transactions land in your own categories, and you can always override.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="landing-feature-icon">🎯</div>
+          <h3>Budgets by category</h3>
+          <p>Set monthly limits and watch them fill in real time, with overrides per month.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="landing-feature-icon">📅</div>
+          <h3>Bills & subscriptions</h3>
+          <p>Due dates, autopay tracking, and reminders so nothing slips past you.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="landing-feature-icon">📊</div>
+          <h3>Clear insights</h3>
+          <p>Net worth, cash flow, top merchants, and exactly where every dollar went.</p>
+        </div>
+      </section>
+
+      <footer class="landing-footer">
+        <span>Trackr — your money, private and in one place.</span>
+      </footer>
+    </div>
+  } @else {
   <div class="login-shell">
     <div class="login-left">
       <div class="login-left-content">
@@ -142,6 +209,7 @@
           } @else {
             <button type="button" (click)="authMode.set('signin')">Back to sign in</button>
           }
+          <button type="button" (click)="backToLanding()">← Back to overview</button>
         </div>
 
         <p class="login-disclaimer">
@@ -150,6 +218,7 @@
       </div>
     </div>
   </div>
+  }
 } @else if (!encryption.unlocked()) {
   <div class="unlock-shell">
     <div class="unlock-card">

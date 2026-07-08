@@ -9,6 +9,7 @@ import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
 import { EncryptionService } from './encryption.service';
 import { Account } from '../models';
+import { displayIcon } from '../utils/legacy-icons';
 
 @Injectable({ providedIn: 'root' })
 export class AccountService {
@@ -34,7 +35,10 @@ export class AccountService {
           async snap => {
             try {
               const accounts = await Promise.all(
-                snap.docs.map(async d => ({ id: d.id, ...(await this.encryption.decryptDoc<Account>(d.data())) }))
+                snap.docs.map(async d => {
+                  const acc = { id: d.id, ...(await this.encryption.decryptDoc<Account>(d.data())) };
+                  return { ...acc, icon: displayIcon(acc.icon) };
+                })
               );
               this.ngZone.run(() => {
                 this.error.set(null);
