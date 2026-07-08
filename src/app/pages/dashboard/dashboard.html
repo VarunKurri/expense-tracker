@@ -214,12 +214,12 @@
     <div class="right-col">
 
       <!-- Where it went -->
-      @if (thisMonthTotal() > 0) {
+      @if (recentTotal() > 0) {
         <div class="panel">
           <div class="panel-head">
             <div>
               <div class="panel-title">Where it went</div>
-              <div class="panel-sub-text">This month · {{ formatCurrency(thisMonthTotal()) }}</div>
+              <div class="panel-sub-text">Last 30 days · {{ formatCurrency(recentTotal()) }}</div>
             </div>
             <button class="panel-link" (click)="navigate('/analysis')">Details →</button>
           </div>
@@ -227,7 +227,7 @@
             <div class="mini-donut-wrap">
               <canvas #miniDonutCanvas></canvas>
               <div class="mini-donut-center">
-                <div class="mini-donut-total">{{ formatCurrencyShort(thisMonthTotal()) }}</div>
+                <div class="mini-donut-total">{{ formatCurrencyShort(recentTotal()) }}</div>
                 <div class="mini-donut-label">total</div>
               </div>
             </div>

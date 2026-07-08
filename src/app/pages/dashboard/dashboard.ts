@@ -46,7 +46,6 @@ export class Dashboard implements AfterViewInit, OnDestroy {
 
   @ViewChild('miniDonutCanvas') miniDonutCanvas!: ElementRef<HTMLCanvasElement>;
   private miniDonut: Chart | null = null;
-  private chartsReady = false;
 
   @ViewChild('cashFlowCanvas') cashFlowCanvas!: ElementRef<HTMLCanvasElement>;
   private cashFlowChart: Chart | null = null;
@@ -323,21 +322,25 @@ export class Dashboard implements AfterViewInit, OnDestroy {
       .slice(0, 4);
   });
 
-  thisMonthExpenses = computed(() => {
-    const month = this.currentMonth;
+  // Last-30-days spending, matching the cash-flow chart's window (so the dashboard is
+  // consistent and isn't blank early in the month or with recent-but-past-month data).
+  recentExpenses = computed(() => {
+    const now = new Date();
+    const cutoff = this.localDateString(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
+    const today = this.localDateString(now);
     return this.txService.transactions()
-      .filter(t => t.type === 'expense' && t.date.startsWith(month) && !t.refunded);
+      .filter(t => t.type === 'expense' && !t.refunded && t.date >= cutoff && t.date <= today);
   });
-  thisMonthTotal = computed(() =>
-    Math.round(this.thisMonthExpenses().reduce((s, t) => s + t.amount, 0) * 100) / 100
+  recentTotal = computed(() =>
+    Math.round(this.recentExpenses().reduce((s, t) => s + t.amount, 0) * 100) / 100
   );
   categoryBreakdown = computed(() => {
     const byCat = new Map<string, number>();
-    for (const t of this.thisMonthExpenses()) {
+    for (const t of this.recentExpenses()) {
       const key = t.categoryId || '__none__';
       byCat.set(key, (byCat.get(key) || 0) + t.amount);
     }
-    const total = this.thisMonthTotal();
+    const total = this.recentTotal();
     return [...byCat.entries()]
       .sort((a, b) => b[1] - a[1]).slice(0, 6)
       .map(([id, amount]) => {
@@ -404,10 +407,12 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     effect(() => {
       const donutData = this.categoryBreakdown();
       const flowData = this.cashFlowData();
-      if (this.chartsReady) {
-        this.updateMiniDonut(donutData);
-        this.updateCashFlow(flowData);
-      }
+      // Init/update each chart independently — the donut canvas only exists when there
+      // is current-month spending, and the cash-flow chart must not depend on it.
+      this.ensureCashFlow();
+      if (this.cashFlowChart) this.updateCashFlow(flowData);
+      this.ensureDonut();
+      if (this.miniDonut) this.updateMiniDonut(donutData);
     });
   }
 
@@ -415,17 +420,25 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     this.initChartsWhenReady();
   }
 
-  // Retry until canvas elements exist — fixes blank donut on hard refresh
+  // The cash-flow canvas is always rendered; retry until it (and, if present, the donut
+  // canvas) exist. Each chart is created independently so a hidden donut can't block it.
   private initChartsWhenReady(attempt = 0) {
-    const donutEl = this.miniDonutCanvas?.nativeElement;
-    const flowEl = this.cashFlowCanvas?.nativeElement;
-    if (donutEl && flowEl) {
-      this.initMiniDonut();
-      this.initCashFlow();
-      this.chartsReady = true;
-    } else if (attempt < 20) {
+    this.ensureCashFlow();
+    this.ensureDonut();
+    if (!this.cashFlowChart && attempt < 20) {
       setTimeout(() => this.initChartsWhenReady(attempt + 1), 100);
     }
+  }
+
+  private ensureCashFlow() {
+    if (!this.cashFlowChart && this.cashFlowCanvas?.nativeElement) this.initCashFlow();
+  }
+
+  private ensureDonut() {
+    const el = this.miniDonutCanvas?.nativeElement;
+    // The donut canvas is added/removed with current-month data; keep the chart in sync.
+    if (this.miniDonut && !el) { this.miniDonut.destroy(); this.miniDonut = null; }
+    if (!this.miniDonut && el) this.initMiniDonut();
   }
 
   ngOnDestroy() {
