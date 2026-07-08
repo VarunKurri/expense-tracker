@@ -181,3 +181,12 @@
   margin-top: 16px;
   .btn { cursor: pointer; }
 }
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+
+  span { font-size: 12px; font-weight: 600; color: var(--fg-3); }
+}

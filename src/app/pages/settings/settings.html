@@ -15,6 +15,22 @@
         </div>
         <div class="settings-arrow">›</div>
       </div>
+      <div class="settings-row" (click)="exportModalOpen.set(true)">
+        <div class="settings-icon">📦</div>
+        <div class="settings-info">
+          <div class="settings-label">Export encrypted backup</div>
+          <div class="settings-sub">Download your whole vault as an encrypted file.</div>
+        </div>
+        <div class="settings-arrow">›</div>
+      </div>
+      <div class="settings-row" (click)="importModalOpen.set(true)">
+        <div class="settings-icon">♻️</div>
+        <div class="settings-info">
+          <div class="settings-label">Restore from backup</div>
+          <div class="settings-sub">Import a backup file into this account.</div>
+        </div>
+        <div class="settings-arrow">›</div>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -113,5 +129,53 @@
   <div class="recovery-actions">
     <button class="btn" (click)="copyRecoveryCode()">Copy</button>
     <button class="btn primary" (click)="closeRecoveryModal()">I've saved it</button>
+  </div>
+</app-modal>
+
+<app-modal
+  [open]="exportModalOpen()"
+  title="Export encrypted backup"
+  size="sm"
+  (closed)="exportModalOpen.set(false)">
+  <p class="recovery-intro">
+    Choose a password for this backup file. You'll need it to restore — it's separate from your
+    passphrase and we can't recover it.
+  </p>
+  <label class="modal-field">
+    <span>Backup password</span>
+    <input class="input-field" type="password" autocomplete="new-password"
+           [ngModel]="exportPassword()" (ngModelChange)="exportPassword.set($event)" />
+  </label>
+  <div class="recovery-actions">
+    <button class="btn" (click)="exportModalOpen.set(false)">Cancel</button>
+    <button class="btn primary" [disabled]="busy() || exportPassword().length < 8" (click)="exportBackup()">
+      {{ busy() ? 'Exporting…' : 'Download backup' }}
+    </button>
+  </div>
+</app-modal>
+
+<app-modal
+  [open]="importModalOpen()"
+  title="Restore from backup"
+  size="sm"
+  (closed)="importModalOpen.set(false)">
+  <p class="recovery-intro">
+    Import a backup file into this account. Existing items with the same id are overwritten; other
+    items are added.
+  </p>
+  <label class="modal-field">
+    <span>Backup file</span>
+    <input class="input-field" type="file" accept="application/json,.json" (change)="onImportFile($event)" />
+  </label>
+  <label class="modal-field">
+    <span>Backup password</span>
+    <input class="input-field" type="password" autocomplete="off"
+           [ngModel]="importPassword()" (ngModelChange)="importPassword.set($event)" />
+  </label>
+  <div class="recovery-actions">
+    <button class="btn" (click)="importModalOpen.set(false)">Cancel</button>
+    <button class="btn primary" [disabled]="busy() || !importFileText() || !importPassword()" (click)="restoreBackup()">
+      {{ busy() ? 'Restoring…' : 'Restore' }}
+    </button>
   </div>
 </app-modal>
