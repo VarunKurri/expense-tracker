@@ -1,6 +1,8 @@
 <app-toast />
 
-@if (showSplash()) {
+@if (isAuthActionRoute) {
+  <app-auth-action />
+} @else if (showSplash()) {
   <div class="boot-splash">
     <div class="brand-mark" style="width:48px;height:48px;border-radius:15px;font-size:24px;">T</div>
     <div class="boot-spinner"></div>
@@ -124,19 +126,19 @@
           }
         </div>
 
-        <div class="auth-form">
+        <form class="auth-form" (ngSubmit)="onAuthSubmit()">
           @if (authMode() === 'signup') {
             <label>
               <span>Name</span>
               <input class="input-field" type="text" autocomplete="name"
-                     [ngModel]="displayName()" (ngModelChange)="displayName.set($event)" />
+                     [ngModel]="displayName()" (ngModelChange)="displayName.set($event)" name="displayName" />
             </label>
           }
 
           <label>
             <span>Email</span>
             <input class="input-field" type="email" autocomplete="email"
-                   [ngModel]="email()" (ngModelChange)="email.set($event)" />
+                   [ngModel]="email()" (ngModelChange)="email.set($event)" name="email" />
           </label>
 
           @if (authMode() !== 'reset') {
@@ -144,7 +146,7 @@
               <span>Password</span>
               <input class="input-field" type="password"
                      [autocomplete]="authMode() === 'signup' ? 'new-password' : 'current-password'"
-                     [ngModel]="password()" (ngModelChange)="password.set($event)" />
+                     [ngModel]="password()" (ngModelChange)="password.set($event)" name="password" />
             </label>
           }
 
@@ -166,22 +168,22 @@
           }
 
           @if (authMode() === 'reset') {
-            <button class="auth-primary" (click)="resetPassword()" [disabled]="signingIn() || !authFormValid()">
+            <button type="submit" class="auth-primary" [disabled]="signingIn() || !authFormValid()">
               @if (signingIn()) { <div class="btn-spinner"></div> }
               <span>Send reset email</span>
             </button>
           } @else if (authMode() === 'signup') {
-            <button class="auth-primary" (click)="signUpWithEmail()" [disabled]="signingIn() || !authFormValid()">
+            <button type="submit" class="auth-primary" [disabled]="signingIn() || !authFormValid()">
               @if (signingIn()) { <div class="btn-spinner"></div> }
               <span>Create account</span>
             </button>
           } @else {
-            <button class="auth-primary" (click)="signInWithEmail()" [disabled]="signingIn() || !authFormValid()">
+            <button type="submit" class="auth-primary" [disabled]="signingIn() || !authFormValid()">
               @if (signingIn()) { <div class="btn-spinner"></div> }
               <span>Sign in</span>
             </button>
           }
-        </div>
+        </form>
 
         @if (authMode() !== 'reset') {
           <div class="auth-divider"><span>or</span></div>

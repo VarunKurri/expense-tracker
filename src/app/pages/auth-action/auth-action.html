@@ -1,0 +1,81 @@
+<div class="action-shell">
+  <div class="action-card">
+    <div class="action-logo">
+      <div class="brand-mark">T</div>
+      <span class="wordmark">Trackr</span>
+    </div>
+
+    @switch (status()) {
+      @case ('loading') {
+        <div class="action-spinner-wrap">
+          <div class="action-spinner"></div>
+          <p>Verifying your link…</p>
+        </div>
+      }
+
+      @case ('resetForm') {
+        <h1>Set a new password</h1>
+        <p class="action-sub">for {{ resetEmail() }}</p>
+
+        <form class="action-form" (ngSubmit)="submitNewPassword()">
+          <label>
+            <span>New password</span>
+            <input class="input-field" type="password" autocomplete="new-password" name="newPassword"
+                   [ngModel]="newPassword()" (ngModelChange)="newPassword.set($event)" />
+          </label>
+          <label>
+            <span>Confirm password</span>
+            <input class="input-field" type="password" autocomplete="new-password" name="confirmPassword"
+                   [ngModel]="confirmPassword()" (ngModelChange)="confirmPassword.set($event)" />
+          </label>
+
+          <ul class="pw-checklist">
+            <li [class.met]="pwChecks().length">
+              <span class="pw-dot">@if (pwChecks().length) { ✓ }</span>
+              At least 8 characters
+            </li>
+            <li [class.met]="pwChecks().uppercase">
+              <span class="pw-dot">@if (pwChecks().uppercase) { ✓ }</span>
+              One uppercase letter
+            </li>
+            <li [class.met]="pwChecks().symbol">
+              <span class="pw-dot">@if (pwChecks().symbol) { ✓ }</span>
+              One symbol
+            </li>
+            <li [class.met]="newPassword() && newPassword() === confirmPassword()">
+              <span class="pw-dot">@if (newPassword() && newPassword() === confirmPassword()) { ✓ }</span>
+              Passwords match
+            </li>
+          </ul>
+
+          @if (errorMessage()) {
+            <p class="action-error">{{ errorMessage() }}</p>
+          }
+
+          <button type="submit" class="action-primary" [disabled]="busy() || !formValid()">
+            @if (busy()) { <div class="action-btn-spinner"></div> }
+            <span>{{ busy() ? 'Saving…' : 'Save new password' }}</span>
+          </button>
+        </form>
+      }
+
+      @case ('success') {
+        <div class="action-result success">
+          <div class="action-result-icon">✓</div>
+          <h1>All set</h1>
+          <p>{{ successMessage() }}</p>
+          <button class="action-primary" (click)="goToApp()">Go to Trackr</button>
+        </div>
+      }
+
+      @case ('error') {
+        <div class="action-result error">
+          <div class="action-result-icon">!</div>
+          <h1>Link problem</h1>
+          <p>{{ errorMessage() }}</p>
+          <button class="action-primary" (click)="goToApp()">Back to Trackr</button>
+        </div>
+      }
+    }
+  </div>
+</div>

@@ -3,6 +3,14 @@ import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+  // Landed on directly from email links (password reset, email verify, email
+  // change) — no auth required, and never entered via in-app navigation.
+  // app.ts renders it outside the normal auth-gated shell; this entry only
+  // keeps the URL from being wildcard-redirected away.
+  {
+    path: 'auth/action',
+    loadComponent: () => import('./pages/auth-action/auth-action').then(m => m.AuthAction)
+  },
   {
     path: 'dashboard',
     canActivate: [authGuard],

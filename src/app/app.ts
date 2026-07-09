@@ -8,6 +8,7 @@ import { ThemeService } from './services/theme.service';
 import { ToastService } from './services/toast.service';
 import { Icon } from './components/icon/icon';
 import { Toast } from './components/toast/toast';
+import { AuthAction } from './pages/auth-action/auth-action';
 import { QuickAddService } from './services/quick-add.service';
 import { BillService } from './services/bill.service';
 import { AutopayService } from './services/autopay.service';
@@ -47,7 +48,7 @@ interface PaletteEntry {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, Icon, Toast],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, Icon, Toast, AuthAction],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -109,6 +110,11 @@ export class App {
     !this.auth.resolved()
     || (!!this.auth.user() && !this.encryption.unlocked() && this.encryption.booting())
   );
+
+  // Password reset / email verify / email change links land here directly from
+  // an email, with no session yet — read once from the real URL (not the
+  // router) so it renders before auth/encryption even resolve.
+  isAuthActionRoute = window.location.pathname.startsWith('/auth/action');
   commandPaletteOpen = signal(false);
   commandQuery = signal('');
   activeCommandIndex = signal(0);
@@ -600,11 +606,42 @@ export class App {
     }
   }
 
+  /** Single entry point for the auth <form>'s (ngSubmit) — Enter now submits
+   *  from any field, dispatched to whichever action the current mode needs. */
+  onAuthSubmit() {
+    if (!this.authFormValid()) return;
+    switch (this.authMode()) {
+      case 'reset': return this.resetPassword();
+      case 'signup': return this.signUpWithEmail();
+      default: return this.signInWithEmail();
+    }
+  }
+
+  /**
+   * Explicitly offer the credential to the browser's password manager via the
+   * Credential Management API. Chrome/Edge/Safari support this; unsupported
+   * browsers (e.g. Firefox) just no-op — the native "Save password?" prompt
+   * relies on this rather than guessing from our SPA's fetch-based sign-in.
+   */
+  private async offerToSaveCredential(email: string, password: string) {
+    try {
+      const w = window as any;
+      if (!w.PasswordCredential) return;
+      const credential = new w.PasswordCredential({ id: email, password, name: email });
+      await navigator.credentials.store(credential);
+    } catch {
+      // Best-effort only.
+    }
+  }
+
   async signInWithEmail() {
     if (this.signingIn()) return;
     this.signingIn.set(true);
+    const email = this.email().trim();
+    const pw = this.password();
     try {
-      await this.auth.signInWithEmail(this.email().trim(), this.password());
+      await this.auth.signInWithEmail(email, pw);
+      this.offerToSaveCredential(email, pw);
     } catch (err: any) {
       this.toastService.error(err?.message || 'Sign in failed. Please try again.');
     } finally {
@@ -615,12 +652,11 @@ export class App {
   async signUpWithEmail() {
     if (this.signingIn()) return;
     this.signingIn.set(true);
+    const email = this.email().trim();
+    const pw = this.password();
     try {
-      await this.auth.signUpWithEmail(
-        this.email().trim(),
-        this.password(),
-        this.displayName().trim()
-      );
+      await this.auth.signUpWithEmail(email, pw, this.displayName().trim());
+      this.offerToSaveCredential(email, pw);
     } catch (err: any) {
       this.toastService.error(err?.message || 'Sign up failed. Please try again.');
     } finally {
