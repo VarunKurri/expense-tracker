@@ -31,6 +31,15 @@ interface EncryptionMeta {
   verifierIv: string;
   version: number;
   createdAt: number;
+  // PBKDF2 iteration count used to derive the master key from the passphrase.
+  // Absent on vaults created before this field existed — those fall back to
+  // LEGACY_KDF_ITERATIONS so they keep unlocking with the exact key they always
+  // have. New vaults get CURRENT_KDF_ITERATIONS. The two coexisting is safe
+  // because the derived key IS the encryption key (no separate wrapped master
+  // key) — changing iterations for an existing vault would change its key and
+  // require re-encrypting everything, which belongs to the planned passphrase
+  // rotation feature, not a silent bump here.
+  kdfIterations?: number;
 }
 
 // Per-user RSA keypair for zero-knowledge envelope encryption. The public key is
@@ -52,9 +61,18 @@ interface RecoveryRecord {
   iv: string; // base64
   salt: string; // base64 — PBKDF2 salt for deriving the KEK from the code
   createdAt: number;
+  iterations?: number; // absent on older records — falls back to RECOVERY_ITERATIONS
 }
 
 const RECOVERY_ITERATIONS = 200_000;
+
+// PBKDF2-HMAC-SHA256 iteration counts. 600k matches OWASP's 2023 baseline for
+// browser contexts (WebCrypto has no native Argon2id/scrypt/bcrypt, so PBKDF2
+// is the right primitive; 600k is the recommended floor). 250k is what every
+// vault created before this change already uses — kept only as the fallback
+// for those, never used for anything new.
+const CURRENT_KDF_ITERATIONS = 600_000;
+const LEGACY_KDF_ITERATIONS = 250_000;
 
 const ENCRYPTION_VERSION = 1;
 const VERIFIER_TEXT = 'trackr-encryption-verifier-v1';
@@ -119,7 +137,7 @@ export class EncryptionService {
 
       if (!metaSnap.exists()) {
         const salt = crypto.getRandomValues(new Uint8Array(16));
-        const { key, raw } = await this.deriveMasterKey(passphrase, salt);
+        const { key, raw } = await this.deriveMasterKey(passphrase, salt, CURRENT_KDF_ITERATIONS);
         const verifier = await this.encryptStringWithKey(VERIFIER_TEXT, key);
         const meta: EncryptionMeta = {
           salt: this.bytesToBase64(salt),
@@ -127,6 +145,7 @@ export class EncryptionService {
           verifierIv: verifier.iv,
           version: ENCRYPTION_VERSION,
           createdAt: Date.now(),
+          kdfIterations: CURRENT_KDF_ITERATIONS,
         };
         await setDoc(metaRef, meta);
         this.salt = salt;
@@ -140,7 +159,7 @@ export class EncryptionService {
 
       const meta = metaSnap.data() as EncryptionMeta;
       const salt = this.base64ToBytes(meta.salt);
-      const { key, raw } = await this.deriveMasterKey(passphrase, salt);
+      const { key, raw } = await this.deriveMasterKey(passphrase, salt, meta.kdfIterations ?? LEGACY_KDF_ITERATIONS);
       const verifier = await this.decryptStringWithKey(meta.verifier, meta.verifierIv, key);
       if (verifier !== VERIFIER_TEXT) {
         throw new Error('Encryption passphrase is incorrect.');
@@ -185,7 +204,7 @@ export class EncryptionService {
     }
     const code = this.generateRecoveryCode();
     const salt = crypto.getRandomValues(new Uint8Array(16));
-    const kek = await this.deriveKekFromCode(code, salt);
+    const kek = await this.deriveKekFromCode(code, salt, RECOVERY_ITERATIONS);
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const wrapped = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, kek, this.masterKeyRaw as BufferSource);
     const record: RecoveryRecord = {
@@ -193,6 +212,7 @@ export class EncryptionService {
       iv: this.bytesToBase64(iv),
       salt: this.bytesToBase64(salt),
       createdAt: Date.now(),
+      iterations: RECOVERY_ITERATIONS,
     };
     await setDoc(doc(this.db, `users/${user.uid}/meta/keys`), { recovery: record }, { merge: true });
     this.hasRecoveryCode.set(true);
@@ -217,7 +237,11 @@ export class EncryptionService {
       const keysSnap = await getDoc(doc(this.db, `users/${user.uid}/meta/keys`));
       const record = (keysSnap.data() as KeyMeta | undefined)?.recovery;
       if (!record) throw new Error('No recovery code is set for this account.');
-      const kek = await this.deriveKekFromCode(this.normalizeCode(code), this.base64ToBytes(record.salt));
+      const kek = await this.deriveKekFromCode(
+        this.normalizeCode(code),
+        this.base64ToBytes(record.salt),
+        record.iterations ?? RECOVERY_ITERATIONS,
+      );
       let raw: ArrayBuffer;
       try {
         raw = await crypto.subtle.decrypt(
@@ -498,9 +522,10 @@ export class EncryptionService {
   }
 
   // Derive the master key from the passphrase, returning both the AES-GCM CryptoKey
-  // and the raw bytes (kept so a recovery code can wrap them). Same 256-bit PBKDF2
-  // output as before, so existing data still decrypts.
-  private async deriveMasterKey(passphrase: string, salt: Uint8Array): Promise<{ key: CryptoKey; raw: Uint8Array }> {
+  // and the raw bytes (kept so a recovery code can wrap them). The iteration count
+  // is per-vault (see EncryptionMeta.kdfIterations) — callers must pass the value
+  // that matches how this vault's verifier/data were actually encrypted.
+  private async deriveMasterKey(passphrase: string, salt: Uint8Array, iterations: number): Promise<{ key: CryptoKey; raw: Uint8Array }> {
     const material = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(passphrase),
@@ -509,7 +534,7 @@ export class EncryptionService {
       ['deriveBits']
     );
     const bits = await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', salt: salt as BufferSource, iterations: 250000, hash: 'SHA-256' },
+      { name: 'PBKDF2', salt: salt as BufferSource, iterations, hash: 'SHA-256' },
       material,
       256
     );
@@ -542,7 +567,7 @@ export class EncryptionService {
   }
 
   /** PBKDF2 a recovery code into an AES-GCM key-encryption-key. */
-  private async deriveKekFromCode(code: string, salt: Uint8Array): Promise<CryptoKey> {
+  private async deriveKekFromCode(code: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
     const material = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(this.normalizeCode(code)),
@@ -551,7 +576,7 @@ export class EncryptionService {
       ['deriveKey']
     );
     return crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt: salt as BufferSource, iterations: RECOVERY_ITERATIONS, hash: 'SHA-256' },
+      { name: 'PBKDF2', salt: salt as BufferSource, iterations, hash: 'SHA-256' },
       material,
       { name: 'AES-GCM', length: 256 },
       false,

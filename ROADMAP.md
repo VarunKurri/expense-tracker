@@ -126,9 +126,14 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
   - Done when: export creates encrypted JSON/CSV backup and restore validates schema before importing.
   - Verified: `BackupService.exportVault` decrypts every collection and downloads an AES-GCM file encrypted under a PBKDF2 backup password (separate from the passphrase); `importVault` decrypts, validates the `trackr-backup` format, and restores by document id (references stay intact), portable to a fresh account. Settings → Data has Export / Restore. Round-trip + wrong-password rejection validated with a local test.
 
+- [x] Harden the passphrase KDF (PBKDF2 iteration count).
+  - Why: 250,000 PBKDF2-SHA256 iterations was below OWASP's 2023 baseline (600,000) for browser contexts (WebCrypto has no native Argon2id/scrypt/bcrypt, so PBKDF2 is the right primitive; iteration count is the lever).
+  - Done when: new vaults derive at the stronger count; existing vaults are provably unaffected (no forced re-encryption, no lockout risk).
+  - Verified: the iteration count is now stored per-vault (`meta/encryption.kdfIterations`) — new vaults get `CURRENT_KDF_ITERATIONS = 600_000`; vaults created before this change have no stored value and fall back to `LEGACY_KDF_ITERATIONS = 250_000`, deriving the byte-identical key they always have (confirmed with a local Node/WebCrypto test: same passphrase+salt+250k iterations produces identical output pre/post-refactor). The recovery-code KEK derivation was made the same per-record-versioned shape for future-proofing (value unchanged for now — a high-entropy random code doesn't need the urgency a human passphrase does). `ng build` passes; deployed. Existing vaults can only move to the stronger count via a full re-encrypt, which is exactly the passphrase-rotation item below — no separate migration built here.
+
 - [ ] Add encryption passphrase rotation.
   - Why: users may need to change the vault passphrase without losing data.
-  - Done when: authenticated users can re-encrypt all records with a new passphrase after confirming the old one. (Needs the master key decoupled from the passphrase — random DEK wrapped by KEKs — so it's a re-encrypt migration; deferred.)
+  - Done when: authenticated users can re-encrypt all records with a new passphrase after confirming the old one. (Needs the master key decoupled from the passphrase — random DEK wrapped by KEKs — so it's a re-encrypt migration; deferred.) Rotating also naturally upgrades the vault to the current KDF iteration count (see above) — no separate "upgrade my KDF" feature is needed once this exists.
 
 - [x] Add recovery guidance for forgotten passphrases.
   - Why: account password reset cannot recover encrypted finance records.
