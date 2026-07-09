@@ -161,6 +161,11 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
   - Why: future changes will be safer if core architecture decisions are easy to find.
   - Done when: docs explain collections, encrypted payload shape, migration, rules, and release steps.
 
+- [ ] Get a custom domain and finish branded/deliverable auth emails.
+  - Why: Firebase's default `*.firebaseapp.com` sender lands password-reset/verification emails in spam, and Firebase refuses to let the Action URL point at a default `*.web.app`/`*.vercel.app` domain (confirmed: saving it returns `EMAIL_TEMPLATE_UPDATE_NOT_ALLOWED`) — both require a domain the user owns and verifies via DNS (TXT/CNAME), which is true across every provider (Firebase, Auth0, etc.), not a Firebase-specific limitation.
+  - Done when: a real domain is purchased (~$1-10/yr, e.g. Cloudflare Registrar or a Namecheap/Porkbun promo TLD) and connected via Firebase's custom-domain flow for both (a) the auth email sending domain and (b) the Action URL, which is then pointed at the already-built, already-deployed branded `/auth/action` page (`src/app/pages/auth-action/`, live at `expense-tracker-ai-5e35a.web.app/auth/action`) instead of Firebase's default hosted page. No further app code changes needed — this is purely the domain purchase + Console/DNS configuration.
+  - Note: also set the Firebase project's "Public-facing name" (Project settings → General) to `Trackr` — fixes the `%APP_NAME%` placeholder currently showing `project-772405031663` in email subjects/footers; doesn't require a domain and can be done anytime.
+
 ## Phase 7: Plaid Bank Integration
 
 Connect real bank accounts through Plaid so transactions are fetched and categorized automatically instead of entered by hand. This phase introduces a Firebase Cloud Functions backend (the Plaid secret and all Plaid API calls must run server-side) while keeping Plaid item data in Firestore alongside the rest of the app. Sandbox first via an environment variable, then production. Build and verify one item at a time.
