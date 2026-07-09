@@ -117,6 +117,48 @@ export const exchangePublicToken = onCall(
   },
 );
 
+/**
+ * Mint a Link token in Plaid's "update mode" for an item that needs re-auth
+ * (expired/revoked login). Passing the item's existing access_token instead of
+ * `products` puts Link into update mode: same item_id, same access_token stays
+ * valid — the user just re-authenticates at their bank. No new exchange needed;
+ * Plaid clears the item's error state once update-mode Link completes.
+ */
+export const createReauthLinkToken = onCall(
+  { secrets: [plaidClientId, plaidSecret, tokenEncKey] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'You must be signed in.');
+    }
+    const uid = request.auth.uid;
+    const itemId = (request.data?.item_id ?? '').toString().trim();
+    if (!itemId) throw new HttpsError('invalid-argument', 'An item_id is required.');
+
+    const itemSnap = await getFirestore().doc(`users/${uid}/plaidItems/${itemId}`).get();
+    if (!itemSnap.exists) throw new HttpsError('not-found', 'That linked bank was not found.');
+
+    const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
+    const webhook = plaidWebhookUrl.value();
+
+    try {
+      const accessToken = decryptToken(itemSnap.data()!.accessToken as EncryptedValue, tokenEncKey.value());
+      const resp = await client.linkTokenCreate({
+        user: { client_user_id: uid },
+        client_name: 'Trackr',
+        country_codes: [CountryCode.Us],
+        language: 'en',
+        access_token: accessToken,
+        ...(webhook ? { webhook } : {}),
+      });
+      return { link_token: resp.data.link_token, expiration: resp.data.expiration };
+    } catch (err: any) {
+      const plaidError = err?.response?.data;
+      console.error('createReauthLinkToken failed:', plaidError || err);
+      throw new HttpsError('internal', plaidError?.error_message || err?.message || 'Failed to start reconnection.');
+    }
+  },
+);
+
 // --- Transaction sync ---------------------------------------------------------
 
 /** Read a user's plaintext RSA public key (SPKI base64) for envelope encryption. */
@@ -170,10 +212,27 @@ function envelopeDoc(mapped: Record<string, unknown>, publicKey: string) {
   };
 }
 
-interface SyncTotals {
+interface ItemSyncTotals {
   added: number;
   modified: number;
   removed: number;
+}
+
+interface SyncTotals extends ItemSyncTotals {
+  failed: { itemId: string; institutionName: string; status: string }[];
+}
+
+/** Plaid item error codes that mean "user must re-authenticate at their bank". */
+const REAUTH_ERROR_CODES = new Set([
+  'ITEM_LOGIN_REQUIRED',
+  'PENDING_EXPIRATION',
+  'USER_PERMISSION_REVOKED',
+  'USER_ACCOUNT_REVOKED',
+  'PENDING_DISCONNECT',
+]);
+
+function statusForErrorCode(code: string | undefined): 'login_required' | 'error' {
+  return code && REAUTH_ERROR_CODES.has(code) ? 'login_required' : 'error';
 }
 
 /**
@@ -189,14 +248,14 @@ async function syncItem(
   client: PlaidApi,
   tokenEncKeyValue: string,
   publicKey: string,
-): Promise<SyncTotals> {
+): Promise<ItemSyncTotals> {
   const db = getFirestore();
   const item = itemDoc.data();
   if (!item) return { added: 0, modified: 0, removed: 0 };
   const accessToken = decryptToken(item.accessToken as EncryptedValue, tokenEncKeyValue);
   const txCol = db.collection(`users/${uid}/transactions`);
 
-  const totals: SyncTotals = { added: 0, modified: 0, removed: 0 };
+  const totals: ItemSyncTotals = { added: 0, modified: 0, removed: 0 };
   let cursor: string | undefined = item.cursor || undefined;
   let hasMore = true;
 
@@ -241,7 +300,7 @@ async function syncUser(
 
   const db = getFirestore();
   const itemsSnap = await db.collection(`users/${uid}/plaidItems`).get();
-  const totals: SyncTotals = { added: 0, modified: 0, removed: 0 };
+  const totals: SyncTotals = { added: 0, modified: 0, removed: 0, failed: [] };
 
   for (const itemDoc of itemsSnap.docs) {
     // Keep the reverse index fresh (covers items linked before it existed).
@@ -255,11 +314,13 @@ async function syncUser(
       const plaidError = err?.response?.data;
       console.error(`sync failed for item ${itemDoc.id}:`, plaidError || err);
       const code = plaidError?.error_code;
-      // ITEM_LOGIN_REQUIRED etc. → flag for the re-auth flow (later milestone).
+      const status = statusForErrorCode(code);
       await itemDoc.ref.set(
-        { status: code === 'ITEM_LOGIN_REQUIRED' ? 'login_required' : 'error', lastError: code || 'sync_failed', updatedAt: Date.now() },
+        { status, lastError: code || 'sync_failed', updatedAt: Date.now() },
         { merge: true },
       );
+      const institutionName = (itemDoc.data()?.institutionName as string) || 'Your bank';
+      totals.failed.push({ itemId: itemDoc.id, institutionName, status });
     }
   }
 
@@ -441,11 +502,9 @@ export const plaidWebhook = onRequest(
     const { webhook_type, webhook_code, item_id } = req.body ?? {};
     console.log('Plaid webhook:', webhook_type, webhook_code, item_id);
 
-    // Only transaction updates drive a sync; ITEM errors are handled by the
-    // re-auth/error milestone.
     if (webhook_type === 'TRANSACTIONS' && item_id) {
+      const uid = await uidForItem(item_id);
       try {
-        const uid = await uidForItem(item_id);
         const publicKey = uid ? await getUserPublicKey(uid) : null;
         if (uid && publicKey) {
           const itemDoc = await getFirestore().doc(`users/${uid}/plaidItems/${item_id}`).get();
@@ -456,8 +515,44 @@ export const plaidWebhook = onRequest(
         } else {
           console.warn('Webhook: no user/public key for item', item_id);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Webhook sync failed for', item_id, err);
+        if (uid) {
+          const code = err?.response?.data?.error_code;
+          await getFirestore().doc(`users/${uid}/plaidItems/${item_id}`).set(
+            { status: statusForErrorCode(code), lastError: code || 'sync_failed', updatedAt: Date.now() },
+            { merge: true },
+          ).catch(() => {}); // best-effort — don't let a status-flag failure break the ack
+        }
+      }
+    }
+
+    // ITEM webhooks report the item's health directly, independent of any sync
+    // attempt — this is how Plaid tells us proactively that re-auth is needed
+    // (or that it recovered) rather than us only discovering it on next sync.
+    if (webhook_type === 'ITEM' && item_id) {
+      try {
+        const uid = await uidForItem(item_id);
+        if (uid) {
+          const itemRef = getFirestore().doc(`users/${uid}/plaidItems/${item_id}`);
+          if (webhook_code === 'LOGIN_REPAIRED') {
+            await itemRef.set({ status: 'active', lastError: null, updatedAt: Date.now() }, { merge: true });
+          } else if (webhook_code === 'ERROR') {
+            const code = req.body?.error?.error_code as string | undefined;
+            await itemRef.set(
+              { status: statusForErrorCode(code), lastError: code || 'item_error', updatedAt: Date.now() },
+              { merge: true },
+            );
+          } else if (webhook_code === 'PENDING_EXPIRATION' || webhook_code === 'PENDING_DISCONNECT') {
+            await itemRef.set(
+              { status: 'login_required', lastError: webhook_code, updatedAt: Date.now() },
+              { merge: true },
+            );
+          }
+          // Other ITEM codes (e.g. WEBHOOK_UPDATE_ACKNOWLEDGED) need no status change.
+        }
+      } catch (err) {
+        console.error('Webhook ITEM handling failed for', item_id, err);
       }
     }
 

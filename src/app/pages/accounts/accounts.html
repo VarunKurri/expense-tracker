@@ -52,16 +52,26 @@
           <div class="bank-row">
             <div class="bank-info">
               <span class="bank-name">🏦 {{ item.institutionName }}</span>
-              @if (item.status && item.status !== 'active') {
-                <span class="bank-status" [class.warn]="item.status !== 'active'">{{ item.status }}</span>
+              @if (needsReconnect(item)) {
+                <span class="bank-status warn">⚠️ {{ statusLabel(item) }}</span>
               }
             </div>
-            <button
-              class="btn btn-danger-outline"
-              (click)="askDisconnect(item)"
-              [disabled]="plaidSvc.disconnectingId() === item.itemId">
-              {{ plaidSvc.disconnectingId() === item.itemId ? 'Disconnecting…' : 'Disconnect' }}
-            </button>
+            <div class="bank-actions">
+              @if (needsReconnect(item)) {
+                <button
+                  class="btn btn-primary-outline"
+                  (click)="reconnectItem(item)"
+                  [disabled]="plaidSvc.reauthenticatingId() === item.itemId">
+                  {{ plaidSvc.reauthenticatingId() === item.itemId ? 'Reconnecting…' : 'Reconnect' }}
+                </button>
+              }
+              <button
+                class="btn btn-danger-outline"
+                (click)="askDisconnect(item)"
+                [disabled]="plaidSvc.disconnectingId() === item.itemId">
+                {{ plaidSvc.disconnectingId() === item.itemId ? 'Disconnecting…' : 'Disconnect' }}
+              </button>
+            </div>
           </div>
         }
       </div>

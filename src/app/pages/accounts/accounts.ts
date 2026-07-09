@@ -131,6 +131,21 @@ export class Accounts {
     this.plaidSvc.syncTransactions();
   }
 
+  reconnectItem(item: PlaidItem) {
+    this.plaidSvc.reconnect(item);
+  }
+
+  /** Friendly label for an item's raw Plaid status. */
+  statusLabel(item: PlaidItem): string {
+    if (item.status === 'login_required') return 'Needs reconnect';
+    if (item.status === 'error') return 'Sync error';
+    return item.status || '';
+  }
+
+  needsReconnect(item: PlaidItem): boolean {
+    return item.status === 'login_required' || item.status === 'error';
+  }
+
   askDisconnect(item: PlaidItem) {
     this.itemToDisconnect.set(item);
     this.disconnectOpen.set(true);

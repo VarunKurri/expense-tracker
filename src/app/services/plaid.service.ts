@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, NgZone } from '@angular/core';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Firestore } from '@angular/fire/firestore';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { Observable, of, switchMap } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
@@ -60,6 +60,7 @@ interface SyncResult {
   added: number;
   modified: number;
   removed: number;
+  failed: { itemId: string; institutionName: string; status: string }[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -80,6 +81,9 @@ export class PlaidService {
 
   /** item_id currently being disconnected (for per-row button state). */
   disconnectingId = signal<string | null>(null);
+
+  /** item_id currently going through re-auth (Plaid Link update mode). */
+  reauthenticatingId = signal<string | null>(null);
 
   /** Live list of linked banks (Plaid items). Metadata is plaintext, so no unlock needed. */
   private items$: Observable<PlaidItem[]> = toObservable(this.auth.user).pipe(
@@ -250,6 +254,10 @@ export class PlaidService {
           `Synced: ${data.added} added, ${data.modified} updated, ${data.removed} removed.`,
         );
       }
+      if (data.failed.length > 0) {
+        const names = data.failed.map(f => f.institutionName).join(', ');
+        this.toast.error(`${names} — reconnect needed. See Accounts to fix.`);
+      }
     } catch (err: any) {
       console.error('syncTransactions failed:', err);
       this.toast.error(err?.message || 'Could not sync transactions. Please try again.');
@@ -283,6 +291,59 @@ export class PlaidService {
       this.toast.error(err?.message || 'Could not disconnect this bank. Please try again.');
     } finally {
       this.disconnectingId.set(null);
+    }
+  }
+
+  /**
+   * Re-authenticate a bank that needs it (expired/revoked login): opens Plaid
+   * Link in "update mode" for this exact item, so the user re-logs in at their
+   * bank without creating a duplicate item. Update mode doesn't need a fresh
+   * token exchange — the existing access_token stays valid — so on success we
+   * just clear the item's error status locally.
+   */
+  async reconnect(item: PlaidItem): Promise<void> {
+    if (this.reauthenticatingId()) return;
+    this.reauthenticatingId.set(item.itemId);
+
+    try {
+      await this.loadLinkScript();
+
+      const createReauthLinkToken = httpsCallable<{ item_id: string }, CreateLinkTokenResult>(
+        this.functions,
+        'createReauthLinkToken',
+      );
+      const { data } = await createReauthLinkToken({ item_id: item.itemId });
+
+      const handler = (window as any).Plaid.create({
+        token: data.link_token,
+        onSuccess: () => {
+          this.ngZone.run(async () => {
+            const user = this.auth.user();
+            if (user) {
+              await updateDoc(doc(this.db, `users/${user.uid}/plaidItems/${item.itemId}`), {
+                status: 'active',
+                lastError: null,
+              }).catch(() => {});
+            }
+            this.toast.success(`${item.institutionName} reconnected.`);
+          });
+        },
+        onExit: (err: any) => {
+          this.ngZone.run(() => {
+            if (err) {
+              console.error('Reconnect exit error:', err);
+              this.toast.error(err.display_message || err.error_message || 'Reconnection cancelled.');
+            }
+          });
+        },
+      });
+
+      handler.open();
+    } catch (err: any) {
+      console.error('reconnect failed:', err);
+      this.toast.error(err?.message || 'Could not start reconnection. Please try again.');
+    } finally {
+      this.reauthenticatingId.set(null);
     }
   }
 }

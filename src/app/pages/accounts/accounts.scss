@@ -158,6 +158,13 @@
     }
   }
 
+  .bank-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
   .btn-danger-outline {
     cursor: pointer;
     white-space: nowrap;
@@ -166,6 +173,17 @@
     background: transparent;
 
     &:hover { background: var(--red-bg); }
+    &:disabled { opacity: 0.6; cursor: default; }
+  }
+
+  .btn-primary-outline {
+    cursor: pointer;
+    white-space: nowrap;
+    color: var(--green);
+    border-color: var(--line);
+    background: transparent;
+
+    &:hover { background: var(--green-bg, rgba(0, 214, 79, 0.12)); }
     &:disabled { opacity: 0.6; cursor: default; }
   }
 }
