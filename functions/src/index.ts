@@ -404,24 +404,47 @@ export const disconnectPlaidItem = onCall(
     const itemSnap = await itemRef.get();
     if (!itemSnap.exists) throw new HttpsError('not-found', 'That linked bank was not found.');
 
+    const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
+    const accessToken = decryptToken(itemSnap.data()!.accessToken as EncryptedValue, tokenEncKey.value());
+
+    // Look up this item's Plaid account_ids *before* removing the item — the
+    // access token stops working right after itemRemove. These back up the
+    // plaidItemId filter below in case any transaction is missing that field.
+    let accountIds: string[] = [];
+    try {
+      const accountsResp = await client.accountsGet({ access_token: accessToken });
+      accountIds = accountsResp.data.accounts.map(a => a.account_id);
+    } catch (err: any) {
+      console.warn('accountsGet failed (continuing with plaidItemId-only cleanup):', err?.response?.data || err?.message);
+    }
+
     // Best-effort remove at Plaid (ignore if already gone / token invalid).
     try {
-      const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
-      const accessToken = decryptToken(itemSnap.data()!.accessToken as EncryptedValue, tokenEncKey.value());
       await client.itemRemove({ access_token: accessToken });
     } catch (err: any) {
       console.warn('itemRemove failed (continuing cleanup):', err?.response?.data || err?.message);
     }
 
-    // Delete this item's synced transactions (plaintext plaidItemId filter).
-    const txSnap = await db
-      .collection(`users/${uid}/transactions`)
-      .where('plaidItemId', '==', itemId)
-      .get();
+    // Delete this item's synced transactions. Primary filter is the plaintext
+    // plaidItemId field; a second query on plaidAccountId (chunked to Firestore's
+    // 10-value `in` limit) catches any doc where plaidItemId is missing/stale, so
+    // a partial write or older sync doesn't leave orphaned transactions behind.
+    const txCol = db.collection(`users/${uid}/transactions`);
+    const toDelete = new Map<string, FirebaseFirestore.DocumentReference>();
+
+    const byItem = await txCol.where('plaidItemId', '==', itemId).get();
+    for (const doc of byItem.docs) toDelete.set(doc.ref.path, doc.ref);
+
+    for (let i = 0; i < accountIds.length; i += 10) {
+      const chunk = accountIds.slice(i, i + 10);
+      const byAccount = await txCol.where('plaidAccountId', 'in', chunk).get();
+      for (const doc of byAccount.docs) toDelete.set(doc.ref.path, doc.ref);
+    }
+
     let removedTx = 0;
     let batch = db.batch();
-    for (const doc of txSnap.docs) {
-      batch.delete(doc.ref);
+    for (const ref of toDelete.values()) {
+      batch.delete(ref);
       removedTx++;
       if (removedTx % 400 === 0) {
         await batch.commit();
