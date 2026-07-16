@@ -85,6 +85,9 @@ export class PlaidService {
   /** item_id currently going through re-auth (Plaid Link update mode). */
   reauthenticatingId = signal<string | null>(null);
 
+  /** True while an on-demand institution refresh is in flight. */
+  refreshing = signal(false);
+
   /** Live list of linked banks (Plaid items). Metadata is plaintext, so no unlock needed. */
   private items$: Observable<PlaidItem[]> = toObservable(this.auth.user).pipe(
     switchMap(user => {
@@ -263,6 +266,38 @@ export class PlaidService {
       this.toast.error(err?.message || 'Could not sync transactions. Please try again.');
     } finally {
       this.syncing.set(false);
+    }
+  }
+
+  /**
+   * Ask Plaid to proactively re-poll every linked institution right now (outside
+   * their normal cadence), rather than waiting for the next scheduled sync. Useful
+   * to check whether a low transaction count is a timing issue or a real limit on
+   * how much history that institution shares — if a refresh + resync still shows
+   * the same count, the institution itself is capping what it returns.
+   * The webhook picks up any new data automatically; wait a few seconds after this
+   * resolves, then use "Sync transactions" to pull in whatever Plaid found.
+   */
+  async refreshInstitutions(): Promise<void> {
+    if (this.refreshing()) return;
+    this.refreshing.set(true);
+    try {
+      const refresh = httpsCallable<
+        unknown,
+        { results: { itemId: string; institutionName: string; ok: boolean; error?: string }[] }
+      >(this.functions, 'refreshPlaidItems');
+      const { data } = await refresh();
+      const failed = data.results.filter(r => !r.ok);
+      if (failed.length > 0) {
+        this.toast.error(`Refresh failed for ${failed.map(f => f.institutionName).join(', ')}.`);
+      } else {
+        this.toast.success('Refresh requested. Give it 10-30s, then Sync transactions.');
+      }
+    } catch (err: any) {
+      console.error('refreshInstitutions failed:', err);
+      this.toast.error(err?.message || 'Could not request a refresh. Please try again.');
+    } finally {
+      this.refreshing.set(false);
     }
   }
 

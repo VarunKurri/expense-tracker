@@ -131,6 +131,10 @@ export class Accounts {
     this.plaidSvc.syncTransactions();
   }
 
+  refreshInstitutions() {
+    this.plaidSvc.refreshInstitutions();
+  }
+
   reconnectItem(item: PlaidItem) {
     this.plaidSvc.reconnect(item);
   }

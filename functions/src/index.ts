@@ -344,6 +344,43 @@ export const syncTransactions = onCall(
 );
 
 /**
+ * Ask Plaid to proactively re-poll the institution right now, outside its normal
+ * polling cadence. Useful when a user suspects transactions are missing — e.g. an
+ * institution that only just posted data, or as a way to confirm whether a low
+ * transaction count is a timing issue vs. a real limit on how much history that
+ * institution shares. Plaid fires TRANSACTIONS/DEFAULT_UPDATE (and
+ * SYNC_UPDATES_AVAILABLE) via our existing webhook once the refresh completes, so
+ * no separate sync call is needed here — just trigger and wait for the webhook.
+ */
+export const refreshPlaidItems = onCall(
+  { secrets: [plaidClientId, plaidSecret, tokenEncKey] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'You must be signed in.');
+    }
+    const uid = request.auth.uid;
+    const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
+    const db = getFirestore();
+    const itemsSnap = await db.collection(`users/${uid}/plaidItems`).get();
+
+    const results: { itemId: string; institutionName: string; ok: boolean; error?: string }[] = [];
+    for (const itemDoc of itemsSnap.docs) {
+      const institutionName = (itemDoc.data()?.institutionName as string) || 'Your bank';
+      try {
+        const accessToken = decryptToken(itemDoc.data()!.accessToken as EncryptedValue, tokenEncKey.value());
+        await client.transactionsRefresh({ access_token: accessToken });
+        results.push({ itemId: itemDoc.id, institutionName, ok: true });
+      } catch (err: any) {
+        const message = err?.response?.data?.error_message || err?.message || 'Refresh failed.';
+        console.error(`transactionsRefresh failed for item ${itemDoc.id}:`, err?.response?.data || err);
+        results.push({ itemId: itemDoc.id, institutionName, ok: false, error: message });
+      }
+    }
+    return { results };
+  },
+);
+
+/**
  * Return the accounts held under a linked Plaid item (name, mask, type, balance)
  * so the client can auto-create matching app accounts. Not stored server-side —
  * the client owns (and encrypts) the app accounts.
