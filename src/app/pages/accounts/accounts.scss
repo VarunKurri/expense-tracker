@@ -247,3 +247,28 @@
 
   .btn { cursor: pointer; }
 }
+
+.reassign-warning {
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-hi);
+
+  .reassign-note {
+    font-size: 13px;
+    color: var(--fg-3);
+    margin: 0 0 8px;
+  }
+
+  .reassign-bill-list {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13.5px;
+    color: var(--fg);
+  }
+}

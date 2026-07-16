@@ -133,8 +133,30 @@
   <app-confirm
     [open]="confirmOpen()"
     title="Delete account?"
-    [message]="'This will permanently delete &quot;' + (accountToDelete()?.name || '') + '&quot;. Existing transactions will still exist but will lose their link. This cannot be undone.'"
-    confirmText="Delete account"
+    [message]="'This will remove &quot;' + (accountToDelete()?.name || '') + '&quot; from your accounts list. Existing transactions keep their history and stay searchable.'"
+    [confirmText]="affectedBills().length > 0 ? 'Reassign & delete' : 'Delete account'"
     (confirmed)="confirmDelete()"
-    (cancelled)="cancelDelete()" />
+    (cancelled)="cancelDelete()">
+    @if (affectedBills().length > 0) {
+      <div class="reassign-warning">
+        <p class="reassign-note">
+          {{ affectedBills().length }} bill{{ affectedBills().length === 1 ? '' : 's' }} still
+          {{ affectedBills().length === 1 ? 'points' : 'point' }} at this account, so future payments would
+          silently attach to it after it's hidden. Move
+          {{ affectedBills().length === 1 ? 'it' : 'them' }} to:
+        </p>
+        <ul class="reassign-bill-list">
+          @for (b of affectedBills(); track b.id) {
+            <li>{{ b.icon }} {{ b.name }}</li>
+          }
+        </ul>
+        <select class="input-field" [ngModel]="reassignAccountId()" (ngModelChange)="reassignAccountId.set($event)">
+          <option value="">No account (leave unlinked)</option>
+          @for (a of reassignOptions(); track a.id) {
+            <option [value]="a.id">{{ a.icon }} {{ a.name }}</option>
+          }
+        </select>
+      </div>
+    }
+  </app-confirm>
 </div>

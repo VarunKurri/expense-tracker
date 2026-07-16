@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AccountService } from '../../services/account.service';
 import { TransactionService } from '../../services/transaction.service';
+import { BillService } from '../../services/bill.service';
 import { AccountForm } from './account-form/account-form';
 import { AccountCard } from './account-card/account-card';
 import { SummaryBar } from './summary-bar/summary-bar';
 import { Confirm } from '../../components/confirm/confirm';
 import { Modal } from '../../components/modal/modal';
-import { Account } from '../../models';
+import { Account, Bill } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { PlaidService, PlaidItem } from '../../services/plaid.service';
 
@@ -25,12 +26,18 @@ export class Accounts {
   private toastService = inject(ToastService);
   accountSvc     = inject(AccountService);
   transactionSvc = inject(TransactionService);
+  billSvc        = inject(BillService);
   plaidSvc       = inject(PlaidService);
 
   formOpen        = signal(false);
   editingAccount  = signal<Account | null>(null);
   confirmOpen     = signal(false);
   accountToDelete = signal<Account | null>(null);
+
+  // Safeguard: bills still pointing at the account being deleted, and where to
+  // move them so a future "Pay bill" doesn't silently attach to a hidden account.
+  affectedBills    = signal<Bill[]>([]);
+  reassignAccountId = signal<string>('');
 
   disconnectOpen  = signal(false);
   itemToDisconnect = signal<PlaidItem | null>(null);
@@ -190,20 +197,35 @@ export class Accounts {
     const account = this.editingAccount();
     if (!account) return;
     this.accountToDelete.set(account);
+    this.affectedBills.set(this.billSvc.bills().filter(b => b.accountId === account.id));
+    this.reassignAccountId.set('');
     this.formOpen.set(false);
     this.confirmOpen.set(true);
   }
+
+  // Other active accounts a bill could move to instead of being left unlinked.
+  reassignOptions = computed(() =>
+    this.activeAccounts().filter(a => a.id !== this.accountToDelete()?.id)
+  );
 
   async confirmDelete() {
     const account = this.accountToDelete();
     if (!account?.id) return;
     try {
+      const bills = this.affectedBills();
+      if (bills.length > 0) {
+        const newAccountId = this.reassignAccountId() || undefined;
+        for (const b of bills) {
+          if (b.id) await this.billSvc.update(b.id, { accountId: newAccountId });
+        }
+      }
       await this.accountSvc.remove(account.id);
     } catch (err) {
       this.toastService.error('Failed to delete. Please try again.');
     } finally {
       this.confirmOpen.set(false);
       this.accountToDelete.set(null);
+      this.affectedBills.set([]);
       this.editingAccount.set(null);
     }
   }
@@ -211,5 +233,6 @@ export class Accounts {
   cancelDelete() {
     this.confirmOpen.set(false);
     this.accountToDelete.set(null);
+    this.affectedBills.set([]);
   }
 }

@@ -16,6 +16,7 @@ export interface Account {
   // Plaid (set for auto-created bank accounts)
   plaidAccountId?: string;   // links synced transactions (via their plaidAccountId) to this account
   plaidItemId?: string;      // which linked bank — for cleanup on disconnect
+  openingBalanceSeeded?: boolean; // true once openingBalance has been reconciled against Plaid's real balance
 
   // Credit card specific
   creditLimit?: number;

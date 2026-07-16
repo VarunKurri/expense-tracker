@@ -6,9 +6,11 @@ import { Observable, of, switchMap } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
 import { AccountService } from './account.service';
+import { TransactionService } from './transaction.service';
 import { ReconciliationService } from './reconciliation.service';
 import { ToastService } from './toast.service';
 import { Account, AccountType } from '../models';
+import { roundMoney } from '../utils/finance';
 
 /** A linked bank (Plaid item). Metadata is plaintext; the access token is not stored here. */
 export interface PlaidItem {
@@ -73,6 +75,7 @@ export class PlaidService {
   private db = inject(Firestore);
   private auth = inject(AuthService);
   private accountSvc = inject(AccountService);
+  private txService = inject(TransactionService);
   private reconcileSvc = inject(ReconciliationService);
   private toast = inject(ToastService);
   private ngZone = inject(NgZone);
@@ -221,6 +224,21 @@ export class PlaidService {
           if (!match.minimumPayment && a.minimum_payment) patch.minimumPayment = a.minimum_payment;
           if (!match.paymentDueDay && a.payment_due_day) patch.paymentDueDay = a.payment_due_day;
           if (!match.statementClosingDay && a.statement_closing_day) patch.statementClosingDay = a.statement_closing_day;
+          // One-time opening-balance reconciliation: accounts are auto-created with
+          // openingBalance 0, so the locally-computed balance only reflects whatever
+          // history Plaid happened to sync — it's wrong whenever the real account had
+          // activity before that window. Once Plaid reports a real current_balance,
+          // back-solve the opening balance that makes our formula land on it exactly,
+          // using whatever's already synced locally at that moment. Only ever runs
+          // once per account (flagged), so it never fights with balance changes the
+          // user makes afterward.
+          if (!match.openingBalanceSeeded && a.current_balance != null && match.id) {
+            const txDelta = this.txService.balanceForAccount(match.id);
+            patch.openingBalance = roundMoney(
+              match.type === 'credit' ? a.current_balance + txDelta : a.current_balance - txDelta,
+            );
+            patch.openingBalanceSeeded = true;
+          }
           if (Object.keys(patch).length > 0 && match.id) await this.accountSvc.update(match.id, patch);
           continue;
         }
