@@ -29,6 +29,7 @@ interface PlaidAccount {
   type: string;
   subtype: string | null;
   current_balance: number | null;
+  credit_limit: number | null;
 }
 
 /** Map a Plaid account type/subtype onto an app AccountType. */
@@ -207,7 +208,15 @@ export class PlaidService {
       const existing = this.accountSvc.accounts();
 
       for (const a of data.accounts) {
-        if (existing.some(acc => acc.plaidAccountId === a.account_id)) continue;
+        const match = existing.find(acc => acc.plaidAccountId === a.account_id);
+        if (match) {
+          // Already created — backfill creditLimit if Plaid now reports one we
+          // didn't have yet (covers accounts created before this field existed).
+          if (!match.creditLimit && a.credit_limit && match.id) {
+            await this.accountSvc.update(match.id, { creditLimit: a.credit_limit });
+          }
+          continue;
+        }
         const account: Omit<Account, 'id' | 'createdAt'> = {
           name: a.name || `${institutionName} ${a.mask ?? ''}`.trim(),
           type: mapPlaidAccountType(a.type, a.subtype),
@@ -215,6 +224,7 @@ export class PlaidService {
           currency: 'USD',
           institution: institutionName,
           ...(a.mask ? { last4: a.mask } : {}),
+          ...(a.credit_limit ? { creditLimit: a.credit_limit } : {}),
           plaidAccountId: a.account_id,
           plaidItemId: itemId,
           archived: false,

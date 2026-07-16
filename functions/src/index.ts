@@ -411,6 +411,7 @@ export const getPlaidAccounts = onCall(
           type: a.type,
           subtype: a.subtype ?? null,
           current_balance: a.balances?.current ?? null,
+          credit_limit: a.balances?.limit ?? null,
         })),
       };
     } catch (err: any) {
