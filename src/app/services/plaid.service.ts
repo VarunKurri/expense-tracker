@@ -30,6 +30,9 @@ interface PlaidAccount {
   subtype: string | null;
   current_balance: number | null;
   credit_limit: number | null;
+  minimum_payment: number | null;
+  payment_due_day: number | null;
+  statement_closing_day: number | null;
 }
 
 /** Map a Plaid account type/subtype onto an app AccountType. */
@@ -210,11 +213,15 @@ export class PlaidService {
       for (const a of data.accounts) {
         const match = existing.find(acc => acc.plaidAccountId === a.account_id);
         if (match) {
-          // Already created — backfill creditLimit if Plaid now reports one we
-          // didn't have yet (covers accounts created before this field existed).
-          if (!match.creditLimit && a.credit_limit && match.id) {
-            await this.accountSvc.update(match.id, { creditLimit: a.credit_limit });
-          }
+          // Already created — backfill any credit-card fields Plaid now reports
+          // that we didn't have yet (covers accounts created before these fields
+          // existed, or before Liabilities was granted for this item).
+          const patch: Partial<Account> = {};
+          if (!match.creditLimit && a.credit_limit) patch.creditLimit = a.credit_limit;
+          if (!match.minimumPayment && a.minimum_payment) patch.minimumPayment = a.minimum_payment;
+          if (!match.paymentDueDay && a.payment_due_day) patch.paymentDueDay = a.payment_due_day;
+          if (!match.statementClosingDay && a.statement_closing_day) patch.statementClosingDay = a.statement_closing_day;
+          if (Object.keys(patch).length > 0 && match.id) await this.accountSvc.update(match.id, patch);
           continue;
         }
         const account: Omit<Account, 'id' | 'createdAt'> = {
@@ -225,6 +232,9 @@ export class PlaidService {
           institution: institutionName,
           ...(a.mask ? { last4: a.mask } : {}),
           ...(a.credit_limit ? { creditLimit: a.credit_limit } : {}),
+          ...(a.minimum_payment ? { minimumPayment: a.minimum_payment } : {}),
+          ...(a.payment_due_day ? { paymentDueDay: a.payment_due_day } : {}),
+          ...(a.statement_closing_day ? { statementClosingDay: a.statement_closing_day } : {}),
           plaidAccountId: a.account_id,
           plaidItemId: itemId,
           archived: false,

@@ -43,7 +43,7 @@ export const createLinkToken = onCall({ secrets: [plaidClientId, plaidSecret] },
     const resp = await client.linkTokenCreate({
       user: { client_user_id: uid },
       client_name: 'Trackr',
-      products: [Products.Transactions],
+      products: [Products.Transactions, Products.Liabilities],
       country_codes: [CountryCode.Us],
       language: 'en',
       transactions: { days_requested: daysRequested },
@@ -170,6 +170,14 @@ async function getUserPublicKey(uid: string): Promise<string | null> {
 /** Server-only item_id -> uid index so the webhook can find the owning user. */
 async function indexPlaidItem(itemId: string, uid: string): Promise<void> {
   await getFirestore().doc(`plaidItemsByItem/${itemId}`).set({ uid, updatedAt: Date.now() });
+}
+
+/** Extract the day-of-month (1-31) from a Plaid ISO date string, matching the
+ *  app's Account.statementClosingDay/paymentDueDay (day-of-month, not a full date). */
+function dayOfMonth(isoDate: string | null | undefined): number | null {
+  if (!isoDate) return null;
+  const day = Number(isoDate.slice(8, 10));
+  return Number.isFinite(day) && day >= 1 && day <= 31 ? day : null;
 }
 
 /** Map a Plaid transaction onto the app's Transaction shape (as a plain object). */
@@ -402,17 +410,43 @@ export const getPlaidAccounts = onCall(
       const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
       const accessToken = decryptToken(itemSnap.data()!.accessToken as EncryptedValue, tokenEncKey.value());
       const resp = await client.accountsGet({ access_token: accessToken });
+
+      // Liabilities (min payment, due date, statement date) is a separate call and a
+      // separate consent scope. Items linked before Liabilities was requested at Link
+      // time will fail here (e.g. PRODUCT_NOT_READY / no access) — that's expected for
+      // not-yet-relinked items, so we degrade gracefully rather than fail the whole call.
+      const creditByAccountId = new Map<string, { min: number | null; dueDay: number | null; statementDay: number | null }>();
+      try {
+        const liab = await client.liabilitiesGet({ access_token: accessToken });
+        for (const c of liab.data.liabilities?.credit ?? []) {
+          if (!c.account_id) continue;
+          creditByAccountId.set(c.account_id, {
+            min: c.minimum_payment_amount ?? null,
+            dueDay: dayOfMonth(c.next_payment_due_date),
+            statementDay: dayOfMonth(c.last_statement_issue_date),
+          });
+        }
+      } catch (err: any) {
+        console.warn('liabilitiesGet unavailable (item may need re-link for this product):', err?.response?.data?.error_code || err?.message);
+      }
+
       return {
-        accounts: resp.data.accounts.map(a => ({
-          account_id: a.account_id,
-          name: a.name,
-          official_name: a.official_name ?? null,
-          mask: a.mask ?? null,
-          type: a.type,
-          subtype: a.subtype ?? null,
-          current_balance: a.balances?.current ?? null,
-          credit_limit: a.balances?.limit ?? null,
-        })),
+        accounts: resp.data.accounts.map(a => {
+          const credit = creditByAccountId.get(a.account_id);
+          return {
+            account_id: a.account_id,
+            name: a.name,
+            official_name: a.official_name ?? null,
+            mask: a.mask ?? null,
+            type: a.type,
+            subtype: a.subtype ?? null,
+            current_balance: a.balances?.current ?? null,
+            credit_limit: a.balances?.limit ?? null,
+            minimum_payment: credit?.min ?? null,
+            payment_due_day: credit?.dueDay ?? null,
+            statement_closing_day: credit?.statementDay ?? null,
+          };
+        }),
       };
     } catch (err: any) {
       const plaidError = err?.response?.data;
