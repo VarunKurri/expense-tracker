@@ -43,7 +43,13 @@ export class ReconciliationService {
     const txs = this.txService.transactions();
     const ignore = this.ignoreIds();
     const serverPlaid = txs.filter(t => t.plaidTransactionId && t.id === t.plaidTransactionId);
-    const manual = txs.filter(t => !t.plaidTransactionId);
+    // A manual entry merged with an earlier Plaid transaction stays tagged with that
+    // plaidTransactionId forever (see linkAndDrop). If that item was later disconnected
+    // and relinked, the same real-world charge comes back under a brand-new
+    // plaidTransactionId — the old tag is now orphaned, so treat it as manual again
+    // instead of permanently blocking it from ever being reconciled.
+    const livePlaidIds = new Set(serverPlaid.map(p => p.plaidTransactionId!));
+    const manual = txs.filter(t => !t.plaidTransactionId || !livePlaidIds.has(t.plaidTransactionId));
 
     const results: ReconcileMatch[] = [];
     const usedManual = new Set<string>();
@@ -63,8 +69,9 @@ export class ReconciliationService {
     return results;
   });
 
-  /** Merge one pair: keep the manual entry (its merchant/notes/category), link it to
-   *  Plaid, and delete the duplicate bank row. */
+  /** Merge one pair: keep the manual entry's merchant/notes/category, take the
+   *  date and account from the bank row (the source of truth for when/where the
+   *  charge actually happened), link it to Plaid, and delete the duplicate bank row. */
   async merge(match: ReconcileMatch): Promise<void> {
     this.busy.set(true);
     try {
@@ -110,11 +117,14 @@ export class ReconciliationService {
   }
 
   private async linkAndDrop(match: ReconcileMatch): Promise<void> {
-    await this.txService.update(match.manual.id!, {
+    const patch: Partial<Transaction> = {
+      date: match.plaid.date,
       plaidTransactionId: match.plaid.plaidTransactionId,
       plaidItemId: match.plaid.plaidItemId,
       plaidAccountId: match.plaid.plaidAccountId,
-    });
+    };
+    if (match.plaid.accountId) patch.accountId = match.plaid.accountId;
+    await this.txService.update(match.manual.id!, patch);
     await this.txService.remove(match.plaid.id!);
   }
 
