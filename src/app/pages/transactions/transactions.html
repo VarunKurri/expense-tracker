@@ -553,10 +553,20 @@
 <app-confirm
   [open]="bulkConfirmOpen()"
   title="Delete selected transactions?"
-  [message]="'This will permanently delete ' + selectedCount() + ' selected transaction' + (selectedCount() === 1 ? '' : 's') + '. This cannot be undone.'"
+  [message]="'This will permanently delete ' + selectedCount() + ' selected transaction' + (selectedCount() === 1 ? '' : 's') + '. This cannot be undone — review the list below before confirming.'"
   confirmText="Delete selected"
   (confirmed)="confirmBulkDelete()"
-  (cancelled)="bulkConfirmOpen.set(false)" />
+  (cancelled)="bulkConfirmOpen.set(false)">
+  <ul class="bulk-delete-list">
+    @for (tx of selectedTransactions(); track tx.id) {
+      <li>
+        <span class="bdl-merchant">{{ tx.type === 'transfer' ? 'Transfer' : (tx.merchant || 'Untitled') }}</span>
+        <span class="bdl-date">{{ formatDateLabel(tx.date) }}</span>
+        <span class="bdl-amount">{{ formatCurrency(tx.amount) }}</span>
+      </li>
+    }
+  </ul>
+</app-confirm>
 
 <app-reconcile-review
   [open]="reconcileOpen()"

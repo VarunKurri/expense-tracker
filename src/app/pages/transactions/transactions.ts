@@ -606,6 +606,22 @@ export class Transactions {
       this.openedQueryTxId = txId;
       setTimeout(() => this.openView(tx), 0);
     });
+
+    // Clear bulk selection whenever a filter changes. selectedIds otherwise
+    // persists silently across filter changes — select rows under one filter,
+    // switch filters, select more, and a bulk delete would include the earlier
+    // (now off-screen, easy to forget) selections too. Skips the very first run
+    // so entering bulk mode / initial load doesn't wipe a selection that was
+    // never made.
+    let firstFilterRun = true;
+    effect(() => {
+      this.filterType(); this.filterDateRange(); this.filterAccountId();
+      this.filterCategoryId(); this.search(); this.merchantFilter();
+      this.minAmount(); this.maxAmount(); this.customStartDate(); this.customEndDate();
+      this.specialFilter();
+      if (firstFilterRun) { firstFilterRun = false; return; }
+      if (this.bulkMode() && this.selectedIds().size > 0) this.clearSelection();
+    });
   }
 
   async handleSave(data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
