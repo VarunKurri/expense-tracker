@@ -40,6 +40,10 @@ export class Accounts {
   affectedBills    = signal<Bill[]>([]);
   reassignAccountId = signal<string>('');
 
+  // Optional: also delete every transaction on the account being removed (used to
+  // clean up a manual duplicate account once its data lives on a Plaid account).
+  deleteTransactionsToo = signal(false);
+
   disconnectOpen  = signal(false);
   itemToDisconnect = signal<PlaidItem | null>(null);
 
@@ -143,6 +147,14 @@ export class Accounts {
     this.plaidSvc.refreshInstitutions();
   }
 
+  recoverMissing() {
+    this.plaidSvc.recoverMissingTransactions();
+  }
+
+  recalculateBalances() {
+    this.plaidSvc.recalculateOpeningBalances();
+  }
+
   reconnectItem(item: PlaidItem) {
     this.plaidSvc.reconnect(item);
   }
@@ -200,6 +212,7 @@ export class Accounts {
     this.accountToDelete.set(account);
     this.affectedBills.set(this.billSvc.bills().filter(b => b.accountId === account.id));
     this.reassignAccountId.set('');
+    this.deleteTransactionsToo.set(false);
     this.formOpen.set(false);
     this.confirmOpen.set(true);
   }
@@ -208,6 +221,16 @@ export class Accounts {
   reassignOptions = computed(() =>
     this.activeAccounts().filter(a => a.id !== this.accountToDelete()?.id)
   );
+
+  // Every transaction that touches the account being deleted — as its account, or
+  // as either side of a transfer. Shown for review and removed if the user opts in.
+  accountTransactions = computed(() => {
+    const id = this.accountToDelete()?.id;
+    if (!id) return [];
+    return this.transactionSvc.transactions().filter(t =>
+      t.accountId === id || t.fromAccountId === id || t.toAccountId === id
+    );
+  });
 
   async confirmDelete() {
     const account = this.accountToDelete();
@@ -220,6 +243,10 @@ export class Accounts {
           if (b.id) await this.billSvc.update(b.id, { accountId: newAccountId });
         }
       }
+      if (this.deleteTransactionsToo()) {
+        const ids = this.accountTransactions().map(t => t.id).filter((id): id is string => !!id);
+        if (ids.length > 0) await this.transactionSvc.removeMany(ids);
+      }
       await this.accountSvc.remove(account.id);
     } catch (err) {
       this.toastService.error('Failed to delete. Please try again.');
@@ -227,6 +254,7 @@ export class Accounts {
       this.confirmOpen.set(false);
       this.accountToDelete.set(null);
       this.affectedBills.set([]);
+      this.deleteTransactionsToo.set(false);
       this.editingAccount.set(null);
     }
   }
@@ -235,5 +263,6 @@ export class Accounts {
     this.confirmOpen.set(false);
     this.accountToDelete.set(null);
     this.affectedBills.set([]);
+    this.deleteTransactionsToo.set(false);
   }
 }

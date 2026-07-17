@@ -95,6 +95,12 @@ export class PlaidService {
   /** True while an on-demand institution refresh is in flight. */
   refreshing = signal(false);
 
+  /** True while a one-time "recover deleted transactions" pass is running. */
+  recovering = signal(false);
+
+  /** True while recomputing Plaid accounts' opening balances. */
+  recalculating = signal(false);
+
   /** Live list of linked banks (Plaid items). Metadata is plaintext, so no unlock needed. */
   private items$: Observable<PlaidItem[]> = toObservable(this.auth.user).pipe(
     switchMap(user => {
@@ -304,6 +310,81 @@ export class PlaidService {
       this.toast.error(err?.message || 'Could not sync transactions. Please try again.');
     } finally {
       this.syncing.set(false);
+    }
+  }
+
+  /**
+   * One-time recovery for accidentally-deleted synced transactions: re-pull every
+   * linked bank's full history from Plaid and re-create only the transactions whose
+   * records are missing. Non-destructive — existing transactions (and any edits on
+   * them) are left untouched, and the normal incremental sync position is unchanged.
+   */
+  async recoverMissingTransactions(): Promise<void> {
+    if (this.recovering()) return;
+    this.recovering.set(true);
+    try {
+      const recover = httpsCallable<
+        unknown,
+        { totalRecovered: number; results: { itemId: string; institutionName: string; recovered: number; scanned: number }[] }
+      >(this.functions, 'recoverDeletedTransactions');
+      const { data } = await recover();
+      // Make sure accounts exist so recovered transactions map to the right one.
+      await this.setupAllAccounts();
+      // NOTE: deliberately does NOT run cleanupReconciled here. Recovered bank rows
+      // are the correctly-attributed (Plaid-account) version of a transaction; an
+      // older merge may have left a manual entry carrying the same plaidTransactionId
+      // on a *manual* duplicate account, and cleanup would delete the recovered row as
+      // a "duplicate" — reverting the balance fix. Recovery must keep what it restores.
+      if (data.totalRecovered === 0) {
+        this.toast.info('Nothing to recover — all bank transactions are already present.');
+      } else {
+        this.toast.success(`Recovered ${data.totalRecovered} transaction(s). If you see duplicates on old manual accounts, those are the ones to delete.`);
+      }
+    } catch (err: any) {
+      console.error('recoverMissingTransactions failed:', err);
+      this.toast.error(err?.message || 'Could not recover transactions. Please try again.');
+    } finally {
+      this.recovering.set(false);
+    }
+  }
+
+  /**
+   * Recompute each linked account's opening balance from Plaid's authoritative
+   * current balance and the transactions currently present, so the app's balance
+   * lands exactly on Plaid's. Use after a big cleanup (e.g. deleting duplicate
+   * accounts) when the originally-seeded opening balance no longer reflects reality.
+   */
+  async recalculateOpeningBalances(): Promise<void> {
+    if (this.recalculating()) return;
+    this.recalculating.set(true);
+    try {
+      const getAccounts = httpsCallable<{ item_id: string }, { accounts: PlaidAccount[] }>(
+        this.functions,
+        'getPlaidAccounts',
+      );
+      let updated = 0;
+      for (const item of this.linkedItems()) {
+        const { data } = await getAccounts({ item_id: item.itemId });
+        const existing = this.accountSvc.accounts();
+        for (const a of data.accounts) {
+          if (a.current_balance == null) continue;
+          const match = existing.find(acc => acc.plaidAccountId === a.account_id);
+          if (!match?.id) continue;
+          const txDelta = this.txService.balanceForAccount(match.id);
+          const openingBalance = roundMoney(
+            match.type === 'credit' ? a.current_balance + txDelta : a.current_balance - txDelta,
+          );
+          await this.accountSvc.update(match.id, { openingBalance, openingBalanceSeeded: true });
+          updated++;
+        }
+      }
+      if (updated === 0) this.toast.info('No linked accounts to recalculate.');
+      else this.toast.success(`Recalculated opening balance for ${updated} linked account(s).`);
+    } catch (err: any) {
+      console.error('recalculateOpeningBalances failed:', err);
+      this.toast.error(err?.message || 'Could not recalculate. Please try again.');
+    } finally {
+      this.recalculating.set(false);
     }
   }
 

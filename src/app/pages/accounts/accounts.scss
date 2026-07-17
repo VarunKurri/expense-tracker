@@ -272,3 +272,39 @@
     color: var(--fg);
   }
 }
+
+.delete-txns-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--fg-2);
+  cursor: pointer;
+
+  input { margin-top: 2px; accent-color: var(--red); flex-shrink: 0; }
+}
+
+.delete-txns-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--line);
+    &:last-child { border-bottom: none; }
+  }
+
+  .dtl-merchant { flex: 1; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dtl-date { color: var(--fg-3); flex-shrink: 0; }
+  .dtl-amount { color: var(--fg); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+}

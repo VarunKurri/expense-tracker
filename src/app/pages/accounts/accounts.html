@@ -22,6 +22,14 @@
               title="Ask your bank(s) to re-check for data right now, outside the normal schedule">
         {{ plaidSvc.refreshing() ? 'Requesting…' : '⏱️ Refresh from bank' }}
       </button>
+      <button class="btn" (click)="recoverMissing()" [disabled]="plaidSvc.recovering()"
+              title="Re-pull full history from your banks and bring back any synced transactions that were deleted. Won't overwrite anything you still have.">
+        {{ plaidSvc.recovering() ? 'Recovering…' : '♻️ Recover missing' }}
+      </button>
+      <button class="btn" (click)="recalculateBalances()" [disabled]="plaidSvc.recalculating()"
+              title="Recompute linked accounts' opening balance so their balance matches your bank exactly. Use after deleting duplicate accounts.">
+        {{ plaidSvc.recalculating() ? 'Recalculating…' : '⚖️ Fix balances' }}
+      </button>
       <button class="btn-primary" (click)="openNewForm()">+ New Account</button>
     </div>
   </div>
@@ -135,8 +143,12 @@
   <app-confirm
     [open]="confirmOpen()"
     title="Delete account?"
-    [message]="'This will remove &quot;' + (accountToDelete()?.name || '') + '&quot; from your accounts list. Existing transactions keep their history and stay searchable.'"
-    [confirmText]="affectedBills().length > 0 ? 'Reassign & delete' : 'Delete account'"
+    [message]="deleteTransactionsToo()
+      ? 'This will remove &quot;' + (accountToDelete()?.name || '') + '&quot; AND permanently delete the ' + accountTransactions().length + ' transaction(s) below. This cannot be undone.'
+      : 'This will remove &quot;' + (accountToDelete()?.name || '') + '&quot; from your accounts list. Existing transactions keep their history and stay searchable.'"
+    [confirmText]="deleteTransactionsToo()
+      ? 'Delete account + ' + accountTransactions().length + ' txns'
+      : (affectedBills().length > 0 ? 'Reassign & delete' : 'Delete account')"
     (confirmed)="confirmDelete()"
     (cancelled)="cancelDelete()">
     @if (affectedBills().length > 0) {
@@ -159,6 +171,26 @@
           }
         </select>
       </div>
+    }
+
+    @if (accountTransactions().length > 0) {
+      <label class="delete-txns-toggle">
+        <input type="checkbox" [ngModel]="deleteTransactionsToo()"
+               (ngModelChange)="deleteTransactionsToo.set($event)" />
+        <span>Also delete this account's {{ accountTransactions().length }} transaction(s)
+          (use when consolidating a duplicate account onto a linked one)</span>
+      </label>
+      @if (deleteTransactionsToo()) {
+        <ul class="delete-txns-list">
+          @for (t of accountTransactions(); track t.id) {
+            <li>
+              <span class="dtl-merchant">{{ t.type === 'transfer' ? 'Transfer' : (t.merchant || 'Untitled') }}</span>
+              <span class="dtl-date">{{ t.date }}</span>
+              <span class="dtl-amount">{{ formatCurrency(t.amount) }}</span>
+            </li>
+          }
+        </ul>
+      }
     }
   </app-confirm>
 </div>

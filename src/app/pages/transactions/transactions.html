@@ -33,6 +33,34 @@
     </div>
   }
 
+  <!-- INVALID/BLANK TRANSACTIONS BANNER -->
+  @if (invalidTransactions().length > 0) {
+    <div class="reconcile-banner">
+      <div class="rb-text">
+        <span class="rb-icon">🧹</span>
+        <span>
+          <strong>{{ invalidTransactions().length }} blank/invalid transaction(s)</strong>
+          (no amount or missing accounts) — leftovers from an earlier bug.
+        </span>
+      </div>
+      <button class="btn-primary" (click)="invalidConfirmOpen.set(true)">Review &amp; remove</button>
+    </div>
+  }
+
+  <!-- DUPLICATE BANK COPIES BANNER -->
+  @if (duplicateBankCopies().length > 0) {
+    <div class="reconcile-banner">
+      <div class="rb-text">
+        <span class="rb-icon">👯</span>
+        <span>
+          <strong>{{ duplicateBankCopies().length }} raw bank duplicate(s)</strong>
+          of transactions you've edited — keeps your version (notes/category/merchant), removes the bank copy.
+        </span>
+      </div>
+      <button class="btn-primary" (click)="dedupeConfirmOpen.set(true)">Review &amp; remove</button>
+    </div>
+  }
+
   <!-- TOTALS -->
   <div class="totals-row">
     <div class="total-card">
@@ -563,6 +591,42 @@
         <span class="bdl-merchant">{{ tx.type === 'transfer' ? 'Transfer' : (tx.merchant || 'Untitled') }}</span>
         <span class="bdl-date">{{ formatDateLabel(tx.date) }}</span>
         <span class="bdl-amount">{{ formatCurrency(tx.amount) }}</span>
+      </li>
+    }
+  </ul>
+</app-confirm>
+
+<app-confirm
+  [open]="invalidConfirmOpen()"
+  title="Remove blank/invalid transactions?"
+  [message]="'This permanently deletes ' + invalidTransactions().length + ' broken transaction' + (invalidTransactions().length === 1 ? '' : 's') + ' that never held valid data (no amount / missing accounts). The real transactions they were meant to capture already come from your linked banks. This cannot be undone.'"
+  confirmText="Remove them"
+  (confirmed)="confirmDeleteInvalid()"
+  (cancelled)="invalidConfirmOpen.set(false)">
+  <ul class="bulk-delete-list">
+    @for (tx of invalidTransactions(); track tx.id) {
+      <li>
+        <span class="bdl-merchant">{{ tx.type === 'transfer' ? 'Transfer' : (tx.merchant || 'Untitled') }}</span>
+        <span class="bdl-date">{{ tx.date }}</span>
+        <span class="bdl-amount">{{ isFiniteAmount(tx.amount) ? formatCurrency(tx.amount) : '—' }}</span>
+      </li>
+    }
+  </ul>
+</app-confirm>
+
+<app-confirm
+  [open]="dedupeConfirmOpen()"
+  title="Remove raw bank duplicates?"
+  [message]="'For each of these, you already have an edited version (with your merchant name, notes, and category) that is kept. This removes only the ' + duplicateBankCopies().length + ' raw bank-synced duplicate(s) shown below. This cannot be undone.'"
+  confirmText="Remove bank duplicates"
+  (confirmed)="confirmDedupe()"
+  (cancelled)="dedupeConfirmOpen.set(false)">
+  <ul class="bulk-delete-list">
+    @for (tx of duplicateBankCopies(); track tx.id) {
+      <li>
+        <span class="bdl-merchant">{{ tx.type === 'transfer' ? 'Transfer' : (tx.merchant || 'Untitled') }}</span>
+        <span class="bdl-date">{{ tx.date }}</span>
+        <span class="bdl-amount">{{ isFiniteAmount(tx.amount) ? formatCurrency(tx.amount) : '—' }}</span>
       </li>
     }
   </ul>
