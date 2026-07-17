@@ -16,6 +16,9 @@
     </div>
   </div>
 
+  <!-- DECRYPT ERROR BANNER -->
+  <app-error-banner [message]="txService.error()" />
+
   <!-- RECONCILE BANNER -->
   @if (reconcile.matches().length > 0) {
     <div class="reconcile-banner">

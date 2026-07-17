@@ -8,6 +8,7 @@ import { CategoryService } from '../../services/category.service';
 import { TransactionForm } from './transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { ReconcileReview } from '../../components/reconcile-review/reconcile-review';
+import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Transaction } from '../../models';
 import { QuickAddService } from '../../services/quick-add.service';
 import { ToastService } from '../../services/toast.service';
@@ -28,13 +29,13 @@ type QuickEditDraft = {
 @Component({
   selector: 'app-transactions',
   standalone: true,
-  imports: [CommonModule, FormsModule, TransactionForm, Confirm, ReconcileReview],
+  imports: [CommonModule, FormsModule, TransactionForm, Confirm, ReconcileReview, ErrorBanner],
   templateUrl: './transactions.html',
   styleUrl: './transactions.scss',
 })
 export class Transactions {
   private toastService = inject(ToastService);
-  private txService = inject(TransactionService);
+  txService = inject(TransactionService);
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
   private route = inject(ActivatedRoute);

@@ -26,6 +26,8 @@
     </div>
   </div>
 
+  <app-error-banner [message]="accountSvc.error()" />
+
   <app-summary-bar [assets]="assets()" [liabilities]="liabilities()" />
 
   @if (activeAccounts().length === 0) {

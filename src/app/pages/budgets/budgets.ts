@@ -7,6 +7,7 @@ import { CategoryService } from '../../services/category.service';
 import { TransactionService } from '../../services/transaction.service';
 import { BudgetForm } from './budget-form/budget-form';
 import { Confirm } from '../../components/confirm/confirm';
+import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Budget } from '../../models';
 import { ToastService } from '../../services/toast.service';
 
@@ -23,7 +24,7 @@ interface BudgetRow {
 @Component({
   selector: 'app-budgets',
   standalone: true,
-  imports: [CommonModule, FormsModule, BudgetForm, Confirm],
+  imports: [CommonModule, FormsModule, BudgetForm, Confirm, ErrorBanner],
   templateUrl: './budgets.html',
   styleUrl: './budgets.scss'
 })

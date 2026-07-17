@@ -9,6 +9,9 @@
     <button class="btn-primary" (click)="openNew()">+ New Budget</button>
   </div>
 
+  <app-error-banner [message]="budgetService.error()" />
+  <app-error-banner [message]="categoryService.error()" />
+
   <!-- MONTH SELECTOR -->
   <div class="month-nav">
     @for (m of availableMonths(); track m.value) {

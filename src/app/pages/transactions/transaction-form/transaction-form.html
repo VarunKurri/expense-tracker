@@ -2,9 +2,11 @@
   [open]="open"
   [title]="transaction ? 'Edit Transaction' : 'New Transaction'"
   size="md"
-  (closed)="closed.emit()">
+  (closed)="!submitting() && closed.emit()">
 
   <div class="form">
+
+    <app-error-banner [message]="templateService.error()" />
 
     <!-- TYPE TABS -->
     @if (!transaction) {
@@ -274,9 +276,9 @@
         <button class="btn-danger" (click)="deleteRequested.emit()">Delete</button>
       }
       <div class="actions-right">
-        <button class="btn-ghost" (click)="closed.emit()">Cancel</button>
+        <button class="btn-ghost" (click)="closed.emit()" [disabled]="submitting()">Cancel</button>
         <button class="btn-primary" (click)="save()" [disabled]="submitting()">
-          {{ transaction ? 'Save changes' : (isSubscription() && !hasExistingBill() ? 'Add transaction & bill' : 'Add transaction') }}
+          {{ submitting() ? 'Saving…' : (transaction ? 'Save changes' : (isSubscription() && !hasExistingBill() ? 'Add transaction & bill' : 'Add transaction')) }}
         </button>
       </div>
     </div>

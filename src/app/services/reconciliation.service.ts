@@ -43,13 +43,14 @@ export class ReconciliationService {
     const txs = this.txService.transactions();
     const ignore = this.ignoreIds();
     const serverPlaid = txs.filter(t => t.plaidTransactionId && t.id === t.plaidTransactionId);
-    // A manual entry merged with an earlier Plaid transaction stays tagged with that
-    // plaidTransactionId forever (see linkAndDrop). If that item was later disconnected
-    // and relinked, the same real-world charge comes back under a brand-new
-    // plaidTransactionId — the old tag is now orphaned, so treat it as manual again
-    // instead of permanently blocking it from ever being reconciled.
-    const livePlaidIds = new Set(serverPlaid.map(p => p.plaidTransactionId!));
-    const manual = txs.filter(t => !t.plaidTransactionId || !livePlaidIds.has(t.plaidTransactionId));
+    // Once an entry is merged it's permanently excluded from being reconsidered — a
+    // looser rule (re-open matching once the original link target is gone, e.g. after
+    // a disconnect/relink) was tried and reverted: with no merchant check and only a
+    // 3-day/exact-amount match, it let a just-merged entry immediately become
+    // "eligible" again and cascade into matching unrelated same-amount transactions
+    // (recurring charges especially). The Discover disconnect/relink case this was
+    // meant to fix is handled as a one-off manual merge instead.
+    const manual = txs.filter(t => !t.plaidTransactionId);
 
     const results: ReconcileMatch[] = [];
     const usedManual = new Set<string>();

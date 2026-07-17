@@ -29,20 +29,27 @@ export class BillService {
         const unsub = onSnapshot(
           q,
           async snap => {
-            try {
-              const bills = await Promise.all(
-                snap.docs.map(async d => ({ id: d.id, ...(await this.encryption.decryptDoc<Bill>(d.data())) }))
-              );
-              this.ngZone.run(() => {
-                this.error.set(null);
-                sub.next(bills);
-              });
-            } catch (err: any) {
-              this.ngZone.run(() => {
-                this.error.set(err?.message || 'Could not decrypt bills.');
-                sub.next([]);
-              });
+            const results = await Promise.allSettled(
+              snap.docs.map(async d => {
+                try {
+                  return { id: d.id, ...(await this.encryption.decryptDoc<Bill>(d.data())) };
+                } catch (err) {
+                  throw new Error(`doc ${d.id}: ${(err as Error)?.message || err}`);
+                }
+              })
+            );
+            const bills: Bill[] = [];
+            let failed = 0;
+            for (const r of results) {
+              if (r.status === 'fulfilled') bills.push(r.value);
+              else { failed++; console.error('Failed to decrypt a bill doc:', r.reason); }
             }
+            this.ngZone.run(() => {
+              this.error.set(failed > 0
+                ? `${failed} bill${failed === 1 ? '' : 's'} failed to decrypt and ${failed === 1 ? 'is' : 'are'} hidden. The rest are shown below.`
+                : null);
+              sub.next(bills);
+            });
           },
           err => this.ngZone.run(() => {
             this.error.set(err.message || 'Could not load bills.');

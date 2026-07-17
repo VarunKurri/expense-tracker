@@ -2,7 +2,7 @@ import { Injectable, inject, NgZone, signal, computed } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
   collection, query, orderBy, onSnapshot,
-  addDoc, updateDoc, deleteDoc, doc, getDoc, writeBatch
+  addDoc, setDoc, deleteDoc, doc, getDoc, writeBatch
 } from 'firebase/firestore';
 import { Observable, of, switchMap, combineLatest } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
@@ -40,20 +40,27 @@ export class TransactionService {
         const unsub = onSnapshot(
           q,
           async snap => {
-            try {
-              const transactions = await Promise.all(
-                snap.docs.map(async d => ({ id: d.id, ...(await this.encryption.decryptDoc<Transaction>(d.data())) }))
-              );
-              this.ngZone.run(() => {
-                this.error.set(null);
-                sub.next(transactions);
-              });
-            } catch (err: any) {
-              this.ngZone.run(() => {
-                this.error.set(err?.message || 'Could not decrypt transactions.');
-                sub.next([]);
-              });
+            const results = await Promise.allSettled(
+              snap.docs.map(async d => {
+                try {
+                  return { id: d.id, ...(await this.encryption.decryptDoc<Transaction>(d.data())) };
+                } catch (err) {
+                  throw new Error(`doc ${d.id}: ${(err as Error)?.message || err}`);
+                }
+              })
+            );
+            const transactions: Transaction[] = [];
+            let failed = 0;
+            for (const r of results) {
+              if (r.status === 'fulfilled') transactions.push(r.value);
+              else { failed++; console.error('Failed to decrypt a transaction doc:', r.reason); }
             }
+            this.ngZone.run(() => {
+              this.error.set(failed > 0
+                ? `${failed} transaction${failed === 1 ? '' : 's'} failed to decrypt and ${failed === 1 ? 'is' : 'are'} hidden. The rest are shown below.`
+                : null);
+              sub.next(transactions);
+            });
           },
           err => this.ngZone.run(() => {
             this.error.set(err.message || 'Could not load transactions.');
@@ -152,7 +159,12 @@ availableCredit(account: Account): number {
     const snap = await getDoc(ref);
     if (!snap.exists()) throw new Error('Transaction not found');
     const current = await this.encryption.decryptDoc<Transaction>(snap.data());
-    await updateDoc(ref, await this.encryption.encryptForWrite({ ...current, ...patch, updatedAt: Date.now() }) as any);
+    // setDoc (full replace), not updateDoc (partial merge): a Plaid-synced transaction
+    // is a differently-shaped `__envelope` document (encryptedDEK, tag, no __encrypted
+    // flag). Editing it re-encrypts it as a symmetric `__encrypted` doc — updateDoc
+    // would leave the old envelope-only fields in place alongside the new ciphertext,
+    // producing a document that's neither validly enveloped nor validly symmetric.
+    await setDoc(ref, await this.encryption.encryptForWrite({ ...current, ...patch, updatedAt: Date.now() }) as any);
   }
 
   async updateMany(ids: string[], patch: Partial<Transaction>) {

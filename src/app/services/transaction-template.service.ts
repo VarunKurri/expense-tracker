@@ -39,23 +39,30 @@ export class TransactionTemplateService {
         const unsub = onSnapshot(
           q,
           async snap => {
-            try {
-              const templates = await Promise.all(
-                snap.docs.map(async d => ({
-                  id: d.id,
-                  ...(await this.encryption.decryptDoc<TransactionTemplate>(d.data())),
-                }))
-              );
-              this.ngZone.run(() => {
-                this.error.set(null);
-                sub.next(templates);
-              });
-            } catch (err: any) {
-              this.ngZone.run(() => {
-                this.error.set(err?.message || 'Could not decrypt transaction templates.');
-                sub.next([]);
-              });
+            const results = await Promise.allSettled(
+              snap.docs.map(async d => {
+                try {
+                  return {
+                    id: d.id,
+                    ...(await this.encryption.decryptDoc<TransactionTemplate>(d.data())),
+                  };
+                } catch (err) {
+                  throw new Error(`doc ${d.id}: ${(err as Error)?.message || err}`);
+                }
+              })
+            );
+            const templates: TransactionTemplate[] = [];
+            let failed = 0;
+            for (const r of results) {
+              if (r.status === 'fulfilled') templates.push(r.value);
+              else { failed++; console.error('Failed to decrypt a transaction template doc:', r.reason); }
             }
+            this.ngZone.run(() => {
+              this.error.set(failed > 0
+                ? `${failed} template${failed === 1 ? '' : 's'} failed to decrypt and ${failed === 1 ? 'is' : 'are'} hidden. The rest are shown below.`
+                : null);
+              sub.next(templates);
+            });
           },
           err => this.ngZone.run(() => {
             this.error.set(err.message || 'Could not load transaction templates.');

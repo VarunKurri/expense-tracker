@@ -29,20 +29,27 @@ export class BudgetService {
         const unsub = onSnapshot(
           q,
           async snap => {
-            try {
-              const budgets = await Promise.all(
-                snap.docs.map(async d => ({ id: d.id, ...(await this.encryption.decryptDoc<Budget>(d.data())) }))
-              );
-              this.ngZone.run(() => {
-                this.error.set(null);
-                sub.next(budgets);
-              });
-            } catch (err: any) {
-              this.ngZone.run(() => {
-                this.error.set(err?.message || 'Could not decrypt budgets.');
-                sub.next([]);
-              });
+            const results = await Promise.allSettled(
+              snap.docs.map(async d => {
+                try {
+                  return { id: d.id, ...(await this.encryption.decryptDoc<Budget>(d.data())) };
+                } catch (err) {
+                  throw new Error(`doc ${d.id}: ${(err as Error)?.message || err}`);
+                }
+              })
+            );
+            const budgets: Budget[] = [];
+            let failed = 0;
+            for (const r of results) {
+              if (r.status === 'fulfilled') budgets.push(r.value);
+              else { failed++; console.error('Failed to decrypt a budget doc:', r.reason); }
             }
+            this.ngZone.run(() => {
+              this.error.set(failed > 0
+                ? `${failed} budget${failed === 1 ? '' : 's'} failed to decrypt and ${failed === 1 ? 'is' : 'are'} hidden. The rest are shown below.`
+                : null);
+              sub.next(budgets);
+            });
           },
           err => this.ngZone.run(() => {
             this.error.set(err.message || 'Could not load budgets.');

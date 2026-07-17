@@ -5,6 +5,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Modal } from '../../../components/modal/modal';
+import { ErrorBanner } from '../../../components/error-banner/error-banner';
 import { AccountService } from '../../../services/account.service';
 import { CategoryService } from '../../../services/category.service';
 import { BillService } from '../../../services/bill.service';
@@ -18,7 +19,7 @@ import { ToastService } from '../../../services/toast.service';
 @Component({
   selector: 'app-transaction-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, Modal],
+  imports: [CommonModule, FormsModule, Modal, ErrorBanner],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss'
 })
@@ -340,74 +341,99 @@ export class TransactionForm implements OnChanges {
   }
 
   async save() {
+    if (this.submitting()) return;
     if (!this.amount || this.amount <= 0) {
       this.toastService.error('Amount must be greater than zero');
       return;
     }
-    if (this.type === 'transfer') {
-      if (!this.fromAccountId || !this.toAccountId) {
+    // Snapshot every field into locals up front. save() awaits saveCurrentAsTemplate()
+    // and billService.add() below — if the modal gets closed/reopened for another add
+    // while those are in flight (easy to trigger on a slow mobile connection: tap Save,
+    // nothing visibly happens, tap Cancel, tap +Add again), ngOnChanges' load() resets
+    // this.amount/fromAccountId/toAccountId/etc. Reading `this.x` again after an await
+    // would then emit whatever the form was reset to, not what the user actually
+    // entered — producing a stray blank transaction. Locals make that impossible.
+    const type = this.type;
+    const amount = Number(this.amount);
+    const date = this.date;
+    const notes = this.notes.trim();
+
+    if (type === 'transfer') {
+      const fromAccountId = this.fromAccountId;
+      const toAccountId = this.toAccountId;
+      if (!fromAccountId || !toAccountId) {
         this.toastService.error('Please select both accounts');
         return;
       }
-      if (this.fromAccountId === this.toAccountId) {
+      if (fromAccountId === toAccountId) {
         this.toastService.error('From and To must be different accounts');
         return;
       }
+      this.submitting.set(true);
       try {
         await this.saveCurrentAsTemplate();
       } catch (err) {
         this.toastService.error('Transaction template could not be saved.');
+        this.submitting.set(false);
         return;
       }
       this.saved.emit({
         type: 'transfer',
-        amount: Number(this.amount),
-        date: this.date,
-        fromAccountId: this.fromAccountId,
-        toAccountId: this.toAccountId,
-        ...(this.notes.trim() ? { notes: this.notes.trim() } : {}),
+        amount,
+        date,
+        fromAccountId,
+        toAccountId,
+        ...(notes ? { notes } : {}),
       });
+      this.submitting.set(false);
     } else {
-      if (!this.accountId) { this.toastService.error('Please select an account'); return; }
-      if (!this.merchant().trim()) { this.toastService.error('Merchant or source is required'); return; }
+      const merchant = this.merchant().trim();
+      const accountId = this.accountId;
+      const categoryId = this.categoryId();
+      const refunded = this.refunded;
+      if (!accountId) { this.toastService.error('Please select an account'); return; }
+      if (!merchant) { this.toastService.error('Merchant or source is required'); return; }
 
+      this.submitting.set(true);
       try {
         await this.saveCurrentAsTemplate();
       } catch (err) {
         this.toastService.error('Transaction template could not be saved.');
+        this.submitting.set(false);
         return;
       }
 
       // Emit the transaction first
       this.saved.emit({
-        type: this.type,
-        amount: Number(this.amount),
-        date: this.date,
-        merchant: this.merchant().trim(),
-        accountId: this.accountId,
-        ...(this.categoryId() ? { categoryId: this.categoryId() } : {}),
-        ...(this.notes.trim() ? { notes: this.notes.trim() } : {}),
-        refunded: this.refunded,
+        type,
+        amount,
+        date,
+        merchant,
+        accountId,
+        ...(categoryId ? { categoryId } : {}),
+        ...(notes ? { notes } : {}),
+        refunded,
       });
 
       // If Subscriptions category selected, auto-create bill if one doesn't exist yet
-      if (this.isSubscription() && this.merchant().trim() && !this.transaction) {
-        const name = this.merchant().trim();
+      const isSubscription = this.isSubscription();
+      const canAutopayBill = this.canAutopayBill();
+      if (isSubscription && merchant && !this.transaction) {
         const existing = this.billService.bills().find(
-          b => b.name.toLowerCase() === name.toLowerCase()
+          b => b.name.toLowerCase() === merchant.toLowerCase()
         );
         if (!existing) {
           try {
             await this.billService.add({
-              name,
-              amount: Number(this.amount),
+              name: merchant,
+              amount,
               amountMode: this.billAmountMode,
               frequency: this.billFrequency,
-              nextDueDate: this.billNextDueDate || this.nextMonthDate(this.date),
+              nextDueDate: this.billNextDueDate || this.nextMonthDate(date),
               dueDateMode: this.billDueDateMode,
-              accountId: this.accountId,
-              categoryId: this.categoryId(),
-              autopayEnabled: this.canAutopayBill() && this.billAutopay,
+              accountId,
+              categoryId,
+              autopayEnabled: canAutopayBill && this.billAutopay,
               icon: '📄',
               active: true,
             });
@@ -416,6 +442,7 @@ export class TransactionForm implements OnChanges {
           }
         }
       }
+      this.submitting.set(false);
     }
   }
 }

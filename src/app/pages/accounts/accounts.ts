@@ -10,6 +10,7 @@ import { AccountCard } from './account-card/account-card';
 import { SummaryBar } from './summary-bar/summary-bar';
 import { Confirm } from '../../components/confirm/confirm';
 import { Modal } from '../../components/modal/modal';
+import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Account, Bill } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { PlaidService, PlaidItem } from '../../services/plaid.service';
@@ -17,7 +18,7 @@ import { PlaidService, PlaidItem } from '../../services/plaid.service';
 @Component({
   selector: 'app-accounts',
   standalone: true,
-  imports: [CommonModule, FormsModule, AccountForm, AccountCard, SummaryBar, Confirm, Modal],
+  imports: [CommonModule, FormsModule, AccountForm, AccountCard, SummaryBar, Confirm, Modal, ErrorBanner],
   templateUrl: './accounts.html',
   styleUrl: './accounts.scss'
 })

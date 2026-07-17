@@ -33,23 +33,28 @@ export class AccountService {
         const unsub = onSnapshot(
           q,
           async snap => {
-            try {
-              const accounts = await Promise.all(
-                snap.docs.map(async d => {
+            const results = await Promise.allSettled(
+              snap.docs.map(async d => {
+                try {
                   const acc = { id: d.id, ...(await this.encryption.decryptDoc<Account>(d.data())) };
                   return { ...acc, icon: displayIcon(acc.icon) };
-                })
-              );
-              this.ngZone.run(() => {
-                this.error.set(null);
-                sub.next(accounts);
-              });
-            } catch (err: any) {
-              this.ngZone.run(() => {
-                this.error.set(err?.message || 'Could not decrypt accounts.');
-                sub.next([]);
-              });
+                } catch (err) {
+                  throw new Error(`doc ${d.id}: ${(err as Error)?.message || err}`);
+                }
+              })
+            );
+            const accounts: Account[] = [];
+            let failed = 0;
+            for (const r of results) {
+              if (r.status === 'fulfilled') accounts.push(r.value);
+              else { failed++; console.error('Failed to decrypt an account doc:', r.reason); }
             }
+            this.ngZone.run(() => {
+              this.error.set(failed > 0
+                ? `${failed} account${failed === 1 ? '' : 's'} failed to decrypt and ${failed === 1 ? 'is' : 'are'} hidden. The rest are shown below.`
+                : null);
+              sub.next(accounts);
+            });
           },
           err => this.ngZone.run(() => {
             this.error.set(err.message || 'Could not load accounts.');

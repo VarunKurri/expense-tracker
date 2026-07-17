@@ -8,6 +8,7 @@ import { CategoryService } from '../../services/category.service';
 import { BillForm } from './bill-form/bill-form';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
+import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Bill, Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
 
@@ -16,7 +17,7 @@ type BillTab = 'active' | 'paused';
 @Component({
   selector: 'app-bills',
   standalone: true,
-  imports: [CommonModule, BillForm, TransactionForm, Confirm],
+  imports: [CommonModule, BillForm, TransactionForm, Confirm, ErrorBanner],
   templateUrl: './bills.html',
   styleUrl: './bills.scss'
 })

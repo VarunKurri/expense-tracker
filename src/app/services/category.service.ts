@@ -33,23 +33,28 @@ export class CategoryService {
         const unsub = onSnapshot(
           q,
           async snap => {
-            try {
-              const categories = await Promise.all(
-                snap.docs.map(async d => {
+            const results = await Promise.allSettled(
+              snap.docs.map(async d => {
+                try {
                   const cat = { id: d.id, ...(await this.encryption.decryptDoc<Category>(d.data())) };
                   return { ...cat, icon: displayIcon(cat.icon) };
-                })
-              );
-              this.ngZone.run(() => {
-                this.error.set(null);
-                sub.next(categories.sort((a, b) => a.name.localeCompare(b.name)));
-              });
-            } catch (err: any) {
-              this.ngZone.run(() => {
-                this.error.set(err?.message || 'Could not decrypt categories.');
-                sub.next([]);
-              });
+                } catch (err) {
+                  throw new Error(`doc ${d.id}: ${(err as Error)?.message || err}`);
+                }
+              })
+            );
+            const categories: Category[] = [];
+            let failed = 0;
+            for (const r of results) {
+              if (r.status === 'fulfilled') categories.push(r.value);
+              else { failed++; console.error('Failed to decrypt a category doc:', r.reason); }
             }
+            this.ngZone.run(() => {
+              this.error.set(failed > 0
+                ? `${failed} categor${failed === 1 ? 'y' : 'ies'} failed to decrypt and ${failed === 1 ? 'is' : 'are'} hidden. The rest are shown below.`
+                : null);
+              sub.next(categories.sort((a, b) => a.name.localeCompare(b.name)));
+            });
           },
           err => this.ngZone.run(() => {
             this.error.set(err.message || 'Could not load categories.');
