@@ -3,6 +3,7 @@ import { Firestore } from '@angular/fire/firestore';
 import { AuthService } from './auth.service';
 import { TransactionService } from './transaction.service';
 import { BillService } from './bill.service';
+import { AccountService } from './account.service';
 
 @Injectable({ providedIn: 'root' })
 export class AutopayService {
@@ -10,6 +11,7 @@ export class AutopayService {
   private auth = inject(AuthService);
   private txService = inject(TransactionService);
   private billService = inject(BillService);
+  private accountService = inject(AccountService);
 
   private running = false;
   private failedBillIds = new Set<string>();
@@ -33,31 +35,42 @@ export class AutopayService {
         if (this.failedBillIds.has(bill.id)) continue;
         if (bill.nextDueDate > today) continue;
 
+        // A Plaid-linked account will deliver the real transaction via sync —
+        // fabricating one here would double it up. Still advance nextDueDate below
+        // so the reminder widget/nav badge stay accurate; just skip creating a
+        // transaction for these bills.
+        const account = bill.accountId
+          ? this.accountService.accounts().find(a => a.id === bill.accountId)
+          : undefined;
+        const isPlaidLinked = !!account?.plaidAccountId;
+
         try {
           let nextDate = bill.nextDueDate;
           while (nextDate <= today) {
-            // Check if there is already a manual/existing transaction matching this bill around this date (within 2 days)
-            const hasExisting = this.txService.transactions().some(t => {
-              if (t.type !== 'expense') return false;
-              if (t.merchant?.toLowerCase() !== bill.name.toLowerCase()) return false;
-              if (Math.abs(t.amount - bill.amount) >= 0.01) return false;
+            if (!isPlaidLinked) {
+              // Check if there is already a manual/existing transaction matching this bill around this date (within 2 days)
+              const hasExisting = this.txService.transactions().some(t => {
+                if (t.type !== 'expense') return false;
+                if (t.merchant?.toLowerCase() !== bill.name.toLowerCase()) return false;
+                if (Math.abs(t.amount - bill.amount) >= 0.01) return false;
 
-              const tDate = new Date(t.date + 'T00:00:00').getTime();
-              const bDate = new Date(nextDate + 'T00:00:00').getTime();
-              const diffDays = Math.abs(tDate - bDate) / (1000 * 60 * 60 * 24);
-              return diffDays <= 2;
-            });
-
-            if (!hasExisting) {
-              await this.txService.add({
-                type: 'expense',
-                amount: bill.amount,
-                date: nextDate,
-                merchant: bill.name,
-                accountId: bill.accountId,
-                categoryId: bill.categoryId,
-                notes: `Autopay — ${bill.frequency} bill`,
+                const tDate = new Date(t.date + 'T00:00:00').getTime();
+                const bDate = new Date(nextDate + 'T00:00:00').getTime();
+                const diffDays = Math.abs(tDate - bDate) / (1000 * 60 * 60 * 24);
+                return diffDays <= 2;
               });
+
+              if (!hasExisting) {
+                await this.txService.add({
+                  type: 'expense',
+                  amount: bill.amount,
+                  date: nextDate,
+                  merchant: bill.name,
+                  accountId: bill.accountId,
+                  categoryId: bill.categoryId,
+                  notes: `Autopay — ${bill.frequency} bill`,
+                });
+              }
             }
             nextDate = this.billService.advanceDate(nextDate, bill.frequency);
           }
