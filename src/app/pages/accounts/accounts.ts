@@ -147,14 +147,6 @@ export class Accounts {
     this.plaidSvc.refreshInstitutions();
   }
 
-  recoverMissing() {
-    this.plaidSvc.recoverMissingTransactions();
-  }
-
-  recalculateBalances() {
-    this.plaidSvc.recalculateOpeningBalances();
-  }
-
   reconnectItem(item: PlaidItem) {
     this.plaidSvc.reconnect(item);
   }
