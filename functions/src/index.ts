@@ -202,7 +202,11 @@ function mapPlaidTransaction(t: PlaidTransaction, itemId: string): Record<string
   return {
     type,
     amount: Math.abs(t.amount),
-    date: t.date, // YYYY-MM-DD
+    // authorized_date is the day the purchase actually happened; date is when it
+    // posted (can lag by a few days, or a purchase could still be cancelled before
+    // posting). Prefer authorized_date — falls back to date when Plaid doesn't
+    // supply one (common for some institutions/pending rows).
+    date: t.authorized_date ?? t.date, // YYYY-MM-DD
     merchant: t.merchant_name || t.name || 'Unknown',
     createdAt: now,
     updatedAt: now,
@@ -493,6 +497,72 @@ export const getPlaidAccounts = onCall(
       console.error('getPlaidAccounts failed:', plaidError || err);
       throw new HttpsError('internal', plaidError?.error_message || err?.message || 'Failed to load bank accounts.');
     }
+  },
+);
+
+/**
+ * TEMPORARY, ONE-TIME: re-map already-synced transactions with the corrected
+ * mapPlaidTransaction (authorized_date instead of posted date; isInternalTransfer
+ * detection, added after these were first synced). Re-pulls each item's full
+ * history from an empty (local, never persisted) cursor — same non-destructive
+ * pattern as the old recovery tool — and overwrites a doc only when it still
+ * exists AND is still the untouched, server-written `__envelope` shape. A
+ * user-edited (`__encrypted`) doc is never touched, so no edit is ever at risk.
+ * Remove this function (and its "Update dates" button) once run.
+ */
+export const backfillTransactionFields = onCall(
+  { secrets: [plaidClientId, plaidSecret, tokenEncKey] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'You must be signed in.');
+    }
+    const uid = request.auth.uid;
+    const publicKey = await getUserPublicKey(uid);
+    if (!publicKey) {
+      throw new HttpsError('failed-precondition', 'Unlock the app once to set up your encryption keys first.');
+    }
+    const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
+    const db = getFirestore();
+    const itemsSnap = await db.collection(`users/${uid}/plaidItems`).get();
+
+    let updated = 0;
+    let scanned = 0;
+    for (const itemDoc of itemsSnap.docs) {
+      const item = itemDoc.data();
+      if (!item) continue;
+      const accessToken = decryptToken(item.accessToken as EncryptedValue, tokenEncKey.value());
+      const txCol = db.collection(`users/${uid}/transactions`);
+
+      let cursor: string | undefined = undefined; // local only — never persisted to the item
+      let hasMore = true;
+      while (hasMore) {
+        const resp = await client.transactionsSync({ access_token: accessToken, cursor });
+        const { added, next_cursor, has_more } = resp.data;
+        scanned += added.length;
+
+        if (added.length > 0) {
+          const refs = added.map(t => txCol.doc(t.transaction_id));
+          const snaps = await db.getAll(...refs);
+          const batch = db.batch();
+          let writes = 0;
+          snaps.forEach((snap, i) => {
+            if (snap.exists && snap.data()?.['__envelope']) {
+              batch.set(refs[i], envelopeDoc(mapPlaidTransaction(added[i], itemDoc.id), publicKey));
+              writes++;
+            }
+          });
+          if (writes > 0) {
+            await batch.commit();
+            updated += writes;
+          }
+        }
+
+        cursor = next_cursor;
+        hasMore = has_more;
+      }
+    }
+
+    return { updated, scanned };
   },
 );
 
