@@ -183,6 +183,7 @@
           <option value="uncategorized">Uncategorized</option>
           <option value="refunded">Refunded</option>
           <option value="not-refunded">Not refunded</option>
+          <option value="internal-transfer">Internal transfer</option>
         </select>
       </label>
     </div>
@@ -426,6 +427,9 @@
                       @if (tx.refunded) {
                         <span class="refunded-badge">↩ Refunded</span>
                       }
+                      @if (tx.isInternalTransfer) {
+                        <span class="refunded-badge">↔ Transfer</span>
+                      }
                       @if (tx.notes) {
                         <span class="has-notes">📝</span>
                       }
@@ -475,6 +479,9 @@
         </div>
         @if (tx.refunded) {
           <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
+        }
+        @if (tx.isInternalTransfer) {
+          <div class="view-refunded-badge">↔ Internal transfer — excluded from analysis</div>
         }
       </div>
 

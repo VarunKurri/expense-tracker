@@ -181,11 +181,24 @@ function dayOfMonth(isoDate: string | null | undefined): number | null {
 }
 
 /** Map a Plaid transaction onto the app's Transaction shape (as a plain object). */
+// Plaid category values that indicate money moving between the user's own
+// accounts (e.g. a credit card payment) rather than real spending/earning.
+// TRANSFER_IN/TRANSFER_OUT cover most internal transfers; generic LOAN_PAYMENTS
+// is left alone (could be a real loan, not a transfer) except for the specific
+// credit-card-payment detailed subtype.
+function isInternalTransferCategory(primary: string | undefined, detailed: string | undefined): boolean {
+  if (primary === 'TRANSFER_IN' || primary === 'TRANSFER_OUT') return true;
+  if (detailed === 'LOAN_PAYMENTS_CREDIT_CARD_PAYMENT') return true;
+  return false;
+}
+
 function mapPlaidTransaction(t: PlaidTransaction, itemId: string): Record<string, unknown> {
   const now = Date.now();
   // Plaid convention: positive amount = money leaving the account (expense),
   // negative = money coming in (income).
   const type = t.amount < 0 ? 'income' : 'expense';
+  const pfcPrimary = t.personal_finance_category?.primary;
+  const pfcDetailed = t.personal_finance_category?.detailed;
   return {
     type,
     amount: Math.abs(t.amount),
@@ -196,8 +209,9 @@ function mapPlaidTransaction(t: PlaidTransaction, itemId: string): Record<string
     plaidTransactionId: t.transaction_id,
     plaidItemId: itemId,
     plaidAccountId: t.account_id,
-    plaidPersonalFinanceCategory: t.personal_finance_category?.primary,
+    plaidPersonalFinanceCategory: pfcPrimary,
     plaidPending: t.pending,
+    isInternalTransfer: isInternalTransferCategory(pfcPrimary, pfcDetailed),
   };
 }
 

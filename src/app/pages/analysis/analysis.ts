@@ -180,8 +180,10 @@ export class Analysis implements AfterViewInit, OnDestroy {
     });
   });
 
-  expenses = computed(() => this.filtered().filter(t => t.type === 'expense'));
-  income = computed(() => this.filtered().filter(t => t.type === 'income'));
+  // Internal transfers (e.g. a credit card payment) are excluded — real money
+  // movement between the user's own accounts, not real spending/earning.
+  expenses = computed(() => this.filtered().filter(t => t.type === 'expense' && !t.isInternalTransfer));
+  income = computed(() => this.filtered().filter(t => t.type === 'income' && !t.isInternalTransfer));
 
   // ── KPIs ───────────────────────────────────────────────────
   totalExpenses = computed(() =>
@@ -307,6 +309,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
     }
 
     for (const t of this.txService.transactions()) {
+      if (t.isInternalTransfer) continue;
       const key = t.date.slice(0, 7);
       if (!months.has(key)) continue;
       const entry = months.get(key)!;

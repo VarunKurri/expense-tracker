@@ -176,7 +176,7 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     const cutoff = this.localDateString(d);
     return Math.round(
       this.txService.transactions()
-        .filter(t => t.date >= cutoff)
+        .filter(t => t.date >= cutoff && !t.isInternalTransfer)
         .reduce((s, t) => {
           if (t.type === 'income') return s + t.amount;
           if (t.type === 'expense') return s - t.amount;
@@ -196,6 +196,7 @@ export class Dashboard implements AfterViewInit, OnDestroy {
       days.push({ date, label, income: 0, expenses: 0 });
     }
     for (const t of this.txService.transactions()) {
+      if (t.isInternalTransfer) continue;
       const entry = days.find(d => d.date === t.date);
       if (!entry) continue;
       if (t.type === 'income') entry.income += t.amount;
@@ -226,12 +227,12 @@ export class Dashboard implements AfterViewInit, OnDestroy {
 
   rangeIncome = computed(() =>
     this.txService.transactions()
-      .filter(t => t.type === 'income' && t.date >= this.rangeStart())
+      .filter(t => t.type === 'income' && !t.isInternalTransfer && t.date >= this.rangeStart())
       .reduce((s, t) => s + t.amount, 0)
   );
   rangeExpenses = computed(() =>
     this.txService.transactions()
-      .filter(t => t.type === 'expense' && t.date >= this.rangeStart())
+      .filter(t => t.type === 'expense' && !t.isInternalTransfer && t.date >= this.rangeStart())
       .reduce((s, t) => s + t.amount, 0)
   );
   savingsRate = computed(() => {
@@ -304,6 +305,7 @@ export class Dashboard implements AfterViewInit, OnDestroy {
         const spent = this.txService.transactions()
           .filter(t =>
             t.type === 'expense' &&
+            !t.isInternalTransfer &&
             t.categoryId === budget.categoryId &&
             t.date.startsWith(month) &&
             !t.refunded
@@ -329,7 +331,7 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     const cutoff = this.localDateString(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
     const today = this.localDateString(now);
     return this.txService.transactions()
-      .filter(t => t.type === 'expense' && !t.refunded && t.date >= cutoff && t.date <= today);
+      .filter(t => t.type === 'expense' && !t.refunded && !t.isInternalTransfer && t.date >= cutoff && t.date <= today);
   });
   recentTotal = computed(() =>
     Math.round(this.recentExpenses().reduce((s, t) => s + t.amount, 0) * 100) / 100

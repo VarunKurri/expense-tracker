@@ -16,7 +16,7 @@ import { ReconciliationService } from '../../services/reconciliation.service';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
 type DateRange = 'last-30' | 'this-month' | 'last-month' | 'this-year' | 'custom' | 'all';
-type SpecialFilter = 'all' | 'uncategorized' | 'refunded' | 'not-refunded';
+type SpecialFilter = 'all' | 'uncategorized' | 'refunded' | 'not-refunded' | 'internal-transfer';
 type QuickEditDraft = {
   amount: number;
   date: string;
@@ -141,6 +141,7 @@ export class Transactions {
       if (this.specialFilter() === 'uncategorized' && (t.type === 'transfer' || !!t.categoryId)) return false;
       if (this.specialFilter() === 'refunded' && !t.refunded) return false;
       if (this.specialFilter() === 'not-refunded' && t.refunded) return false;
+      if (this.specialFilter() === 'internal-transfer' && !t.isInternalTransfer) return false;
       if (merchantQuery && !(t.merchant || '').toLowerCase().includes(merchantQuery)) return false;
       if (q) {
         const merchant = (t.merchant || '').toLowerCase();

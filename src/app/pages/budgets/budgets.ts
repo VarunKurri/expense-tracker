@@ -142,6 +142,7 @@ export class Budgets {
       const spent = this.txService.transactions()
         .filter(t =>
           t.type === 'expense' &&
+          !t.isInternalTransfer &&
           t.categoryId === budget.categoryId &&
           t.date.startsWith(month) &&
           !(this.excludeRefunded() && t.refunded)

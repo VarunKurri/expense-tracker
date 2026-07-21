@@ -50,6 +50,7 @@ export class TransactionForm implements OnChanges {
   fromAccountId: string = '';
   toAccountId: string = '';
   refunded = false;
+  isInternalTransfer = false;
   saveAsTemplate = signal(false);
   templateName = signal('');
 
@@ -116,6 +117,7 @@ export class TransactionForm implements OnChanges {
       this.fromAccountId = this.transaction.fromAccountId || '';
       this.toAccountId = this.transaction.toAccountId || '';
       this.refunded = this.transaction.refunded || false;
+      this.isInternalTransfer = this.transaction.isInternalTransfer || false;
       this.saveAsTemplate.set(false);
       this.templateName.set('');
     } else {
@@ -391,6 +393,7 @@ export class TransactionForm implements OnChanges {
       const accountId = this.accountId;
       const categoryId = this.categoryId();
       const refunded = this.refunded;
+      const isInternalTransfer = this.isInternalTransfer;
       if (!accountId) { this.toastService.error('Please select an account'); return; }
       if (!merchant) { this.toastService.error('Merchant or source is required'); return; }
 
@@ -413,6 +416,7 @@ export class TransactionForm implements OnChanges {
         ...(categoryId ? { categoryId } : {}),
         ...(notes ? { notes } : {}),
         refunded,
+        isInternalTransfer,
       });
 
       // If Subscriptions category selected, auto-create bill if one doesn't exist yet

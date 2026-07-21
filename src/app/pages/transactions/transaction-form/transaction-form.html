@@ -270,6 +270,23 @@
       </div>
     }
 
+    <!-- INTERNAL TRANSFER TOGGLE -->
+    @if (transaction && (type === 'expense' || type === 'income')) {
+      <div class="refunded-row">
+        <div>
+          <div class="refunded-label">Internal transfer</div>
+          <div class="refunded-sub">
+            E.g. a credit card payment. Excludes from income/expense/savings totals — it's money moving between your own accounts, not real spending or earning.
+          </div>
+        </div>
+        <button type="button"
+                class="toggle"
+                [class.on]="isInternalTransfer"
+                (click)="isInternalTransfer = !isInternalTransfer">
+        </button>
+      </div>
+    }
+
     <!-- ACTIONS -->
     <div class="modal-actions">
       @if (transaction) {

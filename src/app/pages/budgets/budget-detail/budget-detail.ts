@@ -65,6 +65,7 @@ export class BudgetDetail {
     this.txService.transactions()
       .filter(t =>
         t.type === 'expense' &&
+        !t.isInternalTransfer &&
         t.categoryId === this.categoryId() &&
         t.date.startsWith(this.month())
       )

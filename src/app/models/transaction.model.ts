@@ -29,6 +29,13 @@ export interface Transaction {
   refunded?: boolean;
   refundedBy?: string; // transaction ID of the refunding income
 
+  // Internal transfer tracking (e.g. a credit card payment: an expense on the
+  // paying account and an income on the card account, both real per-account, but
+  // not real spending/earning app-wide). Excluded from income/expense/savings
+  // totals when true. Auto-set for Plaid transactions whose category indicates a
+  // transfer; user-toggleable on any transaction to correct what Plaid misses.
+  isInternalTransfer?: boolean;
+
   // Plaid sync metadata (set for bank-synced transactions)
   plaidTransactionId?: string;            // Plaid transaction_id; also the Firestore doc id — used for dedup
   plaidItemId?: string;                   // Plaid item_id (which linked bank) — plaintext on the doc, for disconnect cleanup
