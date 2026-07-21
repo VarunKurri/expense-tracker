@@ -284,13 +284,39 @@ async function syncItem(
   while (hasMore) {
     const resp = await client.transactionsSync({ access_token: accessToken, cursor });
     const { added, modified, removed, next_cursor, has_more } = resp.data;
+    const incoming = [...added, ...modified];
+
+    // A pending transaction posting arrives as `removed: [oldId]` + a new incoming
+    // transaction with a different transaction_id and pending_transaction_id set to
+    // the old id. Naively that deletes the old doc and writes a fresh one, silently
+    // discarding any edits the user made while it was pending. Check whether the old
+    // doc still exists and whether it's still the untouched server-written envelope
+    // (safe to replace) or has become user-edited (must be preserved as-is — the
+    // server can't decrypt it to merge fields, by design). This is a doc-ID lookup,
+    // not a field query, since plaidTransactionId etc. are only guaranteed plaintext
+    // on untouched envelope docs.
+    const pendingIds = [...new Set(
+      incoming.map(t => t.pending_transaction_id).filter((id): id is string => !!id),
+    )];
+    const pendingSnaps = pendingIds.length > 0
+      ? await db.getAll(...pendingIds.map(id => txCol.doc(id)))
+      : [];
+    const preserveIds = new Set<string>();
+    for (const snap of pendingSnaps) {
+      if (snap.exists && !snap.data()?.['__envelope']) preserveIds.add(snap.id);
+    }
 
     const batch = db.batch();
-    for (const t of [...added, ...modified]) {
+    for (const t of incoming) {
+      if (t.pending_transaction_id && preserveIds.has(t.pending_transaction_id)) {
+        continue; // keep the user's edited doc in place; don't create a duplicate
+      }
       batch.set(txCol.doc(t.transaction_id), envelopeDoc(mapPlaidTransaction(t, itemDoc.id), publicKey));
     }
     for (const r of removed) {
-      if (r.transaction_id) batch.delete(txCol.doc(r.transaction_id));
+      if (r.transaction_id && !preserveIds.has(r.transaction_id)) {
+        batch.delete(txCol.doc(r.transaction_id));
+      }
     }
     // Advance the cursor atomically with this page's writes.
     batch.set(itemDoc.ref, { cursor: next_cursor, status: 'active', updatedAt: Date.now() }, { merge: true });
