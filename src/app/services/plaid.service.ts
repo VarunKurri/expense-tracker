@@ -95,10 +95,6 @@ export class PlaidService {
   /** True while an on-demand institution refresh is in flight. */
   refreshing = signal(false);
 
-  /** TEMPORARY: true while the one-time date/transfer backfill is running. Remove
-   *  alongside backfillDates() and its button once the backfill has been run. */
-  backfilling = signal(false);
-
   /** Live list of linked banks (Plaid items). Metadata is plaintext, so no unlock needed. */
   private items$: Observable<PlaidItem[]> = toObservable(this.auth.user).pipe(
     switchMap(user => {
@@ -340,30 +336,6 @@ export class PlaidService {
       this.toast.error(err?.message || 'Could not request a refresh. Please try again.');
     } finally {
       this.refreshing.set(false);
-    }
-  }
-
-  /**
-   * TEMPORARY, ONE-TIME: re-map already-synced transactions with the corrected
-   * date (purchase date instead of posted date) and transfer detection, added
-   * after these were first synced. Never touches anything you've edited. Remove
-   * this method (and its button) once run.
-   */
-  async backfillDates(): Promise<void> {
-    if (this.backfilling()) return;
-    this.backfilling.set(true);
-    try {
-      const backfill = httpsCallable<unknown, { updated: number; scanned: number }>(
-        this.functions,
-        'backfillTransactionFields',
-      );
-      const { data } = await backfill();
-      this.toast.success(`Updated ${data.updated} of ${data.scanned} synced transaction(s).`);
-    } catch (err: any) {
-      console.error('backfillDates failed:', err);
-      this.toast.error(err?.message || 'Could not run the backfill. Please try again.');
-    } finally {
-      this.backfilling.set(false);
     }
   }
 

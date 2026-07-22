@@ -147,11 +147,6 @@ export class Accounts {
     this.plaidSvc.refreshInstitutions();
   }
 
-  // TEMPORARY — remove alongside PlaidService.backfillDates() once run.
-  backfillDates() {
-    this.plaidSvc.backfillDates();
-  }
-
   reconnectItem(item: PlaidItem) {
     this.plaidSvc.reconnect(item);
   }
