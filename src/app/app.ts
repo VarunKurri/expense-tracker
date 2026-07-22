@@ -8,6 +8,7 @@ import { ThemeService } from './services/theme.service';
 import { ToastService } from './services/toast.service';
 import { Icon } from './components/icon/icon';
 import { Toast } from './components/toast/toast';
+import { UpdateBanner } from './components/update-banner/update-banner';
 import { AuthAction } from './pages/auth-action/auth-action';
 import { QuickAddService } from './services/quick-add.service';
 import { BillService } from './services/bill.service';
@@ -48,7 +49,7 @@ interface PaletteEntry {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, Icon, Toast, AuthAction],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, Icon, Toast, UpdateBanner, AuthAction],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

@@ -359,3 +359,49 @@ edits to pending transactions getting silently lost when they post. Design doc:
   - Verified: `mapPlaidTransaction` maps `date: t.authorized_date ?? t.date`. The temporary `backfillTransactionFields` cloud function ran successfully (user confirmed) — re-pulled full history from an empty, never-persisted cursor and corrected every already-synced, untouched (`__envelope`) transaction's date and `isInternalTransfer` flag, without disturbing any user-edited transaction. Temporary tooling then fully removed: the cloud function (explicitly deleted from production via `firebase functions:delete`, same as Phase 8's opening item — a normal deploy won't auto-remove a function no longer in source), the `backfillDates()`/`backfilling` signal in `PlaidService`, and the button/handler on Accounts. `functions` build and `ng build`/`tsc` both pass clean with zero dangling references. Deployed, pushed to this branch and `main`.
 
 **Phase 8 complete** — all 5 refinement parts (migration-tool cleanup, autopay fix, transfer double-counting fix, pending-transaction edit preservation, purchase-date fix) shipped, verified, and the temporary backfill tooling fully removed.
+
+## Phase 9: Full App QA Pass — Correctness & Mobile/PWA
+
+Requested after Phase 8 shipped: a full pass over the whole codebase for latent bugs
+(not tied to any one feature), plus a dedicated mobile/iPhone PWA audit, since the app
+is now meant to feel like "a professional platform," not a project under construction.
+Two parallel research passes (general code-health, PWA/mobile-specific) surfaced the
+items below; fixed the highest-confidence ones this round, logged the rest as backlog.
+
+- [x] PWA: unlock safe-area support for iPhone notch/home-indicator.
+  - Why: `app.scss` already had three `env(safe-area-inset-*)` rules (topbar, modal backdrop, command palette) written for the iOS notch/home-indicator, but they were silently inert — the viewport meta tag never opted into `viewport-fit=cover`, so iOS Safari/standalone-PWA never returned nonzero inset values.
+  - Done when: `viewport-fit=cover` is set; the 7 duplicated `.view-panel` bottom-sheet blocks (dashboard, transactions, bills, account-detail, account-overview, budget-detail, analysis) and the toast container also respect the bottom safe area, since those hadn't been written with insets at all.
+  - Verified: `index.html` viewport meta now includes `viewport-fit=cover`. Added `env(safe-area-inset-bottom)` to all 7 `.view-panel` blocks' bottom padding and to `toast.scss`'s `.toast-container` (both desktop and the ≤480px mobile override). `ng build` passes clean.
+
+- [x] PWA: add theme-color (light/dark synced), fix iOS status bar style, fix manifest metadata.
+  - Why: no `<meta name="theme-color">` existed at all (browser chrome/iOS status bar defaulted to plain white/black instead of matching the app); `apple-mobile-web-app-status-bar-style` was hardcoded to `"default"`, which conflicts with letting content flow under the status bar via the safe-area insets above; `manifest.webmanifest` was missing `theme_color`/`background_color`/`orientation`/`description` and — more visibly — had `name`/`short_name` both set to the literal string `"expense-tracker"` instead of `"Trackr"`, so an iOS "Add to Home Screen" install would show the wrong app name.
+  - Done when: theme-color meta tracks the user's light/dark toggle live; status bar style matches the safe-area strategy; manifest is filled in and shows the correct app name.
+  - Verified: added `<meta name="theme-color">` to `index.html` (default light `#F5F5F7`); `ThemeService`'s existing theme-switch effect now also updates that meta tag's `content` (`#0B0B0D` dark / `#F5F5F7` light) alongside its existing `data-theme` attribute and localStorage write. Changed `apple-mobile-web-app-status-bar-style` to `black-translucent`. `manifest.webmanifest`: `name`/`short_name` corrected to `"Trackr"`, added `description`, `orientation: "portrait"`, `theme_color`/`background_color` (`#F5F5F7`).
+
+- [x] PWA: surface new-version availability instead of silently updating on next reload.
+  - Why: `provideServiceWorker` was configured (`registerWhenStable:30000`) but nothing ever consumed Angular's `SwUpdate` — a deployed update would sit installed-but-inactive until the user happened to fully reload, with zero indication a new version was even available. Not acceptable for a "professional platform" that ships frequently.
+  - Done when: when the service worker detects and installs a new version, the user sees a small non-blocking prompt to reload; declining doesn't nag repeatedly beyond a periodic re-check.
+  - Verified: new `AppUpdateService` (`src/app/services/app-update.service.ts`) subscribes to `SwUpdate.versionUpdates`, sets an `updateReady` signal on `VERSION_READY`, and polls `checkForUpdate()` hourly to catch installs that land while a tab's been open in the background. New standalone `UpdateBanner` component renders a small pill top-of-screen (safe-area aware) with a Reload button when the signal is true; wired into the app root alongside the existing toast host. `ng build` passes clean.
+
+- [x] Fix silent failure in bank/manual duplicate reconciliation ("merge all").
+  - Why: `ReconciliationService.mergeAll()` looped through every matched duplicate pair with no per-item error handling — one failed merge (e.g. a network blip) would throw out of the loop, abandon every remaining pair with zero explanation, and the calling component (`reconcile-review.ts`) had no try/catch either, so the failure vanished as an unhandled promise rejection with no toast, no retry, nothing.
+  - Done when: one failed merge doesn't abandon the rest of the batch; every failure path shows the user an error toast; `keepBoth()`'s local ignore-list update rolls back if the Firestore write fails, instead of drifting out of sync with what's actually persisted.
+  - Verified: `mergeAll()` now wraps each `linkAndDrop` call individually, tallies successes/failures, and toasts both counts (`"Merged N duplicates"` / `"N duplicates couldn't be merged"`); `merge()` and `keepBoth()` now catch and toast on failure (`keepBoth` also reverts its optimistic local-signal update on a failed save). `reconcile-review.ts`'s three handlers now wrap their service calls in try/finally so `closeIfDone()` always runs and no rejection escapes a template click handler unhandled. `ng build` passes clean.
+
+- [x] Fix two stale-signal-after-await bugs (data read after an `await` could reflect a change that happened during the wait, not what the user actually had on screen when they clicked).
+  - Why: same class of bug Phase 8 already fixed once in `transaction-form.ts`'s main fields (see the comment left in that file) — two more spots read live signals/computed()s *after* an awaited async call instead of snapshotting them into locals first.
+  - Done when: `transaction-form.ts`'s auto-create-bill block and `accounts.ts`'s `confirmDelete()` both read every value they need before their respective `await`s, not after.
+  - Verified: `transaction-form.ts` — `isSubscription`, `canAutopayBill`, `billAmountMode`, `billFrequency`, `billNextDueDate`, `billDueDateMode`, `billAutopay`, and whether this is a new-vs-editing transaction are now snapshotted into locals before `await this.saveCurrentAsTemplate()`, alongside the fields Phase 8 already snapshotted. `accounts.ts` — `confirmDelete()` now snapshots `affectedBills()`, `deleteTransactionsToo()`, and `accountTransactions()` before the awaited per-bill reassignment loop. `ng build` passes clean.
+
+- [x] Visual mobile check (real iOS WebKit via Playwright, iPhone 13 viewport): pre-auth landing page and sign-in form.
+  - Why: no dedicated browser-testing tool was set up for this project; needed a way to actually see iOS rendering, not just review CSS.
+  - Done when: both pages render without overflow/clipping and with no console errors on real WebKit at iPhone dimensions.
+  - Verified: both pages render cleanly — hero section collapses correctly above the form on mobile width, no horizontal scroll, no console errors. Authenticated pages (Dashboard, Accounts, Transactions, Bills, Budgets, Analysis) were **not** visually verified on-device this pass — doing so needs a logged-in session, which this pass had no credentials for. Backlog item below.
+
+**Backlog (found, not yet fixed — lower confidence or lower impact, deferred rather than rushed):**
+- Switch `account.service.ts`, `category.service.ts`, `bill.service.ts`, `budget.service.ts`, `transaction-template.service.ts` from Firestore `updateDoc()` (partial-merge) to `setDoc()` for defense-in-depth consistency with how other services already write.
+- Add per-item error isolation to `plaid.service.ts`'s `setupAccountsForItem()`/`disconnect()` and `import.ts`'s `seedCategories()`/`runImport()` (currently sequential with no isolation, same class of bug as `mergeAll()` above but lower-traffic code paths).
+- Add a `[disabled]`/busy guard to the shared `Confirm` component so a double-tap on a slow connection can't fire its action twice.
+- Visually verify authenticated pages on iOS WebKit/iPhone viewport once there's a way to get a logged-in session in this environment (test credentials, or a scripted sign-in).
+
+**Phase 9 in progress** — PWA/safe-area/update-notification fixes and the two stale-signal bugs shipped; backlog items above deferred as lower-priority follow-ups.

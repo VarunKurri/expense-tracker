@@ -11,6 +11,8 @@ export class ThemeService {
       const t = this.theme();
       document.documentElement.setAttribute('data-theme', t);
       localStorage.setItem('theme', t);
+      document.querySelector('meta[name="theme-color"]')
+        ?.setAttribute('content', t === 'dark' ? '#0B0B0D' : '#F5F5F7');
     });
   }
 

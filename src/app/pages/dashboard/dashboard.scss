@@ -497,7 +497,7 @@
   border: 1px solid var(--line);
   border-bottom: none;
   z-index: 51;
-  padding: 0 0 40px;
+  padding: 0 0 calc(40px + env(safe-area-inset-bottom));
   animation: slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 

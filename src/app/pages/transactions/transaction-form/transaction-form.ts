@@ -394,6 +394,16 @@ export class TransactionForm implements OnChanges {
       const categoryId = this.categoryId();
       const refunded = this.refunded;
       const isInternalTransfer = this.isInternalTransfer;
+      // Same reasoning as the snapshot above: read before the await, not after,
+      // so a form reset in flight can't swap in stale bill settings.
+      const isSubscription = this.isSubscription();
+      const canAutopayBill = this.canAutopayBill();
+      const billAmountMode = this.billAmountMode;
+      const billFrequency = this.billFrequency;
+      const billNextDueDate = this.billNextDueDate;
+      const billDueDateMode = this.billDueDateMode;
+      const billAutopay = this.billAutopay;
+      const isNewTransaction = !this.transaction;
       if (!accountId) { this.toastService.error('Please select an account'); return; }
       if (!merchant) { this.toastService.error('Merchant or source is required'); return; }
 
@@ -420,9 +430,7 @@ export class TransactionForm implements OnChanges {
       });
 
       // If Subscriptions category selected, auto-create bill if one doesn't exist yet
-      const isSubscription = this.isSubscription();
-      const canAutopayBill = this.canAutopayBill();
-      if (isSubscription && merchant && !this.transaction) {
+      if (isSubscription && merchant && isNewTransaction) {
         const existing = this.billService.bills().find(
           b => b.name.toLowerCase() === merchant.toLowerCase()
         );
@@ -431,13 +439,13 @@ export class TransactionForm implements OnChanges {
             await this.billService.add({
               name: merchant,
               amount,
-              amountMode: this.billAmountMode,
-              frequency: this.billFrequency,
-              nextDueDate: this.billNextDueDate || this.nextMonthDate(date),
-              dueDateMode: this.billDueDateMode,
+              amountMode: billAmountMode,
+              frequency: billFrequency,
+              nextDueDate: billNextDueDate || this.nextMonthDate(date),
+              dueDateMode: billDueDateMode,
               accountId,
               categoryId,
-              autopayEnabled: canAutopayBill && this.billAutopay,
+              autopayEnabled: canAutopayBill && billAutopay,
               icon: '📄',
               active: true,
             });

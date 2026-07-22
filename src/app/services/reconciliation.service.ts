@@ -77,19 +77,35 @@ export class ReconciliationService {
     this.busy.set(true);
     try {
       await this.linkAndDrop(match);
+    } catch (err) {
+      this.toast.error('Failed to merge. Please try again.');
     } finally {
       this.busy.set(false);
     }
   }
 
-  /** Merge every current match. */
+  /** Merge every current match. Isolated per-item so one failure doesn't abandon the rest. */
   async mergeAll(): Promise<void> {
     const all = this.matches();
     if (all.length === 0) return;
     this.busy.set(true);
     try {
-      for (const m of all) await this.linkAndDrop(m);
-      this.toast.success(`Merged ${all.length} duplicate${all.length === 1 ? '' : 's'}.`);
+      let succeeded = 0;
+      let failed = 0;
+      for (const m of all) {
+        try {
+          await this.linkAndDrop(m);
+          succeeded++;
+        } catch (err) {
+          failed++;
+        }
+      }
+      if (succeeded > 0) {
+        this.toast.success(`Merged ${succeeded} duplicate${succeeded === 1 ? '' : 's'}.`);
+      }
+      if (failed > 0) {
+        this.toast.error(`${failed} duplicate${failed === 1 ? '' : 's'} couldn't be merged. Please try again.`);
+      }
     } finally {
       this.busy.set(false);
     }
@@ -97,10 +113,16 @@ export class ReconciliationService {
 
   /** Dismiss a pair as genuinely separate; never suggest it again. */
   async keepBoth(match: ReconcileMatch): Promise<void> {
-    const next = new Set(this.ignoreIds());
+    const previous = this.ignoreIds();
+    const next = new Set(previous);
     next.add(match.plaid.plaidTransactionId!);
     this.ignoreIds.set(next);
-    await this.saveIgnore();
+    try {
+      await this.saveIgnore();
+    } catch (err) {
+      this.ignoreIds.set(previous);
+      this.toast.error('Failed to dismiss. Please try again.');
+    }
   }
 
   /**

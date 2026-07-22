@@ -227,17 +227,21 @@ export class Accounts {
   async confirmDelete() {
     const account = this.accountToDelete();
     if (!account?.id) return;
+    // Snapshot before the awaited bill-reassignment loop below — these are computed()s
+    // over live data, so re-reading them afterward could pick up transactions/settings
+    // that changed (e.g. a sync landing) while the loop was in flight.
+    const bills = this.affectedBills();
+    const deleteTransactionsToo = this.deleteTransactionsToo();
+    const transactionIds = this.accountTransactions().map(t => t.id).filter((id): id is string => !!id);
     try {
-      const bills = this.affectedBills();
       if (bills.length > 0) {
         const newAccountId = this.reassignAccountId() || undefined;
         for (const b of bills) {
           if (b.id) await this.billSvc.update(b.id, { accountId: newAccountId });
         }
       }
-      if (this.deleteTransactionsToo()) {
-        const ids = this.accountTransactions().map(t => t.id).filter((id): id is string => !!id);
-        if (ids.length > 0) await this.transactionSvc.removeMany(ids);
+      if (deleteTransactionsToo && transactionIds.length > 0) {
+        await this.transactionSvc.removeMany(transactionIds);
       }
       await this.accountSvc.remove(account.id);
     } catch (err) {

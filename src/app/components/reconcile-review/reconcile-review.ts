@@ -39,18 +39,27 @@ export class ReconcileReview {
   }
 
   async merge(m: ReconcileMatch) {
-    await this.reconcile.merge(m);
-    this.closeIfDone();
+    try {
+      await this.reconcile.merge(m);
+    } finally {
+      this.closeIfDone();
+    }
   }
 
   async mergeAll() {
-    await this.reconcile.mergeAll();
-    this.closeIfDone();
+    try {
+      await this.reconcile.mergeAll();
+    } finally {
+      this.closeIfDone();
+    }
   }
 
   async keepBoth(m: ReconcileMatch) {
-    await this.reconcile.keepBoth(m);
-    this.closeIfDone();
+    try {
+      await this.reconcile.keepBoth(m);
+    } finally {
+      this.closeIfDone();
+    }
   }
 
   private closeIfDone() {
