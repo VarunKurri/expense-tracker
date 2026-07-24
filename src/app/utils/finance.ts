@@ -35,3 +35,25 @@ export function availableCredit(account: Account, transactions: Transaction[]): 
 export function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+/** Money in/out for one account within a given "YYYY-MM" month — includes transfers
+ *  (a transfer is a real movement of money through that specific account, even
+ *  though it's excluded from app-wide income/expense totals). */
+export function monthActivityForAccount(
+  transactions: Transaction[], accountId: string, month: string
+): { in: number; out: number } {
+  let moneyIn = 0;
+  let moneyOut = 0;
+  for (const t of transactions) {
+    if (!t.date.startsWith(month)) continue;
+    if (t.type === 'income' && t.accountId === accountId) {
+      moneyIn += t.amount;
+    } else if (t.type === 'expense' && t.accountId === accountId) {
+      moneyOut += t.amount;
+    } else if (t.type === 'transfer') {
+      if (t.toAccountId === accountId) moneyIn += t.amount;
+      if (t.fromAccountId === accountId) moneyOut += t.amount;
+    }
+  }
+  return { in: roundMoney(moneyIn), out: roundMoney(moneyOut) };
+}

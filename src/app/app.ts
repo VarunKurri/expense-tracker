@@ -259,12 +259,17 @@ export class App {
       }
     });
 
-    // Autopay: fires when both user AND bills signal are populated.
+    // Autopay: fires when user, bills, AND accounts are all populated. Accounts must
+    // be loaded too — autopay's Plaid-linked check reads accountService.accounts(),
+    // and that signal starts at [] until its first snapshot resolves; running before
+    // it's ready would see every account as "not Plaid-linked" and fabricate a
+    // duplicate transaction for one that actually is.
     // Component effects are guaranteed to run; service-constructor effects are not.
     effect(() => {
       const user = this.auth.user();
       const bills = this.billService.bills();
-      if (user && this.encryption.unlocked() && bills.length > 0) {
+      const accountsLoaded = this.accountService.loaded();
+      if (user && this.encryption.unlocked() && bills.length > 0 && accountsLoaded) {
         untracked(() => this.autopayService.runIfNeeded());
       }
     });

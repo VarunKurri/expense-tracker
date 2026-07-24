@@ -18,13 +18,17 @@ export class AccountService {
   private encryption = inject(EncryptionService);
   private ngZone = inject(NgZone);
   error = signal<string | null>(null);
+  // True once the first accounts snapshot (empty or not) has been received — lets
+  // callers (autopay's Plaid-linked check) tell "genuinely no accounts" apart from
+  // "still loading," since the signal itself starts at [] either way.
+  loaded = signal(false);
 
   private accounts$: Observable<Account[]> = combineLatest([
     toObservable(this.auth.user),
     toObservable(this.encryption.unlocked),
   ]).pipe(
     switchMap(([user, unlocked]) => {
-      if (!user || !unlocked) return of([]);
+      if (!user || !unlocked) { this.loaded.set(false); return of([]); }
       const q = query(
         collection(this.db, `users/${user.uid}/accounts`),
         orderBy('createdAt', 'asc')
@@ -54,11 +58,13 @@ export class AccountService {
                 ? `${failed} account${failed === 1 ? '' : 's'} failed to decrypt and ${failed === 1 ? 'is' : 'are'} hidden. The rest are shown below.`
                 : null);
               sub.next(accounts);
+              this.loaded.set(true);
             });
           },
           err => this.ngZone.run(() => {
             this.error.set(err.message || 'Could not load accounts.');
             sub.next([]);
+            this.loaded.set(true);
           })
         );
         return unsub;

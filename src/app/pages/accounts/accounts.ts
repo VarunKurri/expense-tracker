@@ -14,6 +14,7 @@ import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Account, Bill } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { PlaidService, PlaidItem } from '../../services/plaid.service';
+import { monthActivityForAccount } from '../../utils/finance';
 
 @Component({
   selector: 'app-accounts',
@@ -68,6 +69,16 @@ export class Accounts {
   availableCreditFor(account: Account): number {
     if (!account.creditLimit) return 0;
     return account.creditLimit - this.balanceFor(account);
+  }
+
+  // "YYYY-MM" for the current calendar month, local time.
+  private currentMonth = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  })();
+
+  monthActivityFor(account: Account): { in: number; out: number } {
+    return monthActivityForAccount(this.transactionSvc.transactions(), account.id!, this.currentMonth);
   }
 
   assets = computed(() => {

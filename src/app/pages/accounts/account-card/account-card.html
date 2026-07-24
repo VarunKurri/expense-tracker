@@ -39,5 +39,16 @@
         </div>
       }
     </div>
+  } @else {
+    <div class="card-credit-row">
+      <div class="card-credit-chip">
+        <span class="chip-label">In this month</span>
+        <span class="chip-value positive">{{ formatCurrency(monthActivity.in) }}</span>
+      </div>
+      <div class="card-credit-chip">
+        <span class="chip-label">Out this month</span>
+        <span class="chip-value negative">{{ formatCurrency(monthActivity.out) }}</span>
+      </div>
+    </div>
   }
 </div>

@@ -14,6 +14,7 @@ export class AccountCard {
   @Input() account!: Account;
   @Input() balance = 0;
   @Input() availableCredit = 0;
+  @Input() monthActivity: { in: number; out: number } = { in: 0, out: 0 };
   @Output() edit = new EventEmitter<Account>();
 
   private router = inject(Router);
