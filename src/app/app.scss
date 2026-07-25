@@ -283,6 +283,8 @@
 .auth-switches {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
+  row-gap: 6px;
   gap: 14px;
 
   button {
@@ -296,10 +298,11 @@
 
 .unlock-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
   background: var(--bg);
 }
 
@@ -357,7 +360,7 @@
   }
 
   .login-left {
-    padding: 48px 32px 36px;
+    padding: calc(48px + env(safe-area-inset-top)) 32px 36px;
     min-height: 220px;
   }
 
@@ -378,19 +381,41 @@
   }
 }
 
+// Phone-sized: compact the hero to a thin strip and let the card pane scroll on
+// its own (rather than the whole page), so sign-in/reset fit in one screen like a
+// native app; signup's extra fields still scroll gracefully instead of breaking.
 @media (max-width: 480px) {
+  .login-shell {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
   .login-left {
-    padding: 36px 24px;
+    padding: calc(14px + env(safe-area-inset-top)) 24px 12px;
+    min-height: 0;
+    flex-shrink: 0;
   }
 
   .login-left-content {
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
+    gap: 4px;
   }
 
-  .login-hero-text h1 { font-size: 24px; }
+  .login-hero-text h1 { font-size: 19px; margin-bottom: 0; }
   .login-hero-text p  { display: none; }
+
+  .login-right {
+    align-items: flex-start;
+    padding: 18px 20px calc(18px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+  }
+
+  .login-card { gap: 14px; margin: 0 auto; }
+  .login-card-heading h2 { font-size: 19px; margin-bottom: 2px; }
+  .login-card-heading p { font-size: 13px; }
+  .login-disclaimer { font-size: 11px; }
 }
 
 
@@ -423,7 +448,7 @@
 .sidebar {
   width: 240px;
   flex-shrink: 0;
-  padding: 20px 14px;
+  padding: calc(20px + env(safe-area-inset-top)) 14px calc(20px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--line);
@@ -692,9 +717,19 @@
 }
 
 .topbar-brand {
+  // Absolutely centered on the bar itself, independent of the hamburger (left) and
+  // action buttons (right) — those two sides aren't the same width, so centering
+  // this via flex "remaining space" (the old approach) visibly skewed the logo
+  // toward the narrower side. `.topbar` is `position: sticky`, which already
+  // establishes a positioning context for this.
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 8px;
+  pointer-events: none;
 
   .brand-name {
     font-weight: 700;
@@ -971,12 +1006,6 @@
   .overlay { display: block; }
   .topbar  { display: flex; }
 
-  .topbar-brand {
-    flex: 1;
-    justify-content: center;
-    min-width: 0;
-  }
-
   .command-backdrop {
     padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
   }
@@ -1159,7 +1188,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 22px clamp(20px, 5vw, 64px);
+  padding: calc(22px + env(safe-area-inset-top)) clamp(20px, 5vw, 64px) 22px;
 }
 
 .landing-brand {

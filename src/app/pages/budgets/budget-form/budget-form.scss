@@ -52,13 +52,15 @@ select.input-field {
   position: relative;
   .curr {
     position: absolute;
-    left: 14px;
+    left: 16px;
     top: 50%;
     transform: translateY(-50%);
+    font-size: 14px;
+    line-height: 1;
     color: var(--fg-3);
     pointer-events: none;
   }
-  .amount-input { padding-left: 28px; }
+  .amount-input { padding-left: 34px; }
 }
 
 .type-toggle {

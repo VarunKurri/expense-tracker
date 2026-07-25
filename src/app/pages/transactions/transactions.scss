@@ -910,10 +910,10 @@
 
     .btn-primary,
     .btn-outline {
+      flex: 1;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 118px;
       min-height: 44px;
       padding: 8px 12px;
       border-radius: 12px;

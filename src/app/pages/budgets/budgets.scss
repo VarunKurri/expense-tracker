@@ -372,6 +372,11 @@
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
   .page-head { flex-direction: column; align-items: stretch; }
+  // Stacking page-head to a column adds the "+ New Budget" button as a full-width
+  // block above the month pills — on top of .page's uniform 20px gap between
+  // sections, that reads as an oddly large gap under just this one button. Pull
+  // the month row closer, same technique .filter-row already uses above.
+  .month-nav { margin-top: -8px; }
   .summary-bar { flex-wrap: wrap; gap: 16px; }
   .summary-divider { display: none; }
   .budget-grid { grid-template-columns: 1fr; }
