@@ -91,7 +91,12 @@ select.input-field {
     color: var(--fg-3);
     pointer-events: none;
   }
-  .amount-input { padding-left: 34px; }
+  // Named distinctly from transaction-form's own `.amount-input` (its big custom
+  // amount display) — modal.scss has a `::ng-deep .amount-input { font-size: 32px
+  // !important }` rule scoped to any modal body, meant for that display only, and
+  // it was leaking into this plain small text input purely because they shared a
+  // class name, blowing the digits up past the "$" prefix's reserved space.
+  .bill-amount-input { padding-left: 34px; }
 }
 
 .icon-picker {
