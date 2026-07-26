@@ -448,6 +448,17 @@
   &.bulk-mode {
     grid-template-columns: 24px 44px 1fr auto;
   }
+
+  // Analysis view: this row is shown for reference but not counted in the totals.
+  // Dim it and strike the title + amount so it reads as "present but excluded".
+  &.excluded-from-analysis {
+    opacity: 0.5;
+
+    .tx-title,
+    .tx-amount {
+      text-decoration: line-through;
+    }
+  }
 }
 
 .tx-select {
@@ -1089,6 +1100,12 @@
 
   .rb-icon { font-size: 16px; }
   .btn-primary { flex-shrink: 0; }
+  .btn-outline { flex-shrink: 0; }
+
+  &.analysis-banner {
+    border-color: color-mix(in srgb, var(--accent, #00D64F) 45%, var(--line));
+    background: color-mix(in srgb, var(--accent, #00D64F) 8%, var(--surface));
+  }
 }
 
 .bulk-delete-list {

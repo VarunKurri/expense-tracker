@@ -32,8 +32,11 @@ export interface Transaction {
   // Internal transfer tracking (e.g. a credit card payment: an expense on the
   // paying account and an income on the card account, both real per-account, but
   // not real spending/earning app-wide). Excluded from income/expense/savings
-  // totals when true. Auto-set for Plaid transactions whose category indicates a
-  // transfer; user-toggleable on any transaction to correct what Plaid misses.
+  // totals when true (Analysis, Dashboard, Budgets, and the Transactions "analysis
+  // view"). Set manually via the transaction form's "Internal transfer" toggle —
+  // NOT auto-detected for Plaid transactions today, so an untagged autopay still
+  // counts as spending/income until the user marks it. (Auto-detection from Plaid's
+  // transfer category is a possible future improvement.)
   isInternalTransfer?: boolean;
 
   // Plaid sync metadata (set for bank-synced transactions)

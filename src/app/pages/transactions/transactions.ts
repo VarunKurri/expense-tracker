@@ -75,6 +75,21 @@ export class Transactions {
   specialFilter = signal<SpecialFilter>('all');
   advancedFiltersOpen = signal(false);
 
+  // "Analysis view": entered by following "See all transactions" from the Analysis
+  // page. Refunded + internal-transfer rows stay visible but are greyed/struck through
+  // and left out of the Income/Expenses/Net totals, so the numbers match the Analysis
+  // page exactly. Direct navigation to Transactions leaves this off (everything counts).
+  analysisView = signal(false);
+  analysisExcludeRefunded = signal(true);
+
+  /** True when a row is shown but excluded from analysis-view totals. */
+  excludedFromAnalysis(t: Transaction): boolean {
+    if (!this.analysisView()) return false;
+    if (t.isInternalTransfer) return true;
+    if (this.analysisExcludeRefunded() && t.refunded) return true;
+    return false;
+  }
+
   // Date range bounds
   private dateRange = computed(() => {
     const now = new Date();
@@ -166,6 +181,7 @@ export class Transactions {
         label: this.formatDateLabel(date),
         items,
         total: items.reduce((s, t) => {
+          if (this.excludedFromAnalysis(t)) return s;
           if (t.type === 'income') return s + t.amount;
           if (t.type === 'expense') return s - t.amount;
           return s;
@@ -173,10 +189,12 @@ export class Transactions {
       }));
   });
 
-  // Totals
+  // Totals — in analysis view, refunded + internal-transfer rows are left out so the
+  // numbers match the Analysis page; otherwise everything in range counts.
   totals = computed(() => {
     let income = 0, expense = 0;
     for (const t of this.filtered()) {
+      if (this.excludedFromAnalysis(t)) continue;
       if (t.type === 'income') income += t.amount;
       if (t.type === 'expense') expense += t.amount;
     }
@@ -291,6 +309,12 @@ export class Transactions {
     this.customStartDate.set('');
     this.customEndDate.set('');
     this.specialFilter.set('all');
+    this.exitAnalysisView();
+  }
+
+  /** Leave analysis view — refunded/internal rows count again and un-grey. */
+  exitAnalysisView() {
+    this.analysisView.set(false);
   }
 
   isSelected(tx: Transaction): boolean {
@@ -578,6 +602,13 @@ export class Transactions {
       const start = params.get('start');
       const end = params.get('end');
       const special = params.get('special') as SpecialFilter | null;
+      const view = params.get('view');
+
+      // Arriving from the Analysis page's "See all transactions" — mirror its KPIs:
+      // refunded + internal-transfer rows stay visible but are greyed out and left
+      // out of the totals. `excludeRefunded` reflects the Analysis toggle at the time.
+      this.analysisView.set(view === 'analysis');
+      this.analysisExcludeRefunded.set(params.get('excludeRefunded') !== 'false');
 
       // A start/end pair (e.g. from Analysis' "see all" links) means the caller
       // picked an exact period — honor it as a custom range instead of falling

@@ -384,6 +384,15 @@ export class Analysis implements AfterViewInit, OnDestroy {
     return qp;
   });
 
+  // Params for "See all transactions" — same period as above, plus a marker so the
+  // Transactions page enters an "analysis view" (matches these KPIs exactly: refunded
+  // + internal-transfer rows stay visible but greyed out and are left out of totals).
+  seeAllTxParams = computed(() => {
+    const qp: Record<string, string> = { ...this.seeAllParams(), view: 'analysis' };
+    qp['excludeRefunded'] = this.excludeRefunded() ? 'true' : 'false';
+    return qp;
+  });
+
   toggleCategoryExclusion(categoryId: string) {
     const current = new Set(this.excludedCategories());
     if (current.has(categoryId)) current.delete(categoryId);

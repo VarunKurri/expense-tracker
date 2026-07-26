@@ -33,6 +33,21 @@
     </div>
   }
 
+  <!-- ANALYSIS-VIEW NOTICE -->
+  @if (analysisView()) {
+    <div class="reconcile-banner analysis-banner">
+      <div class="rb-text">
+        <span class="rb-icon">📊</span>
+        <span>
+          <strong>Analysis view</strong> — matching the Analysis page.
+          Internal transfers{{ analysisExcludeRefunded() ? ' and refunded rows' : '' }}
+          are shown but greyed out and left out of the totals.
+        </span>
+      </div>
+      <button class="btn-outline" (click)="exitAnalysisView()">View normally</button>
+    </div>
+  }
+
   <!-- TOTALS -->
   <div class="totals-row">
     <div class="total-card">
@@ -288,6 +303,7 @@
                    [class.selected]="isSelected(tx)"
                    [class.bulk-mode]="bulkMode()"
                    [class.editing]="quickEditingId() === tx.id"
+                   [class.excluded-from-analysis]="excludedFromAnalysis(tx)"
                    [class.last]="last"
                    (click)="openView(tx)">
 
