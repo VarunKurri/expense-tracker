@@ -452,10 +452,38 @@ items below; fixed the highest-confidence ones this round, logged the rest as ba
     - **Transfer disclosure**: added a small always-visible "ⓘ Internal transfers always excluded" note in the filters row, with a `title` tooltip explaining why (mirrors the same explanation already used on the transaction-edit toggle from Phase 8) — visually distinct from the refunded toggle so it doesn't read as another user-controllable option.
     - `ng build` passes clean; smoke-tested pre-auth pages on WebKit post-change with no console errors (the new pages are behind auth, so full interaction testing is the user's to do next).
 
-**Phase 9 in progress** — PWA/safe-area/update-notification fixes, the reconciliation/stale-signal bugs, the autopay race condition, the account-card sizing/content fix, and three rounds of real-device visual bugs are all shipped; the `updateDoc()`→`setDoc()`, per-item error isolation, and Confirm double-tap-guard backlog items below remain deferred, along with fully exercising authenticated-page *functionality* on-device (visual layout is being iterated via real user screenshots; functional testing — Plaid flows, editing, etc. — is still the user's to report back on).
+**Phase 9 in progress** — PWA/safe-area/update-notification fixes, the reconciliation/stale-signal bugs, the autopay race condition, the account-card sizing/content fix, three rounds of real-device visual bugs, the PWA update-reliability fix, the bills badge change, and the Analysis expansion (custom range, see-all drill-throughs, transfer disclosure) are all shipped; the `updateDoc()`→`setDoc()`, per-item error isolation, and Confirm double-tap-guard backlog items below remain deferred.
+
+---
+
+### Session handoff (2026-07-26) — continue here on the new laptop
+
+**Sync state:** everything below is committed, pushed to both `claude/plaid-bank-integration-ddvp8w` and `main` (latest commit `2785e0c`, "part 33"), and deployed live to Firebase Hosting. A fresh `git pull` on `main` is all a new session needs — no uncommitted or undeployed work is sitting anywhere.
+
+**What's implemented but NOT yet tested by the user** (this is the next task — a testing pass, not more building):
+
+1. **Money-math correctness** (highest priority — these touch real financial numbers):
+   - Pending → posted transaction edits survive the transition (Phase 8).
+   - Internal-transfer flagging excludes correctly from Analysis/Dashboard totals but still moves both account balances (Phase 8).
+   - Autopay no longer creates a duplicate transaction on a Plaid-linked account's due date — the race-condition fix from part 29. Note: the original "Apple iCloud" duplicate this bug produced is still sitting in the user's data and needs manual deletion (note field: "Autopay — monthly bill").
+   - Purchase date (not posted date) shows on new Plaid syncs (Phase 8).
+
+2. **This session's new features** (parts 29–33, never tested live):
+   - Account cards: equal height, "In/Out this month" chips on non-credit accounts.
+   - Bills sidebar badge now = overdue + due today/tomorrow only (was 7-day window).
+   - Analysis page: Custom date range picker (two date inputs), "See all transactions →" link (Top Merchants → Transactions, same period), "See all categories →" link (Where It Went → new `/analysis/categories` page → drill into Transactions per category), and the "Internal transfers always excluded" note in the filters row.
+   - Reconciliation ("merge duplicates") partial-failure handling — hasn't been exercised with an actual failure case.
+
+3. **PWA mechanics** (part 33's fix, unverified in the field):
+   - The update-detection fix — `activateUpdate()` before reload, check-on-resume via `visibilitychange`. Worth confirming a deploy actually gets picked up promptly next time one goes out, since this is what several "my fix isn't showing up" reports in this session turned out to be.
+   - Safe-area fixes across landing/sign-in/sidebar/topbar (parts 30–31) — last confirmed status per user screenshots: sidebar ✅, bill $ overlap ✅ (was actually the class-collision bug from part 32, separate from safe-area), landing/sign-in and topbar vertical alignment were fixed in part 31 but not yet re-confirmed on-device.
+
+**Known limitation carried forward:** this dev environment has no way to log into the app (no test credentials), so anything behind auth can only be verified by code review + the user's own on-device testing — that's true of everything in the list above.
 
 **Backlog (found, not yet fixed — lower confidence or lower impact, deferred rather than rushed):**
 - Switch `account.service.ts`, `category.service.ts`, `bill.service.ts`, `budget.service.ts`, `transaction-template.service.ts` from Firestore `updateDoc()` (partial-merge) to `setDoc()` for defense-in-depth consistency with how other services already write.
 - Add per-item error isolation to `plaid.service.ts`'s `setupAccountsForItem()`/`disconnect()` and `import.ts`'s `seedCategories()`/`runImport()` (currently sequential with no isolation, same class of bug as `mergeAll()` above but lower-traffic code paths).
 - Add a `[disabled]`/busy guard to the shared `Confirm` component so a double-tap on a slow connection can't fire its action twice.
 - Visually verify authenticated pages on iOS WebKit/iPhone viewport once there's a way to get a logged-in session in this environment (test credentials, or a scripted sign-in).
+
+---
