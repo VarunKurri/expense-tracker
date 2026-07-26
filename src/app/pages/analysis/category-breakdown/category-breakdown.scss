@@ -1,0 +1,133 @@
+.page {
+  padding: 28px 32px 48px;
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.page-head {
+  h1 {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    color: var(--fg);
+    margin: 6px 0 4px;
+  }
+
+  .sub { color: var(--fg-3); font-size: 13.5px; margin: 0; }
+}
+
+.back-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-3);
+  text-decoration: none;
+
+  &:hover { color: var(--fg); }
+}
+
+.empty {
+  padding: 48px;
+  text-align: center;
+  color: var(--fg-3);
+  font-size: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.cat-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.cat-row {
+  display: grid;
+  grid-template-columns: 170px 1fr 90px 44px 20px;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 20px;
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.15s ease;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: var(--surface-hi); }
+}
+
+.cat-icon-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cat-icon { font-size: 16px; flex-shrink: 0; }
+
+.cat-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cat-bar-wrap {
+  height: 6px;
+  background: var(--bg-3);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cat-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 2px;
+}
+
+.cat-amount {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cat-pct {
+  font-size: 12px;
+  color: var(--fg-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cat-chevron {
+  font-size: 18px;
+  color: var(--fg-4);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .page { padding: 20px 16px 40px; }
+
+  .cat-row {
+    grid-template-columns: 1fr 70px 16px;
+    grid-template-areas:
+      "name amount chevron"
+      "bar bar bar";
+    row-gap: 6px;
+  }
+
+  .cat-icon-name { grid-area: name; }
+  .cat-amount { grid-area: amount; }
+  .cat-chevron { grid-area: chevron; }
+  .cat-bar-wrap { grid-area: bar; }
+  .cat-pct { display: none; }
+}

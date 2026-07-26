@@ -1,0 +1,32 @@
+<div class="page">
+
+  <div class="page-head">
+    <div>
+      <a class="back-link" routerLink="/analysis">← Back to Analysis</a>
+      <h1>All categories</h1>
+      <p class="sub">{{ rangeLabel() }} · {{ formatCurrency(totalExpenses()) }} spent</p>
+    </div>
+  </div>
+
+  @if (categories().length === 0) {
+    <div class="empty">No expense data for this period</div>
+  } @else {
+    <div class="cat-panel">
+      @for (cat of categories(); track cat.id) {
+        <a class="cat-row" [routerLink]="['/transactions']" [queryParams]="transactionsParams(cat.id)">
+          <div class="cat-icon-name">
+            <span class="cat-icon">{{ cat.icon }}</span>
+            <span class="cat-name">{{ cat.name }}</span>
+          </div>
+          <div class="cat-bar-wrap">
+            <div class="cat-bar-fill" [style.width]="cat.pct + '%'" [style.background]="cat.color"></div>
+          </div>
+          <div class="cat-amount">{{ formatCurrency(cat.amount) }}</div>
+          <div class="cat-pct">{{ cat.pct }}%</div>
+          <div class="cat-chevron">›</div>
+        </a>
+      }
+    </div>
+  }
+
+</div>

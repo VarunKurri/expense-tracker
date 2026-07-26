@@ -575,17 +575,33 @@ export class Transactions {
       const categoryId = params.get('categoryId');
       const search = params.get('search');
       const txId = params.get('txId') || '';
+      const start = params.get('start');
+      const end = params.get('end');
+      const special = params.get('special') as SpecialFilter | null;
+
+      // A start/end pair (e.g. from Analysis' "see all" links) means the caller
+      // picked an exact period — honor it as a custom range instead of falling
+      // back to "all," which the other query-param entry points below still do
+      // since they don't carry any date intent of their own.
+      if (start || end) {
+        this.customStartDate.set(start || '');
+        this.customEndDate.set(end || '');
+        this.filterDateRange.set('custom');
+      }
       if (accountId) {
         this.filterAccountId.set(accountId);
-        this.filterDateRange.set('all');
+        if (!start && !end) this.filterDateRange.set('all');
       }
       if (categoryId) {
         this.filterCategoryId.set(categoryId);
-        this.filterDateRange.set('all');
+        if (!start && !end) this.filterDateRange.set('all');
+      }
+      if (special && ['all', 'uncategorized', 'refunded', 'not-refunded', 'internal-transfer'].includes(special)) {
+        this.specialFilter.set(special);
       }
       if (search) {
         this.search.set(search);
-        this.filterDateRange.set('all');
+        if (!start && !end) this.filterDateRange.set('all');
       }
       this.queryTxId.set(txId);
     });

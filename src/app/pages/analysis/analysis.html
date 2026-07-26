@@ -11,11 +11,26 @@
         @for (r of ranges; track r.value) {
           <button class="range-pill"
                   [class.active]="range() === r.value"
-                  (click)="range.set(r.value)">{{ r.label }}</button>
+                  (click)="selectRange(r.value)">{{ r.label }}</button>
         }
       </div>
     </div>
   </div>
+
+  @if (range() === 'custom') {
+    <div class="custom-range-row">
+      <label>
+        <span>From</span>
+        <input type="date" class="filter-select" [max]="customEnd() || todayStr"
+               [ngModel]="customStart()" (ngModelChange)="customStart.set($event)" />
+      </label>
+      <label>
+        <span>To</span>
+        <input type="date" class="filter-select" [min]="customStart()" [max]="todayStr"
+               [ngModel]="customEnd()" (ngModelChange)="customEnd.set($event)" />
+      </label>
+    </div>
+  }
 
   <!-- FILTERS ROW -->
   <div class="filters-row">
@@ -45,6 +60,11 @@
         <span class="filter-badge">{{ excludedCategories().size }}</span>
       }
     </button>
+
+    <span class="filter-note"
+          title="Money moved between your own accounts — like paying off a credit card from checking — is never counted as income or spending in these totals, whether Plaid auto-detected it or you flagged it manually on the transaction.">
+      ⓘ Internal transfers always excluded
+    </span>
 
     @if (showCategoryFilter()) {
       <div class="category-filter-panel">
@@ -139,7 +159,10 @@
     <!-- TOP MERCHANTS — rows are now clickable -->
     <div class="card-panel">
       <div class="panel-head">
-        <div class="panel-title">Top merchants</div>
+        <div class="panel-head-row">
+          <div class="panel-title">Top merchants</div>
+          <a class="see-all-link" [routerLink]="['/transactions']" [queryParams]="seeAllParams()">See all transactions →</a>
+        </div>
         <div class="panel-sub">by total spend</div>
       </div>
       @if (topMerchants().length === 0) {
@@ -192,7 +215,10 @@
     <!-- SPENDING BY CATEGORY -->
     <div class="card-panel">
       <div class="panel-head">
-        <div class="panel-title">Where it went</div>
+        <div class="panel-head-row">
+          <div class="panel-title">Where it went</div>
+          <a class="see-all-link" [routerLink]="['/analysis/categories']" [queryParams]="categoryBreakdownParams()">See all categories →</a>
+        </div>
         <div class="panel-sub">{{ formatCurrency(totalExpenses()) }} total · top 8 categories</div>
       </div>
       <div class="donut-wrap">

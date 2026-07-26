@@ -4,6 +4,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { TransactionService } from '../../services/transaction.service';
 import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
@@ -11,6 +12,7 @@ import { TransactionForm } from '../transactions/transaction-form/transaction-fo
 import { Confirm } from '../../components/confirm/confirm';
 import { Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
+import { filterForAnalysis } from '../../utils/analysis-filter';
 import {
   Chart, ChartData, ChartOptions,
   ArcElement, DoughnutController,
@@ -26,12 +28,12 @@ Chart.register(
   Tooltip, Legend
 );
 
-type RangeKey = 'this-month' | 'last-month' | '3-months' | 'this-year' | 'all';
+type RangeKey = 'this-month' | 'last-month' | '3-months' | 'this-year' | 'all' | 'custom';
 
 @Component({
   selector: 'app-analysis',
   standalone: true,
-  imports: [CommonModule, FormsModule, TransactionForm, Confirm],
+  imports: [CommonModule, FormsModule, RouterLink, TransactionForm, Confirm],
   templateUrl: './analysis.html',
   styleUrl: './analysis.scss'
 })
@@ -123,6 +125,9 @@ export class Analysis implements AfterViewInit, OnDestroy {
   filterAccountId = signal('');
   excludeRefunded = signal(true);
   excludedCategories = signal<Set<string>>(new Set());
+  customStart = signal('');
+  customEnd = signal('');
+  todayStr = new Date().toISOString().slice(0, 10);
 
   ranges: { value: RangeKey; label: string }[] = [
     { value: 'this-month',  label: 'This month' },
@@ -130,9 +135,21 @@ export class Analysis implements AfterViewInit, OnDestroy {
     { value: '3-months',    label: 'Last 3 months' },
     { value: 'this-year',   label: 'This year' },
     { value: 'all',         label: 'All time' },
+    { value: 'custom',      label: 'Custom' },
   ];
 
   showCategoryFilter = signal(false);
+
+  selectRange(r: RangeKey) {
+    this.range.set(r);
+    if (r === 'custom' && !this.customStart()) {
+      // Default the custom picker to the current month so it opens with a
+      // sensible, non-empty range rather than "all time" until both dates are set.
+      const now = new Date();
+      this.customStart.set(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
+      this.customEnd.set(this.todayStr);
+    }
+  }
 
   // ── Date range ─────────────────────────────────────────────
   private dateRange = computed(() => {
@@ -158,6 +175,8 @@ export class Analysis implements AfterViewInit, OnDestroy {
         return { start: localDate(y, m - 2, 1), end: localDate(y, m, lastDay(y, m)) };
       case 'this-year':
         return { start: `${y}-01-01`, end: `${y}-12-31` };
+      case 'custom':
+        return { start: this.customStart(), end: this.customEnd() };
       default:
         return { start: '', end: '' };
     }
@@ -166,17 +185,11 @@ export class Analysis implements AfterViewInit, OnDestroy {
   // ── Filtered transactions ──────────────────────────────────
   filtered = computed(() => {
     const { start, end } = this.dateRange();
-    const accountId = this.filterAccountId();
-    const excludeRef = this.excludeRefunded();
-    const excluded = this.excludedCategories();
-
-    return this.txService.transactions().filter(t => {
-      if (start && t.date < start) return false;
-      if (end && t.date > end) return false;
-      if (accountId && t.accountId !== accountId) return false;
-      if (excludeRef && t.refunded) return false;
-      if (t.categoryId && excluded.has(t.categoryId)) return false;
-      return true;
+    return filterForAnalysis(this.txService.transactions(), {
+      start, end,
+      accountId: this.filterAccountId(),
+      excludeRefunded: this.excludeRefunded(),
+      excludedCategoryIds: this.excludedCategories(),
     });
   });
 
@@ -332,12 +345,43 @@ export class Analysis implements AfterViewInit, OnDestroy {
     this.categoryService.categories().filter(c => c.kind === 'expense')
   );
 
+  // Human label for the active range — a real date span for "Custom" instead of
+  // just the word "Custom", since that's the whole point of picking exact dates.
+  rangeLabel = computed(() => {
+    if (this.range() === 'custom') {
+      const s = this.customStart(), e = this.customEnd();
+      if (!s || !e) return 'Custom range';
+      const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return `${fmt(s)} – ${fmt(e)}`;
+    }
+    return this.ranges.find(r => r.value === this.range())?.label || '';
+  });
+
   // Dynamic subtitle
   subtitle = computed(() => {
-    const label = this.ranges.find(r => r.value === this.range())?.label || '';
+    const label = this.rangeLabel();
     const spent = this.totalExpenses();
     if (!spent) return label;
     return `${label} · ${this.formatCurrency(spent)} spent`;
+  });
+
+  // Query params for "see all" links so Transactions/the category breakdown page
+  // reflect the exact same filtered period the user is currently looking at.
+  seeAllParams = computed(() => {
+    const { start, end } = this.dateRange();
+    const qp: Record<string, string> = {};
+    if (start) qp['start'] = start;
+    if (end) qp['end'] = end;
+    if (this.filterAccountId()) qp['accountId'] = this.filterAccountId();
+    return qp;
+  });
+
+  categoryBreakdownParams = computed(() => {
+    const qp = { ...this.seeAllParams() };
+    if (!this.excludeRefunded()) qp['excludeRefunded'] = 'false';
+    const excluded = [...this.excludedCategories()];
+    if (excluded.length) qp['excluded'] = excluded.join(',');
+    return qp;
   });
 
   toggleCategoryExclusion(categoryId: string) {

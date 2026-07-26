@@ -135,7 +135,10 @@ export class App {
     { path: '/accounts',     label: 'Accounts',     iconName: 'accounts' },
     { path: '/transactions', label: 'Transactions', iconName: 'tx' },
     { path: '/bills',        label: 'Bills',        iconName: 'bills',
-      badge: (this.billService.overdueBills().length + this.billService.upcomingBills(7).length) || null },
+      // Overdue always counts; "upcoming" only counts a bill due today/tomorrow —
+      // narrowed from 7 days so the badge means "needs attention very soon," not
+      // just "something's due sometime this week."
+      badge: (this.billService.overdueBills().length + this.billService.upcomingBills(1).length) || null },
     { path: '/budgets',      label: 'Budgets',      iconName: 'budgets' },
     { path: '/analysis',     label: 'Analysis',     iconName: 'analysis' },
   ]);
