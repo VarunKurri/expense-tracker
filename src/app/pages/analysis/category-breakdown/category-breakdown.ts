@@ -90,9 +90,16 @@ export class CategoryBreakdown {
   }
 
   // Query params for drilling into Transactions, filtered to exactly this
-  // category within the same period this whole page is scoped to.
+  // category within the same period this whole page is scoped to. Also marks it
+  // as an "analysis view" — same as Analysis' own "See all transactions" link —
+  // so refunded/internal-transfer rows still show (this page's own category
+  // totals already exclude them) but greyed out and struck through, rather than
+  // silently vanishing and leaving the drill-through looking incomplete.
   transactionsParams(categoryId: string): Record<string, string> {
-    const qp: Record<string, string> = {};
+    const qp: Record<string, string> = {
+      view: 'analysis',
+      excludeRefunded: this.excludeRefunded() ? 'true' : 'false',
+    };
     if (this.start()) qp['start'] = this.start();
     if (this.end()) qp['end'] = this.end();
     if (this.accountId()) qp['accountId'] = this.accountId();
