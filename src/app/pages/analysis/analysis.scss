@@ -183,9 +183,26 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
+}
 
-  input[type="date"] {
-    color-scheme: light dark;
+// Deliberately its own class, not a reuse of .filter-select — that class sets
+// `appearance: none` plus a custom dropdown-chevron background-image meant for
+// <select>, which fights with iOS Safari's native date-picker chrome on
+// <input type="date"> (can suppress the calendar affordance / look doubled-up).
+// This keeps the native picker intact and just matches the surrounding look.
+.date-input {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  font-size: 13px;
+  font-family: inherit;
+  color-scheme: light dark;
+
+  &:focus {
+    outline: none;
+    border-color: var(--green);
   }
 }
 

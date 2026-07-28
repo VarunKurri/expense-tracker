@@ -933,6 +933,18 @@
 
   .totals-row { grid-template-columns: 1fr; }
 
+  // Reconcile + Analysis-view banners: space-between with no wrap was fine for the
+  // original short reconcile message, but the Analysis-view banner's longer
+  // explanatory text plus a button could overflow/crowd on a phone-width screen.
+  .reconcile-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+
+    .rb-text { align-items: flex-start; }
+    .btn-primary, .btn-outline { width: 100%; }
+  }
+
   .filter-bar {
     flex-direction: column;
     align-items: stretch;

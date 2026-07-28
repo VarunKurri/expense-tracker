@@ -21,12 +21,12 @@
     <div class="custom-range-row">
       <label>
         <span>From</span>
-        <input type="date" class="filter-select" [max]="customEnd() || todayStr"
+        <input type="date" class="date-input" [max]="customEnd() || todayStr"
                [ngModel]="customStart()" (ngModelChange)="customStart.set($event)" />
       </label>
       <label>
         <span>To</span>
-        <input type="date" class="filter-select" [min]="customStart()" [max]="todayStr"
+        <input type="date" class="date-input" [min]="customStart()" [max]="todayStr"
                [ngModel]="customEnd()" (ngModelChange)="customEnd.set($event)" />
       </label>
     </div>
