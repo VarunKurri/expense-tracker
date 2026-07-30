@@ -465,6 +465,23 @@ items below; fixed the highest-confidence ones this round, logged the rest as ba
 
 **Phase 9 in progress** — PWA/safe-area/update-notification fixes, the reconciliation/stale-signal bugs, the autopay race condition, the account-card sizing/content fix, three rounds of real-device visual bugs, the PWA update-reliability fix, the bills badge change, the Analysis expansion (custom range, see-all drill-throughs, transfer disclosure), and the analysis-view treatment on both Transactions entry points are all shipped; the `updateDoc()`→`setDoc()`, per-item error isolation, and Confirm double-tap-guard backlog items below remain deferred.
 
+## Phase 10: Reimbursement Linking & Credit-Card Payment Reminders
+
+Two user-requested features. (1) Link a reimbursement (a friend paying you back) to the
+original expense so Analysis reflects what you *truly* spent — generalizes the all-or-nothing
+`refunded` tag to the partial-split case. (2) Surface each Plaid-linked credit card's upcoming
+payment (statement balance + due date) as a read-only reminder in Bills.
+
+- [x] Part 1 — Credit-card payment reminders in Bills (derived from Plaid, read-only).
+  - Why: the user's subscriptions/phone bills live in Bills as manual entries, but their credit-card autopays (monthly, with a due date and amount Plaid already knows) had no home there. They wanted each linked card's next payment visible — with the amount being the **total statement balance**, not the minimum payment or current outstanding balance.
+  - Done when: a read-only "Credit card payments" section on Bills lists each Plaid-linked credit card with its statement balance (the amount actually due) and next due date, auto-refreshing each statement cycle; no autopay transaction is fabricated (the real payment already arrives via Plaid sync, and `AutopayService` already skips Plaid-linked accounts).
+  - Verified: `getPlaidAccounts` (`functions/src/index.ts`) now also reads `last_statement_balance` and `next_payment_due_date` from Plaid's `liabilitiesGet` credit object (both confirmed valid on the SDK type — `functions` build passes), returning them as `statement_balance`/`payment_due_date`. Added `statementBalance?`/`paymentDueDate?` to the `Account` model; `PlaidService.setupAccountsForItem` maps them on link and **always refreshes** them (plus `minimumPayment`/`paymentDueDay`) to Plaid's latest on every sync — unlike the static credit fields which only backfill-when-missing — since they change each statement cycle and come from Plaid, not user edits. Bills page gained a `creditCardDues` computed (Plaid credit accounts with a positive statement balance + a due date, sorted by date) rendered as a read-only "💳 Credit card payments" section above Overdue, styled like a bill row but non-clickable (`cc-due-row`), showing the statement balance, a relative `dueDateLabel` ("Due in 5d"/"Due today"/"3d overdue"), and an "Auto" chip. Not counted in the manual Monthly/Yearly bill totals. `ng build`/`tsc` pass. **Populates only after one "Sync transactions"** (existing accounts need a fresh `getPlaidAccounts`); cards whose institution doesn't return Liabilities (e.g. Discover in this project) simply won't appear. Not yet verified on-device (auth limitation).
+
+- [ ] Part 2 — Link reimbursements to expenses (partial-refund / split-bill).
+  - Why: `refunded` is all-or-nothing (whole expense excluded from Analysis) — correct only when a friend repays the full amount. A split bill (you paid $40, friend sends ~$20 back) has no clean handling today.
+  - Design (agreed with user): link the repayment income to the original expense from **either** side. Both stay real for account balances. In Analysis the expense counts as its **net** (amount − linked reimbursements) across every KPI/donut/monthly/merchant total, and the linked income is **excluded from income** (same "real for balance, excluded from analysis" treatment as `isInternalTransfer`). Supports multiple reimbursements per expense. The Transactions list shows the **full** charge with a "· $X reimbursed" badge (net only in Analysis), mirroring how `refunded` displays. `refunded` stays as the full-reimbursement shorthand.
+  - Not started yet — Part 1 shipped first per the user's chosen order.
+
 ---
 
 ### Session handoff (2026-07-28) — continue here on the new laptop

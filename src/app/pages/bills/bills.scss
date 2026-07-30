@@ -203,6 +203,12 @@
   &.overdue { color: var(--red); }
 }
 
+.section-sub {
+  font-size: 11px;
+  color: var(--fg-4);
+  letter-spacing: 0.02em;
+}
+
 /* ── BILLS LIST ────────────────────────────────────────────── */
 .bills-list {
   display: flex;
@@ -224,6 +230,12 @@
 
   &:hover { background: var(--surface-hi); }
   &.overdue-row { border-color: rgba(255, 77, 94, 0.3); }
+
+  // Credit-card dues are read-only reminders derived from Plaid, not editable bills.
+  &.cc-due-row {
+    cursor: default;
+    &:hover { background: var(--surface); }
+  }
 }
 
 /* Default icon */

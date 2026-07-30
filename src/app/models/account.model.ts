@@ -24,4 +24,7 @@ export interface Account {
   paymentDueDay?: number;        // day of month 1-31
   autopayEnabled?: boolean;
   minimumPayment?: number;
+  // Dynamic Plaid liability data, refreshed each sync (change every statement cycle).
+  statementBalance?: number;     // last closed statement balance — the amount actually due
+  paymentDueDate?: string;       // exact next payment due date (YYYY-MM-DD), from Plaid
 }

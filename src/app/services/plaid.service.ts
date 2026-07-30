@@ -35,6 +35,8 @@ interface PlaidAccount {
   minimum_payment: number | null;
   payment_due_day: number | null;
   statement_closing_day: number | null;
+  statement_balance: number | null;
+  payment_due_date: string | null;
 }
 
 /** Map a Plaid account type/subtype onto an app AccountType. */
@@ -221,9 +223,14 @@ export class PlaidService {
           // existed, or before Liabilities was granted for this item).
           const patch: Partial<Account> = {};
           if (!match.creditLimit && a.credit_limit) patch.creditLimit = a.credit_limit;
-          if (!match.minimumPayment && a.minimum_payment) patch.minimumPayment = a.minimum_payment;
-          if (!match.paymentDueDay && a.payment_due_day) patch.paymentDueDay = a.payment_due_day;
           if (!match.statementClosingDay && a.statement_closing_day) patch.statementClosingDay = a.statement_closing_day;
+          // Dynamic liability fields change every statement cycle, so always refresh
+          // to Plaid's latest (unlike the static fields above, which only backfill).
+          // These come from Plaid for a linked card — a user wouldn't hand-edit them.
+          if (a.minimum_payment != null && a.minimum_payment !== match.minimumPayment) patch.minimumPayment = a.minimum_payment;
+          if (a.payment_due_day != null && a.payment_due_day !== match.paymentDueDay) patch.paymentDueDay = a.payment_due_day;
+          if (a.statement_balance != null && a.statement_balance !== match.statementBalance) patch.statementBalance = a.statement_balance;
+          if (a.payment_due_date && a.payment_due_date !== match.paymentDueDate) patch.paymentDueDate = a.payment_due_date;
           // One-time opening-balance reconciliation: accounts are auto-created with
           // openingBalance 0, so the locally-computed balance only reflects whatever
           // history Plaid happened to sync — it's wrong whenever the real account had
@@ -253,6 +260,8 @@ export class PlaidService {
           ...(a.minimum_payment ? { minimumPayment: a.minimum_payment } : {}),
           ...(a.payment_due_day ? { paymentDueDay: a.payment_due_day } : {}),
           ...(a.statement_closing_day ? { statementClosingDay: a.statement_closing_day } : {}),
+          ...(a.statement_balance != null ? { statementBalance: a.statement_balance } : {}),
+          ...(a.payment_due_date ? { paymentDueDate: a.payment_due_date } : {}),
           plaidAccountId: a.account_id,
           plaidItemId: itemId,
           archived: false,

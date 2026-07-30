@@ -64,6 +64,42 @@
   <!-- ── ACTIVE TAB ─────────────────────────────────────────── -->
   @if (activeTab() === 'active') {
 
+    <!-- CREDIT CARD PAYMENTS — derived from Plaid, read-only, auto-updates each cycle -->
+    @if (creditCardDues().length > 0) {
+      <div class="section-header">
+        <span class="section-title">💳 Credit card payments</span>
+        <span class="section-sub">From your bank · statement balance</span>
+      </div>
+      <div class="bills-list">
+        @for (due of creditCardDues(); track due.account.id) {
+          <div class="bill-row cc-due-row">
+            <div class="bill-date-box" [class.date-box-accent]="daysUntil(due.dueDate) <= 3">
+              <div class="bill-day">{{ localDate(due.dueDate).getDate() }}</div>
+              <div class="bill-mon">
+                {{ localDate(due.dueDate).toLocaleDateString('en-US', { month: 'short' }).toUpperCase() }}
+              </div>
+            </div>
+            <div class="bill-main">
+              <div class="bill-name">{{ due.account.icon || '💳' }} {{ due.account.name }}</div>
+              <div class="bill-meta">
+                <span class="bill-meta-text">
+                  Statement balance
+                  @if (due.account.last4) { · •••• {{ due.account.last4 }} }
+                </span>
+                <span class="autopay-chip">Auto</span>
+              </div>
+            </div>
+            <div class="bill-right">
+              <div class="bill-amount">{{ formatCurrency(due.amount) }}</div>
+              <div class="bill-due" [class.overdue-text]="daysUntil(due.dueDate) < 0">
+                {{ dueDateLabel(due.dueDate) }}
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
     <!-- OVERDUE -->
     @if (overdue().length > 0) {
       <div class="section-header">

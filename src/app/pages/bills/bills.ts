@@ -160,6 +160,19 @@ export class Bills {
     this.billService.bills().filter(b => !b.active)
   );
 
+  // Derived, read-only credit-card payment dues from Plaid-linked credit accounts.
+  // The amount is the last statement balance (what's actually due), and the date is
+  // Plaid's next payment due date — both come straight from Plaid's Liabilities data
+  // and refresh every statement cycle, so there's nothing to store or hand-edit.
+  creditCardDues = computed(() =>
+    this.accountService.accounts()
+      .filter(a =>
+        !a.archived && a.type === 'credit' && !!a.plaidAccountId &&
+        a.statementBalance != null && a.statementBalance > 0 && !!a.paymentDueDate)
+      .map(a => ({ account: a, amount: a.statementBalance!, dueDate: a.paymentDueDate! }))
+      .sort((x, y) => x.dueDate.localeCompare(y.dueDate))
+  );
+
   // Payment history
   paymentHistory = computed(() => {
     const subCat = this.categoryService.categories().find(c =>
@@ -436,6 +449,15 @@ export class Bills {
     today.setHours(0, 0, 0, 0);
     const due = new Date(date + 'T00:00:00');
     return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  /** Relative label for a due date, e.g. "Due in 5d" / "Due today" / "3d overdue". */
+  dueDateLabel(date: string): string {
+    const d = this.daysUntil(date);
+    if (d < 0) return `${Math.abs(d)}d overdue`;
+    if (d === 0) return 'Due today';
+    if (d === 1) return 'Due tomorrow';
+    return `Due in ${d}d`;
   }
 
   frequencyLabel(f: string): string {

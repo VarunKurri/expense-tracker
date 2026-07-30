@@ -459,7 +459,14 @@ export const getPlaidAccounts = onCall(
       // separate consent scope. Items linked before Liabilities was requested at Link
       // time will fail here (e.g. PRODUCT_NOT_READY / no access) — that's expected for
       // not-yet-relinked items, so we degrade gracefully rather than fail the whole call.
-      const creditByAccountId = new Map<string, { min: number | null; dueDay: number | null; statementDay: number | null }>();
+      type CreditInfo = {
+        min: number | null;
+        dueDay: number | null;
+        statementDay: number | null;
+        statementBalance: number | null; // last closed statement balance — what's actually due
+        dueDate: string | null;          // exact next payment due date (YYYY-MM-DD)
+      };
+      const creditByAccountId = new Map<string, CreditInfo>();
       try {
         const liab = await client.liabilitiesGet({ access_token: accessToken });
         for (const c of liab.data.liabilities?.credit ?? []) {
@@ -468,6 +475,8 @@ export const getPlaidAccounts = onCall(
             min: c.minimum_payment_amount ?? null,
             dueDay: dayOfMonth(c.next_payment_due_date),
             statementDay: dayOfMonth(c.last_statement_issue_date),
+            statementBalance: c.last_statement_balance ?? null,
+            dueDate: c.next_payment_due_date ?? null,
           });
         }
       } catch (err: any) {
@@ -489,6 +498,8 @@ export const getPlaidAccounts = onCall(
             minimum_payment: credit?.min ?? null,
             payment_due_day: credit?.dueDay ?? null,
             statement_closing_day: credit?.statementDay ?? null,
+            statement_balance: credit?.statementBalance ?? null,
+            payment_due_date: credit?.dueDate ?? null,
           };
         }),
       };
