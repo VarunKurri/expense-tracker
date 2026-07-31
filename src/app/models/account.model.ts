@@ -27,4 +27,8 @@ export interface Account {
   // Dynamic Plaid liability data, refreshed each sync (change every statement cycle).
   statementBalance?: number;     // last closed statement balance — the amount actually due
   paymentDueDate?: string;       // exact next payment due date (YYYY-MM-DD), from Plaid
+  statementIssueDate?: string;   // last statement close date (YYYY-MM-DD) — for paid detection
+  lastPaymentDate?: string;      // when the last card payment posted (YYYY-MM-DD)
+  lastPaymentAmount?: number;    // amount of the last card payment
+  statementOverdue?: boolean;    // Plaid's own is_overdue flag (authoritative)
 }

@@ -465,6 +465,10 @@ export const getPlaidAccounts = onCall(
         statementDay: number | null;
         statementBalance: number | null; // last closed statement balance — what's actually due
         dueDate: string | null;          // exact next payment due date (YYYY-MM-DD)
+        statementIssueDate: string | null; // last statement close date — for paid detection
+        lastPaymentDate: string | null;    // when the last payment posted
+        lastPaymentAmount: number | null;  // how much the last payment was
+        isOverdue: boolean | null;         // Plaid's own overdue flag (authoritative)
       };
       const creditByAccountId = new Map<string, CreditInfo>();
       try {
@@ -477,6 +481,10 @@ export const getPlaidAccounts = onCall(
             statementDay: dayOfMonth(c.last_statement_issue_date),
             statementBalance: c.last_statement_balance ?? null,
             dueDate: c.next_payment_due_date ?? null,
+            statementIssueDate: c.last_statement_issue_date ?? null,
+            lastPaymentDate: c.last_payment_date ?? null,
+            lastPaymentAmount: c.last_payment_amount ?? null,
+            isOverdue: c.is_overdue ?? null,
           });
         }
       } catch (err: any) {
@@ -500,6 +508,10 @@ export const getPlaidAccounts = onCall(
             statement_closing_day: credit?.statementDay ?? null,
             statement_balance: credit?.statementBalance ?? null,
             payment_due_date: credit?.dueDate ?? null,
+            statement_issue_date: credit?.statementIssueDate ?? null,
+            last_payment_date: credit?.lastPaymentDate ?? null,
+            last_payment_amount: credit?.lastPaymentAmount ?? null,
+            is_overdue: credit?.isOverdue ?? null,
           };
         }),
       };

@@ -37,6 +37,10 @@ interface PlaidAccount {
   statement_closing_day: number | null;
   statement_balance: number | null;
   payment_due_date: string | null;
+  statement_issue_date: string | null;
+  last_payment_date: string | null;
+  last_payment_amount: number | null;
+  is_overdue: boolean | null;
 }
 
 /** Map a Plaid account type/subtype onto an app AccountType. */
@@ -231,6 +235,10 @@ export class PlaidService {
           if (a.payment_due_day != null && a.payment_due_day !== match.paymentDueDay) patch.paymentDueDay = a.payment_due_day;
           if (a.statement_balance != null && a.statement_balance !== match.statementBalance) patch.statementBalance = a.statement_balance;
           if (a.payment_due_date && a.payment_due_date !== match.paymentDueDate) patch.paymentDueDate = a.payment_due_date;
+          if (a.statement_issue_date && a.statement_issue_date !== match.statementIssueDate) patch.statementIssueDate = a.statement_issue_date;
+          if (a.last_payment_date && a.last_payment_date !== match.lastPaymentDate) patch.lastPaymentDate = a.last_payment_date;
+          if (a.last_payment_amount != null && a.last_payment_amount !== match.lastPaymentAmount) patch.lastPaymentAmount = a.last_payment_amount;
+          if (a.is_overdue != null && a.is_overdue !== match.statementOverdue) patch.statementOverdue = a.is_overdue;
           // One-time opening-balance reconciliation: accounts are auto-created with
           // openingBalance 0, so the locally-computed balance only reflects whatever
           // history Plaid happened to sync — it's wrong whenever the real account had
@@ -262,6 +270,10 @@ export class PlaidService {
           ...(a.statement_closing_day ? { statementClosingDay: a.statement_closing_day } : {}),
           ...(a.statement_balance != null ? { statementBalance: a.statement_balance } : {}),
           ...(a.payment_due_date ? { paymentDueDate: a.payment_due_date } : {}),
+          ...(a.statement_issue_date ? { statementIssueDate: a.statement_issue_date } : {}),
+          ...(a.last_payment_date ? { lastPaymentDate: a.last_payment_date } : {}),
+          ...(a.last_payment_amount != null ? { lastPaymentAmount: a.last_payment_amount } : {}),
+          ...(a.is_overdue != null ? { statementOverdue: a.is_overdue } : {}),
           plaidAccountId: a.account_id,
           plaidItemId: itemId,
           archived: false,
