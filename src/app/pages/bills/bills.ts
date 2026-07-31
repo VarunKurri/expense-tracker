@@ -9,11 +9,10 @@ import { BillForm } from './bill-form/bill-form';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { ErrorBanner } from '../../components/error-banner/error-banner';
-import { Account, Bill, Transaction } from '../../models';
+import { Bill, Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
 
 type BillTab = 'active' | 'paused';
-type CardDueStatus = 'paid' | 'overdue' | 'due';
 
 @Component({
   selector: 'app-bills',
@@ -160,47 +159,6 @@ export class Bills {
   pausedBills = computed(() =>
     this.billService.bills().filter(b => !b.active)
   );
-
-  // Derived, read-only credit-card payment dues from Plaid-linked credit accounts.
-  // Amount = last statement balance (what's actually due), date = Plaid's next payment
-  // due date. Status is computed from Plaid's own paid/overdue signals so an already-
-  // paid statement (e.g. autopay ran before the due date) reads "Paid", never "overdue".
-  // All of this comes from Plaid's Liabilities data and refreshes every statement cycle.
-  creditCardDues = computed(() => {
-    const statusRank: Record<CardDueStatus, number> = { overdue: 0, due: 1, paid: 2 };
-    return this.accountService.accounts()
-      .filter(a =>
-        !a.archived && a.type === 'credit' && !!a.plaidAccountId &&
-        a.statementBalance != null && a.statementBalance > 0 && !!a.paymentDueDate)
-      .map(a => {
-        const paid = this.isStatementPaid(a);
-        const status: CardDueStatus = paid
-          ? 'paid'
-          : a.statementOverdue === true
-            ? 'overdue'
-            : a.statementOverdue === false
-              ? 'due'                                        // Plaid says not overdue — trust it
-              : this.daysUntil(a.paymentDueDate!) < 0 ? 'overdue' : 'due'; // no flag → date math
-        return {
-          account: a,
-          amount: a.statementBalance!,
-          dueDate: a.paymentDueDate!,
-          status,
-          paidDate: paid ? (a.lastPaymentDate ?? null) : null,
-        };
-      })
-      // Needs-attention first (overdue, then upcoming), paid ones settle to the bottom.
-      .sort((x, y) =>
-        statusRank[x.status] - statusRank[y.status] || x.dueDate.localeCompare(y.dueDate));
-  });
-
-  /** A card's current statement is paid when a payment posted on/after the statement
-   *  closed and covered (about) the full statement balance — i.e. autopay already ran. */
-  private isStatementPaid(a: Account): boolean {
-    if (!a.lastPaymentDate || !a.statementIssueDate || a.statementBalance == null) return false;
-    if (a.lastPaymentDate < a.statementIssueDate) return false;
-    return (a.lastPaymentAmount ?? 0) >= a.statementBalance - 0.01;
-  }
 
   // Payment history
   paymentHistory = computed(() => {
@@ -480,19 +438,6 @@ export class Bills {
     return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   }
 
-  /** Short date, e.g. "Jul 22" — used for the "Paid <date>" pill. */
-  formatShort(date: string): string {
-    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
-
-  /** Relative label for a due date, e.g. "Due in 5d" / "Due today" / "3d overdue". */
-  dueDateLabel(date: string): string {
-    const d = this.daysUntil(date);
-    if (d < 0) return `${Math.abs(d)}d overdue`;
-    if (d === 0) return 'Due today';
-    if (d === 1) return 'Due tomorrow';
-    return `Due in ${d}d`;
-  }
 
   frequencyLabel(f: string): string {
     const map: Record<string, string> = {

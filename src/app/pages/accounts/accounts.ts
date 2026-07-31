@@ -16,6 +16,18 @@ import { ToastService } from '../../services/toast.service';
 import { PlaidService, PlaidItem } from '../../services/plaid.service';
 import { monthActivityForAccount } from '../../utils/finance';
 
+type CardDueStatus = 'paid' | 'overdue' | 'due' | 'no-date';
+interface CardDue {
+  account: Account;
+  amount: number;
+  status: CardDueStatus;
+  dueDate: string | null;
+  paidDate: string | null;
+  // 'statement' = Plaid Liabilities (statement balance); 'balance' = current balance
+  // owed, used when the bank doesn't share Liabilities (e.g. Discover) + a manual due day.
+  source: 'statement' | 'balance';
+}
+
 @Component({
   selector: 'app-accounts',
   standalone: true,
@@ -30,6 +42,7 @@ export class Accounts {
   transactionSvc = inject(TransactionService);
   billSvc        = inject(BillService);
   plaidSvc       = inject(PlaidService);
+  Math = Math;
 
   formOpen        = signal(false);
   editingAccount  = signal<Account | null>(null);
@@ -111,6 +124,96 @@ export class Accounts {
       style: 'currency', currency: 'USD',
       maximumFractionDigits: 0   // no cents in the subtitle — cleaner
     }).format(Math.abs(n));
+  }
+
+  /** Exact currency (with cents) — for the credit-card payment amounts. */
+  formatMoney(n: number): string {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.abs(n));
+  }
+
+  // ── Credit-card payments strip ─────────────────────────────
+  // Upcoming/recent card payments for each linked credit card. Two tiers:
+  //  • statement: the bank shares Liabilities (statement balance, due date, payment
+  //    history) → we show the statement balance and a Paid/Due/Overdue status.
+  //  • balance:   the bank doesn't share Liabilities (e.g. Discover) → we fall back to
+  //    the current balance owed + the due date the user set on the card (or prompt for
+  //    one). No paid-detection there, since the bank gives us no payment signal.
+  creditCardDues = computed<CardDue[]>(() => {
+    const rank: Record<CardDueStatus, number> = { overdue: 0, due: 1, 'no-date': 2, paid: 3 };
+    return this.accountSvc.accounts()
+      .filter(a => !a.archived && a.type === 'credit' && !!a.plaidAccountId)
+      .map(a => this.toCardDue(a))
+      .filter((d): d is CardDue => d !== null)
+      .sort((x, y) => rank[x.status] - rank[y.status] || (x.dueDate ?? '').localeCompare(y.dueDate ?? ''));
+  });
+
+  private toCardDue(a: Account): CardDue | null {
+    // Tier 1 — Plaid Liabilities available.
+    if (a.statementBalance != null && a.statementBalance > 0 && a.paymentDueDate) {
+      const paid = this.isStatementPaid(a);
+      const status: CardDueStatus = paid ? 'paid'
+        : a.statementOverdue === true ? 'overdue'
+        : a.statementOverdue === false ? 'due'
+        : this.daysUntil(a.paymentDueDate) < 0 ? 'overdue' : 'due';
+      return {
+        account: a, amount: a.statementBalance, dueDate: a.paymentDueDate,
+        status, paidDate: paid ? (a.lastPaymentDate ?? null) : null, source: 'statement',
+      };
+    }
+    // Tier 2 — no Liabilities: current balance owed + the user's manual due day.
+    const owed = this.balanceFor(a); // credit: positive = owed
+    if (owed <= 0) return null;
+    const dueDate = a.paymentDueDay ? this.nextDueFromDay(a.paymentDueDay) : null;
+    return {
+      account: a, amount: owed, dueDate,
+      status: dueDate ? 'due' : 'no-date', paidDate: null, source: 'balance',
+    };
+  }
+
+  /** Statement is paid when a payment posted on/after it closed, covering ~the full balance. */
+  private isStatementPaid(a: Account): boolean {
+    if (!a.lastPaymentDate || !a.statementIssueDate || a.statementBalance == null) return false;
+    if (a.lastPaymentDate < a.statementIssueDate) return false;
+    return (a.lastPaymentAmount ?? 0) >= a.statementBalance - 0.01;
+  }
+
+  /** Next calendar occurrence of a day-of-month (1-31), as YYYY-MM-DD, local time. */
+  private nextDueFromDay(day: number): string {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const daysIn = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+    const mk = (y: number, m: number) => new Date(y, m, Math.min(day, daysIn(y, m)));
+    let y = today.getFullYear(), m = today.getMonth();
+    let cand = mk(y, m);
+    if (cand.getTime() < today.getTime()) { m++; if (m > 11) { m = 0; y++; } cand = mk(y, m); }
+    const mm = String(cand.getMonth() + 1).padStart(2, '0');
+    const dd = String(cand.getDate()).padStart(2, '0');
+    return `${cand.getFullYear()}-${mm}-${dd}`;
+  }
+
+  daysUntil(date: string): number {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return Math.round((new Date(date + 'T00:00:00').getTime() - today.getTime()) / 86_400_000);
+  }
+
+  /** Short date, e.g. "Jul 22" — for the "Paid <date>" pill. */
+  formatShort(date: string): string {
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  /** Relative due label, e.g. "Due in 5d" / "Due today" / "Due Jul 23". */
+  dueDateLabel(date: string): string {
+    const d = this.daysUntil(date);
+    if (d < 0) return `${Math.abs(d)}d overdue`;
+    if (d === 0) return 'Due today';
+    if (d === 1) return 'Due tomorrow';
+    if (d <= 30) return `Due in ${d}d`;
+    return `Due ${this.formatShort(date)}`;
+  }
+
+  /** Open the edit form for a card so the user can add a due date (Discover case). */
+  openEditForm(account: Account) {
+    this.editingAccount.set(account);
+    this.formOpen.set(true);
   }
 
   // Navigate to the appropriate detail page based on account type

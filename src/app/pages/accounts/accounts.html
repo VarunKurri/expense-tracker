@@ -50,6 +50,44 @@
     </div>
   }
 
+  <!-- CREDIT CARD PAYMENTS — compact strip, from Plaid (read-only) -->
+  @if (creditCardDues().length > 0) {
+    <div class="cc-strip">
+      <div class="cc-strip-head">
+        <span class="cc-strip-title">💳 Credit card payments</span>
+        <span class="cc-strip-sub">Statement balance &amp; due date from your bank</span>
+      </div>
+      <div class="cc-strip-list">
+        @for (due of creditCardDues(); track due.account.id) {
+          <div class="cc-item" [class.is-paid]="due.status === 'paid'">
+            <div class="cc-item-main">
+              <span class="cc-item-name">{{ due.account.icon || '💳' }} {{ due.account.name }}</span>
+              @if (due.account.last4) { <span class="cc-item-mask">•••• {{ due.account.last4 }}</span> }
+              @if (due.source === 'balance') { <span class="cc-item-tag">current balance</span> }
+            </div>
+            <div class="cc-item-right">
+              <span class="cc-item-amount">{{ formatMoney(due.amount) }}</span>
+              @switch (due.status) {
+                @case ('paid') {
+                  <span class="cc-pill paid">✓ Paid{{ due.paidDate ? ' ' + formatShort(due.paidDate) : '' }}</span>
+                }
+                @case ('overdue') {
+                  <span class="cc-pill overdue">Overdue {{ Math.abs(daysUntil(due.dueDate!)) }}d</span>
+                }
+                @case ('no-date') {
+                  <button class="cc-setdate" (click)="openEditForm(due.account)">Set due date</button>
+                }
+                @default {
+                  <span class="cc-pill due">{{ dueDateLabel(due.dueDate!) }}</span>
+                }
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
   @if (plaidSvc.linkedItems().length > 0) {
     <div class="linked-banks">
       <h2>Linked banks</h2>
