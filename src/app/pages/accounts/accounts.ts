@@ -14,18 +14,21 @@ import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Account, Bill } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { PlaidService, PlaidItem } from '../../services/plaid.service';
-import { monthActivityForAccount } from '../../utils/finance';
+import { monthActivityForAccount, transactionDeltaForAccount, roundMoney } from '../../utils/finance';
 
-type CardDueStatus = 'paid' | 'overdue' | 'due' | 'no-date';
+type CardDueStatus = 'paid' | 'settled' | 'overdue' | 'due' | 'no-date';
 interface CardDue {
   account: Account;
   amount: number;
   status: CardDueStatus;
   dueDate: string | null;
   paidDate: string | null;
-  // 'statement' = Plaid Liabilities (statement balance); 'balance' = current balance
-  // owed, used when the bank doesn't share Liabilities (e.g. Discover) + a manual due day.
-  source: 'statement' | 'balance';
+  // How the figure was derived:
+  //  'statement' = Plaid Liabilities (real statement balance + due date),
+  //  'computed'  = no Liabilities (e.g. Discover): running balance as of the user's
+  //                statement-closing day + the due day after it,
+  //  'balance'   = fallback: current balance owed + next due day.
+  source: 'statement' | 'computed' | 'balance';
 }
 
 @Component({
@@ -139,7 +142,7 @@ export class Accounts {
   //    the current balance owed + the due date the user set on the card (or prompt for
   //    one). No paid-detection there, since the bank gives us no payment signal.
   creditCardDues = computed<CardDue[]>(() => {
-    const rank: Record<CardDueStatus, number> = { overdue: 0, due: 1, 'no-date': 2, paid: 3 };
+    const rank: Record<CardDueStatus, number> = { overdue: 0, due: 1, 'no-date': 2, settled: 3, paid: 4 };
     return this.accountSvc.accounts()
       .filter(a => !a.archived && a.type === 'credit' && !!a.plaidAccountId)
       .map(a => this.toCardDue(a))
@@ -160,7 +163,18 @@ export class Accounts {
         status, paidDate: paid ? (a.lastPaymentDate ?? null) : null, source: 'statement',
       };
     }
-    // Tier 2 — no Liabilities: current balance owed + the user's manual due day.
+    // Tier 2a — no Liabilities, but the user set the statement cycle (e.g. Discover):
+    // the statement balance is the running balance as of the last close date, and the
+    // payment is due on the first due-day after that close. A $0 statement is valid.
+    if (a.statementClosingDay && a.paymentDueDay) {
+      const closeDate = this.lastStatementClose(a.statementClosingDay);
+      const amount = Math.max(0, this.balanceOwedAsOf(a, closeDate));
+      const dueDate = this.dueAfterClose(closeDate, a.paymentDueDay);
+      const status: CardDueStatus = amount <= 0.005 ? 'settled'
+        : this.daysUntil(dueDate) < 0 ? 'overdue' : 'due';
+      return { account: a, amount, dueDate, status, paidDate: null, source: 'computed' };
+    }
+    // Tier 2b — fallback: current balance owed + next due day, or prompt to set dates.
     const owed = this.balanceFor(a); // credit: positive = owed
     if (owed <= 0) return null;
     const dueDate = a.paymentDueDay ? this.nextDueFromDay(a.paymentDueDay) : null;
@@ -168,6 +182,38 @@ export class Accounts {
       account: a, amount: owed, dueDate,
       status: dueDate ? 'due' : 'no-date', paidDate: null, source: 'balance',
     };
+  }
+
+  /** Balance owed on a credit card as of a given date (inclusive), using local history. */
+  private balanceOwedAsOf(a: Account, dateStr: string): number {
+    const txns = this.transactionSvc.transactions().filter(t => t.date <= dateStr);
+    return roundMoney(a.openingBalance - transactionDeltaForAccount(txns, a.id!));
+  }
+
+  /** Most recent statement-closing day (1-31) on/before today, as YYYY-MM-DD. */
+  private lastStatementClose(closingDay: number): string {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const daysIn = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+    const mk = (y: number, m: number) => new Date(y, m, Math.min(closingDay, daysIn(y, m)));
+    let y = today.getFullYear(), m = today.getMonth();
+    let cand = mk(y, m);
+    if (cand.getTime() > today.getTime()) { m--; if (m < 0) { m = 11; y--; } cand = mk(y, m); }
+    return this.iso(cand);
+  }
+
+  /** First occurrence of a due-day strictly after a statement close date, as YYYY-MM-DD. */
+  private dueAfterClose(closeDate: string, dueDay: number): string {
+    const close = new Date(closeDate + 'T00:00:00');
+    const daysIn = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+    const mk = (y: number, m: number) => new Date(y, m, Math.min(dueDay, daysIn(y, m)));
+    let y = close.getFullYear(), m = close.getMonth();
+    let cand = mk(y, m);
+    while (cand.getTime() <= close.getTime()) { m++; if (m > 11) { m = 0; y++; } cand = mk(y, m); }
+    return this.iso(cand);
+  }
+
+  private iso(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   /** Statement is paid when a payment posted on/after it closed, covering ~the full balance. */

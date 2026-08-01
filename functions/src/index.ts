@@ -473,7 +473,19 @@ export const getPlaidAccounts = onCall(
       const creditByAccountId = new Map<string, CreditInfo>();
       try {
         const liab = await client.liabilitiesGet({ access_token: accessToken });
-        for (const c of liab.data.liabilities?.credit ?? []) {
+        const creditList = liab.data.liabilities?.credit ?? [];
+        // Diagnostic: shows exactly what statement/cycle data each institution returns
+        // (e.g. confirms whether Discover ever provides Liabilities). Safe — no amounts
+        // of user spending, just statement metadata for the linked cards.
+        console.log(`liabilitiesGet item ${itemId}: ${creditList.length} credit account(s):`,
+          JSON.stringify(creditList.map(c => ({
+            account_id: c.account_id,
+            last_statement_balance: c.last_statement_balance,
+            last_statement_issue_date: c.last_statement_issue_date,
+            next_payment_due_date: c.next_payment_due_date,
+            is_overdue: c.is_overdue,
+          }))));
+        for (const c of creditList) {
           if (!c.account_id) continue;
           creditByAccountId.set(c.account_id, {
             min: c.minimum_payment_amount ?? null,
