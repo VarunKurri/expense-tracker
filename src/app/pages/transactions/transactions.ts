@@ -7,6 +7,7 @@ import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
 import { TransactionForm } from './transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
+import { Modal } from '../../components/modal/modal';
 import { ReconcileReview } from '../../components/reconcile-review/reconcile-review';
 import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Transaction } from '../../models';
@@ -29,7 +30,7 @@ type QuickEditDraft = {
 @Component({
   selector: 'app-transactions',
   standalone: true,
-  imports: [CommonModule, FormsModule, TransactionForm, Confirm, ReconcileReview, ErrorBanner],
+  imports: [CommonModule, FormsModule, TransactionForm, Confirm, Modal, ReconcileReview, ErrorBanner],
   templateUrl: './transactions.html',
   styleUrl: './transactions.scss',
 })
@@ -87,6 +88,9 @@ export class Transactions {
     if (!this.analysisView()) return false;
     if (t.isInternalTransfer) return true;
     if (this.analysisExcludeRefunded() && t.refunded) return true;
+    // A reimbursement (income linked to an expense) isn't real income — it's folded
+    // into the expense's true cost — so it's greyed out and left out of the totals.
+    if (t.type === 'income' && t.reimbursesId) return true;
     return false;
   }
 
@@ -192,11 +196,13 @@ export class Transactions {
   // Totals — in analysis view, refunded + internal-transfer rows are left out so the
   // numbers match the Analysis page; otherwise everything in range counts.
   totals = computed(() => {
+    const analysis = this.analysisView();
     let income = 0, expense = 0;
     for (const t of this.filtered()) {
       if (this.excludedFromAnalysis(t)) continue;
       if (t.type === 'income') income += t.amount;
-      if (t.type === 'expense') expense += t.amount;
+      // In analysis view, an expense counts at its true cost (net of reimbursements).
+      if (t.type === 'expense') expense += analysis ? this.txService.effectiveExpenseAmount(t) : t.amount;
     }
     return { income, expense, net: income - expense };
   });
@@ -281,6 +287,11 @@ export class Transactions {
     return d.toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
+  }
+
+  /** Short date, e.g. "Jul 5" — used in the reimbursement rows/picker. */
+  formatDate(date: string): string {
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
   hasActiveFilters = computed(() =>
@@ -497,6 +508,75 @@ export class Transactions {
     if (tx) {
       this.editing.set(tx);
       this.formOpen.set(true);
+    }
+  }
+
+  // ── Reimbursement linking ─────────────────────────────────
+  linkingFrom = signal<Transaction | null>(null);
+  linkSearch = signal('');
+
+  // Live copy of the viewed transaction (the `viewing()` snapshot is frozen at open;
+  // these read through the service so the panel updates right after a link/unlink).
+  private viewingId = computed(() => this.viewing()?.id ?? null);
+  viewingLive = computed<Transaction | null>(() => {
+    const id = this.viewingId();
+    return id ? (this.txService.transactions().find(t => t.id === id) ?? null) : null;
+  });
+  viewingReimbursements = computed(() => {
+    const id = this.viewingId();
+    return id ? this.txService.reimbursementsFor(id) : [];
+  });
+  viewingReimbursedTotal = computed(() => this.txService.reimbursedAmountFor(this.viewingId() ?? undefined));
+  viewingReimbursesExpense = computed<Transaction | null>(() => {
+    const live = this.viewingLive();
+    if (live?.type !== 'income' || !live.reimbursesId) return null;
+    return this.txService.transactions().find(t => t.id === live.reimbursesId) ?? null;
+  });
+
+  // Opposite-type transactions to link (an expense picks an income, and vice versa).
+  linkCandidates = computed<Transaction[]>(() => {
+    const from = this.linkingFrom();
+    if (!from) return [];
+    const wantType = from.type === 'income' ? 'expense' : 'income';
+    const q = this.linkSearch().trim().toLowerCase();
+    return this.txService.transactions().filter(t =>
+      t.type === wantType && t.id !== from.id &&
+      !(t.type === 'income' && !!t.reimbursesId) &&   // an income can reimburse only one expense
+      (!q || (t.merchant || '').toLowerCase().includes(q) || String(t.amount).includes(q))
+    ).slice(0, 50);
+  });
+
+  openLinkPicker(tx: Transaction) {
+    this.linkSearch.set('');
+    this.linkingFrom.set(tx);
+  }
+  closeLinkPicker() {
+    this.linkingFrom.set(null);
+    this.linkSearch.set('');
+  }
+
+  async confirmLink(candidate: Transaction) {
+    const from = this.linkingFrom();
+    if (!from) return;
+    const income = from.type === 'income' ? from : candidate;
+    const expense = from.type === 'expense' ? from : candidate;
+    if (!income.id || !expense.id) return;
+    try {
+      await this.txService.update(income.id, { reimbursesId: expense.id });
+      this.toastService.success('Reimbursement linked.');
+      this.closeLinkPicker();
+    } catch {
+      this.toastService.error('Could not link. Please try again.');
+    }
+  }
+
+  async unlinkReimbursement(income: Transaction) {
+    if (!income.id) return;
+    try {
+      await this.txService.update(income.id, { reimbursesId: undefined });
+      this.toastService.success('Reimbursement unlinked.');
+    } catch {
+      this.toastService.error('Could not unlink. Please try again.');
     }
   }
 

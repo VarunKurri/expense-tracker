@@ -29,6 +29,14 @@ export interface Transaction {
   refunded?: boolean;
   refundedBy?: string; // transaction ID of the refunding income
 
+  // Partial-reimbursement linking (e.g. a friend pays you back ~half of a shared
+  // meal). Set on an INCOME to point at the EXPENSE it reimburses. The expense's
+  // true cost is then `amount − Σ(reimbursing incomes)` (floored at 0), and the
+  // reimbursing income is left out of income totals — so analysis reflects what you
+  // truly spent. Differs from `refunded`, which fully excludes an expense (whole
+  // amount paid back). Derived, not stored, on the expense side.
+  reimbursesId?: string; // on an income: the expense transaction id it pays back
+
   // Internal transfer tracking (e.g. a credit card payment: an expense on the
   // paying account and an income on the card account, both real per-account, but
   // not real spending/earning app-wide). Excluded from income/expense/savings

@@ -519,3 +519,15 @@ payment (statement balance + due date) as a read-only reminder in Bills.
 - Visually verify authenticated pages on iOS WebKit/iPhone viewport once there's a way to get a logged-in session in this environment (test credentials, or a scripted sign-in).
 
 ---
+
+## Partial-reimbursement linking (part 42)
+
+- [x] Link a reimbursing income to the expense it partially pays back, so analysis reflects true spending.
+  - Why: the `refunded` tag handles a *full* payback (whole expense excluded). It doesn't fit the common "split the bill" case — you pay $50 for a shared meal, a friend Venmos you back ~$25. Without this, analysis counts $50 spent + $25 income; the truth is $25 spent.
+  - Model: new `Transaction.reimbursesId?` set on an **income**, pointing at the **expense** it reimburses. Single source of truth (the income); the expense derives its reimbursed total, so it can never go stale. Distinct from `refunded`.
+  - Service (`TransactionService`): `reimbursedByExpense` (computed `Map<expenseId, total>`), `reimbursedAmountFor(id)`, `effectiveExpenseAmount(t)` = `amount − reimbursed` floored at 0, `reimbursementsFor(id)`.
+  - Analysis integration: expenses count at their **effective** (net) amount across every aggregation — total spent, category donut, top merchants, top category, largest expense, monthly trend; and reimbursing income is **excluded from income** (it's an offset, not earnings). The Transactions **analysis-view** matches: reimbursing-income rows are greyed/struck and left out, expenses count net. Direct (non-analysis) Transactions totals still show gross. **Account balances are unaffected** — the income really did hit the account; it's only re-classified for spending analysis.
+  - UI: the transaction detail panel gained a Reimbursements section — from an **expense** you "Link a reimbursement" (pick the income), from an **income** you "Mark as reimbursement" (pick the expense); either writes `reimbursesId` on the income. Shows "Reimbursed $X of $Y · true cost $Z" with per-item unlink. Picker is an `app-modal` searchable list of opposite-type transactions (incomes already linked elsewhere are hidden). Row badges: income → "↩ Reimbursement", reimbursed expense → "↩ −$X".
+  - `ng build`/`tsc` pass. Linking UI is on the **Transactions** page (Analysis page reflects the netted numbers automatically but has no linking control yet — possible follow-up). Not yet verified on-device (auth limitation).
+
+---

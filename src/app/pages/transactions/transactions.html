@@ -443,6 +443,12 @@
                       @if (tx.refunded) {
                         <span class="refunded-badge">↩ Refunded</span>
                       }
+                      @if (tx.type === 'income' && tx.reimbursesId) {
+                        <span class="refunded-badge">↩ Reimbursement</span>
+                      }
+                      @if (tx.type === 'expense' && txService.reimbursedAmountFor(tx.id) > 0) {
+                        <span class="refunded-badge">↩ −{{ formatCurrency(txService.reimbursedAmountFor(tx.id)) }}</span>
+                      }
                       @if (tx.isInternalTransfer) {
                         <span class="refunded-badge">↔ Transfer</span>
                       }
@@ -553,9 +559,69 @@
           </span>
         </div>
       </div>
+
+      <!-- REIMBURSEMENT LINKING -->
+      @if (tx.type === 'expense') {
+        <div class="view-reimburse">
+          <div class="view-reimburse-head">Reimbursements</div>
+          @if (viewingReimbursedTotal() > 0) {
+            <div class="reimburse-summary">
+              Reimbursed <strong>{{ formatCurrency(viewingReimbursedTotal()) }}</strong> of {{ formatCurrency(tx.amount) }}
+              · true cost <strong>{{ formatCurrency(tx.amount - viewingReimbursedTotal()) }}</strong>
+            </div>
+            @for (r of viewingReimbursements(); track r.id) {
+              <div class="reimburse-row">
+                <span class="reimburse-row-text">↩ {{ r.merchant || 'Income' }} · +{{ formatCurrency(r.amount) }} · {{ formatDate(r.date) }}</span>
+                <button class="reimburse-unlink" (click)="unlinkReimbursement(r)" title="Unlink">✕</button>
+              </div>
+            }
+          } @else {
+            <p class="reimburse-hint">Link money a friend paid you back so analysis counts only what you truly spent.</p>
+          }
+          <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Link a reimbursement</button>
+        </div>
+      }
+
+      @if (tx.type === 'income') {
+        <div class="view-reimburse">
+          @if (viewingReimbursesExpense(); as exp) {
+            <div class="view-reimburse-head">Reimbursement</div>
+            <div class="reimburse-summary">↩ Reimburses <strong>{{ exp.merchant || 'an expense' }}</strong> · {{ formatCurrency(exp.amount) }} on {{ formatDate(exp.date) }}</div>
+            <button class="reimburse-add" (click)="unlinkReimbursement(viewingLive()!)">Unlink reimbursement</button>
+          } @else {
+            <div class="view-reimburse-head">Reimbursement</div>
+            <p class="reimburse-hint">Did this pay you back for an expense? Link it so it doesn't count as income.</p>
+            <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Mark as reimbursement</button>
+          }
+        </div>
+      }
     }
   </div>
 }
+
+<!-- REIMBURSEMENT LINK PICKER -->
+<app-modal
+  [open]="!!linkingFrom()"
+  [title]="linkingFrom()?.type === 'income' ? 'Reimburses which expense?' : 'Which income paid this back?'"
+  size="sm"
+  (closed)="closeLinkPicker()">
+  <input class="link-search input-field"
+         [ngModel]="linkSearch()"
+         (ngModelChange)="linkSearch.set($event)"
+         placeholder="Search merchant or amount…" />
+  <div class="link-list">
+    @for (c of linkCandidates(); track c.id) {
+      <button class="link-item" (click)="confirmLink(c)">
+        <span class="link-item-main">{{ c.merchant || (c.type === 'income' ? 'Income' : 'Expense') }}</span>
+        <span class="link-item-meta">
+          {{ formatDate(c.date) }} · {{ c.type === 'expense' ? '−' : '+' }}{{ formatCurrency(c.amount) }}
+        </span>
+      </button>
+    } @empty {
+      <div class="link-empty">No matching transactions.</div>
+    }
+  </div>
+</app-modal>
 
 <!-- MODALS -->
 <app-transaction-form

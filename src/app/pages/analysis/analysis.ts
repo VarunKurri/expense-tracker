@@ -196,11 +196,18 @@ export class Analysis implements AfterViewInit, OnDestroy {
   // Internal transfers (e.g. a credit card payment) are excluded — real money
   // movement between the user's own accounts, not real spending/earning.
   expenses = computed(() => this.filtered().filter(t => t.type === 'expense' && !t.isInternalTransfer));
-  income = computed(() => this.filtered().filter(t => t.type === 'income' && !t.isInternalTransfer));
+  // Reimbursing income (a friend paying you back) isn't real income — it offsets an
+  // expense — so it's left out of income and folded into the expense's true cost.
+  income = computed(() => this.filtered().filter(t => t.type === 'income' && !t.isInternalTransfer && !t.reimbursesId));
+
+  /** An expense's true cost after any linked reimbursements. */
+  private eff(t: Transaction): number {
+    return this.txService.effectiveExpenseAmount(t);
+  }
 
   // ── KPIs ───────────────────────────────────────────────────
   totalExpenses = computed(() =>
-    Math.round(this.expenses().reduce((s, t) => s + t.amount, 0) * 100) / 100
+    Math.round(this.expenses().reduce((s, t) => s + this.eff(t), 0) * 100) / 100
   );
 
   totalIncome = computed(() =>
@@ -233,7 +240,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
     const byCat = new Map<string, number>();
     for (const t of this.expenses()) {
       if (!t.categoryId) continue;
-      byCat.set(t.categoryId, (byCat.get(t.categoryId) || 0) + t.amount);
+      byCat.set(t.categoryId, (byCat.get(t.categoryId) || 0) + this.eff(t));
     }
     if (!byCat.size) return null;
     const [id, amount] = [...byCat.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -244,7 +251,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
   largestExpense = computed(() => {
     const txs = this.expenses();
     if (!txs.length) return null;
-    return txs.reduce((max, t) => t.amount > max.amount ? t : max, txs[0]);
+    return txs.reduce((max, t) => this.eff(t) > this.eff(max) ? t : max, txs[0]);
   });
 
   // ── Spending by category ───────────────────────────────────
@@ -253,7 +260,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
     const total = this.totalExpenses();
     for (const t of this.expenses()) {
       const key = t.categoryId || '__none__';
-      byCat.set(key, (byCat.get(key) || 0) + t.amount);
+      byCat.set(key, (byCat.get(key) || 0) + this.eff(t));
     }
     return [...byCat.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -278,11 +285,12 @@ export class Analysis implements AfterViewInit, OnDestroy {
     const byMerchant = new Map<string, { amount: number; txs: Transaction[] }>();
     for (const t of this.expenses()) {
       const key = t.merchant || 'Unknown';
+      const amt = this.eff(t);
       const existing = byMerchant.get(key);
       if (!existing) {
-        byMerchant.set(key, { amount: t.amount, txs: [t] });
+        byMerchant.set(key, { amount: amt, txs: [t] });
       } else {
-        existing.amount += t.amount;
+        existing.amount += amt;
         existing.txs.push(t);
       }
     }
@@ -326,8 +334,8 @@ export class Analysis implements AfterViewInit, OnDestroy {
       const key = t.date.slice(0, 7);
       if (!months.has(key)) continue;
       const entry = months.get(key)!;
-      if (t.type === 'income') entry.income += t.amount;
-      if (t.type === 'expense' && !t.refunded) entry.expenses += t.amount;
+      if (t.type === 'income' && !t.reimbursesId) entry.income += t.amount;
+      if (t.type === 'expense' && !t.refunded) entry.expenses += this.eff(t);
     }
 
     return [...months.entries()].map(([month, data]) => {

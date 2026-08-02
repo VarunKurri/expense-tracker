@@ -108,6 +108,37 @@ export class TransactionService {
     return transactionDeltaForAccount(this.transactions(), accountId);
   }
 
+  // ── Partial reimbursements ─────────────────────────────────
+  // Total reimbursed per expense: sum of every income's amount that points at it via
+  // `reimbursesId`. One source of truth (the income), so an expense never gets stale.
+  reimbursedByExpense = computed<Map<string, number>>(() => {
+    const map = new Map<string, number>();
+    for (const t of this.transactions()) {
+      if (t.type === 'income' && t.reimbursesId) {
+        map.set(t.reimbursesId, (map.get(t.reimbursesId) ?? 0) + t.amount);
+      }
+    }
+    return map;
+  });
+
+  /** How much of an expense has been reimbursed by linked income. */
+  reimbursedAmountFor(expenseId?: string): number {
+    if (!expenseId) return 0;
+    return Math.round((this.reimbursedByExpense().get(expenseId) ?? 0) * 100) / 100;
+  }
+
+  /** An expense's true cost after reimbursements (floored at 0). Non-expenses pass through. */
+  effectiveExpenseAmount(t: Transaction): number {
+    if (t.type !== 'expense' || !t.id) return t.amount;
+    return Math.max(0, Math.round((t.amount - this.reimbursedAmountFor(t.id)) * 100) / 100);
+  }
+
+  /** The income transactions that reimburse a given expense. */
+  reimbursementsFor(expenseId?: string): Transaction[] {
+    if (!expenseId) return [];
+    return this.transactions().filter(t => t.type === 'income' && t.reimbursesId === expenseId);
+  }
+
   // For credit cards: currentBalance = openingBalance + txBalance
   // openingBalance is positive debt, expenses add to it, payments reduce it
   creditCardBalance(account: Account): number {
