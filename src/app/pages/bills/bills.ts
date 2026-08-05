@@ -271,8 +271,24 @@ export class Bills {
   }
 
   // ── Mark as paid ──────────────────────────────────────────
+  /** True when the bill's account is Plaid-linked — the real payment already
+   *  arrives via sync, so "Mark paid" here must only advance the due date, never
+   *  log its own transaction (that would duplicate the synced one). */
+  private isPlaidLinkedBill(bill: Bill): boolean {
+    const account = bill.accountId
+      ? this.accountService.accounts().find(a => a.id === bill.accountId)
+      : undefined;
+    return !!account?.plaidAccountId;
+  }
+
   async markPaid(bill: Bill) {
     if (!bill.id) return;
+
+    if (this.isPlaidLinkedBill(bill)) {
+      await this.advanceDueDateOnly(bill);
+      return;
+    }
+
     if (this.needsManualPaymentForm(bill)) {
       this.openBillPayment(bill);
       return;
@@ -288,6 +304,19 @@ export class Bills {
         categoryId: bill.categoryId,
         notes: `${bill.frequency} bill — manual payment`,
       });
+      const nextDate = this.billService.nextDueDate(bill);
+      await this.billService.update(bill.id, { nextDueDate: nextDate });
+    } catch (err) {
+      this.toastService.error('Failed. Please try again.');
+    } finally {
+      this.markingPaid.set(null);
+    }
+  }
+
+  private async advanceDueDateOnly(bill: Bill) {
+    if (!bill.id) return;
+    this.markingPaid.set(bill.id);
+    try {
       const nextDate = this.billService.nextDueDate(bill);
       await this.billService.update(bill.id, { nextDueDate: nextDate });
     } catch (err) {

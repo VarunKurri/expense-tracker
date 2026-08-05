@@ -201,8 +201,13 @@ export class Transactions {
     for (const t of this.filtered()) {
       if (this.excludedFromAnalysis(t)) continue;
       if (t.type === 'income') income += t.amount;
-      // In analysis view, an expense counts at its true cost (net of reimbursements).
-      if (t.type === 'expense') expense += analysis ? this.txService.effectiveExpenseAmount(t) : t.amount;
+      // In analysis view, an expense counts at its true cost (net of reimbursements);
+      // if reimbursements exceed the expense, the excess is real profit — add it to
+      // income rather than letting effectiveExpenseAmount's floor silently drop it.
+      if (t.type === 'expense') {
+        expense += analysis ? this.txService.effectiveExpenseAmount(t) : t.amount;
+        if (analysis) income += this.txService.reimbursementSurplus(t);
+      }
     }
     return { income, expense, net: income - expense };
   });

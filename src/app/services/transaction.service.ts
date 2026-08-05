@@ -133,6 +133,14 @@ export class TransactionService {
     return Math.max(0, Math.round((t.amount - this.reimbursedAmountFor(t.id)) * 100) / 100);
   }
 
+  /** When linked reimbursements exceed the original expense (e.g. split evenly but one
+   *  side rounded up), the excess is real profit, not spending — it belongs in income,
+   *  not silently floored away by `effectiveExpenseAmount`. Zero for non-expenses. */
+  reimbursementSurplus(t: Transaction): number {
+    if (t.type !== 'expense' || !t.id) return 0;
+    return Math.max(0, Math.round((this.reimbursedAmountFor(t.id) - t.amount) * 100) / 100);
+  }
+
   /** The income transactions that reimburse a given expense. */
   reimbursementsFor(expenseId?: string): Transaction[] {
     if (!expenseId) return [];

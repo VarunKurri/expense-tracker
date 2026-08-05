@@ -210,9 +210,12 @@ export class Analysis implements AfterViewInit, OnDestroy {
     Math.round(this.expenses().reduce((s, t) => s + this.eff(t), 0) * 100) / 100
   );
 
-  totalIncome = computed(() =>
-    Math.round(this.income().reduce((s, t) => s + t.amount, 0) * 100) / 100
-  );
+  totalIncome = computed(() => {
+    const direct = this.income().reduce((s, t) => s + t.amount, 0);
+    // Reimbursements over the original expense are real profit — see reimbursementSurplus.
+    const surplus = this.expenses().reduce((s, t) => s + this.txService.reimbursementSurplus(t), 0);
+    return Math.round((direct + surplus) * 100) / 100;
+  });
 
   avgMonthlySpend = computed(() => {
     const txs = this.expenses();
@@ -335,7 +338,10 @@ export class Analysis implements AfterViewInit, OnDestroy {
       if (!months.has(key)) continue;
       const entry = months.get(key)!;
       if (t.type === 'income' && !t.reimbursesId) entry.income += t.amount;
-      if (t.type === 'expense' && !t.refunded) entry.expenses += this.eff(t);
+      if (t.type === 'expense' && !t.refunded) {
+        entry.expenses += this.eff(t);
+        entry.income += this.txService.reimbursementSurplus(t);
+      }
     }
 
     return [...months.entries()].map(([month, data]) => {
