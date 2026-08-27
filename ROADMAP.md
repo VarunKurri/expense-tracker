@@ -496,9 +496,34 @@ payment (statement balance + due date) as a read-only reminder in Bills.
 
 ---
 
-### Session handoff (2026-08-05) — continue here
+## Phase 11: Autopay Date, Refund-Adjusted Statements, Reimbursement Surplus Display (part 46)
 
-**Sync state:** everything below is committed, pushed to both `claude/plaid-bank-integration-ddvp8w` and `main` (latest commit `1612847`, "part 44"), and deployed live to Firebase Hosting. A fresh `git pull` on `main` is all a new session needs — no uncommitted or undeployed work is sitting anywhere. Note: parts 36–42 were committed as `Varun Kurri` (mostly without a Claude co-author trailer) — logged here from `git log`/`git show`, not from having built them in this conversation.
+Three-part follow-up request building on Phase 10's credit-card strip and reimbursement linking.
+
+- [x] Part 1 — Show autopay status/date per card, alongside the bank's due date.
+  - Why: the strip showed the bank's statement due date, but the user's autopay is often scheduled for an earlier date — they need to know when money actually leaves their linked account, not just when the bank considers payment "due."
+  - Investigated first: checked the Plaid Node SDK's `CreditCardLiability` type directly (`node_modules/plaid/dist/api.d.ts`) — confirmed Plaid exposes no autopay flag or date for any institution (only `is_overdue`, `last_payment_*`, `last_statement_*`, `next_payment_due_date`, `minimum_payment_amount`). So this is manual-only, same as `paymentDueDay`.
+  - Done when: the strip shows, per card, the due date (unchanged, static) alongside an autopay chip with its date when known, or "Autopay off" when explicitly disabled, or nothing when unset; the countdown pill counts down to autopay instead of the due date once autopay is known, since that's the number that matters for having funds ready.
+  - Verified: added `Account.autopayDay?: number` (the existing `autopayEnabled` toggle was already on the model/account-form from an earlier feature). Account edit form gained an "Autopay date (day)" select, shown only when the toggle is on, mirroring `paymentDueDay`'s pattern exactly. `accounts.ts`: new `autopayInfoFor()` computes the next occurrence via the existing `nextDueFromDay()` helper (reused, not duplicated); new `countdownLabel()` prefers the autopay countdown ("5 days left" / "Autopay today" / "Autopay tomorrow") over `dueDateLabel()`'s due-date countdown when autopay is enabled and dated, leaving `dueDateLabel()` itself untouched as the fallback and as what still drives the separate 'overdue' pill (real lateness stays tied to the bank's true due date, not autopay). Each `.cc-item` gained a secondary line showing the static due date plus the autopay chip or "Autopay off." Never fabricates a date when unset. `ng build` passes clean.
+
+- [x] Part 2 — Refund-adjusted statement amount (Plaid-Liabilities cards only).
+  - Why: `last_statement_balance` is a snapshot from when the statement closed — if a refund posts after that but before autopay runs, the bank may only auto-pay the reduced amount, while the strip kept showing the stale original figure. Concrete case: $185.15 statement, $164.96 refunded before autopay, bank actually collected $20.19 — the app needs to show $20.19, not $185.15.
+  - Scoped to tier 1 (Plaid Liabilities — Chase, AMEX) only, per the request's own reasoning: tier 2 (Discover, no Liabilities) has no bank-issued statement figure to reconcile against — its computed amount is already a live running balance, so the same adjustment doesn't apply there.
+  - Done when: the strip's primary amount reflects the statement balance minus any refunds posted after the statement closed; the original amount is still visible (struck through) when it differs, so it's clear why the number moved; once paid, the "✓ Paid" amount is the real `last_payment_amount`, not the pre-refund statement balance.
+  - Verified: new `effectiveStatementAmount()` in `accounts.ts` — `last_statement_balance` minus the sum of `type: 'income'` transactions on that account dated after `statementIssueDate` (a refund credits a credit-card account as income; mirrors the reasoning already used by tier 2's `balanceOwedAsOf`, just isolated to the credit side within one date window instead of a full running balance). `CardDue.originalAmount` is set only when it actually differs from the displayed amount (>$0.005), shown struck through next to the effective figure with a "refund applied since statement closed" note. Paid state now shows `lastPaymentAmount` when available, falling back to the effective (refund-adjusted) amount otherwise. `ng build` passes clean.
+
+- [x] Part 3 — Visually distinguish "still a net expense" from "came out ahead" in reimbursement linking.
+  - Why: part 44 fixed the *math* (an over-reimbursed expense's surplus now correctly lands in income instead of vanishing), but the display still collapsed both cases into the same neutral wording/color — a partial reimbursement (still owe something) and an overpayment (actually gained money) looked the same at a glance.
+  - Done when: the expense's detail panel reads "Net expense: $Z" in expense-red when reimbursed less than it cost, or "You came out ahead by $X" in income-green when reimbursed more; the linked income's own detail view shows the reimbursed expense's covered/surplus breakdown; the compact list-row badges on both sides get the same red/green split.
+  - Verified: new `TransactionService.reimbursementSurplusForIncome()` (looks up the reimbursed expense's surplus from an income's `reimbursesId`, for the income-side row badge). `transactions.ts` gained `viewingReimbursementSurplus`, `viewingReimbursesSurplus`, `viewingReimbursesCovered` computed()s. Expense detail panel branches on `viewingReimbursementSurplus() > 0` between the two wordings/colors (`.reimburse-summary.net-expense` red / `.surplus` green). Income detail panel shows "$X covered + $Y surplus" when the expense it reimburses has a surplus, otherwise the original "$Y on \<date\>" line. List-row badges: the expense-side badge (`.refunded-badge`) gets a `.net-expense` red modifier when there's no surplus (was always green before, which is wrong for "still owe money"); the income-side badge appends "+ surplus" when relevant. The surplus attribution is expense-level, not attributed to a specific payment when multiple reimbursements are linked (e.g. two $300/$175 payments against one expense) — deliberately, since splitting "which dollar was the surplus one" across several payments has no non-arbitrary answer; both linked incomes show the same expense-level breakdown. `ng build` passes clean.
+
+**Phase 11 complete.** Deployed, pushed to `main`. Not yet verified on-device (auth limitation) — the concrete scenarios from the request (autopay date on the AMEX/Chase/Discover cards, the $185.15→$20.19 refund case, the $469.40/$475 overpay case) are what to check first.
+
+---
+
+### Session handoff (2026-08-27) — continue here
+
+**Sync state:** everything below is committed and pushed — `main` and `claude/plaid-bank-integration-ddvp8w` both at `5003f39` ("part 46") — and deployed live to Firebase Hosting. A fresh `git pull` on `main` is all a new session needs. Note: work now lands on `main` directly (the feature branch is kept fast-forwarded alongside it for continuity, not used as a separate line of work); parts 36–42 were committed as `Varun Kurri` without a Claude co-author trailer — logged here from `git log`/`git show`, not built in a Claude session.
 
 **What's implemented but NOT yet tested by the user** (this is the next task — a testing pass, not more building):
 
@@ -507,11 +532,13 @@ payment (statement balance + due date) as a read-only reminder in Bills.
    - Internal-transfer flagging excludes correctly from Analysis/Dashboard totals but still moves both account balances (Phase 8).
    - Autopay no longer creates a duplicate transaction on a Plaid-linked account's due date (part 29). Note: the original "Apple iCloud" duplicate this bug produced may still be sitting in the data and need manual deletion (note field: "Autopay — monthly bill") — confirm it's gone.
    - Purchase date (not posted date) shows on new Plaid syncs (Phase 8).
-   - Reimbursement linking (part 42) — **first real on-device test already found and fixed two bugs (part 44)**: an over-reimbursed expense showing $0 instead of the correct income, and "Mark paid" duplicating a transaction on Plaid-linked bill accounts. Worth a second pass now that both are fixed — including the exact overpayment scenario that surfaced the first bug (paid $469.40, reimbursed $475 total) to confirm it now shows $5.60 income.
+   - Reimbursement linking (part 42, fixed part 44) — the $469.40/$475 overpayment case should now show $5.60 income in Analysis instead of $0.00; worth confirming.
+   - **New (part 46)**: reimbursement surplus display (red "Net expense" vs. green "You came out ahead" wording/coloring) and the refund-adjusted statement amount on the cc-strip (last_statement_balance minus post-close refunds) — both brand new, unverified against real data.
 
-2. **Credit-card payments strip on Accounts** (parts 36, 39–41 — iterated 4 times off the user's own feedback each round, but never confirmed as *actually correct* on-device after the last round):
-   - Tier 1 (Plaid Liabilities banks — Chase, AMEX): statement balance + due date, "✓ Paid <date>" when autopay already covered it, "Overdue" only on Plaid's own flag.
+2. **Credit-card payments strip on Accounts** (parts 36, 39–41, 46 — iterated several times off the user's own feedback each round, but never confirmed as *actually correct* on-device after the last round):
+   - Tier 1 (Plaid Liabilities banks — Chase, AMEX): statement balance + due date, "✓ Paid <date>" when autopay already covered it, "Overdue" only on Plaid's own flag, refund-adjusted amount when a refund posted after the statement closed (part 46).
    - Tier 2 (no-Liabilities banks — Discover): if both a statement-closing day and due day are set on the card, shows a **computed** "est. statement" (balance as of last close, due date = next due-day after that close); otherwise falls back to current balance + "Set due date" prompt.
+   - **New (part 46)**: per-card autopay chip + countdown, manual-only (`Account.autopayDay`, set from the account edit form) — needs the autopay toggle/day actually set on each card before anything shows; confirmed no Plaid autopay data exists for any linked institution.
    - Needs a "Sync transactions" first (to pick up the newer liability fields on existing linked accounts) before the strip will show real data.
 
 3. **This session's Phase 9 features** (parts 29–38):
