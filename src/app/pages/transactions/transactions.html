@@ -435,7 +435,8 @@
                     <div class="tx-status">
                       <div class="tx-amount"
                            [class.pos]="tx.type === 'income'"
-                           [class.neg]="tx.type === 'expense'">
+                           [class.neg]="tx.type === 'expense'"
+                           [class.struck]="showNetAnalysis(tx)">
                         @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
                         @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
                         @else { {{ formatCurrency(tx.amount) }} }
@@ -447,11 +448,26 @@
                         <span class="refunded-badge">↩ Reimbursement{{ txService.reimbursementSurplusForIncome(tx) > 0 ? ' + surplus' : '' }}</span>
                       }
                       @if (tx.type === 'expense' && txService.reimbursedAmountFor(tx.id) > 0) {
-                        <span class="refunded-badge" [class.net-expense]="txService.reimbursementSurplus(tx) === 0">
-                          @if (txService.reimbursementSurplus(tx) > 0) {
-                            ↩ +{{ formatCurrency(txService.reimbursementSurplus(tx)) }} surplus
-                          } @else {
-                            ↩ −{{ formatCurrency(txService.reimbursedAmountFor(tx.id)) }}
+                        <!-- A reimbursement is money coming back — always green, always the
+                             full amount, same convention as an income row. In analysis view
+                             (with netting active) it's struck through with the net effect
+                             shown alongside, rather than recolored to imply "still owed." -->
+                        <span class="reimburse-net-row">
+                          <span class="refunded-badge" [class.struck]="showNetAnalysis(tx)">
+                            ↩ +{{ formatCurrency(txService.reimbursedAmountFor(tx.id)) }}
+                          </span>
+                          @if (showNetAnalysis(tx)) {
+                            <!-- Exactly-reimbursed ($0 either way) stays neutral — it's
+                                 neither still owed nor a gain, so no color applies. -->
+                            <span class="tx-net-amt"
+                                  [class.pos]="txService.reimbursementSurplus(tx) > 0.005"
+                                  [class.neg]="txService.effectiveExpenseAmount(tx) > 0.005">
+                              @if (txService.reimbursementSurplus(tx) > 0.005) {
+                                +{{ formatCurrency(txService.reimbursementSurplus(tx)) }}
+                              } @else {
+                                −{{ formatCurrency(txService.effectiveExpenseAmount(tx)) }}
+                              }
+                            </span>
                           }
                         </span>
                       }
@@ -571,17 +587,14 @@
         <div class="view-reimburse">
           <div class="view-reimburse-head">Reimbursements</div>
           @if (viewingReimbursedTotal() > 0) {
-            @if (viewingReimbursementSurplus() > 0) {
-              <div class="reimburse-summary surplus">
-                Reimbursed <strong>{{ formatCurrency(viewingReimbursedTotal()) }}</strong> of {{ formatCurrency(tx.amount) }}
-                · <strong>You came out ahead by {{ formatCurrency(viewingReimbursementSurplus()) }}</strong> — counted as income
-              </div>
-            } @else {
-              <div class="reimburse-summary net-expense">
-                Reimbursed <strong>{{ formatCurrency(viewingReimbursedTotal()) }}</strong> of {{ formatCurrency(tx.amount) }}
-                · Net expense <strong>{{ formatCurrency(tx.amount - viewingReimbursedTotal()) }}</strong>
-              </div>
-            }
+            <div class="reimburse-summary">
+              Reimbursed <strong>{{ formatCurrency(viewingReimbursedTotal()) }}</strong> of {{ formatCurrency(tx.amount) }}
+              @if (viewingReimbursementSurplus() > 0.005) {
+                · Surplus <strong class="amt-surplus">{{ formatCurrency(viewingReimbursementSurplus()) }}</strong>
+              } @else {
+                · Net expense <strong [class.amt-expense]="txService.effectiveExpenseAmount(tx) > 0.005">{{ formatCurrency(txService.effectiveExpenseAmount(tx)) }}</strong>
+              }
+            </div>
             @for (r of viewingReimbursements(); track r.id) {
               <div class="reimburse-row">
                 <span class="reimburse-row-text">↩ {{ r.merchant || 'Income' }} · +{{ formatCurrency(r.amount) }} · {{ formatDate(r.date) }}</span>
@@ -600,9 +613,9 @@
           @if (viewingReimbursesExpense(); as exp) {
             <div class="view-reimburse-head">Reimbursement</div>
             @if (viewingReimbursesSurplus() > 0) {
-              <div class="reimburse-summary surplus">
+              <div class="reimburse-summary">
                 ↩ Reimburses <strong>{{ exp.merchant || 'an expense' }}</strong> ·
-                {{ formatCurrency(viewingReimbursesCovered()) }} covered + <strong>{{ formatCurrency(viewingReimbursesSurplus()) }} surplus</strong>
+                {{ formatCurrency(viewingReimbursesCovered()) }} covered + <strong class="amt-surplus">{{ formatCurrency(viewingReimbursesSurplus()) }} surplus</strong>
               </div>
             } @else {
               <div class="reimburse-summary">↩ Reimburses <strong>{{ exp.merchant || 'an expense' }}</strong> · {{ formatCurrency(exp.amount) }} on {{ formatDate(exp.date) }}</div>

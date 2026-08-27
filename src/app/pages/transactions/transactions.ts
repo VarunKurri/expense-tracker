@@ -87,11 +87,23 @@ export class Transactions {
   excludedFromAnalysis(t: Transaction): boolean {
     if (!this.analysisView()) return false;
     if (t.isInternalTransfer) return true;
-    if (this.analysisExcludeRefunded() && t.refunded) return true;
+    // "Include refunded" also turns off reimbursement netting/exclusion, same as it
+    // does for refunded rows — one toggle for "count things as originally recorded."
+    if (!this.analysisExcludeRefunded()) return false;
+    if (t.refunded) return true;
     // A reimbursement (income linked to an expense) isn't real income — it's folded
     // into the expense's true cost — so it's greyed out and left out of the totals.
     if (t.type === 'income' && t.reimbursesId) return true;
     return false;
+  }
+
+  /** True when an expense's reimbursement should show as struck-through-original +
+   *  a net amount alongside — only while netting is actually active (analysis view
+   *  with "Excluding refunded" on) and only for expenses that have one. */
+  showNetAnalysis(tx: Transaction): boolean {
+    return tx.type === 'expense'
+      && this.analysisView() && this.analysisExcludeRefunded()
+      && this.txService.reimbursedAmountFor(tx.id) > 0;
   }
 
   // Date range bounds
@@ -187,7 +199,15 @@ export class Transactions {
         total: items.reduce((s, t) => {
           if (this.excludedFromAnalysis(t)) return s;
           if (t.type === 'income') return s + t.amount;
-          if (t.type === 'expense') return s - t.amount;
+          if (t.type === 'expense') {
+            // Same netting rule as `totals` below — a day's subtotal should agree
+            // with what each row in it actually shows, not a raw sum from a
+            // different accounting mode.
+            if (this.showNetAnalysis(t)) {
+              return s - this.txService.effectiveExpenseAmount(t) + this.txService.reimbursementSurplus(t);
+            }
+            return s - t.amount;
+          }
           return s;
         }, 0)
       }));
@@ -196,17 +216,19 @@ export class Transactions {
   // Totals — in analysis view, refunded + internal-transfer rows are left out so the
   // numbers match the Analysis page; otherwise everything in range counts.
   totals = computed(() => {
-    const analysis = this.analysisView();
+    const netting = this.analysisView() && this.analysisExcludeRefunded();
     let income = 0, expense = 0;
     for (const t of this.filtered()) {
       if (this.excludedFromAnalysis(t)) continue;
       if (t.type === 'income') income += t.amount;
-      // In analysis view, an expense counts at its true cost (net of reimbursements);
-      // if reimbursements exceed the expense, the excess is real profit — add it to
-      // income rather than letting effectiveExpenseAmount's floor silently drop it.
+      // With netting active, an expense counts at its true cost (net of
+      // reimbursements); if reimbursements exceed the expense, the excess is real
+      // profit — add it to income rather than letting effectiveExpenseAmount's
+      // floor silently drop it. With netting off ("include refunded"), everything
+      // counts exactly as recorded.
       if (t.type === 'expense') {
-        expense += analysis ? this.txService.effectiveExpenseAmount(t) : t.amount;
-        if (analysis) income += this.txService.reimbursementSurplus(t);
+        expense += netting ? this.txService.effectiveExpenseAmount(t) : t.amount;
+        if (netting) income += this.txService.reimbursementSurplus(t);
       }
     }
     return { income, expense, net: income - expense };

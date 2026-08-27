@@ -4,6 +4,7 @@ import { RouterLink, ActivatedRoute } from '@angular/router';
 import { TransactionService } from '../../../services/transaction.service';
 import { CategoryService } from '../../../services/category.service';
 import { filterForAnalysis } from '../../../utils/analysis-filter';
+import { Transaction } from '../../../models';
 
 @Component({
   selector: 'app-category-breakdown',
@@ -47,8 +48,15 @@ export class CategoryBreakdown {
     this.filtered().filter(t => t.type === 'expense' && !t.isInternalTransfer)
   );
 
+  /** An expense's true cost after any linked reimbursements — matches the Analysis
+   *  page's own netting rule, gated by the same "Excluding refunded" toggle. */
+  private eff(t: Transaction): number {
+    if (!this.excludeRefunded()) return t.amount;
+    return this.txService.effectiveExpenseAmount(t);
+  }
+
   totalExpenses = computed(() =>
-    Math.round(this.expenses().reduce((s, t) => s + t.amount, 0) * 100) / 100
+    Math.round(this.expenses().reduce((s, t) => s + this.eff(t), 0) * 100) / 100
   );
 
   // Every category with spend in the period — no top-8 cap, unlike the Analysis
@@ -58,7 +66,7 @@ export class CategoryBreakdown {
     const total = this.totalExpenses();
     for (const t of this.expenses()) {
       const key = t.categoryId || '__none__';
-      byCat.set(key, (byCat.get(key) || 0) + t.amount);
+      byCat.set(key, (byCat.get(key) || 0) + this.eff(t));
     }
     return [...byCat.entries()]
       .sort((a, b) => b[1] - a[1])

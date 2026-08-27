@@ -569,6 +569,10 @@
   &.pos { color: var(--green); }
   &.neg { color: var(--fg); }
   &.neu { color: var(--fg-3); }
+  // Analysis view: this raw figure isn't what counts — the net amount next to the
+  // reimbursement badge below is. Struck, not recolored, since the number itself
+  // (what was actually charged) is still true — it just isn't the analysis total.
+  &.struck { text-decoration: line-through; opacity: 0.6; }
 }
 
 .refunded-badge {
@@ -579,13 +583,28 @@
   border-radius: 4px;
   font-weight: 600;
 
-  // A reimbursement still short of the expense's own cost is a net expense, not
-  // money back — distinct from the default green (refunded / surplus / plain
-  // reimbursement link), which all mean "this reduced or reversed spending."
-  &.net-expense {
-    background: var(--red-bg);
-    color: var(--red);
-  }
+  // Analysis view: this specific figure isn't what counts (see the net amount next
+  // to it) — struck, not recolored, since it's still genuinely a reimbursement.
+  &.struck { text-decoration: line-through; opacity: 0.6; }
+}
+
+// Row for the expense-side reimbursement badge — in analysis view the badge is
+// struck through and the actual net effect (still an expense, or a surplus) sits
+// right next to it.
+.reimburse-net-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tx-net-amt {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-3); // neutral: exactly reimbursed, neither owed nor gained
+
+  &.pos { color: var(--green); }
+  &.neg { color: var(--red); }
 }
 
 .has-notes {
@@ -873,10 +892,11 @@
     margin-bottom: 8px;
     strong { font-weight: 700; }
 
-    // Still a net expense (reimbursed less than it cost) vs. a genuine surplus
-    // (reimbursed more) need to read as opposites at a glance, not both as neutral text.
-    &.net-expense strong { color: var(--red); }
-    &.surplus strong { color: var(--green); }
+    // Only the specific figure that means "still owed" or "came out ahead" gets
+    // color — the reimbursed-amount figure and merchant name stay neutral text,
+    // so color always means the same one thing wherever it shows up.
+    .amt-expense { color: var(--red); }
+    .amt-surplus { color: var(--green); }
   }
 
   .reimburse-hint {

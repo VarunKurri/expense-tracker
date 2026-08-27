@@ -196,12 +196,21 @@ export class Analysis implements AfterViewInit, OnDestroy {
   // Internal transfers (e.g. a credit card payment) are excluded — real money
   // movement between the user's own accounts, not real spending/earning.
   expenses = computed(() => this.filtered().filter(t => t.type === 'expense' && !t.isInternalTransfer));
-  // Reimbursing income (a friend paying you back) isn't real income — it offsets an
-  // expense — so it's left out of income and folded into the expense's true cost.
-  income = computed(() => this.filtered().filter(t => t.type === 'income' && !t.isInternalTransfer && !t.reimbursesId));
+  // "Excluding refunded" also governs reimbursement netting — same "count things as
+  // originally recorded" toggle. On: a reimbursing income isn't real income, it's
+  // folded into the expense's true cost. Off: everything counts as recorded, so the
+  // reimbursing income counts as ordinary income instead.
+  income = computed(() => {
+    const netting = this.excludeRefunded();
+    return this.filtered().filter(t =>
+      t.type === 'income' && !t.isInternalTransfer && (!netting || !t.reimbursesId)
+    );
+  });
 
-  /** An expense's true cost after any linked reimbursements. */
+  /** An expense's true cost after any linked reimbursements — unless netting is
+   *  off ("Include refunded"), in which case every expense counts as recorded. */
   private eff(t: Transaction): number {
+    if (!this.excludeRefunded()) return t.amount;
     return this.txService.effectiveExpenseAmount(t);
   }
 
@@ -212,6 +221,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
 
   totalIncome = computed(() => {
     const direct = this.income().reduce((s, t) => s + t.amount, 0);
+    if (!this.excludeRefunded()) return Math.round(direct * 100) / 100;
     // Reimbursements over the original expense are real profit — see reimbursementSurplus.
     const surplus = this.expenses().reduce((s, t) => s + this.txService.reimbursementSurplus(t), 0);
     return Math.round((direct + surplus) * 100) / 100;
@@ -332,15 +342,16 @@ export class Analysis implements AfterViewInit, OnDestroy {
       months.set(`${y}-${m}`, { income: 0, expenses: 0 });
     }
 
+    const netting = this.excludeRefunded();
     for (const t of this.txService.transactions()) {
       if (t.isInternalTransfer) continue;
       const key = t.date.slice(0, 7);
       if (!months.has(key)) continue;
       const entry = months.get(key)!;
-      if (t.type === 'income' && !t.reimbursesId) entry.income += t.amount;
+      if (t.type === 'income' && (!netting || !t.reimbursesId)) entry.income += t.amount;
       if (t.type === 'expense' && !t.refunded) {
         entry.expenses += this.eff(t);
-        entry.income += this.txService.reimbursementSurplus(t);
+        if (netting) entry.income += this.txService.reimbursementSurplus(t);
       }
     }
 
