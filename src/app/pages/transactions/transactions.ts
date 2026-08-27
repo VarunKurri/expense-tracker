@@ -532,10 +532,28 @@ export class Transactions {
     return id ? this.txService.reimbursementsFor(id) : [];
   });
   viewingReimbursedTotal = computed(() => this.txService.reimbursedAmountFor(this.viewingId() ?? undefined));
+  // How much of viewingReimbursedTotal() is genuine surplus (reimbursed beyond what the
+  // expense cost) rather than reducing its cost — distinguishes "still a net expense"
+  // from "came out ahead" in the detail panel.
+  viewingReimbursementSurplus = computed(() => {
+    const tx = this.viewing();
+    return tx ? this.txService.reimbursementSurplus(tx) : 0;
+  });
   viewingReimbursesExpense = computed<Transaction | null>(() => {
     const live = this.viewingLive();
     if (live?.type !== 'income' || !live.reimbursesId) return null;
     return this.txService.transactions().find(t => t.id === live.reimbursesId) ?? null;
+  });
+  // The reimbursed expense's own covered/surplus breakdown — shown on the income side
+  // of the link so a surplus is visible from either transaction, not just the expense's.
+  viewingReimbursesSurplus = computed(() => {
+    const exp = this.viewingReimbursesExpense();
+    return exp ? this.txService.reimbursementSurplus(exp) : 0;
+  });
+  viewingReimbursesCovered = computed(() => {
+    const exp = this.viewingReimbursesExpense();
+    if (!exp) return 0;
+    return Math.min(exp.amount, this.txService.reimbursedAmountFor(exp.id));
   });
 
   // Opposite-type transactions to link (an expense picks an income, and vice versa).

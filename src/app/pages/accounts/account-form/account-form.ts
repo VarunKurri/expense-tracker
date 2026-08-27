@@ -37,6 +37,7 @@ export class AccountForm implements OnChanges {
   statementClosingDay = 1;
   paymentDueDay = 1;
   autopayEnabled = false;
+  autopayDay = 1;
   minimumPayment = 0;
 
   submitting = signal(false);
@@ -74,6 +75,7 @@ export class AccountForm implements OnChanges {
       this.statementClosingDay = this.account.statementClosingDay || 1;
       this.paymentDueDay = this.account.paymentDueDay || 1;
       this.autopayEnabled = this.account.autopayEnabled || false;
+      this.autopayDay = this.account.autopayDay || 1;
       this.minimumPayment = this.account.minimumPayment || 0;
     } else {
       this.name = '';
@@ -87,6 +89,7 @@ export class AccountForm implements OnChanges {
       this.statementClosingDay = 1;
       this.paymentDueDay = 1;
       this.autopayEnabled = false;
+      this.autopayDay = 1;
       this.minimumPayment = 0;
     }
   }
@@ -124,6 +127,7 @@ export class AccountForm implements OnChanges {
         data.statementClosingDay = Number(this.statementClosingDay) || 1;
         data.paymentDueDay = Number(this.paymentDueDay) || 1;
         data.autopayEnabled = this.autopayEnabled;
+        if (this.autopayEnabled) data.autopayDay = Number(this.autopayDay) || 1;
         data.minimumPayment = Number(this.minimumPayment) || 0;
       }
 

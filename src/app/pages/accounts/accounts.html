@@ -59,32 +59,52 @@
         <div class="cc-strip-list">
           @for (due of creditCardDues(); track due.account.id) {
             <div class="cc-item" [class.is-paid]="due.status === 'paid' || due.status === 'settled'">
-              <div class="cc-item-main">
-                <span class="cc-item-name">{{ due.account.icon || '💳' }} {{ due.account.name }}</span>
-                @if (due.account.last4) { <span class="cc-item-mask">•••• {{ due.account.last4 }}</span> }
-                @if (due.source === 'balance') { <span class="cc-item-tag">current balance</span> }
-                @if (due.source === 'computed') { <span class="cc-item-tag">est. statement</span> }
+              <div class="cc-item-row">
+                <div class="cc-item-main">
+                  <span class="cc-item-name">{{ due.account.icon || '💳' }} {{ due.account.name }}</span>
+                  @if (due.account.last4) { <span class="cc-item-mask">•••• {{ due.account.last4 }}</span> }
+                  @if (due.source === 'balance') { <span class="cc-item-tag">current balance</span> }
+                  @if (due.source === 'computed') { <span class="cc-item-tag">est. statement</span> }
+                </div>
+                <div class="cc-item-right">
+                  <span class="cc-item-amount-wrap">
+                    @if (due.originalAmount) {
+                      <span class="cc-item-amount-original">{{ formatMoney(due.originalAmount) }}</span>
+                    }
+                    <span class="cc-item-amount">{{ formatMoney(due.amount) }}</span>
+                  </span>
+                  @switch (due.status) {
+                    @case ('paid') {
+                      <span class="cc-pill paid">✓ Paid{{ due.paidDate ? ' ' + formatShort(due.paidDate) : '' }}</span>
+                    }
+                    @case ('settled') {
+                      <span class="cc-pill due">Nothing due</span>
+                    }
+                    @case ('overdue') {
+                      <span class="cc-pill overdue">Overdue {{ Math.abs(daysUntil(due.dueDate!)) }}d</span>
+                    }
+                    @case ('no-date') {
+                      <button class="cc-setdate" (click)="openEditForm(due.account)">Set dates</button>
+                    }
+                    @default {
+                      <span class="cc-pill due">{{ countdownLabel(due) }}</span>
+                    }
+                  }
+                </div>
               </div>
-              <div class="cc-item-right">
-                <span class="cc-item-amount">{{ formatMoney(due.amount) }}</span>
-                @switch (due.status) {
-                  @case ('paid') {
-                    <span class="cc-pill paid">✓ Paid{{ due.paidDate ? ' ' + formatShort(due.paidDate) : '' }}</span>
+              @if (due.dueDate && due.status !== 'paid' && due.status !== 'no-date') {
+                <div class="cc-item-sub">
+                  <span>Due {{ formatShort(due.dueDate) }}</span>
+                  @if (due.originalAmount) {
+                    <span class="cc-item-refund-note">· refund applied since statement closed</span>
                   }
-                  @case ('settled') {
-                    <span class="cc-pill due">Nothing due</span>
+                  @if (due.autopayEnabled && due.autopayDate) {
+                    <span class="cc-autopay-chip">⚡ Autopay {{ formatShort(due.autopayDate) }}</span>
+                  } @else if (due.autopayEnabled === false) {
+                    <span class="cc-autopay-off">Autopay off</span>
                   }
-                  @case ('overdue') {
-                    <span class="cc-pill overdue">Overdue {{ Math.abs(daysUntil(due.dueDate!)) }}d</span>
-                  }
-                  @case ('no-date') {
-                    <button class="cc-setdate" (click)="openEditForm(due.account)">Set dates</button>
-                  }
-                  @default {
-                    <span class="cc-pill due">{{ dueDateLabel(due.dueDate!) }}</span>
-                  }
-                }
-              </div>
+                </div>
+              }
             </div>
           }
         </div>

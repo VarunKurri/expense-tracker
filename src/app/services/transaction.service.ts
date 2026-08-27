@@ -147,6 +147,16 @@ export class TransactionService {
     return this.transactions().filter(t => t.type === 'income' && t.reimbursesId === expenseId);
   }
 
+  /** For an income that reimburses an expense: that expense's surplus, if any. Surplus
+   *  belongs to the expense as a whole (it can come from one or several linked
+   *  incomes together), not to any single payment — this just lets a reimbursing
+   *  income's own row indicate "this is part of a package that came out ahead." */
+  reimbursementSurplusForIncome(income: Transaction): number {
+    if (income.type !== 'income' || !income.reimbursesId) return 0;
+    const expense = this.transactions().find(t => t.id === income.reimbursesId);
+    return expense ? this.reimbursementSurplus(expense) : 0;
+  }
+
   // For credit cards: currentBalance = openingBalance + txBalance
   // openingBalance is positive debt, expenses add to it, payments reduce it
   creditCardBalance(account: Account): number {

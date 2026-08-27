@@ -100,6 +100,18 @@
                   (click)="autopayEnabled = !autopayEnabled">
           </button>
         </div>
+
+        @if (autopayEnabled) {
+          <div class="field">
+            <label class="label-sm">Autopay date (day)</label>
+            <select class="input" [(ngModel)]="autopayDay" name="autopayDay">
+              @for (d of days; track d) {
+                <option [value]="d">{{ d }}</option>
+              }
+            </select>
+            <span class="field-hint">When your bank actually debits the payment — if it's different from the due date above</span>
+          </div>
+        }
       </div>
     }
 

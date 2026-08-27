@@ -100,14 +100,20 @@
 
 .cc-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
   padding: 10px 2px;
   border-top: 1px solid var(--line);
 
   &:first-child { border-top: none; }
   &.is-paid { opacity: 0.6; }
+}
+
+.cc-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .cc-item-main {
@@ -149,11 +155,55 @@
   flex-shrink: 0;
 }
 
+.cc-item-amount-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
 .cc-item-amount {
   font-size: 14px;
   font-weight: 700;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
+}
+
+// The pre-refund statement figure, kept visible (struck through) so it's clear the
+// number moved and why — not just silently swapped out.
+.cc-item-amount-original {
+  font-size: 11.5px;
+  color: var(--fg-4);
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+}
+
+.cc-item-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--fg-4);
+  padding-left: 2px;
+}
+
+.cc-item-refund-note {
+  color: var(--fg-4);
+}
+
+.cc-autopay-chip {
+  font-weight: 600;
+  color: var(--amber, #C97A00);
+  background: color-mix(in srgb, var(--amber, #C97A00) 14%, transparent);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+.cc-autopay-off {
+  color: var(--fg-4);
+  background: var(--bg-3);
+  padding: 1px 7px;
+  border-radius: 999px;
 }
 
 .cc-pill {
@@ -187,7 +237,7 @@
 }
 
 @media (max-width: 560px) {
-  .cc-item { flex-wrap: wrap; gap: 6px; }
+  .cc-item-row { flex-wrap: wrap; gap: 6px; }
   .cc-item-right { width: 100%; justify-content: space-between; }
 }
 

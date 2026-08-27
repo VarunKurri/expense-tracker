@@ -23,6 +23,7 @@ export interface Account {
   statementClosingDay?: number;  // day of month 1-31
   paymentDueDay?: number;        // day of month 1-31
   autopayEnabled?: boolean;
+  autopayDay?: number;            // day of month 1-31 — when the bank actually debits, if different from paymentDueDay
   minimumPayment?: number;
   // Dynamic Plaid liability data, refreshed each sync (change every statement cycle).
   statementBalance?: number;     // last closed statement balance — the amount actually due

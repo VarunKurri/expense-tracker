@@ -578,6 +578,14 @@
   padding: 1px 6px;
   border-radius: 4px;
   font-weight: 600;
+
+  // A reimbursement still short of the expense's own cost is a net expense, not
+  // money back — distinct from the default green (refunded / surplus / plain
+  // reimbursement link), which all mean "this reduced or reversed spending."
+  &.net-expense {
+    background: var(--red-bg);
+    color: var(--red);
+  }
 }
 
 .has-notes {
@@ -864,6 +872,11 @@
     color: var(--fg);
     margin-bottom: 8px;
     strong { font-weight: 700; }
+
+    // Still a net expense (reimbursed less than it cost) vs. a genuine surplus
+    // (reimbursed more) need to read as opposites at a glance, not both as neutral text.
+    &.net-expense strong { color: var(--red); }
+    &.surplus strong { color: var(--green); }
   }
 
   .reimburse-hint {
