@@ -1266,8 +1266,8 @@
   .btn-outline { flex-shrink: 0; }
 
   &.analysis-banner {
-    border-color: color-mix(in srgb, var(--accent, #00D64F) 45%, var(--line));
-    background: color-mix(in srgb, var(--accent, #00D64F) 8%, var(--surface));
+    border-color: color-mix(in srgb, var(--teal) 45%, var(--line));
+    background: color-mix(in srgb, var(--teal) 8%, var(--surface));
   }
 }
 

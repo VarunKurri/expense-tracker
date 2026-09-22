@@ -1,113 +1,125 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap');
-
 /* ============================================
-   TALLY DESIGN SYSTEM
+   ORIGIN DESIGN SYSTEM
+   ============================================
+
+   Ported from Origin's (useorigin.com) production stylesheet.
+
+   Three type voices:
+     display  Newsreader, weight 300 — stands in for Origin's Lyon Display.
+              One word per headline is italicised (see `.display em`).
+     ui       Inter — stands in for Suisse Intl. Origin loads Inter as its own
+              fallback, so this matches their intent exactly.
+     mono     Roboto Mono, 10px/500 UPPERCASE — labels, eyebrows, data, buttons.
+
+   Colour discipline: the canvas is near-black and surfaces are monochrome.
+   Colour appears only as a data signal (chart lines, sparklines, category
+   tiles). White-on-black is the ONLY primary action — never a coloured fill.
+
+   Fonts are loaded from index.html, not here, so they are not queued behind
+   this stylesheet.
    ============================================ */
 
-/* --- Dark mode --- */
+/* --- Dark mode (default — Origin is dark-first) --- */
+:root,
 :root[data-theme="dark"] {
-  --bg:          #0B0B0D;
-  --bg-2:        #141417;
-  --bg-3:        #1C1C21;
-  --surface:     #17171B;
-  --surface-hi:  #1F1F25;
-  --line:        rgba(255, 255, 255, 0.08);
-  --line-strong: rgba(255, 255, 255, 0.14);
+  --bg:          #0A0A0A;   /* page canvas, near-black */
+  --bg-2:        #131313;   /* Origin's surface base */
+  --bg-3:        #1C1C1C;
+  --surface:     #131313;
+  --surface-hi:  #222222;   /* Origin's surface gradient end */
+  --line:        #2A2A2A;
+  --line-strong: #5B5B5B;   /* Origin's border colour */
 
-  --fg:   #F7F7F5;
-  --fg-2: #C9C9CE;
-  --fg-3: #8A8A92;
-  --fg-4: #5A5A62;
+  --fg:   #FAFAFA;                      /* Origin's near-white */
+  --fg-2: rgba(250, 250, 250, 0.90);    /* #fafafae5 — body text */
+  --fg-3: rgba(255, 255, 255, 0.60);    /* #ffffff99 — muted label */
+  --fg-4: #5B5B5B;
 
-  --green:    #00D64F;
-  --green-hi: #3EFF7A;
-  --green-bg: rgba(0, 214, 79, 0.12);
-  --red:      #FF4D5E;
-  --red-bg:   rgba(255, 77, 94, 0.12);
-  --amber:    #FFB020;
-  --blue:     #4DA6FF;
-  --violet:   #A78BFA;
+  /* Card fill — Origin's linear-gradient(135deg, #fafafa1f, #fafafa03) */
+  --card-grad: linear-gradient(135deg, rgba(250, 250, 250, 0.12), rgba(250, 250, 250, 0.012));
+  /* Input fill — Origin's linear-gradient(0deg, #131313, #222) */
+  --input-grad: linear-gradient(0deg, #131313, #222222);
+  /* Forward-looking surfaces (forecasts, projections) */
+  --forecast-grad: linear-gradient(135deg, rgba(77, 140, 255, 0.18), rgba(77, 140, 255, 0.03));
 
-  /* ── Compat aliases ── */
-  --glass-bg:        var(--surface);
-  --glass-bg-strong: var(--surface-hi);
-  --glass-border:    var(--line);
-  --glass-shadow:    0 2px 20px rgba(0, 0, 0, 0.45);
-  --glass-blur:      none;
-  --text-primary:    var(--fg);
-  --text-secondary:  var(--fg-2);
-  --text-muted:      var(--fg-3);
-  --text-inverse:    #000000;
-  --color-income:    var(--green);
-  --color-expense:   var(--red);
-  --color-transfer:  var(--blue);
-  --color-warning:   var(--amber);
-  --color-success:   var(--green);
-  --accent:          var(--green);
-  --accent-hover:    var(--green-hi);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --t-fast: .12s ease;
-  --t-base: .18s ease;
+  /* Data signals — used in charts and amounts, never as UI chrome */
+  --teal:     #00C2A8;   /* positive movement */
+  --teal-hi:  #2BE0C6;
+  --teal-bg:  rgba(0, 194, 168, 0.12);
+  --red:      #FF5A5A;
+  --red-bg:   rgba(255, 90, 90, 0.12);
+  --amber:    #E0A020;
+  --amber-bg: rgba(224, 160, 32, 0.12);
+  --blue:     #4D8CFF;
+  --blue-bg:  rgba(77, 140, 255, 0.12);
+
+  /* `--green` is kept as an alias so the ~150 existing page-level uses keep
+     working while pages are converted phase by phase. It now resolves to the
+     teal signal, not Tally's neon green. */
+  --green:    var(--teal);
+  --green-hi: var(--teal-hi);
+  --green-bg: var(--teal-bg);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
 
-/* --- Light mode (default) --- */
-:root,
+/* --- Light mode --- */
 :root[data-theme="light"] {
-  --bg:          #F5F5F7;
+  --bg:          #FAFAFA;
   --bg-2:        #FFFFFF;
-  --bg-3:        #EBEBED;
+  --bg-3:        #F0F0F0;
   --surface:     #FFFFFF;
-  --surface-hi:  #F0F0F2;
-  --line:        rgba(0, 0, 0, 0.07);
-  --line-strong: rgba(0, 0, 0, 0.12);
+  --surface-hi:  #F4F4F4;
+  --line:        #E4E4E4;
+  --line-strong: #C8C8C8;
 
-  --fg:   #0A0A0C;
-  --fg-2: #2C2C30;
-  --fg-3: #6B6B72;
-  --fg-4: #9A9AA2;
+  --fg:   #131313;
+  --fg-2: rgba(19, 19, 19, 0.90);
+  --fg-3: rgba(19, 19, 19, 0.58);
+  --fg-4: #8A8A8A;
 
-  --green:    #00A83C;
-  --green-hi: #00D64F;
-  --green-bg: rgba(0, 168, 60, 0.10);
-  --red:      #E0192D;
-  --red-bg:   rgba(224, 25, 45, 0.10);
-  --amber:    #C97A00;
-  --blue:     #1A7FD4;
-  --violet:   #7C5CC4;
+  --card-grad: linear-gradient(135deg, rgba(19, 19, 19, 0.045), rgba(19, 19, 19, 0.008));
+  --input-grad: linear-gradient(0deg, #FFFFFF, #F6F6F6);
+  --forecast-grad: linear-gradient(135deg, rgba(26, 108, 214, 0.14), rgba(26, 108, 214, 0.02));
 
-  /* ── Compat aliases ── */
-  --glass-bg:        var(--surface);
-  --glass-bg-strong: var(--surface-hi);
-  --glass-border:    var(--line);
-  --glass-shadow:    0 1px 3px rgba(0, 0, 0, 0.06);
-  --glass-blur:      none;
-  --text-primary:    var(--fg);
-  --text-secondary:  var(--fg-2);
-  --text-muted:      var(--fg-3);
-  --text-inverse:    #ffffff;
-  --color-income:    var(--green);
-  --color-expense:   var(--red);
-  --color-transfer:  var(--blue);
-  --color-warning:   var(--amber);
-  --color-success:   var(--green);
-  --accent:          var(--green);
-  --accent-hover:    var(--green-hi);
+  --teal:     #00806F;
+  --teal-hi:  #00A38C;
+  --teal-bg:  rgba(0, 128, 111, 0.10);
+  --red:      #D93838;
+  --red-bg:   rgba(217, 56, 56, 0.10);
+  --amber:    #A87400;
+  --amber-bg: rgba(168, 116, 0, 0.10);
+  --blue:     #1A6CD6;
+  --blue-bg:  rgba(26, 108, 214, 0.10);
+
+  --green:    var(--teal);
+  --green-hi: var(--teal-hi);
+  --green-bg: var(--teal-bg);
+
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
-  --t-fast: .12s ease;
-  --t-base: .18s ease;
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
-/* --- Shared layout tokens (theme-independent) --- */
+/* --- Theme-independent tokens --- */
 :root {
-  --radius:      16px;
-  --radius-sm:   10px;
-  --radius-lg:   24px;
+  --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-ui:      'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-mono:    'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Origin's radii: 4 small · 8 inputs/figures · 14 cards · 999 pills */
+  --radius-xs:   4px;
+  --radius-sm:   8px;
+  --radius:      14px;
+  --radius-lg:   14px;
   --radius-pill: 999px;
-  --t:           .18s cubic-bezier(.2, .8, .2, 1);
+
+  --t:      .18s cubic-bezier(.2, .8, .2, 1);
+  --t-fast: .12s ease;
+  --t-base: .18s ease;
+
   --sidebar-width: 240px;
 }
 
@@ -123,18 +135,24 @@ html, body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--fg);
-  font-family: 'Inter Tight', 'Inter', -apple-system, BlinkMacSystemFont,
-               'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
-  font-feature-settings: 'ss01', 'cv11';
-  -webkit-font-smoothing: antialiased;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
   letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
   text-wrap: pretty;
 }
 
+/* Bare headings stay on the UI sans. The display serif is OPT-IN via `.display`.
+   Reason: ~100 `font-weight: 600–800` declarations across the page stylesheets
+   would clamp Newsreader to its heaviest weight and render the serif as a slab,
+   which is the opposite of Origin's whisper-weight 300. Each page switches to
+   `.display` as it is converted, so un-converted pages stay coherent instead of
+   looking broken. */
 h1, h2, h3, h4 {
   margin: 0;
   font-weight: 600;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 button {
@@ -157,12 +175,83 @@ input, select, textarea {
 }
 
 /* ============================================
-   SURFACE CLASSES
-   (.glass / .glass-strong kept for compat — now flat Tally surfaces)
+   TYPE PRIMITIVES
    ============================================ */
 
+/* Origin's signature: a headline in light serif with one word italicised.
+   Usage: <h1 class="display">Track <em>your entire</em> financial life.</h1>
+
+   Origin's own scale: h1 48/40/36 · h2 32/30/28 · h3 26/24/22
+   (desktop / ≤767 / ≤479). Size modifiers below match it. */
+.display {
+  font-family: var(--font-display);
+  font-weight: 300;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+
+  em {
+    font-style: italic;
+    font-weight: 300;
+  }
+
+  &.d1 { font-size: 48px; }
+  &.d2 { font-size: 32px; }
+  &.d3 { font-size: 26px; }
+
+  @media (max-width: 767px) {
+    &.d1 { font-size: 40px; }
+    &.d2 { font-size: 30px; }
+    &.d3 { font-size: 24px; }
+  }
+
+  @media (max-width: 479px) {
+    &.d1 { font-size: 36px; }
+    &.d2 { font-size: 28px; }
+    &.d3 { font-size: 22px; }
+  }
+}
+
+/* Mono uppercase eyebrow — Origin's SAVINGS / CASH FLOW / SPENDING labels.
+   Their spec: Roboto Mono, 10px, 500, uppercase, -0.03em, line-height 2. */
+.label-mono {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 2;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+/* Money and other figures — mono, tabular so columns line up. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+/* Large display figure (hero balances) — serif, not mono. */
+.num-display {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ============================================
+   SURFACES
+   ============================================ */
+
+.card {
+  background: var(--card-grad);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* `.glass` / `.glass-strong` are legacy names kept so existing templates keep
+   rendering. They are flat Origin surfaces, not blurred glass. */
 .glass {
-  background: var(--surface);
+  background: var(--card-grad);
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
@@ -173,38 +262,60 @@ input, select, textarea {
   border-radius: var(--radius);
 }
 
-.card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-
 /* ============================================
    BUTTONS
+   White-on-black is the only primary action.
    ============================================ */
 
-/* Old names (compat for existing page components) */
-.btn {
-  padding: 9px 16px;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  color: var(--fg);
-  font-size: 13.5px;
+@mixin btn-base {
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 12px;
   font-weight: 500;
+  letter-spacing: -0.03em;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   transition: all var(--t);
+}
+
+.btn-primary {
+  @include btn-base;
+  background: var(--fg);
+  color: var(--bg);
+  &:hover { background: var(--fg-2); }
+}
+
+.btn-ghost {
+  @include btn-base;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
+  &:hover { background: var(--surface-hi); }
+}
+
+.btn-danger {
+  @include btn-base;
+  background: var(--red-bg);
+  color: var(--red);
+  &:hover { filter: brightness(1.15); }
+}
+
+/* Legacy `.btn` kept for pages not yet converted. */
+.btn {
+  @include btn-base;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
 
   &:hover { background: var(--surface-hi); }
 
   &.primary {
-    background: var(--green);
-    color: #000;
+    background: var(--fg);
+    color: var(--bg);
     border-color: transparent;
-    font-weight: 600;
-    &:hover { background: var(--green-hi); }
+    &:hover { background: var(--fg-2); }
   }
 
   &.ghost {
@@ -217,105 +328,57 @@ input, select, textarea {
     background: var(--red-bg);
     color: var(--red);
     border-color: transparent;
-    font-weight: 600;
-    &:hover { filter: brightness(1.1); }
+    &:hover { filter: brightness(1.15); }
   }
-}
-
-/* Tally canonical button names */
-.btn-primary {
-  padding: 9px 16px;
-  border-radius: var(--radius-sm);
-  background: var(--green);
-  color: #000;
-  font-weight: 600;
-  font-size: 13.5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  transition: all var(--t);
-  &:hover { background: var(--green-hi); }
-}
-
-.btn-ghost {
-  padding: 9px 16px;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  color: var(--fg);
-  font-weight: 500;
-  font-size: 13.5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  transition: all var(--t);
-  &:hover { background: var(--surface-hi); }
-}
-
-.btn-danger {
-  padding: 9px 16px;
-  border-radius: var(--radius-sm);
-  background: var(--red-bg);
-  color: var(--red);
-  font-weight: 600;
-  font-size: 13.5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  transition: all var(--t);
-  &:hover { filter: brightness(1.1); }
 }
 
 /* ============================================
    INPUTS
+   Origin: 40px tall, 8px radius, no border, gradient fill.
    ============================================ */
 
-.input {
-  padding: 11px 14px;
+@mixin field-base {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 16px;
   border-radius: var(--radius-sm);
-  background: var(--bg);
+  background: var(--input-grad);
   border: 1px solid var(--line);
   color: var(--fg);
   font-size: 14px;
   outline: none;
-  width: 100%;
   transition: all var(--t);
 
   &:focus {
-    border-color: var(--green);
-    box-shadow: 0 0 0 3px var(--green-bg);
+    border-color: var(--fg-4);
+    box-shadow: 0 0 0 3px rgba(250, 250, 250, 0.06);
   }
   &::placeholder { color: var(--fg-4); }
 }
 
-.input-field {
-  width: 100%;
-  padding: 11px 14px;
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  color: var(--fg);
-  font-size: 14px;
-  outline: none;
-  transition: all var(--t);
-  &:focus { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-bg); }
-  &::placeholder { color: var(--fg-4); }
-}
+.input       { @include field-base; }
+.input-field { @include field-base; }
 
 /* ============================================
    CHIPS
    ============================================ */
 
 .chip {
-  padding: 7px 12px;
+  padding: 7px 14px;
   border-radius: var(--radius-pill);
-  font-size: 12.5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 500;
-  background: var(--surface);
+  letter-spacing: -0.03em;
+  background: transparent;
   border: 1px solid var(--line);
-  color: var(--fg-2);
+  color: var(--fg-3);
   transition: all var(--t);
 
-  &:hover { background: var(--surface-hi); }
-  &.active { background: var(--fg); color: var(--bg); border-color: transparent; }
+  &:hover { background: var(--surface-hi); color: var(--fg-2); }
+  &.active {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: transparent;
+  }
 }

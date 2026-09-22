@@ -27,11 +27,36 @@
 
 ## Design system
 
-- Read tally-design-system.md and the JSX files in expense_tracker_design/tally/ for visual reference
-- Glassmorphic style (blurred cards, gradients, subtle shadows)
-- CSS variables defined in `src/styles.scss`
-- Desktop-first, responsive down to mobile
-- Use classes like `.glass`, `.glass-strong`, `.btn`, `.input` from the shared styles
+Modelled on Origin (useorigin.com). Values below are ported from Origin's own
+production stylesheet. **Not glassmorphic** — that was two designs ago. Do not
+reintroduce blurred cards, coloured primary buttons, or green glow gradients.
+
+- All tokens live in `src/styles.scss`. Fonts load from `src/index.html`.
+- **Dark is the default.** Light mode exists and must keep working.
+- Three type voices:
+  - `var(--font-display)` Newsreader, **weight 300** — headings and hero figures
+  - `var(--font-ui)` Inter — all UI text
+  - `var(--font-mono)` Roboto Mono, **10px/500 UPPERCASE** — labels, eyebrows, data, buttons
+- Signature headline pattern: one word italicised in the display serif —
+  `<h1 class="display">Track <em>your entire</em> financial life.</h1>`
+- **Colour discipline:** surfaces are monochrome. Colour appears only as a data
+  signal (chart lines, sparklines, category tiles). `--teal` = positive,
+  `--red` = negative, `--blue` / `--forecast-grad` = forward-looking projections.
+- **White-on-black is the only primary action.** `.btn-primary` is `--fg` on
+  `--bg`. Never a coloured fill.
+- Radii: `--radius-xs` 4px · `--radius-sm` 8px (inputs) · `--radius` 14px (cards)
+  · `--radius-pill` 999px.
+- Cards use `var(--card-grad)`; inputs use `var(--input-grad)`.
+- Shared classes: `.card`, `.btn-primary`, `.btn-ghost`, `.btn-danger`,
+  `.input` / `.input-field`, `.chip`, `.display`, `.label-mono`, `.num`.
+- `.glass` / `.glass-strong` are legacy aliases for flat surfaces, kept only so
+  un-converted templates still render. Do not use them in new markup.
+- Desktop-first, responsive down to mobile.
+- Microcopy follows Origin: mono uppercase eyebrow → plain-English sentence
+  headline → a calm sentence explaining *why it matters*. Never just a number.
+- `tally-design-system.md` and `expense_tracker_design/tally/` describe the
+  **previous** (Tally) design and are kept for reference only — they are not the
+  current target.
 
 ## Secrets
 

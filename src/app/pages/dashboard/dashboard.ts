@@ -458,7 +458,7 @@ export class Dashboard implements AfterViewInit, OnDestroy {
         labels: data.map(d => d.label),
         datasets: [
           { label: 'Income', data: data.map(d => d.income), backgroundColor: 'rgba(128,128,128,0.5)', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 },
-          { label: 'Spending', data: data.map(d => d.expenses), backgroundColor: '#00D64F', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 }
+          { label: 'Spending', data: data.map(d => d.expenses), backgroundColor: '#00C2A8', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 }
         ]
       },
       options: {

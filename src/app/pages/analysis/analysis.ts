@@ -562,7 +562,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
           {
             label: 'Spending',
             data: data.map(d => d.expenses),
-            backgroundColor: '#00D64F',
+            backgroundColor: '#00C2A8',
             borderRadius: 4,
             barPercentage: 0.55,
             categoryPercentage: 0.7,

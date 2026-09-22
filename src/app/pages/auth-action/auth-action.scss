@@ -132,7 +132,7 @@ h1 {
   }
 
   li.met .pw-dot {
-    background: var(--green-bg, rgba(0, 214, 79, 0.15));
+    background: var(--green-bg, rgba(0, 194, 168, 0.15));
     border-color: var(--green);
   }
 }
@@ -161,7 +161,7 @@ h1 {
   &:hover:not(:disabled) {
     background: var(--green-hi);
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0, 214, 79, 0.25);
+    box-shadow: 0 8px 24px rgba(0, 194, 168, 0.25);
   }
 
   &:disabled {
@@ -213,7 +213,7 @@ h1 {
 }
 
 .action-result.success .action-result-icon {
-  background: var(--green-bg, rgba(0, 214, 79, 0.15));
+  background: var(--green-bg, rgba(0, 194, 168, 0.15));
   color: var(--green);
 }
 

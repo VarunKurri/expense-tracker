@@ -1,5 +1,5 @@
 .message {
-  color: var(--text-secondary);
+  color: var(--fg-2);
   font-size: 14px;
   line-height: 1.55;
   margin: 0 0 24px 0;
@@ -12,7 +12,7 @@
 }
 
 .btn.danger {
-  background: var(--color-expense);
+  background: var(--red);
   color: white;
   border-color: transparent;
 

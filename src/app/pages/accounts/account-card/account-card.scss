@@ -138,6 +138,6 @@
   color: var(--fg);
   font-variant-numeric: tabular-nums;
 
-  &.positive { color: var(--color-income); }
-  &.negative { color: var(--color-expense); }
+  &.positive { color: var(--teal); }
+  &.negative { color: var(--red); }
 }

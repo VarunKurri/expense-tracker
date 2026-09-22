@@ -316,7 +316,7 @@
   flex-shrink: 0;
 
   &.income-swatch  { background: rgba(128, 128, 128, 0.6); }
-  &.spending-swatch { background: #00D64F; }
+  &.spending-swatch { background: var(--teal); }
 }
 
 .bar-chart-wrap {
