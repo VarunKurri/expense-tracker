@@ -107,16 +107,41 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
 
-/* Category accent colours — the small circular icon chips in Origin's
-   breakdown lists and the donut segments. Identical in both themes. */
-:root {
-  --cat-1: #E8734A;   /* shopping */
-  --cat-2: #F0A830;   /* drinks & dining */
-  --cat-3: #A0522D;   /* auto & transport */
-  --cat-4: #2D6A4F;   /* personal care */
-  --cat-5: #4AABE8;   /* childcare & education */
-  --cat-6: #7C5CC4;
-  --cat-7: #C0405A;
+/* Category accent ramp — donut segments, Sankey nodes, the circular icon chips
+   in breakdown lists.
+   
+   Eight hues in a FIXED order, assigned in sequence and never cycled: the order
+   is what keeps adjacent slots distinguishable under colour-blindness. A ninth
+   category folds into "Other" rather than getting a generated hue.
+   
+   Validated with the dataviz palette checker against our own surfaces
+   (#FFFFFF light, #131313 dark): lightness band, chroma floor, CVD separation
+   and normal-vision separation all pass in both modes. The light column warns
+   on contrast for three slots, which is satisfied by the direct labels and the
+   table view every chart ships with. Do not hand-edit these — re-run the
+   validator if they ever need to change. */
+:root,
+:root[data-theme="light"] {
+  --cat-1: #2a78d6;   /* blue */
+  --cat-2: #eb6834;   /* orange */
+  --cat-3: #1baf7a;   /* aqua */
+  --cat-4: #eda100;   /* yellow */
+  --cat-5: #e87ba4;   /* magenta */
+  --cat-6: #008300;   /* green */
+  --cat-7: #4a3aa7;   /* violet */
+  --cat-8: #e34948;   /* red */
+}
+
+/* The same eight hues re-stepped for the dark surface, not a different palette. */
+:root[data-theme="dark"] {
+  --cat-1: #3987e5;
+  --cat-2: #d95926;
+  --cat-3: #199e70;
+  --cat-4: #c98500;
+  --cat-5: #d55181;
+  --cat-6: #008300;
+  --cat-7: #9085e9;
+  --cat-8: #e66767;
 }
 
 /* --- Theme-independent tokens --- */

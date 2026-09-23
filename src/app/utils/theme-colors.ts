@@ -30,11 +30,26 @@ export function chartColors() {
     grid: token('--line', '#E8E8EA'),
     /** Canvas colour, for donut segment borders. */
     surface: token('--surface', '#FFFFFF'),
+    /** Full-strength ink, for labels drawn on top of coloured marks. */
+    ink: token('--fg', '#131313'),
   };
 }
 
-/** Category accent ramp (`--cat-1..7`), for donut segments and category chips. */
+/**
+ * Category accent ramp (`--cat-1..8`) for donut segments, Sankey nodes and
+ * category chips.
+ *
+ * Assign these in sequence and never cycle them — the fixed order is what keeps
+ * adjacent slots distinguishable under colour-blindness. Past eight categories,
+ * fold the tail into an "Other" slice rather than generating a ninth hue.
+ */
 export function categoryPalette(): string[] {
-  const fallback = ['#E8734A', '#F0A830', '#A0522D', '#2D6A4F', '#4AABE8', '#7C5CC4', '#C0405A'];
+  const fallback = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100',
+                    '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
   return fallback.map((f, i) => token(`--cat-${i + 1}`, f));
+}
+
+/** Neutral for the folded "Other" slice — never one of the eight identity hues. */
+export function otherColor(): string {
+  return token('--fg-4', '#B0B0B5');
 }

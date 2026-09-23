@@ -1,0 +1,193 @@
+<div class="page">
+
+  <div class="header-row">
+    <div>
+      <h1>Reports</h1>
+      <div class="hint">Where your money came from and where it went</div>
+    </div>
+    <a class="btn-primary" routerLink="/analysis">← Back to Analysis</a>
+  </div>
+
+  <section class="card report-card">
+
+    <div class="card-head">
+      <span class="card-label">Reports</span>
+      <label class="netting-toggle">
+        <input type="checkbox" [checked]="netting()" (change)="netting.set(!netting())" />
+        <span>Net off reimbursements</span>
+      </label>
+    </div>
+
+    <!-- Report type — underline tabs, as Origin does -->
+    <div class="tabs" role="tablist">
+      @for (r of reports; track r.value) {
+        <button class="tab"
+                role="tab"
+                [class.active]="report() === r.value"
+                [attr.aria-selected]="report() === r.value"
+                (click)="selectReport(r.value)">{{ r.label }}</button>
+      }
+    </div>
+
+    <div class="controls">
+      <div class="period">
+        <div class="period-title">{{ rangeTitle() }}</div>
+        <div class="period-sub">({{ rangeLabel() }})</div>
+      </div>
+
+      <div class="control-right">
+        <div class="chips">
+          @for (r of ranges; track r.value) {
+            <button class="chip" [class.active]="range() === r.value"
+                    (click)="selectRange(r.value)">{{ r.label }}</button>
+          }
+        </div>
+
+        @if (views().length > 1) {
+          <div class="view-toggle" role="group" aria-label="Chart type">
+            @for (v of views(); track v.id) {
+              <button class="view-btn"
+                      [class.active]="view() === v.id"
+                      [attr.aria-pressed]="view() === v.id"
+                      [title]="v.label"
+                      (click)="view.set(v.id)">{{ v.label }}</button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    @if (range() === 'custom') {
+      <div class="custom-range">
+        <label>
+          <span class="label-mono">From</span>
+          <input class="input-field" type="date" [max]="todayStr"
+                 [value]="customStart()" (change)="customStart.set($any($event.target).value)" />
+        </label>
+        <label>
+          <span class="label-mono">To</span>
+          <input class="input-field" type="date" [max]="todayStr"
+                 [value]="customEnd()" (change)="customEnd.set($any($event.target).value)" />
+        </label>
+      </div>
+    }
+
+    @if (legend().length) {
+      <div class="legend">
+        @for (l of legend(); track l.label) {
+          <span class="legend-item">
+            <span class="legend-swatch" [style.background]="l.color"></span>{{ l.label }}
+          </span>
+        }
+      </div>
+    }
+
+    <div class="chart-wrap" [class.tall]="view() === 'sankey'">
+      @if (hasData()) {
+        <canvas #chartCanvas></canvas>
+      } @else {
+        <div class="empty">
+          <div class="empty-title">Nothing to report yet</div>
+          <p>No transactions fall in this period. Try a wider range, or add some transactions first.</p>
+        </div>
+      }
+    </div>
+
+    <!-- Stat strip: the four headline figures, as Origin shows them -->
+    <div class="stat-strip">
+      <div class="stat">
+        <div class="stat-label">Total income</div>
+        <div class="stat-value num pos">{{ money(totalIn()) }}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Total expenses</div>
+        <div class="stat-value num">{{ money(totalOut()) }}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Net cash flow</div>
+        <div class="stat-value num" [class.pos]="netFlow() >= 0" [class.neg]="netFlow() < 0">
+          {{ signed(netFlow()) }}
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Avg / month</div>
+        <div class="stat-value num" [class.pos]="avgPerMonth() >= 0" [class.neg]="avgPerMonth() < 0">
+          {{ signed(avgPerMonth()) }}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Table view. Always present: it is how the numbers stay readable when a
+       colour is hard to tell apart, and it is the relief the palette check
+       requires for the lighter hues. -->
+  <section class="card">
+    <div class="card-head"><span class="card-label">The numbers</span></div>
+
+    @if (showCategoryTable()) {
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th class="right">{{ report() === 'income' ? 'Income' : 'Expenses' }}</th>
+            <th class="right">Share</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of categoryRows(); track r.name) {
+            <tr>
+              <td>
+                <span class="dot" [style.background]="r.color"></span>{{ r.name }}
+              </td>
+              <td class="right num">{{ money(r.amount) }}</td>
+              <td class="right num muted">{{ r.pct }}%</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="3" class="empty-cell">Nothing in this period.</td></tr>
+          }
+        </tbody>
+      </table>
+    } @else if (report() === 'transfers') {
+      <table class="report-table">
+        <thead>
+          <tr><th>Movement</th><th class="right">Amount</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Moved in</td><td class="right num pos">{{ money(transfers().movedIn) }}</td></tr>
+          <tr><td>Moved out</td><td class="right num">{{ money(transfers().movedOut) }}</td></tr>
+          <tr><td class="muted">Transactions</td>
+              <td class="right num muted">{{ transfers().count }}</td></tr>
+        </tbody>
+      </table>
+      <p class="table-note">
+        Transfers between your own accounts. These are deliberately left out of the
+        income and spending reports — moving money is not earning or spending it.
+      </p>
+    } @else {
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th class="right">Income</th>
+            <th class="right">Expenses</th>
+            <th class="right">Net</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of monthRows(); track r.month) {
+            <tr>
+              <td>{{ r.label }} {{ r.month.slice(0, 4) }}</td>
+              <td class="right num pos">{{ money(r.income) }}</td>
+              <td class="right num">{{ money(r.expenses) }}</td>
+              <td class="right num" [class.pos]="r.net >= 0" [class.neg]="r.net < 0">
+                {{ signed(r.net) }}
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="4" class="empty-cell">Nothing in this period.</td></tr>
+          }
+        </tbody>
+      </table>
+    }
+  </section>
+</div>

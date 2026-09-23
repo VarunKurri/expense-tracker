@@ -1,0 +1,292 @@
+.page {
+  padding: 28px 32px 48px;
+  max-width: 1320px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+
+  h1 {
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    margin-bottom: 4px;
+    color: var(--fg);
+  }
+
+  .hint { color: var(--fg-3); font-size: 14px; }
+}
+
+.card {
+  background: var(--card-grad);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.netting-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg-3);
+  cursor: pointer;
+
+  input { accent-color: var(--blue); cursor: pointer; }
+  &:hover { color: var(--fg-2); }
+}
+
+/* ── Report tabs — underlined, matching Origin's Reports header ── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.tab {
+  padding: 13px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg-3);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--t);
+
+  &:hover { color: var(--fg-2); }
+
+  &.active {
+    color: var(--fg);
+    font-weight: 600;
+    border-bottom-color: var(--fg);
+  }
+}
+
+/* ── Controls row ─────────────────────────────────────────── */
+.controls {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px 20px 6px;
+}
+
+.period-title { font-size: 15px; font-weight: 600; color: var(--fg); }
+.period-sub   { font-size: 13px; color: var(--fg-3); margin-top: 2px; }
+
+.control-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Chart-shape toggle. Labelled rather than icon-only, so the choice is
+   readable without hovering. */
+.view-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--bg-3);
+  border-radius: var(--radius-pill);
+}
+
+.view-btn {
+  padding: 6px 13px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-3);
+  background: none;
+  border: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--t);
+
+  &:hover { color: var(--fg-2); }
+  &.active { background: var(--surface); color: var(--fg); font-weight: 600; }
+}
+
+.custom-range {
+  display: flex;
+  gap: 12px;
+  padding: 10px 20px 0;
+  flex-wrap: wrap;
+
+  label { display: flex; flex-direction: column; gap: 5px; }
+  .input-field { width: auto; min-width: 160px; }
+}
+
+/* ── Legend — always present for two or more series ───────── */
+.legend {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 14px 20px 0;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--fg-2);
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* ── Chart ────────────────────────────────────────────────── */
+.chart-wrap {
+  height: 300px;
+  padding: 14px 20px 18px;
+
+  /* The Sankey needs vertical room for its node labels. */
+  &.tall { height: 460px; }
+
+  canvas { width: 100% !important; height: 100% !important; }
+}
+
+.empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+
+  .empty-title { font-size: 15px; font-weight: 600; color: var(--fg-2); }
+  p { font-size: 13px; color: var(--fg-3); margin: 0; max-width: 340px; line-height: 1.5; }
+}
+
+/* ── Stat strip ───────────────────────────────────────────── */
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--line);
+}
+
+.stat {
+  padding: 16px 20px;
+  text-align: center;
+
+  & + .stat { border-left: 1px solid var(--line); }
+}
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+
+  &.pos { color: var(--teal); }
+  &.neg { color: var(--red); }
+}
+
+/* ── Table ────────────────────────────────────────────────── */
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  th {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+    text-align: left;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  td {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--line);
+    color: var(--fg-2);
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  .right { text-align: right; }
+  .num { font-variant-numeric: tabular-nums; color: var(--fg); font-weight: 500; }
+  .muted { color: var(--fg-3); font-weight: 400; }
+  .pos { color: var(--teal); }
+  .neg { color: var(--red); }
+
+  .dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    margin-right: 9px;
+    vertical-align: baseline;
+  }
+
+  .empty-cell { text-align: center; color: var(--fg-3); padding: 28px 20px; }
+}
+
+.table-note {
+  padding: 12px 20px 16px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--fg-3);
+  line-height: 1.5;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .stat-strip { grid-template-columns: repeat(2, 1fr); }
+  .stat:nth-child(3) { border-left: none; }
+  .stat:nth-child(n + 3) { border-top: 1px solid var(--line); }
+}
+
+@media (max-width: 768px) {
+  .page { padding: 20px 16px 40px; }
+  .header-row { flex-direction: column; align-items: flex-start; }
+  .control-right { justify-content: flex-start; }
+  .chart-wrap { height: 260px; padding: 12px 12px 14px; &.tall { height: 380px; } }
+  .report-table { th, td { padding: 11px 12px; } }
+  .card-head, .controls, .legend { padding-left: 14px; padding-right: 14px; }
+  .tabs { padding: 0 8px; }
+}
