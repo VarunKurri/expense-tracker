@@ -444,6 +444,39 @@ input, select, textarea {
 .input-field { @include field-base; }
 
 /* ============================================
+   SECTION SUB-NAV
+
+   Pill tabs grouping the screens of one section, the way Origin groups
+   Spending's Overview / Breakdown / Budget / Reports. Shared rather than
+   per-page so the tabs cannot drift apart between screens.
+   ============================================ */
+
+.subnav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.subnav-tab {
+  padding: 9px 18px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: background var(--t);
+
+  &:hover { background: var(--bg-3); }
+
+  &.active {
+    background: var(--surface-hi);
+    color: var(--fg);
+    font-weight: 600;
+    cursor: default;
+  }
+}
+
+/* ============================================
    CHIPS
    ============================================ */
 

@@ -2,11 +2,16 @@
 
   <div class="header-row">
     <div>
-      <h1>Reports</h1>
+      <h1>Analysis</h1>
       <div class="hint">Where your money came from and where it went</div>
     </div>
-    <a class="btn-primary" routerLink="/analysis">← Back to Analysis</a>
   </div>
+
+  <!-- Section sub-nav, the way Origin groups Spending's screens. -->
+  <nav class="subnav">
+    <a class="subnav-tab" routerLink="/analysis">Overview</a>
+    <span class="subnav-tab active" aria-current="page">Reports</span>
+  </nav>
 
   <section class="card report-card">
 
@@ -118,6 +123,45 @@
     </div>
   </section>
 
+  @if (drill()) {
+    <section class="card drill">
+      <div class="card-head">
+        <div class="drill-head">
+          <button class="drill-back" (click)="closeDrill()" aria-label="Close">←</button>
+          <div>
+            <span class="card-label">{{ drillTitle() }}</span>
+            <div class="drill-sub">
+              {{ drillTransactions().length }}
+              transaction{{ drillTransactions().length === 1 ? '' : 's' }}
+              · {{ money(drillTotal()) }}
+            </div>
+          </div>
+        </div>
+        <button class="btn-primary" (click)="seeAllInTransactions()">Open in Transactions →</button>
+      </div>
+
+      <table class="report-table">
+        <thead>
+          <tr><th>Date</th><th>Merchant</th><th>Category</th><th class="right">Amount</th></tr>
+        </thead>
+        <tbody>
+          @for (t of drillTransactions(); track t.id) {
+            <tr>
+              <td class="num muted">{{ t.date }}</td>
+              <td>{{ t.merchant }}</td>
+              <td class="muted">{{ t.category }}</td>
+              <td class="right num" [class.pos]="t.type === 'income'">
+                {{ t.type === 'income' ? '+' : '−' }}{{ money(t.amount) }}
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="4" class="empty-cell">No transactions here.</td></tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  }
+
   <!-- Table view. Always present: it is how the numbers stay readable when a
        colour is hard to tell apart, and it is the relief the palette check
        requires for the lighter hues. -->
@@ -135,7 +179,8 @@
         </thead>
         <tbody>
           @for (r of categoryRows(); track r.name) {
-            <tr>
+            <tr class="clickable" (click)="openCategory(r.name)"
+                [attr.title]="'See ' + r.name + ' transactions'">
               <td>
                 <span class="dot" [style.background]="r.color"></span>{{ r.name }}
               </td>
@@ -175,7 +220,8 @@
         </thead>
         <tbody>
           @for (r of monthRows(); track r.month) {
-            <tr>
+            <tr class="clickable" (click)="openMonth(r.month, r.label)"
+                [attr.title]="'See ' + r.label + ' transactions'">
               <td>{{ r.label }} {{ r.month.slice(0, 4) }}</td>
               <td class="right num pos">{{ money(r.income) }}</td>
               <td class="right num">{{ money(r.expenses) }}</td>

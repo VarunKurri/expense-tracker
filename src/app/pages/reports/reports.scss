@@ -213,9 +213,14 @@
 }
 
 .stat-value {
+  /* Money is set in the UI sans everywhere else in the app (Home's hero,
+     Analysis' KPIs, the transaction rows). The global `.num` is mono, so it is
+     overridden here rather than dropped — the tabular figures still matter. */
+  font-family: var(--font-ui);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
   color: var(--fg);
 
   &.pos { color: var(--teal); }
@@ -249,7 +254,12 @@
   tbody tr:last-child td { border-bottom: none; }
 
   .right { text-align: right; }
-  .num { font-variant-numeric: tabular-nums; color: var(--fg); font-weight: 500; }
+  .num {
+    font-family: var(--font-ui);
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+    font-weight: 500;
+  }
   .muted { color: var(--fg-3); font-weight: 400; }
   .pos { color: var(--teal); }
   .neg { color: var(--red); }
@@ -264,6 +274,47 @@
   }
 
   .empty-cell { text-align: center; color: var(--fg-3); padding: 28px 20px; }
+
+  /* Rows are a way into the transactions behind the number. */
+  tbody tr.clickable {
+    cursor: pointer;
+    transition: background var(--t);
+    &:hover { background: var(--bg-3); }
+  }
+}
+
+/* ── Drill-down ───────────────────────────────────────────── */
+.drill {
+  border-color: var(--line-strong);
+}
+
+.drill-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.drill-back {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--fg-2);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--t);
+
+  &:hover { background: var(--bg-3); color: var(--fg); }
+}
+
+.drill-sub {
+  font-size: 13px;
+  color: var(--fg-3);
+  margin-top: 2px;
 }
 
 .table-note {

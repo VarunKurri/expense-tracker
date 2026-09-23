@@ -4,7 +4,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   Chart, BarController, BarElement, CategoryScale, LinearScale,
   DoughnutController, ArcElement, Tooltip, Legend,
@@ -19,6 +19,7 @@ import { chartColors, categoryPalette, otherColor } from '../../utils/theme-colo
 import {
   MoneyRules, totalExpenses, totalIncome, categoryTotals, incomeTotals,
   monthlySeries, monthsBetween, transferTotals, sankeyLinks, sankeyLabel,
+  expenseAmount,
 } from '../../utils/reporting';
 
 Chart.register(
@@ -56,6 +57,7 @@ export class Reports implements AfterViewInit, OnDestroy {
   private txService = inject(TransactionService);
   private categoryService = inject(CategoryService);
   private themeService = inject(ThemeService);
+  private router = inject(Router);
 
   @ViewChild('chartCanvas') chartCanvas?: ElementRef<HTMLCanvasElement>;
   private chart: Chart | null = null;
@@ -91,10 +93,13 @@ export class Reports implements AfterViewInit, OnDestroy {
     this.report.set(r);
     // Each report offers different shapes; fall back to its first.
     this.view.set(VIEWS[r][0].id);
+    // Whatever was drilled into belonged to the previous report.
+    this.drill.set(null);
   }
 
   selectRange(r: RangeKey) {
     this.range.set(r);
+    this.drill.set(null);
     if (r === 'custom' && !this.customStart()) {
       const d = new Date();
       d.setMonth(d.getMonth() - 2);
@@ -214,6 +219,106 @@ export class Reports implements AfterViewInit, OnDestroy {
       .map(r => ({ name: this.catName(r.categoryId), amount: r.amount }));
   });
 
+  // ── Drill-down ─────────────────────────────────────────────
+  /**
+   * What the user clicked into: a month bar, or a category (from the table, the
+   * donut, or a Sankey node). Null means no drill-down is open.
+   *
+   * Reports exist to be explored, so every mark and every row is a way in.
+   */
+  drill = signal<{ kind: 'month'; month: string; label: string }
+                | { kind: 'category'; name: string; categoryId: string }
+                | null>(null);
+
+  /** Category id for a display name — the charts only carry names. */
+  private categoryIdFor(name: string): string {
+    if (name === 'Uncategorized') return '__none__';
+    return this.categoryService.categories().find(c => c.name === name)?.id ?? '';
+  }
+
+  openMonth(month: string, label: string) {
+    this.drill.set({ kind: 'month', month, label });
+  }
+
+  openCategory(name: string) {
+    // "Other (3)" pools several categories, so there is no single one to open.
+    if (name.startsWith('Other (')) return;
+    this.drill.set({ kind: 'category', name, categoryId: this.categoryIdFor(name) });
+  }
+
+  closeDrill() { this.drill.set(null); }
+
+  /**
+   * The transactions behind whatever was clicked, newest first.
+   *
+   * Filtered by the SAME rules the headline figures use, so the rows always add
+   * up to the number that was clicked — internal transfers excluded, and the
+   * report's own side (spending or income) respected.
+   */
+  drillTransactions = computed(() => {
+    const d = this.drill();
+    if (!d) return [];
+    const rules = this.rules();
+
+    let txs = this.filtered().filter(t => !t.isInternalTransfer);
+
+    if (d.kind === 'month') {
+      txs = txs.filter(t => t.date.slice(0, 7) === d.month);
+    } else {
+      const id = d.categoryId;
+      txs = txs.filter(t => (t.categoryId || '__none__') === (id || '__none__'));
+    }
+
+    // Expenses and Income tabs each show only their own side; Cash flow shows both.
+    if (this.report() === 'expenses') txs = txs.filter(t => t.type === 'expense');
+    if (this.report() === 'income') {
+      txs = txs.filter(t => t.type === 'income' && (!rules.netting || !t.reimbursesId));
+    }
+
+    return [...txs]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map(t => ({
+        id: t.id!,
+        date: t.date,
+        merchant: t.merchant || t.notes || 'Untitled',
+        category: this.catName(t.categoryId || '__none__'),
+        type: t.type,
+        amount: t.type === 'expense' ? expenseAmount(t, rules) : t.amount,
+      }));
+  });
+
+  drillTotal = computed(() =>
+    Math.round(this.drillTransactions().reduce(
+      (s, t) => s + (t.type === 'expense' ? t.amount : -t.amount), 0) * -100) / -100);
+
+  drillTitle = computed(() => {
+    const d = this.drill();
+    if (!d) return '';
+    return d.kind === 'month' ? `${d.label} ${d.month.slice(0, 4)}` : d.name;
+  });
+
+  /** Hands the drill-down off to the Transactions page's existing analysis view. */
+  seeAllInTransactions() {
+    const d = this.drill();
+    const { start, end } = this.dateRange();
+    const qp: Record<string, string> = {
+      view: 'analysis',
+      excludeRefunded: this.netting() ? 'true' : 'false',
+    };
+    if (d?.kind === 'month') {
+      const [y, m] = d.month.split('-').map(Number);
+      qp['start'] = `${d.month}-01`;
+      qp['end'] = `${d.month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+    } else {
+      if (start) qp['start'] = start;
+      if (end) qp['end'] = end;
+      if (d?.kind === 'category' && d.categoryId && d.categoryId !== '__none__') {
+        qp['categoryId'] = d.categoryId;
+      }
+    }
+    this.router.navigate(['/transactions'], { queryParams: qp });
+  }
+
   hasData = computed(() =>
     this.report() === 'transfers'
       ? this.transfers().count > 0
@@ -254,9 +359,28 @@ export class Reports implements AfterViewInit, OnDestroy {
     if (!ctx || !this.hasData()) return;
 
     const c = chartColors();
+
+    // Every mark is a way into the underlying transactions — a report you
+    // cannot open is just a picture.
+    const onClick = (kind: 'month' | 'category') => (_evt: any, els: any[]) => {
+      if (!els.length) return;
+      const i = els[0].index;
+      if (kind === 'month') {
+        const row = this.monthRows()[i];
+        if (row) this.openMonth(row.month, row.label);
+      } else {
+        const row = this.categoryRows()[i];
+        if (row) this.openCategory(row.name);
+      }
+    };
+    const pointer = (_evt: any, els: any[], chart: any) => {
+      chart.canvas.style.cursor = els.length ? 'pointer' : 'default';
+    };
+
     const common = {
       responsive: true,
       maintainAspectRatio: false,
+      onHover: pointer,
       // A legend is always present for two or more series, so identity is never
       // carried by colour alone.
       plugins: { legend: { display: false } as any },
@@ -294,9 +418,15 @@ export class Reports implements AfterViewInit, OnDestroy {
         },
         options: {
           ...common, cutout: '68%',
+          onClick: onClick('category'),
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: x => ` ${x.label}: ${money(x.raw)}` } },
+            tooltip: {
+              callbacks: {
+                label: x => ` ${x.label}: ${money(x.raw)}`,
+                footer: () => 'Click to see the transactions',
+              },
+            },
           },
         },
       });
@@ -327,26 +457,36 @@ export class Reports implements AfterViewInit, OnDestroy {
       return;
     }
 
-    // Cash flow (stacked / grouped) and Income share the bar shape.
+    // Bars. Only Cash flow shows both series — Expenses and Income each show
+    // their own, which is the whole point of picking that tab.
     const stacked = view === 'stacked';
-    const datasets = this.report() === 'income'
-      ? [{ label: 'Income', data: rows.map(r => r.income), backgroundColor: c.positive,
-           borderRadius: 4, barPercentage: 0.55, categoryPercentage: 0.7 }]
-      : [
-          { label: 'Income', data: rows.map(r => r.income), backgroundColor: c.positive,
-            borderRadius: 4, barPercentage: stacked ? 0.6 : 0.55, categoryPercentage: 0.7 },
-          { label: 'Spending', data: rows.map(r => r.expenses), backgroundColor: c.accent,
-            borderRadius: 4, barPercentage: stacked ? 0.6 : 0.55, categoryPercentage: 0.7 },
-        ];
+    const bar = (label: string, data: number[], colour: string) => ({
+      label, data, backgroundColor: colour,
+      borderRadius: 4, barPercentage: stacked ? 0.6 : 0.55, categoryPercentage: 0.7,
+    });
+
+    const datasets =
+      this.report() === 'income'   ? [bar('Income', rows.map(r => r.income), c.positive)] :
+      this.report() === 'expenses' ? [bar('Spending', rows.map(r => r.expenses), c.accent)] :
+      [
+        bar('Income', rows.map(r => r.income), c.positive),
+        bar('Spending', rows.map(r => r.expenses), c.accent),
+      ];
 
     this.chart = new Chart(ctx, {
       type: 'bar',
       data: { labels: rows.map(r => r.label), datasets },
       options: {
         ...common,
+        onClick: onClick('month'),
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: x => ` ${x.dataset.label}: ${money(x.raw)}` } },
+          tooltip: {
+            callbacks: {
+              label: x => ` ${x.dataset.label}: ${money(x.raw)}`,
+              footer: () => 'Click to see the transactions',
+            },
+          },
         },
         scales: {
           x: { ...axes.x, stacked },
