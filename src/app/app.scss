@@ -24,8 +24,7 @@
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(circle at 70% 20%, rgba(0, 194, 168, 0.18) 0%, transparent 50%),
-    radial-gradient(circle at 20% 80%, rgba(0, 194, 168, 0.08) 0%, transparent 40%);
+    radial-gradient(circle at 70% 20%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
   pointer-events: none;
 
   &::after {
@@ -54,9 +53,10 @@
 }
 
 .login-wordmark {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.04em;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
   color: #fff;
 }
 
@@ -69,11 +69,7 @@
     color: #fff;
     margin-bottom: 20px;
 
-    /* Green accent on last word via gradient trick */
-    background: linear-gradient(135deg, #ffffff 60%, var(--green) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+
   }
 
   p {
@@ -103,9 +99,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--green);
+  background: var(--fg-4);
   flex-shrink: 0;
-  box-shadow: 0 0 8px rgba(0, 194, 168, 0.6);
 }
 
 /* ── RIGHT PANEL ────────────────────────────── */
@@ -153,10 +148,10 @@
   gap: 10px;
   width: 100%;
   padding: 14px 20px;
-  border-radius: 14px;
-  background: var(--green);
-  color: #000;
-  font-weight: 700;
+  border-radius: var(--radius-sm);
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 500;
   font-size: 15px;
   font-family: inherit;
   border: none;
@@ -176,9 +171,7 @@
   }
 
   &:hover {
-    background: var(--green-hi);
-    transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0, 194, 168, 0.35);
+    opacity: 0.88;
     &::before { opacity: 1; }
   }
 
@@ -195,8 +188,8 @@
 .btn-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(0,0,0,0.3);
-  border-top-color: #000;
+  border: 2px solid rgba(127,127,127,0.35);
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   flex-shrink: 0;
@@ -239,10 +232,10 @@
   gap: 10px;
   width: 100%;
   padding: 14px 20px;
-  border-radius: 14px;
-  background: var(--green);
-  color: #000;
-  font-weight: 700;
+  border-radius: var(--radius-sm);
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 500;
   font-size: 15px;
   margin-top: 4px;
   cursor: pointer;
@@ -250,11 +243,7 @@
 
   span { color: inherit; font-size: inherit; font-weight: inherit; }
 
-  &:hover:not(:disabled) {
-    background: var(--green-hi);
-    transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0, 194, 168, 0.25);
-  }
+  &:hover:not(:disabled) { opacity: 0.88; }
 
   &:disabled {
     opacity: 0.45;
@@ -452,7 +441,7 @@
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--line);
-  background: var(--bg-2);
+  background: var(--surface);
   position: sticky;
   top: 0;
   height: 100vh;
@@ -473,24 +462,26 @@
 }
 
 .brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  background: var(--green);
-  color: #000;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--fg);
+  color: var(--bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-weight: 500;
   font-size: 16px;
-  letter-spacing: -0.04em;
   flex-shrink: 0;
 }
 
+/* The wordmark is set in the display serif, the way Origin sets theirs. */
 .brand-name {
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: -0.03em;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 20px;
+  letter-spacing: -0.01em;
   color: var(--fg);
 }
 
@@ -505,12 +496,13 @@
 }
 
 .nav-section {
-  color: var(--fg-4);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-family: var(--font-mono);
+  color: var(--fg-3);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 14px 12px 6px;
+  padding: 16px 12px 6px;
 }
 
 .nav-item {
@@ -531,11 +523,12 @@
   background: transparent;
   text-align: left;
 
-  &:hover { background: var(--surface); color: var(--fg); }
+  &:hover { background: var(--bg-3); color: var(--fg-2); }
 
   &.active {
-    background: var(--surface-hi);
+    background: var(--bg-3);
     color: var(--fg);
+    font-weight: 600;
     svg { stroke: var(--fg); }
   }
 
@@ -564,11 +557,12 @@
 .nav-badge {
   margin-left: auto;
   padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--green);
-  color: #000;
-  font-size: 10.5px;
-  font-weight: 700;
+  border-radius: var(--radius-pill);
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
 }
 
 /* ============================================
@@ -615,12 +609,13 @@
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--green), #00A03E);
-    color: #000;
+    background: var(--bg-3);
+    border: 1px solid var(--line);
+    color: var(--fg-2);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 14px;
     flex-shrink: 0;
   }
@@ -742,22 +737,18 @@
 .topbar-add {
   width: 42px;
   height: 42px;
-  border-radius: 12px;
-  background: var(--green);
+  border-radius: var(--radius-sm);
+  background: var(--fg);
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #000;
+  color: var(--bg);
   cursor: pointer;
-  transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  transition: opacity 0.18s ease;
   flex-shrink: 0;
-  box-shadow: 0 8px 18px rgba(0, 194, 168, 0.22);
 
-  &:hover {
-    background: var(--green-hi);
-    transform: translateY(-1px);
-  }
+  &:hover { opacity: 0.85; }
 }
 
 .topbar-search {
@@ -1177,8 +1168,7 @@
   position: fixed;
   inset: 0;
   background-image:
-    radial-gradient(circle at 70% 10%, rgba(0, 194, 168, 0.16) 0%, transparent 45%),
-    radial-gradient(circle at 15% 70%, rgba(0, 194, 168, 0.08) 0%, transparent 40%);
+    radial-gradient(circle at 70% 10%, rgba(255, 255, 255, 0.05) 0%, transparent 45%);
   pointer-events: none;
 }
 
@@ -1199,9 +1189,10 @@
 }
 
 .landing-wordmark {
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 .landing-nav-actions {
@@ -1213,20 +1204,16 @@
 .landing-cta {
   padding: 13px 26px;
   border-radius: 13px;
-  background: var(--green);
+  background: #fff;
   color: #000;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 15px;
   cursor: pointer;
   border: none;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease;
   white-space: nowrap;
 
-  &:hover {
-    background: var(--teal-hi);
-    transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0, 194, 168, 0.3);
-  }
+  &:hover { opacity: 0.86; }
 
   &.sm { padding: 9px 18px; font-size: 13.5px; border-radius: 11px; }
 }
@@ -1280,11 +1267,14 @@
   gap: 7px;
   padding: 7px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 194, 168, 0.35);
-  background: rgba(0, 194, 168, 0.1);
-  color: var(--teal-hi);
-  font-size: 12.5px;
-  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.75);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .landing-hero-actions {
@@ -1322,9 +1312,8 @@
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: rgba(0, 194, 168, 0.35);
-    background: rgba(0, 194, 168, 0.05);
-    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.05);
   }
 
   .landing-feature-icon { font-size: 26px; margin-bottom: 12px; }

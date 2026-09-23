@@ -12,6 +12,8 @@ import { BillForm } from '../bills/bill-form/bill-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { ToastService } from '../../services/toast.service';
 import { Account, Bill, Transaction } from '../../models';
+import { chartColors } from '../../utils/theme-colors';
+import { ThemeService } from '../../services/theme.service';
 import {
   Chart, ArcElement, DoughnutController,
   CategoryScale, LinearScale, BarElement, BarController,
@@ -42,6 +44,7 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   private quickAddService = inject(QuickAddService);
   private router = inject(Router);
   private toastService = inject(ToastService);
+  private themeService = inject(ThemeService);
   Math = Math
 
   @ViewChild('miniDonutCanvas') miniDonutCanvas!: ElementRef<HTMLCanvasElement>;
@@ -416,6 +419,18 @@ export class Dashboard implements AfterViewInit, OnDestroy {
       this.ensureDonut();
       if (this.miniDonut) this.updateMiniDonut(donutData);
     });
+
+    // Chart.js bakes colours in at construction time, so a theme switch would
+    // otherwise leave the charts painted for the old theme. Rebuild both when
+    // the theme changes.
+    effect(() => {
+      this.themeService.theme();
+      this.cashFlowChart?.destroy();
+      this.cashFlowChart = null;
+      this.miniDonut?.destroy();
+      this.miniDonut = null;
+      queueMicrotask(() => { this.ensureCashFlow(); this.ensureDonut(); });
+    });
   }
 
   ngAfterViewInit() {
@@ -452,13 +467,14 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     const ctx = this.cashFlowCanvas?.nativeElement?.getContext('2d');
     if (!ctx) return;
     const data = this.cashFlowData();
+    const c = chartColors();
     this.cashFlowChart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: data.map(d => d.label),
         datasets: [
-          { label: 'Income', data: data.map(d => d.income), backgroundColor: 'rgba(128,128,128,0.5)', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 },
-          { label: 'Spending', data: data.map(d => d.expenses), backgroundColor: '#00C2A8', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 }
+          { label: 'Income', data: data.map(d => d.income), backgroundColor: c.positive, borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 },
+          { label: 'Spending', data: data.map(d => d.expenses), backgroundColor: c.accent, borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 }
         ]
       },
       options: {
@@ -473,8 +489,8 @@ export class Dashboard implements AfterViewInit, OnDestroy {
           }
         },
         scales: {
-          x: { grid: { display: false }, border: { display: false }, ticks: { color: '#8A8A92', font: { size: 10 }, maxRotation: 0 } },
-          y: { grid: { color: 'rgba(128,128,128,0.1)' }, border: { display: false }, ticks: { color: '#8A8A92', font: { size: 10 }, callback: (val) => this.formatCurrencyShort(val as number) } }
+          x: { grid: { display: false }, border: { display: false }, ticks: { color: c.tick, font: { size: 10 }, maxRotation: 0 } },
+          y: { grid: { color: c.grid }, border: { display: false }, ticks: { color: c.tick, font: { size: 10 }, callback: (val) => this.formatCurrencyShort(val as number) } }
         }
       }
     });
@@ -496,7 +512,7 @@ export class Dashboard implements AfterViewInit, OnDestroy {
       type: 'doughnut',
       data: {
         labels: data.map(d => d.name),
-        datasets: [{ data: data.map(d => d.amount), backgroundColor: data.map(d => d.color), borderWidth: 2, borderColor: 'transparent', hoverOffset: 4 }]
+        datasets: [{ data: data.map(d => d.amount), backgroundColor: data.map(d => d.color), borderWidth: 2, borderColor: chartColors().surface, hoverOffset: 4 }]
       },
       options: {
         responsive: true, maintainAspectRatio: false, cutout: '70%',
