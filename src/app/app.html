@@ -14,10 +14,10 @@
       <div class="landing-grid-bg" aria-hidden="true"></div>
 
       <nav class="landing-nav">
-        <div class="landing-brand">
+        <button type="button" class="landing-brand" (click)="scrollToTop()" aria-label="Trackr — back to top">
           <app-logo [size]="38" tone="brand" />
           <span class="landing-wordmark">Trackr</span>
-        </div>
+        </button>
         <div class="landing-nav-actions">
           <button class="landing-ghost" (click)="openAuth('signin')">Sign in</button>
           <button class="landing-cta sm" (click)="openAuth('signup')">Get started</button>
@@ -79,10 +79,10 @@
   <div class="login-shell">
     <div class="login-left">
       <div class="login-left-content">
-        <div class="login-logo">
+        <button type="button" class="login-logo" (click)="backToLanding()" aria-label="Trackr — back to home">
           <app-logo [size]="52" tone="brand" />
           <span class="login-wordmark">Trackr</span>
-        </div>
+        </button>
 
         <div class="login-hero-text">
           <h1>Your money,<br>finally under<br>control.</h1>
@@ -110,9 +110,9 @@
 
     <div class="login-right">
       <div class="login-card">
-        <div class="login-card-logo">
+        <button type="button" class="login-card-logo" (click)="backToLanding()" aria-label="Trackr — back to home">
           <app-logo [size]="44" tone="brand" />
-        </div>
+        </button>
 
         <div class="login-card-heading">
           @if (authMode() === 'signup') {
@@ -307,10 +307,10 @@
     }
 
     <aside class="sidebar" [class.open]="sidebarOpen()">
-      <div class="brand">
+      <a class="brand" routerLink="/dashboard" (click)="onNavClick()" aria-label="Trackr — go to Home">
         <app-logo [size]="28" />
-        <div class="brand-name">Trackr</div>
-      </div>
+        <span class="brand-name">Trackr</span>
+      </a>
 
       <nav class="nav">
         <div class="nav-section">Money</div>
@@ -380,10 +380,10 @@
             </svg>
           }
         </button>
-        <div class="topbar-brand">
+        <a class="topbar-brand" routerLink="/dashboard" (click)="onNavClick()" aria-label="Trackr — go to Home">
           <app-logo [size]="26" />
           <span class="brand-name">Trackr</span>
-        </div>
+        </a>
         <div class="topbar-actions">
           <button class="topbar-search" (click)="openCommandPalette()" title="Open command palette">
             <app-icon name="search" [size]="17" />

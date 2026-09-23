@@ -297,6 +297,11 @@ export class App {
     this.password.set('');
   }
 
+  /** The landing page IS home, so its wordmark returns to the top. */
+  scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   backToLanding() {
     this.showAuth.set(false);
     this.authMode.set('signin');

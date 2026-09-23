@@ -51,12 +51,24 @@
   display: flex;
   align-items: center;
   gap: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity var(--t);
+
+  &:hover { opacity: 0.8; }
 }
 
 .login-wordmark {
   font-family: var(--font-display);
   font-size: 26px;
   font-weight: 400;
+  line-height: 1;
   letter-spacing: -0.01em;
   color: #fff;
 }
@@ -123,6 +135,18 @@
 
 .login-card-logo {
   /* Just the icon, no text — wordmark is in the left panel */
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity var(--t);
+
+  &:hover { opacity: 0.8; }
 }
 
 .login-card-heading {
@@ -459,6 +483,18 @@
   gap: 10px;
   padding: 6px 10px;
   margin-bottom: 20px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--t);
+
+  // The lockup behaves as one object: you click it, you don't select it.
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+
+  &:hover { opacity: 0.75; }
 }
 
 .brand-mark {
@@ -481,6 +517,7 @@
   font-family: var(--font-display);
   font-weight: 400;
   font-size: 20px;
+  line-height: 1;
   letter-spacing: -0.01em;
   color: var(--fg);
 }
@@ -724,12 +761,22 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  pointer-events: none;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity var(--t);
+
+  &:active { opacity: 0.7; }
 
   .brand-name {
-    font-weight: 700;
-    font-size: 15px;
-    letter-spacing: -0.02em;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 18px;
+    line-height: 1;
+    letter-spacing: -0.01em;
     color: var(--fg);
   }
 }
@@ -1189,12 +1236,24 @@
   display: flex;
   align-items: center;
   gap: 11px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity var(--t);
+
+  &:hover { opacity: 0.8; }
 }
 
 .landing-wordmark {
   font-family: var(--font-display);
   font-size: 23px;
   font-weight: 400;
+  line-height: 1;
   letter-spacing: -0.01em;
 }
 
