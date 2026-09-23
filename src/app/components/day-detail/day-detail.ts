@@ -1,9 +1,12 @@
-import { Component, HostListener, computed, inject, input, output } from '@angular/core';
+import { Component, HostListener, computed, effect, inject, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CategoryService } from '../../services/category.service';
 import { AccountService } from '../../services/account.service';
+import { ScrollLockService } from '../../services/scroll-lock.service';
 import { Transaction } from '../../models';
 import { transactionsOn } from '../../utils/calendar';
+
+let nextLockId = 0;
 
 /**
  * What one day cost, after Origin's "Details" popup.
@@ -27,6 +30,10 @@ import { transactionsOn } from '../../utils/calendar';
 export class DayDetail {
   private categoryService = inject(CategoryService);
   private accountService = inject(AccountService);
+  private scrollLock = inject(ScrollLockService);
+
+  /** Distinct per instance, so two overlays never cancel each other's lock. */
+  private lockKey = `day-detail-${nextLockId++}`;
 
   /** `YYYY-MM-DD`, or null when closed. */
   date = input<string | null>(null);
@@ -37,6 +44,15 @@ export class DayDetail {
 
   closed = output<void>();
   txPicked = output<Transaction>();
+
+  constructor() {
+    effect(onCleanup => {
+      this.scrollLock.set(this.lockKey, !!this.date());
+      // Navigating away with the popup open would otherwise leave the app
+      // unscrollable.
+      onCleanup(() => this.scrollLock.unlock(this.lockKey));
+    });
+  }
 
   rows = computed(() => {
     const d = this.date();

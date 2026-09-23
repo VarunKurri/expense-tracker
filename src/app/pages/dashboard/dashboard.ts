@@ -66,12 +66,20 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   txConfirmOpen = signal(false);
   txToDelete = signal<Transaction | null>(null);
 
-  // The view panel owns its own body-scroll lock, so these only move state.
+  // The overlays own their own body-scroll locks, so these only move state.
   openTxView(tx: Transaction) { this.viewingTx.set(tx); }
 
-  closeTxView() { this.viewingTx.set(null); }
+  /** Steps back to the day popup when that is where this was opened from. */
+  closeTxView() {
+    this.viewingTx.set(null);
+    const back = this.returnToDay();
+    if (back) { this.returnToDay.set(null); this.selectedDay.set(back); }
+  }
 
   editFromTxView(tx: Transaction) {
+    // Editing leaves the day popup behind — the form is a new destination, not
+    // a step deeper into it.
+    this.returnToDay.set(null);
     this.viewingTx.set(null);
     this.editingTx.set(tx);
     this.txFormOpen.set(true);
@@ -210,19 +218,26 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   /** The day popup's open state — null when closed. */
   selectedDay = signal<string | null>(null);
 
-  openDay(cell: DayCell) {
-    this.selectedDay.set(cell.date);
-    document.body.style.overflow = 'hidden';
-  }
+  /**
+   * The day to come back to when the transaction view closes.
+   *
+   * Without this, closing a transaction opened from a day popup dumps you on
+   * the dashboard — you lose your place and have to find the day again. Closing
+   * an overlay should undo the step that opened it, not the whole stack.
+   */
+  private returnToDay = signal<string | null>(null);
+
+  openDay(cell: DayCell) { this.selectedDay.set(cell.date); }
 
   closeDay() {
     this.selectedDay.set(null);
-    document.body.style.overflow = '';
+    this.returnToDay.set(null);
   }
 
   /** Day popup → the full transaction view, so one tap gets to the detail. */
   openTxFromDay(tx: Transaction) {
-    this.closeDay();
+    this.returnToDay.set(this.selectedDay());
+    this.selectedDay.set(null);
     this.openTxView(tx);
   }
 
@@ -455,9 +470,9 @@ export class Dashboard implements AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     this.miniDonut?.destroy();
-    // The day popup locks body scroll; leaving the page with it open would
-    // otherwise leave the whole app unscrollable.
-    document.body.style.overflow = '';
+    // Scroll locks are released by the overlay components themselves, via
+    // ScrollLockService — writing to body.overflow here would bypass its
+    // counter and could release a lock another overlay still holds.
   }
 
   private initMiniDonut() {

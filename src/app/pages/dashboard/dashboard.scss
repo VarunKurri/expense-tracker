@@ -263,14 +263,30 @@
 .acct-sub { font-size: 11px; color: var(--fg-4); font-family: var(--font-mono); letter-spacing: 0.04em; }
 
 /* ── MAIN GRID ─────────────────────────────────────────────── */
-/* Three equal panels since the calendar card took over the full width above.
-   auto-fit means they reflow to 2-up and then 1-up on their own, with no
-   breakpoint to keep in sync. */
+/* Three cards on one baseline.
+ *
+ * These used to size to their own content, so the row ended in a ragged step —
+ * the donut card runs a good deal taller than a two-bill list, and how far
+ * apart they land changes with the data, which is what made it look accidental.
+ *
+ * Stretching them to a shared height fixes that without inventing content: the
+ * cards share a bottom edge, and each one's own content still starts at the
+ * top. A sidebar arrangement was the other candidate and was worse — stacking
+ * two short cards beside the tall one simply moved the overhang to the other
+ * column. */
 .main-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+}
+
+/* Content tops out; the stretch shows as quiet space at the foot of the
+   shorter cards rather than as stretched rows. */
+.main-grid > .panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 /* ── PANEL ─────────────────────────────────────────────────── */

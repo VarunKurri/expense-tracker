@@ -1,6 +1,8 @@
 .page {
   padding: 28px 32px 48px;
-  max-width: 1180px;
+  /* Matches Overview and Reports — the three are tabs of one screen and must
+     not shift width as you move between them. */
+  max-width: 1320px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;

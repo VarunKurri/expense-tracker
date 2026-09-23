@@ -260,13 +260,15 @@ export class Spending implements AfterViewInit, OnDestroy {
 
   // ── Day popup ──────────────────────────────────────────────
   selectedDay = signal<string | null>(null);
-  openDay(cell: DayCell) {
-    this.selectedDay.set(cell.date);
-    document.body.style.overflow = 'hidden';
-  }
+
+  /** The day to step back to when the transaction view closes. See Dashboard. */
+  private returnToDay = signal<string | null>(null);
+
+  openDay(cell: DayCell) { this.selectedDay.set(cell.date); }
+
   closeDay() {
     this.selectedDay.set(null);
-    document.body.style.overflow = '';
+    this.returnToDay.set(null);
   }
 
   // ── Transaction view / edit ────────────────────────────────
@@ -277,14 +279,21 @@ export class Spending implements AfterViewInit, OnDestroy {
   txToDelete = signal<Transaction | null>(null);
 
   openTxView(tx: Transaction) { this.viewingTx.set(tx); }
-  closeTxView() { this.viewingTx.set(null); }
+
+  closeTxView() {
+    this.viewingTx.set(null);
+    const back = this.returnToDay();
+    if (back) { this.returnToDay.set(null); this.selectedDay.set(back); }
+  }
 
   openTxFromDay(tx: Transaction) {
-    this.closeDay();
+    this.returnToDay.set(this.selectedDay());
+    this.selectedDay.set(null);
     this.openTxView(tx);
   }
 
   editFromTxView(tx: Transaction) {
+    this.returnToDay.set(null);
     this.viewingTx.set(null);
     this.editingTx.set(tx);
     this.txFormOpen.set(true);
@@ -350,7 +359,7 @@ export class Spending implements AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     this.trendChart?.destroy();
-    document.body.style.overflow = '';
+    // Scroll locks are released by the overlay components — see Dashboard.
   }
 
   private renderTrend() {
@@ -363,6 +372,13 @@ export class Spending implements AfterViewInit, OnDestroy {
       this.trendChart.data.labels = current.map((_, i) => String(i + 1));
       this.trendChart.data.datasets[0].data = current as number[];
       this.trendChart.data.datasets[1].data = previous as number[];
+      // The dataset labels name the months, so they have to move with the
+      // month too. Missing this left the tooltip reading "September / August"
+      // after stepping back to July — and it only looked fixed by toggling to
+      // Calendar and back, because that destroys the chart and rebuilds it
+      // with fresh labels.
+      this.trendChart.data.datasets[0].label = this.monthName();
+      this.trendChart.data.datasets[1].label = this.prevLabel();
       this.trendChart.update('none');
       return;
     }

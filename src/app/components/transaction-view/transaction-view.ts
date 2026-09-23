@@ -2,7 +2,10 @@ import { Component, HostListener, effect, inject, input, output } from '@angular
 import { CommonModule } from '@angular/common';
 import { CategoryService } from '../../services/category.service';
 import { AccountService } from '../../services/account.service';
+import { ScrollLockService } from '../../services/scroll-lock.service';
 import { Transaction } from '../../models';
+
+let nextLockId = 0;
 
 /**
  * A single transaction, read-only, as a centred card on desktop and a sheet
@@ -25,6 +28,10 @@ import { Transaction } from '../../models';
 export class TransactionView {
   private categoryService = inject(CategoryService);
   private accountService = inject(AccountService);
+  private scrollLock = inject(ScrollLockService);
+
+  /** Distinct per instance, so two overlays never cancel each other's lock. */
+  private lockKey = `tx-view-${nextLockId++}`;
 
   transaction = input<Transaction | null>(null);
 
@@ -32,8 +39,11 @@ export class TransactionView {
   editRequested = output<Transaction>();
 
   constructor() {
-    effect(() => {
-      document.body.style.overflow = this.transaction() ? 'hidden' : '';
+    effect(onCleanup => {
+      this.scrollLock.set(this.lockKey, !!this.transaction());
+      // Navigating away with the panel open would otherwise leave the whole
+      // app unscrollable.
+      onCleanup(() => this.scrollLock.unlock(this.lockKey));
     });
   }
 
