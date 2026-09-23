@@ -59,18 +59,16 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity var(--t);
-
-  &:hover { opacity: 0.8; }
 }
 
 .login-wordmark {
   font-family: var(--font-display);
-  font-size: 26px;
+  font-size: 46px;
   font-weight: 400;
   line-height: 1;
   letter-spacing: -0.01em;
   color: #fff;
+  transform: translateY(var(--wordmark-nudge));
 }
 
 .login-hero-text {
@@ -144,9 +142,6 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity var(--t);
-
-  &:hover { opacity: 0.8; }
 }
 
 .login-card-heading {
@@ -493,8 +488,6 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-
-  &:hover { opacity: 0.75; }
 }
 
 .brand-mark {
@@ -513,13 +506,36 @@
 }
 
 /* The wordmark is set in the display serif, the way Origin sets theirs. */
+/* ── BRAND LOCKUP ───────────────────────────────
+   The wordmark is optically centred against the mark, not box-centred.
+   Flex centres the text's line box, but "Trackr" has no descenders, so the
+   ink sits in the top of that box with empty space beneath it, and the
+   lockup reads high. --wordmark-nudge pushes the text back down. It is in
+   em, so it holds at every size.
+
+   The value was found by measuring painted pixels rather than font metrics:
+   screenshot the lockup against a fixed page region, find the ink rows of
+   the mark and of the text, and solve for the offset that puts their centres
+   together. 0.115em lands the two centres within a quarter of a pixel, and
+   the measurement repeats exactly.
+
+   Sizes put cap height at ~0.63 of the mark's height, matching how Origin
+   sizes theirs (cap height is 0.74em in Newsreader, so font-size is roughly
+   0.88 × mark height).
+
+   These are logos, not buttons — no hover or active state. */
+/* --wordmark-nudge is defined in src/styles.scss — a `:root` rule inside a
+   component stylesheet gets scoped to `[_ngcontent-…]:root`, which matches
+   nothing, so the token would never be defined. */
+
 .brand-name {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: 20px;
+  font-size: 25px;
   line-height: 1;
   letter-spacing: -0.01em;
   color: var(--fg);
+  transform: translateY(var(--wordmark-nudge));
 }
 
 /* ============================================
@@ -767,17 +783,15 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity var(--t);
-
-  &:active { opacity: 0.7; }
 
   .brand-name {
     font-family: var(--font-display);
     font-weight: 400;
-    font-size: 18px;
+    font-size: 23px;
     line-height: 1;
     letter-spacing: -0.01em;
     color: var(--fg);
+    transform: translateY(var(--wordmark-nudge));
   }
 }
 
@@ -1244,17 +1258,15 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity var(--t);
-
-  &:hover { opacity: 0.8; }
 }
 
 .landing-wordmark {
   font-family: var(--font-display);
-  font-size: 23px;
+  font-size: 33px;
   font-weight: 400;
   line-height: 1;
   letter-spacing: -0.01em;
+  transform: translateY(var(--wordmark-nudge));
 }
 
 .landing-nav-actions {

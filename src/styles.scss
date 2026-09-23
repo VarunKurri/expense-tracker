@@ -137,6 +137,10 @@
   --t-base: .18s ease;
 
   --sidebar-width: 240px;
+
+  /* Optical centring for the brand wordmark against the mark. See the BRAND
+     LOCKUP note in app.scss for how this value was measured. */
+  --wordmark-nudge: 0.115em;
 }
 
 /* ============================================
