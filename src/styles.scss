@@ -19,43 +19,85 @@
    this stylesheet.
    ============================================ */
 
-/* --- Dark mode (default — Origin is dark-first) --- */
+/* --- Light mode (DEFAULT) ---
+
+   The Origin *product* is light, even though their marketing site is
+   near-black. These values are matched against screenshots of the real app:
+   near-white canvas, pure white cards, hairline grey borders, and blue as the
+   chart accent. */
 :root,
+:root[data-theme="light"] {
+  --bg:          #F7F7F8;   /* page canvas */
+  --bg-2:        #FFFFFF;
+  --bg-3:        #F0F0F1;   /* active nav pill, hover fill */
+  --surface:     #FFFFFF;   /* cards */
+  --surface-hi:  #EFEFF0;   /* active tab pill */
+  --line:        #E8E8EA;   /* hairline card border */
+  --line-strong: #D6D6D9;
+
+  --fg:   #131313;
+  --fg-2: #3D3D3F;
+  --fg-3: #8A8A8F;          /* mono labels, secondary text */
+  --fg-4: #B0B0B5;          /* future/disabled */
+
+  /* Cards are flat white in the product — no gradient wash. */
+  --card-grad:  #FFFFFF;
+  --input-grad: #FFFFFF;
+  --forecast-grad: linear-gradient(180deg, rgba(59, 142, 255, 0.22), rgba(59, 142, 255, 0.02));
+
+  /* Data signals — charts and amounts only, never UI chrome. */
+  --blue:     #3B8EFF;      /* the chart accent: spend area, calendar heat */
+  --blue-bg:  rgba(59, 142, 255, 0.12);
+  --teal:     #0E9F6E;      /* positive / income */
+  --teal-hi:  #0B8558;
+  --teal-bg:  rgba(14, 159, 110, 0.10);
+  --red:      #DC3545;
+  --red-bg:   rgba(220, 53, 69, 0.10);
+  --amber:    #F0A830;
+  --amber-bg: rgba(240, 168, 48, 0.12);
+
+  /* `--green` stays as an alias so the ~150 existing page-level uses keep
+     working until each page is converted. */
+  --green:    var(--teal);
+  --green-hi: var(--teal-hi);
+  --green-bg: var(--teal-bg);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.10);
+}
+
+/* --- Dark mode (alternate) ---
+   Built from Origin's marketing-site palette, which is where their dark
+   treatment actually lives. */
 :root[data-theme="dark"] {
-  --bg:          #0A0A0A;   /* page canvas, near-black */
-  --bg-2:        #131313;   /* Origin's surface base */
+  --bg:          #0A0A0A;
+  --bg-2:        #131313;
   --bg-3:        #1C1C1C;
   --surface:     #131313;
-  --surface-hi:  #222222;   /* Origin's surface gradient end */
+  --surface-hi:  #222222;
   --line:        #2A2A2A;
-  --line-strong: #5B5B5B;   /* Origin's border colour */
+  --line-strong: #5B5B5B;
 
-  --fg:   #FAFAFA;                      /* Origin's near-white */
-  --fg-2: rgba(250, 250, 250, 0.90);    /* #fafafae5 — body text */
-  --fg-3: rgba(255, 255, 255, 0.60);    /* #ffffff99 — muted label */
+  --fg:   #FAFAFA;
+  --fg-2: rgba(250, 250, 250, 0.90);
+  --fg-3: rgba(255, 255, 255, 0.60);
   --fg-4: #5B5B5B;
 
-  /* Card fill — Origin's linear-gradient(135deg, #fafafa1f, #fafafa03) */
-  --card-grad: linear-gradient(135deg, rgba(250, 250, 250, 0.12), rgba(250, 250, 250, 0.012));
-  /* Input fill — Origin's linear-gradient(0deg, #131313, #222) */
+  --card-grad:  linear-gradient(135deg, rgba(250, 250, 250, 0.06), rgba(250, 250, 250, 0.015));
   --input-grad: linear-gradient(0deg, #131313, #222222);
-  /* Forward-looking surfaces (forecasts, projections) */
-  --forecast-grad: linear-gradient(135deg, rgba(77, 140, 255, 0.18), rgba(77, 140, 255, 0.03));
+  --forecast-grad: linear-gradient(180deg, rgba(77, 140, 255, 0.22), rgba(77, 140, 255, 0.02));
 
-  /* Data signals — used in charts and amounts, never as UI chrome */
-  --teal:     #00C2A8;   /* positive movement */
-  --teal-hi:  #2BE0C6;
-  --teal-bg:  rgba(0, 194, 168, 0.12);
-  --red:      #FF5A5A;
-  --red-bg:   rgba(255, 90, 90, 0.12);
-  --amber:    #E0A020;
-  --amber-bg: rgba(224, 160, 32, 0.12);
   --blue:     #4D8CFF;
-  --blue-bg:  rgba(77, 140, 255, 0.12);
+  --blue-bg:  rgba(77, 140, 255, 0.14);
+  --teal:     #23C892;
+  --teal-hi:  #4AE0AF;
+  --teal-bg:  rgba(35, 200, 146, 0.14);
+  --red:      #FF5A5A;
+  --red-bg:   rgba(255, 90, 90, 0.14);
+  --amber:    #F0A830;
+  --amber-bg: rgba(240, 168, 48, 0.14);
 
-  /* `--green` is kept as an alias so the ~150 existing page-level uses keep
-     working while pages are converted phase by phase. It now resolves to the
-     teal signal, not Tally's neon green. */
   --green:    var(--teal);
   --green-hi: var(--teal-hi);
   --green-bg: var(--teal-bg);
@@ -65,42 +107,16 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
 
-/* --- Light mode --- */
-:root[data-theme="light"] {
-  --bg:          #FAFAFA;
-  --bg-2:        #FFFFFF;
-  --bg-3:        #F0F0F0;
-  --surface:     #FFFFFF;
-  --surface-hi:  #F4F4F4;
-  --line:        #E4E4E4;
-  --line-strong: #C8C8C8;
-
-  --fg:   #131313;
-  --fg-2: rgba(19, 19, 19, 0.90);
-  --fg-3: rgba(19, 19, 19, 0.58);
-  --fg-4: #8A8A8A;
-
-  --card-grad: linear-gradient(135deg, rgba(19, 19, 19, 0.045), rgba(19, 19, 19, 0.008));
-  --input-grad: linear-gradient(0deg, #FFFFFF, #F6F6F6);
-  --forecast-grad: linear-gradient(135deg, rgba(26, 108, 214, 0.14), rgba(26, 108, 214, 0.02));
-
-  --teal:     #00806F;
-  --teal-hi:  #00A38C;
-  --teal-bg:  rgba(0, 128, 111, 0.10);
-  --red:      #D93838;
-  --red-bg:   rgba(217, 56, 56, 0.10);
-  --amber:    #A87400;
-  --amber-bg: rgba(168, 116, 0, 0.10);
-  --blue:     #1A6CD6;
-  --blue-bg:  rgba(26, 108, 214, 0.10);
-
-  --green:    var(--teal);
-  --green-hi: var(--teal-hi);
-  --green-bg: var(--teal-bg);
-
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+/* Category accent colours — the small circular icon chips in Origin's
+   breakdown lists and the donut segments. Identical in both themes. */
+:root {
+  --cat-1: #E8734A;   /* shopping */
+  --cat-2: #F0A830;   /* drinks & dining */
+  --cat-3: #A0522D;   /* auto & transport */
+  --cat-4: #2D6A4F;   /* personal care */
+  --cat-5: #4AABE8;   /* childcare & education */
+  --cat-6: #7C5CC4;
+  --cat-7: #C0405A;
 }
 
 /* --- Theme-independent tokens --- */
@@ -181,6 +197,11 @@ input, select, textarea {
 /* Origin's signature: a headline in light serif with one word italicised.
    Usage: <h1 class="display">Track <em>your entire</em> financial life.</h1>
 
+   SCOPE: editorial moments only — insight/promo cards ("See where your money
+   goes."), empty states, onboarding. Origin's product sets page titles and all
+   figures in the UI sans; the serif is a garnish, not the number style. Use
+   `.num-display` for money, never `.display`.
+
    Origin's own scale: h1 48/40/36 · h2 32/30/28 · h3 26/24/22
    (desktop / ≤767 / ≤479). Size modifiers below match it. */
 .display {
@@ -230,12 +251,33 @@ input, select, textarea {
   letter-spacing: -0.03em;
 }
 
-/* Large display figure (hero balances) — serif, not mono. */
+/* Large hero figure ($589, $962 in Origin's cards) — sans semibold with tight
+   tracking. Deliberately NOT the serif: Origin's product sets every number
+   this way. */
 .num-display {
-  font-family: var(--font-display);
-  font-weight: 300;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 36px;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+/* Card eyebrow — Origin's `NET WORTH ›`, `SPENT IN SEPTEMBER ›`,
+   `LATEST TRANSACTIONS ›`. A mono uppercase label, optionally a link with a
+   trailing chevron. This heads nearly every card in their product. */
+.card-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+
+  &[href]:hover { color: var(--fg); }
 }
 
 /* ============================================
@@ -264,58 +306,71 @@ input, select, textarea {
 
 /* ============================================
    BUTTONS
-   White-on-black is the only primary action.
+
+   Origin's product uses a quiet outlined button for nearly every action
+   ("Add account", "Create budget", "Connect credit score", "Save") — not a
+   filled one. `.btn-solid` exists for the rare high-emphasis CTA, which is
+   what their marketing site uses.
    ============================================ */
 
 @mixin btn-base {
   padding: 10px 18px;
-  border-radius: var(--radius-pill);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.01em;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   transition: all var(--t);
 }
 
 .btn-primary {
   @include btn-base;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
+  &:hover { background: var(--bg-3); }
+}
+
+.btn-solid {
+  @include btn-base;
   background: var(--fg);
   color: var(--bg);
-  &:hover { background: var(--fg-2); }
+  &:hover { opacity: 0.88; }
 }
 
 .btn-ghost {
   @include btn-base;
   background: transparent;
-  border: 1px solid var(--line-strong);
-  color: var(--fg);
-  &:hover { background: var(--surface-hi); }
+  border: 1px solid transparent;
+  color: var(--fg-2);
+  &:hover { background: var(--bg-3); color: var(--fg); }
 }
 
 .btn-danger {
   @include btn-base;
   background: var(--red-bg);
   color: var(--red);
-  &:hover { filter: brightness(1.15); }
+  &:hover { filter: brightness(1.05); }
 }
 
 /* Legacy `.btn` kept for pages not yet converted. */
 .btn {
   @include btn-base;
-  background: transparent;
+  background: var(--surface);
   border: 1px solid var(--line-strong);
   color: var(--fg);
 
-  &:hover { background: var(--surface-hi); }
+  &:hover { background: var(--bg-3); }
 
   &.primary {
-    background: var(--fg);
-    color: var(--bg);
-    border-color: transparent;
-    &:hover { background: var(--fg-2); }
+    background: var(--surface);
+    border-color: var(--line-strong);
+    color: var(--fg);
+    &:hover { background: var(--bg-3); }
   }
 
   &.ghost {

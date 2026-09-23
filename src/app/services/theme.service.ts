@@ -2,11 +2,12 @@ import { Injectable, signal, effect } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  // Dark is the default — Origin's look is built on a near-black canvas.
-  // index.html applies the same choice inline before first paint so the page
-  // doesn't flash the wrong theme while Angular boots.
+  // Light is the default — the Origin product is light, even though their
+  // marketing site is near-black. index.html applies the same choice inline
+  // before first paint so the page doesn't flash the wrong theme while
+  // Angular boots.
   theme = signal<'light' | 'dark'>(
-    localStorage.getItem('theme') === 'light' ? 'light' : 'dark'
+    localStorage.getItem('theme') === 'dark' ? 'dark' : 'light'
   );
 
   constructor() {
@@ -15,7 +16,7 @@ export class ThemeService {
       document.documentElement.setAttribute('data-theme', t);
       localStorage.setItem('theme', t);
       document.querySelector('meta[name="theme-color"]')
-        ?.setAttribute('content', t === 'dark' ? '#0A0A0A' : '#FAFAFA');
+        ?.setAttribute('content', t === 'dark' ? '#0A0A0A' : '#F7F7F8');
     });
   }
 

@@ -27,28 +27,40 @@
 
 ## Design system
 
-Modelled on Origin (useorigin.com). Values below are ported from Origin's own
-production stylesheet. **Not glassmorphic** — that was two designs ago. Do not
+Modelled on the Origin (useorigin.com) **product**, matched against screenshots
+of the real app. **Not glassmorphic** — that was two designs ago. Do not
 reintroduce blurred cards, coloured primary buttons, or green glow gradients.
 
+Important: Origin's *marketing site* is near-black, but their **app is light**.
+The app is what we copy. Do not "correct" this back to dark.
+
 - All tokens live in `src/styles.scss`. Fonts load from `src/index.html`.
-- **Dark is the default.** Light mode exists and must keep working.
+- **Light is the default.** Dark mode exists and must keep working.
 - Three type voices:
-  - `var(--font-display)` Newsreader, **weight 300** — headings and hero figures
-  - `var(--font-ui)` Inter — all UI text
-  - `var(--font-mono)` Roboto Mono, **10px/500 UPPERCASE** — labels, eyebrows, data, buttons
-- Signature headline pattern: one word italicised in the display serif —
-  `<h1 class="display">Track <em>your entire</em> financial life.</h1>`
-- **Colour discipline:** surfaces are monochrome. Colour appears only as a data
-  signal (chart lines, sparklines, category tiles). `--teal` = positive,
-  `--red` = negative, `--blue` / `--forecast-grad` = forward-looking projections.
-- **White-on-black is the only primary action.** `.btn-primary` is `--fg` on
-  `--bg`. Never a coloured fill.
-- Radii: `--radius-xs` 4px · `--radius-sm` 8px (inputs) · `--radius` 14px (cards)
-  · `--radius-pill` 999px.
+  - `var(--font-ui)` Inter — all UI text, page titles, and **all figures**
+  - `var(--font-mono)` Roboto Mono, **11px/500 UPPERCASE** — card labels, eyebrows, data
+  - `var(--font-display)` Newsreader, weight 300 — **editorial moments only**
+- The serif is a garnish, not the number style. Use it for insight/promo cards,
+  empty states and onboarding — the way Origin uses "See where your money goes."
+  Money always uses `.num-display` (sans semibold) or `.num` (mono tabular),
+  never `.display`.
+- Signature headline pattern, for those editorial moments only:
+  `<h2 class="display">See where <em>your money</em> goes.</h2>`
+- Nearly every card is headed by a mono uppercase eyebrow with a trailing
+  chevron — `.card-label` (`NET WORTH ›`, `SPENT IN SEPTEMBER ›`).
+- **Colour discipline:** surfaces are white on a near-white canvas with hairline
+  borders. Colour is a data signal only: `--blue` = the chart accent (spend
+  areas, calendar heat), `--teal` = positive/income, `--red` = negative,
+  `--forecast-grad` = projections, `--cat-1..7` = category icon chips.
+- **Buttons are outlined, not filled.** `.btn-primary` is a white button with a
+  `--line-strong` border, matching "Add account" / "Create budget" / "Save".
+  `.btn-solid` (dark fill) exists for the rare high-emphasis CTA — use sparingly.
+- Radii: `--radius-xs` 4px · `--radius-sm` 8px (inputs, buttons) · `--radius`
+  14px (cards) · `--radius-pill` 999px (chips, tab pills).
 - Cards use `var(--card-grad)`; inputs use `var(--input-grad)`.
-- Shared classes: `.card`, `.btn-primary`, `.btn-ghost`, `.btn-danger`,
-  `.input` / `.input-field`, `.chip`, `.display`, `.label-mono`, `.num`.
+- Shared classes: `.card`, `.btn-primary`, `.btn-solid`, `.btn-ghost`,
+  `.btn-danger`, `.input` / `.input-field`, `.chip`, `.card-label`,
+  `.label-mono`, `.num`, `.num-display`, `.display`.
 - `.glass` / `.glass-strong` are legacy aliases for flat surfaces, kept only so
   un-converted templates still render. Do not use them in new markup.
 - Desktop-first, responsive down to mobile.
