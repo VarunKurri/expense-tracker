@@ -82,7 +82,7 @@ export class AccountDetail {
     const pct = this.utilizationPct();
     if (pct >= 80) return 'var(--red)';
     if (pct >= 60) return 'var(--amber)';
-    return 'var(--green)';
+    return 'var(--teal)';
   });
 
   // Last 8 transactions for this account, sorted newest first

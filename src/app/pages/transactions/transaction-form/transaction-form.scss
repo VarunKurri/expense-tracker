@@ -35,7 +35,7 @@
   }
 
   &.active.neg { color: var(--red); }
-  &.active.pos { color: var(--green); }
+  &.active.pos { color: var(--teal); }
 }
 
 /* TEMPLATES */
@@ -50,11 +50,12 @@
 }
 
 .template-strip-label {
+  font-family: var(--font-mono);
   color: var(--fg-3);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.04em;
 }
 
 .template-list {
@@ -128,7 +129,7 @@
 .amount-input {
   flex: 1;
   font-size: 56px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.05em;
   font-variant-numeric: tabular-nums;
   border: none;
@@ -149,11 +150,12 @@
 }
 
 .label-sm {
+  font-family: var(--font-mono);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--fg-3);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.04em;
 }
 
 .label-optional {
@@ -178,8 +180,8 @@
   appearance: none;
 
   &:focus {
-    border-color: var(--green);
-    box-shadow: 0 0 0 3px var(--green-bg);
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px var(--teal-bg);
   }
 
   &::placeholder { color: var(--fg-4); }
@@ -215,7 +217,7 @@ select.input-field {
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: var(--green-bg);
+  background: var(--teal-bg);
   border: 1px solid rgba(34, 197, 94, 0.25);
   border-radius: 14px;
   animation: slideDown 0.2s ease;
@@ -369,16 +371,16 @@ select.input-field {
 .btn-primary {
   padding: 10px 18px;
   border-radius: 10px;
-  background: var(--green);
-  color: #000;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
   font-weight: 600;
   font-size: 13.5px;
   font-family: inherit;
-  border: none;
   cursor: pointer;
   transition: background 0.18s ease;
 
-  &:hover { background: var(--green-hi); }
+  &:hover { background: var(--bg-3); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
@@ -461,8 +463,8 @@ select.input-field {
   }
 
   &.on {
-    background: var(--green);
-    border-color: var(--green);
+    background: var(--teal);
+    border-color: var(--teal);
     &::after { left: 21px; background: #000; }
   }
 

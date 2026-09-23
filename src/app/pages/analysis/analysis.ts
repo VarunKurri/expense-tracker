@@ -13,6 +13,8 @@ import { Confirm } from '../../components/confirm/confirm';
 import { Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { filterForAnalysis } from '../../utils/analysis-filter';
+import { chartColors } from '../../utils/theme-colors';
+import { ThemeService } from '../../services/theme.service';
 import {
   Chart, ChartData, ChartOptions,
   ArcElement, DoughnutController,
@@ -39,6 +41,7 @@ type RangeKey = 'this-month' | 'last-month' | '3-months' | 'this-year' | 'all' |
 })
 export class Analysis implements AfterViewInit, OnDestroy {
   private toastService = inject(ToastService);
+  private themeService = inject(ThemeService);
   private txService = inject(TransactionService);
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
@@ -482,6 +485,16 @@ export class Analysis implements AfterViewInit, OnDestroy {
         this.updateBar(trendData);
       }
     });
+
+    // Chart.js resolves colours once, at construction, so a theme switch would
+    // leave these painted for the previous theme. Rebuild both on change.
+    effect(() => {
+      this.themeService.theme();
+      if (!this.chartsReady) return;
+      this.donutChart?.destroy(); this.donutChart = null;
+      this.barChart?.destroy();   this.barChart = null;
+      queueMicrotask(() => this.initCharts());
+    });
   }
 
   ngAfterViewInit() {
@@ -513,7 +526,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
           data: data.map(d => d.amount),
           backgroundColor: data.map(d => d.color),
           borderWidth: 3,
-          borderColor: 'transparent',
+          borderColor: chartColors().surface,
           hoverOffset: 6,
         }]
       },
@@ -544,6 +557,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
     const ctx = this.barCanvas?.nativeElement?.getContext('2d');
     if (!ctx) return;
     const data = this.monthlyTrend();
+    const c = chartColors();
     this.barChart = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -552,9 +566,8 @@ export class Analysis implements AfterViewInit, OnDestroy {
           {
             label: 'Income',
             data: data.map(d => d.income),
-            backgroundColor: 'rgba(128, 128, 128, 0.5)',
-            borderColor: 'rgba(128, 128, 128, 0.8)',
-            borderWidth: 1,
+            backgroundColor: c.positive,
+            borderWidth: 0,
             borderRadius: 4,
             barPercentage: 0.55,
             categoryPercentage: 0.7,
@@ -562,7 +575,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
           {
             label: 'Spending',
             data: data.map(d => d.expenses),
-            backgroundColor: '#00C2A8',
+            backgroundColor: c.accent,
             borderRadius: 4,
             barPercentage: 0.55,
             categoryPercentage: 0.7,
@@ -581,11 +594,11 @@ export class Analysis implements AfterViewInit, OnDestroy {
           }
         },
         scales: {
-          x: { grid: { display: false }, border: { display: false }, ticks: { color: '#8A8A92', font: { size: 11 } } },
+          x: { grid: { display: false }, border: { display: false }, ticks: { color: c.tick, font: { size: 11 } } },
           y: {
-            grid: { color: 'rgba(128,128,128,0.1)' },
+            grid: { color: c.grid },
             border: { display: false },
-            ticks: { color: '#8A8A92', font: { size: 11 }, callback: (val) => this.formatCurrencyShort(val as number) }
+            ticks: { color: c.tick, font: { size: 11 }, callback: (val) => this.formatCurrencyShort(val as number) }
           }
         }
       }

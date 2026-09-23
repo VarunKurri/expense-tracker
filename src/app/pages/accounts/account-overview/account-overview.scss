@@ -31,15 +31,15 @@
 .btn-primary {
   padding: 9px 18px;
   border-radius: 10px;
-  background: var(--green);
-  color: #000;
+  background: var(--bg-3);
+  color: var(--fg);
   font-weight: 600;
   font-size: 13.5px;
   font-family: inherit;
   border: none;
   cursor: pointer;
   transition: background 0.18s ease;
-  &:hover { background: var(--green-hi); }
+  &:hover { background: var(--bg-3); }
 }
 
 /* ── HERO CARD ─────────────────────────────────────────────── */
@@ -103,16 +103,17 @@
 }
 
 .balance-label {
+  font-family: var(--font-mono);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--fg-4);
 }
 
 .balance-value {
   font-size: 48px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   color: var(--fg);
@@ -139,10 +140,11 @@
 }
 
 .stat-label {
+  font-family: var(--font-mono);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--fg-4);
 }
 
@@ -153,7 +155,7 @@
   font-variant-numeric: tabular-nums;
   color: var(--fg);
 
-  &.green { color: var(--green); }
+  &.green { color: var(--teal); }
   &.red   { color: var(--red); }
 }
 
@@ -172,17 +174,18 @@
 }
 
 .recent-title {
+  font-family: var(--font-mono);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--fg-4);
 }
 
 .view-all-btn {
   background: transparent;
   border: none;
-  color: var(--green);
+  color: var(--teal);
   font-size: 13px;
   font-weight: 600;
   font-family: inherit;
@@ -239,7 +242,7 @@
   font-size: 16px;
   flex-shrink: 0;
 
-  &.income   { background: var(--green-bg); border-color: transparent; }
+  &.income   { background: var(--teal-bg); border-color: transparent; }
   &.transfer { background: var(--bg-3); }
 }
 
@@ -280,7 +283,7 @@
   white-space: nowrap;
   flex-shrink: 0;
 
-  &.pos { color: var(--green); }
+  &.pos { color: var(--teal); }
   &.neg { color: var(--fg); }
 }
 
@@ -353,15 +356,15 @@
 .view-edit-btn {
   padding: 7px 16px;
   border-radius: 8px;
-  background: var(--green);
-  color: #000;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
   font-size: 13px;
   font-weight: 600;
   font-family: inherit;
-  border: none;
   cursor: pointer;
   transition: background 0.18s ease;
-  &:hover { background: var(--green-hi); }
+  &:hover { background: var(--bg-3); }
 }
 
 .view-close {
@@ -387,12 +390,12 @@
 
 .view-amount {
   font-size: 42px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   color: var(--fg);
 
-  &.pos { color: var(--green); }
+  &.pos { color: var(--teal); }
   &.neg { color: var(--fg); }
   &.neu { color: var(--fg-3); }
 }
@@ -402,8 +405,8 @@
   margin-top: 8px;
   padding: 4px 12px;
   border-radius: 999px;
-  background: var(--green-bg);
-  color: var(--green);
+  background: var(--teal-bg);
+  color: var(--teal);
   font-size: 12px;
   font-weight: 600;
 }

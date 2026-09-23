@@ -913,24 +913,24 @@
 
   &.more {
     margin-top: 2px;
-    color: var(--green);
+    color: var(--teal);
 
     .command-icon {
-      color: var(--green);
-      background: var(--green-bg);
+      color: var(--teal);
+      background: var(--teal-bg);
       border-color: transparent;
     }
 
     .command-label {
-      color: var(--green);
+      color: var(--teal);
     }
 
     &.active {
       background: var(--surface);
 
       .command-icon {
-        color: var(--green);
-        background: var(--green-bg);
+        color: var(--teal);
+        background: var(--teal-bg);
         border-color: transparent;
       }
     }
@@ -1061,7 +1061,7 @@
     width: 15px;
     height: 15px;
     margin: 2px 0 0;
-    accent-color: var(--green);
+    accent-color: var(--teal);
     flex-shrink: 0;
     cursor: pointer;
   }
@@ -1105,7 +1105,7 @@
   height: 22px;
   border-radius: 50%;
   border: 2.5px solid var(--line);
-  border-top-color: var(--green);
+  border-top-color: var(--teal);
   animation: boot-spin 0.7s linear infinite;
 }
 
@@ -1129,7 +1129,7 @@
     color: var(--fg-3);
     transition: color 0.15s ease;
 
-    &.met { color: var(--green); }
+    &.met { color: var(--teal); }
   }
 
   .pw-dot {
@@ -1142,14 +1142,15 @@
     justify-content: center;
     font-size: 9px;
     font-weight: 700;
-    color: #000;
+    color: var(--fg-4);
     flex-shrink: 0;
     transition: all 0.15s ease;
   }
 
   li.met .pw-dot {
-    background: var(--green);
-    border-color: var(--green);
+    background: var(--teal);
+    border-color: var(--teal);
+    color: #fff;
   }
 }
 

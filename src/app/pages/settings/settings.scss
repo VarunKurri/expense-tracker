@@ -10,8 +10,8 @@
 .page-head {
   h1 {
     font-size: 34px;
-    font-weight: 700;
-    letter-spacing: -0.04em;
+    font-weight: 600;
+    letter-spacing: -0.03em;
     color: var(--fg);
     margin-bottom: 4px;
   }
@@ -31,10 +31,11 @@
 }
 
 .settings-section-title {
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.04em;
   color: var(--fg-4);
   padding: 0 4px 8px;
 }
@@ -152,7 +153,7 @@
   margin-left: 6px;
   vertical-align: middle;
 }
-.settings-label .pill.on { background: var(--green-bg, rgba(0, 194, 168,0.15)); color: var(--green); }
+.settings-label .pill.on { background: var(--teal-bg); color: var(--teal); }
 .settings-label .pill.warn { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
 
 .recovery-intro {

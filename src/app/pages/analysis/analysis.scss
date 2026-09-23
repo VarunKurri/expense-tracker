@@ -17,8 +17,8 @@
 
   h1 {
     font-size: 34px;
-    font-weight: 700;
-    letter-spacing: -0.04em;
+    font-weight: 600;
+    letter-spacing: -0.03em;
     color: var(--fg);
     margin-bottom: 4px;
   }
@@ -102,15 +102,16 @@
 
   &:hover { color: var(--fg); }
   &.active {
-    background: var(--green-bg);
-    border-color: var(--green);
-    color: var(--green);
+    background: var(--teal-bg);
+    border-color: var(--teal);
+    color: var(--teal);
   }
 }
 
 .filter-badge {
-  background: var(--green);
-  color: #000;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
   font-size: 10.5px;
   font-weight: 700;
   padding: 1px 6px;
@@ -131,11 +132,12 @@
 }
 
 .cfp-title {
+  font-family: var(--font-mono);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--fg-3);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.04em;
   margin-bottom: 10px;
 }
 
@@ -174,14 +176,15 @@
   flex-wrap: wrap;
 
   label {
+    font-family: var(--font-mono);
     display: flex;
     flex-direction: column;
     gap: 5px;
     font-size: 11.5px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--fg-3);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
   }
 }
 
@@ -202,7 +205,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--green);
+    border-color: var(--teal);
   }
 }
 
@@ -234,10 +237,11 @@
 }
 
 .kpi-label {
+  font-family: var(--font-mono);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--fg-4);
 }
 
@@ -248,7 +252,7 @@
   font-variant-numeric: tabular-nums;
   color: var(--fg);
 
-  &.positive { color: var(--green); }
+  &.positive { color: var(--teal); }
   &.negative { color: var(--red); }
   &.muted    { color: var(--fg-4); }
 
@@ -368,12 +372,12 @@
 .see-all-link {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--green);
+  color: var(--teal);
   text-decoration: none;
   white-space: nowrap;
   flex-shrink: 0;
 
-  &:hover { color: var(--green-hi); }
+  &:hover { color: var(--teal-hi); }
 }
 
 .panel-empty {
@@ -677,15 +681,15 @@
 .view-edit-btn {
   padding: 7px 16px;
   border-radius: 8px;
-  background: var(--green);
-  color: #000;
+  background: var(--bg-3);
+  color: var(--fg);
   font-size: 13px;
   font-weight: 600;
   font-family: inherit;
   border: none;
   cursor: pointer;
   transition: background 0.18s ease;
-  &:hover { background: var(--green-hi); }
+  &:hover { background: var(--bg-3); }
 }
 
 .view-amount-wrap {
@@ -695,7 +699,7 @@
 
 .view-amount {
   font-size: 42px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   color: var(--fg);
@@ -707,8 +711,8 @@
   margin-top: 8px;
   padding: 4px 12px;
   border-radius: 999px;
-  background: var(--green-bg);
-  color: var(--green);
+  background: var(--teal-bg);
+  color: var(--teal);
   font-size: 12px;
   font-weight: 600;
 }

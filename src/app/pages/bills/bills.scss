@@ -15,8 +15,8 @@
 
   h1 {
     font-size: 34px;
-    font-weight: 700;
-    letter-spacing: -0.04em;
+    font-weight: 600;
+    letter-spacing: -0.03em;
     color: var(--fg);
     margin-bottom: 4px;
   }
@@ -38,16 +38,16 @@
 .btn-primary {
   padding: 10px 18px;
   border-radius: 10px;
-  background: var(--green);
-  color: #000;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
   font-weight: 600;
   font-size: 13.5px;
   font-family: inherit;
-  border: none;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.18s ease;
-  &:hover { background: var(--green-hi); }
+  &:hover { background: var(--bg-3); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
@@ -87,10 +87,11 @@
 }
 
 .summary-label {
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--fg-4);
 }
 
@@ -263,11 +264,11 @@
 
 /* Green accent on the soonest-due bill — green bg + green border matching overdue red pattern */
 .date-box-accent {
-  background: var(--green-bg);
+  background: var(--teal-bg);
   border-color: rgba(34, 197, 94, 0.35);
 
-  .bill-day  { color: var(--green); }
-  .bill-mon  { color: var(--green); opacity: 0.7; }
+  .bill-day  { color: var(--teal); }
+  .bill-mon  { color: var(--teal); opacity: 0.7; }
 }
 
 .bill-day {
@@ -319,8 +320,8 @@
 }
 
 .autopay-chip {
-  background: var(--green-bg);
-  color: var(--green);
+  background: var(--teal-bg);
+  color: var(--teal);
   padding: 1px 7px;
   border-radius: 999px;
   font-size: 10.5px;
@@ -364,8 +365,8 @@
 .mark-paid-btn {
   padding: 5px 12px;
   border-radius: 8px;
-  background: var(--green-bg);
-  color: var(--green);
+  background: var(--teal-bg);
+  color: var(--teal);
   border: 1px solid transparent;
   font-size: 12px;
   font-weight: 600;
@@ -375,8 +376,8 @@
   white-space: nowrap;
 
   &:hover {
-    background: var(--green);
-    color: #000;
+    background: var(--bg-3);
+    color: var(--fg);
   }
 
   &:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -451,10 +452,11 @@
 }
 
 .active-freq {
+  font-family: var(--font-mono);
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--fg-4);
 }
 
@@ -655,15 +657,15 @@
 .view-edit-btn {
   padding: 7px 16px;
   border-radius: 8px;
-  background: var(--green);
-  color: #000;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
   font-size: 13px;
   font-weight: 600;
   font-family: inherit;
-  border: none;
   cursor: pointer;
   transition: background 0.18s ease;
-  &:hover { background: var(--green-hi); }
+  &:hover { background: var(--bg-3); }
 }
 
 .view-close {
@@ -689,12 +691,12 @@
 
 .view-amount {
   font-size: 42px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   color: var(--fg);
 
-  &.pos { color: var(--green); }
+  &.pos { color: var(--teal); }
   &.neg { color: var(--fg); }
   &.neu { color: var(--fg-3); }
 }
@@ -704,8 +706,8 @@
   margin-top: 8px;
   padding: 4px 12px;
   border-radius: 999px;
-  background: var(--green-bg);
-  color: var(--green);
+  background: var(--teal-bg);
+  color: var(--teal);
   font-size: 12px;
   font-weight: 600;
 }

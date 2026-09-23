@@ -11,11 +11,12 @@
 }
 
 .label-sm {
+  font-family: var(--font-mono);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--fg-3);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.04em;
 }
 
 .input-field {
@@ -32,8 +33,8 @@
   appearance: none;
 
   &:focus {
-    border-color: var(--green);
-    box-shadow: 0 0 0 3px var(--green-bg);
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px var(--teal-bg);
   }
 
   &::placeholder { color: var(--fg-4); }
@@ -120,8 +121,8 @@ select.input-field {
 
   &:hover { background: var(--surface-hi); }
   &.active {
-    border-color: var(--green);
-    background: var(--green-bg);
+    border-color: var(--teal);
+    background: var(--teal-bg);
   }
 }
 
@@ -204,8 +205,8 @@ select.input-field {
   }
 
   &.on {
-    background: var(--green);
-    border-color: var(--green);
+    background: var(--teal);
+    border-color: var(--teal);
     &::after { left: 21px; background: #000; }
   }
 
@@ -247,15 +248,15 @@ select.input-field {
 .btn-primary {
   padding: 10px 18px;
   border-radius: 10px;
-  background: var(--green);
-  color: #000;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
   font-weight: 600;
   font-size: 13.5px;
   font-family: inherit;
-  border: none;
   cursor: pointer;
   transition: background 0.18s ease;
-  &:hover { background: var(--green-hi); }
+  &:hover { background: var(--bg-3); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 

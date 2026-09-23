@@ -15,8 +15,8 @@
 
   h1 {
     font-size: 34px;
-    font-weight: 700;
-    letter-spacing: -0.04em;
+    font-weight: 600;
+    letter-spacing: -0.03em;
     color: var(--fg);
     margin-bottom: 4px;
   }
@@ -38,17 +38,17 @@
 .btn-primary {
   padding: 10px 18px;
   border-radius: 10px;
-  background: var(--green);
-  color: #000;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
   font-weight: 600;
   font-size: 13.5px;
   font-family: inherit;
-  border: none;
   cursor: pointer;
   transition: background 0.18s ease;
   white-space: nowrap;
 
-  &:hover { background: var(--green-hi); }
+  &:hover { background: var(--bg-3); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
@@ -117,14 +117,14 @@
 
   &:hover {
     background: var(--surface-hi);
-    border-color: var(--green);
-    color: var(--green);
+    border-color: var(--teal);
+    color: var(--teal);
   }
 }
 
 .upload-count {
   font-size: 12.5px;
-  color: var(--green);
+  color: var(--teal);
   font-weight: 500;
 }
 
@@ -174,15 +174,16 @@
 }
 
 .table-header {
+  font-family: var(--font-mono);
   display: grid;
   grid-template-columns: 2fr 80px 1.5fr 1fr 100px 100px;
   gap: 12px;
   padding: 12px 16px;
   background: var(--bg-3);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--fg-4);
 }
 
@@ -238,7 +239,7 @@
   letter-spacing: 0.06em;
 
   &.expense  { color: var(--red); }
-  &.income   { color: var(--green); }
+  &.income   { color: var(--teal); }
   &.transfer { color: var(--blue); }
 }
 
@@ -266,7 +267,7 @@
   text-align: right;
 
   &.expense  { color: var(--fg); }
-  &.income   { color: var(--green); }
+  &.income   { color: var(--teal); }
   &.transfer { color: var(--blue); }
 }
 
