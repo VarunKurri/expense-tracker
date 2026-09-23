@@ -9,4 +9,5 @@ export interface Category {
   archived?: boolean;
   createdAt: number;
   isDefault?: boolean;        // promoted to a kept "default" category via the cleanup tool
+  groupId?: string;           // optional CategoryGroup; ungrouped categories report together
 }

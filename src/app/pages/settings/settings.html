@@ -35,6 +35,18 @@
     </div>
 
     <div class="settings-section">
+      <div class="settings-section-title">Spending</div>
+      <div class="settings-row" (click)="navigate('/settings/categories')">
+        <div class="settings-icon">🗂️</div>
+        <div class="settings-info">
+          <div class="settings-label">Categories &amp; rules</div>
+          <div class="settings-sub">Group categories, and file transactions automatically</div>
+        </div>
+        <div class="settings-arrow">›</div>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-section-title">Data</div>
       <div class="settings-row" (click)="navigate('/import')">
         <div class="settings-icon">📥</div>

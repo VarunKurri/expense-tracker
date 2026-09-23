@@ -14,6 +14,8 @@ import { Transaction } from '../models';
 import { Account } from '../models';
 import { availableCredit, creditCardBalance, transactionDeltaForAccount } from '../utils/finance';
 import { plaidCategoryName } from '../utils/plaid-category-map';
+import { TransactionRuleService } from './transaction-rule.service';
+import { applyRulesToDraft } from '../utils/rules';
 
 @Injectable({ providedIn: 'root' })
 export class TransactionService {
@@ -22,6 +24,7 @@ export class TransactionService {
   private encryption = inject(EncryptionService);
   private accountSvc = inject(AccountService);
   private categorySvc = inject(CategoryService);
+  private ruleService = inject(TransactionRuleService);
   private ngZone = inject(NgZone);
   error = signal<string | null>(null);
 
@@ -171,8 +174,11 @@ availableCredit(account: Account): number {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
     const now = Date.now();
+    // Rules run before the write, so a manually added transaction lands already
+    // filed rather than needing a second pass.
+    const ruled = applyRulesToDraft(this.ruleService.rules(), tx);
     const data = {
-      ...tx, createdAt: now, updatedAt: now
+      ...ruled, createdAt: now, updatedAt: now
     };
     await addDoc(collection(this.db, `users/${user.uid}/transactions`), await this.encryption.encryptForWrite(data));
   }
@@ -187,8 +193,12 @@ availableCredit(account: Account): number {
     let count = 0;
     const now = Date.now();
 
+    // CSV imports come through here too, so rules apply to them as well.
+    const rules = this.ruleService.rules();
+
     for (const tx of txs) {
-      const data = { ...tx, createdAt: now + count, updatedAt: now + count };
+      const ruled = applyRulesToDraft(rules, tx);
+      const data = { ...ruled, createdAt: now + count, updatedAt: now + count };
       batch.set(doc(ref), await this.encryption.encryptForWrite(data));
       count++;
 
@@ -240,6 +250,41 @@ availableCredit(account: Account): number {
     }
 
     if (count % 400 !== 0) await batch.commit();
+  }
+
+  /**
+   * Writes a different patch to each transaction, batched.
+   *
+   * `updateMany` applies one patch to many rows; applying rules needs the
+   * opposite, since each transaction gets whatever its matching rules decided.
+   */
+  async applyPatches(patches: { id: string; patch: Partial<Transaction> }[]) {
+    const user = this.auth.user();
+    if (!user) throw new Error('Not signed in');
+    if (patches.length === 0) return 0;
+
+    let batch = writeBatch(this.db);
+    let count = 0;
+    const now = Date.now();
+
+    for (const { id, patch } of patches) {
+      const ref = doc(this.db, `users/${user.uid}/transactions/${id}`);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) continue;
+      const current = await this.encryption.decryptDoc<Transaction>(snap.data());
+      batch.set(ref, await this.encryption.encryptForWrite(
+        { ...current, ...patch, updatedAt: now + count }
+      ));
+      count++;
+
+      if (count % 400 === 0) {
+        await batch.commit();
+        batch = writeBatch(this.db);
+      }
+    }
+
+    if (count % 400 !== 0) await batch.commit();
+    return count;
   }
 
   async removeMany(ids: string[]) {
