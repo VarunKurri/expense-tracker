@@ -1,0 +1,214 @@
+<div class="page">
+
+  <div class="header-row">
+    <div>
+      <h1>Spending</h1>
+      <div class="hint">What {{ monthName() }} has cost you, day by day</div>
+    </div>
+    <div class="month-nav">
+      <button class="month-btn" (click)="step(-1)" aria-label="Previous month">‹</button>
+      <span class="month-current">{{ monthTitle() }}</span>
+      <button class="month-btn" (click)="step(1)"
+              [disabled]="!canGoNext()"
+              [title]="canGoNext() ? 'Next month' : 'This is the current month'"
+              aria-label="Next month">›</button>
+    </div>
+  </div>
+
+  <nav class="subnav">
+    <span class="subnav-tab active" aria-current="page">Spending</span>
+    <a class="subnav-tab" routerLink="/analysis">Overview</a>
+    <a class="subnav-tab" routerLink="/analysis/reports">Reports</a>
+  </nav>
+
+  <!-- ── SPENT THIS MONTH ──────────────────────────────────── -->
+  <section class="card hero-card">
+    <div class="card-head">
+      <span class="card-label">Spent in {{ monthName() }}</span>
+      <div class="view-toggle" role="group" aria-label="Chart type">
+        <button class="view-btn" [class.active]="view() === 'calendar'"
+                [attr.aria-pressed]="view() === 'calendar'"
+                (click)="view.set('calendar')">Calendar</button>
+        <button class="view-btn" [class.active]="view() === 'trend'"
+                [attr.aria-pressed]="view() === 'trend'"
+                (click)="view.set('trend')">Trend</button>
+      </div>
+    </div>
+
+    <div class="hero-body">
+      <div class="hero-figure">
+        <div class="hero-total num-display">{{ formatCurrency(total()) }}</div>
+
+        <!-- Microcopy, not just a number: a percentage on its own does not say
+             whether the month is actually going badly. -->
+        @if (pacing(); as p) {
+          <p class="hero-note">
+            By day {{ p.dayOfMonth }} of {{ prevLabel() }} you had spent
+            {{ formatCurrency(p.prevSoFar) }}.
+            @if (p.diff > 0) {
+              You are <strong class="up">{{ formatCurrency(p.diff) }} ahead</strong> of that pace.
+            } @else if (p.diff < 0) {
+              You are <strong class="down">{{ formatCurrency(p.diff) }} behind</strong> it — a slower month so far.
+            } @else {
+              You are running at exactly the same pace.
+            }
+          </p>
+        } @else if (delta(); as d) {
+          <p class="hero-note">
+            {{ prevLabel() }} came to {{ formatCurrency(prevTotal()) }} —
+            @if (d.diff > 0) {
+              <strong class="up">{{ formatCurrency(d.diff) }} more</strong> this month ({{ d.pct }}%).
+            } @else if (d.diff < 0) {
+              <strong class="down">{{ formatCurrency(d.diff) }} less</strong> this month ({{ d.pct }}%).
+            } @else {
+              exactly the same this month.
+            }
+          </p>
+        } @else if (total() > 0) {
+          <p class="hero-note">
+            Money went out on {{ daysWithSpending() }}
+            day{{ daysWithSpending() === 1 ? '' : 's' }} this month.
+          </p>
+        }
+      </div>
+
+      @if (view() === 'calendar') {
+        <app-spend-calendar
+          [month]="month()"
+          [transactions]="spending()"
+          [amountOf]="spendAmount"
+          [selected]="selectedDay()"
+          (daySelected)="openDay($event)" />
+        <p class="hero-hint">Pick a day to see what was spent on it.</p>
+      } @else {
+        <div class="trend-wrap">
+          <canvas #trendCanvas></canvas>
+        </div>
+        <div class="trend-legend">
+          <span class="legend-item"><span class="legend-swatch current"></span>{{ monthName() }}</span>
+          <span class="legend-item"><span class="legend-swatch previous"></span>{{ prevLabel() }}</span>
+        </div>
+      }
+    </div>
+  </section>
+
+  <div class="split">
+
+    <!-- ── BREAKDOWN ───────────────────────────────────────── -->
+    <section class="card">
+      <div class="card-head">
+        <span class="card-label">Category breakdown</span>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" [class.active]="breakdown() === 'expenses'"
+                [attr.aria-selected]="breakdown() === 'expenses'"
+                (click)="breakdown.set('expenses')">Expenses</button>
+        <button class="tab" role="tab" [class.active]="breakdown() === 'budget'"
+                [attr.aria-selected]="breakdown() === 'budget'"
+                (click)="breakdown.set('budget')">Budget</button>
+      </div>
+
+      @if (breakdown() === 'expenses') {
+        @for (row of categoryRows(); track row.id) {
+          <button type="button" class="cat-row" (click)="seeAllInTransactions(row.id)">
+            <span class="cat-icon" [style.background]="row.color + '22'"
+                  [style.border-color]="row.color + '44'">{{ row.icon }}</span>
+            <span class="cat-main">
+              <span class="cat-name">{{ row.name }}</span>
+              <span class="cat-bar">
+                <span class="cat-fill" [style.width]="row.pct + '%'"
+                      [style.background]="row.color"></span>
+              </span>
+            </span>
+            <span class="cat-figures">
+              <span class="cat-amount">{{ formatCurrency(row.amount) }}</span>
+              <span class="cat-pct">{{ row.pct }}%</span>
+            </span>
+          </button>
+        } @empty {
+          <p class="empty">Nothing spent in {{ monthName() }} yet.</p>
+        }
+      } @else {
+        @for (row of budgetRows(); track row.categoryId) {
+          <a class="cat-row"
+             [routerLink]="['/budgets', row.categoryId, month()]">
+            <span class="cat-icon">{{ row.icon }}</span>
+            <span class="cat-main">
+              <span class="cat-name">{{ row.name }}</span>
+              <span class="cat-bar">
+                <span class="cat-fill" [class.warn]="row.status === 'warn'"
+                      [class.over]="row.status === 'over'"
+                      [style.width]="(row.pct > 100 ? 100 : row.pct) + '%'"></span>
+              </span>
+            </span>
+            <span class="cat-figures">
+              <span class="cat-amount">
+                {{ formatCurrency(row.spent) }} / {{ formatCurrency(row.budget) }}
+              </span>
+              <span class="cat-pct" [class.over]="row.status === 'over'">
+                @if (row.remaining >= 0) { {{ formatCurrency(row.remaining) }} left }
+                @else { {{ formatCurrency(row.remaining) }} over }
+              </span>
+            </span>
+          </a>
+        } @empty {
+          <p class="empty">
+            No budgets set for {{ monthName() }}.
+            <a routerLink="/budgets">Create one</a> to track a category against a limit.
+          </p>
+        }
+      }
+    </section>
+
+    <!-- ── LATEST ──────────────────────────────────────────── -->
+    <section class="card">
+      <div class="card-head">
+        <span class="card-label">Latest in {{ monthName() }}</span>
+        <button class="link-btn" (click)="seeAllInTransactions()">See all →</button>
+      </div>
+
+      @for (tx of latest(); track tx.id) {
+        <button type="button" class="tx-row" (click)="openTxView(tx)">
+          <span class="tx-date">{{ formatDay(tx.date) }}</span>
+          <span class="tx-main">
+            <span class="tx-name">{{ tx.merchant || 'Untitled' }}</span>
+            <span class="tx-cat">{{ categoryName(tx.categoryId) }}</span>
+          </span>
+          <span class="tx-amount">{{ formatCurrency(spendAmount(tx)) }}</span>
+        </button>
+      } @empty {
+        <p class="empty">No spending recorded in {{ monthName() }}.</p>
+      }
+    </section>
+
+  </div>
+</div>
+
+<!-- ── OVERLAYS ────────────────────────────────────────────── -->
+<app-day-detail
+  [date]="selectedDay()"
+  [transactions]="spending()"
+  [amountOf]="spendAmount"
+  (closed)="closeDay()"
+  (txPicked)="openTxFromDay($event)" />
+
+<app-transaction-view
+  [transaction]="viewingTx()"
+  (closed)="closeTxView()"
+  (editRequested)="editFromTxView($event)" />
+
+<app-transaction-form
+  [open]="txFormOpen()"
+  [transaction]="editingTx()"
+  (closed)="closeTxForm()"
+  (saved)="handleTxSave($event)"
+  (deleteRequested)="askTxDelete()" />
+
+<app-confirm
+  [open]="txConfirmOpen()"
+  title="Delete transaction?"
+  message="This cannot be undone."
+  confirmText="Delete"
+  (confirmed)="confirmTxDelete()"
+  (cancelled)="txConfirmOpen.set(false)" />

@@ -263,15 +263,15 @@
 .acct-sub { font-size: 11px; color: var(--fg-4); font-family: var(--font-mono); letter-spacing: 0.04em; }
 
 /* ── MAIN GRID ─────────────────────────────────────────────── */
+/* Three equal panels since the calendar card took over the full width above.
+   auto-fit means they reflow to 2-up and then 1-up on their own, with no
+   breakpoint to keep in sync. */
 .main-grid {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
   align-items: start;
 }
-
-.left-col { display: flex; flex-direction: column; gap: 16px; }
-.right-col { display: flex; flex-direction: column; gap: 16px; }
 
 /* ── PANEL ─────────────────────────────────────────────────── */
 .panel {
@@ -307,55 +307,85 @@
 }
 .panel-empty { padding: 24px; text-align: center; color: var(--fg-4); font-size: 13px; }
 
-/* ── FLOW CHART ────────────────────────────────────────────── */
-.flow-header {
+/* ── SPEND CALENDAR CARD ───────────────────────────────────── */
+.spend-card { margin-bottom: 16px; }
+
+.spend-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+}
+
+.spend-main { padding: 20px 22px 22px; min-width: 0; }
+
+/* The eyebrow is the link into the Spending page, the way Origin's
+   "SPENT IN SEPTEMBER ›" is. It is a button, so it gets a pointer and a focus
+   ring — but no fill or border, so it still reads as a label. */
+.spend-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--fg-3);
+
+  &:hover { color: var(--fg); }
+  &:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: var(--radius-xs); }
+
+  .card-label { cursor: pointer; }
+}
+
+.spend-chev {
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.14s ease;
+}
+.spend-link:hover .spend-chev { transform: translateX(2px); }
+
+.spend-total {
+  font-size: 40px;
+  letter-spacing: -0.04em;
+  margin: 10px 0 20px;
+  color: var(--fg);
+}
+
+.spend-rail {
+  border-left: 1px solid var(--line);
+  align-self: stretch;
+  min-width: 0;
+}
+
+.spend-rail-head {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
-  padding: 16px 18px 0;
+  gap: 10px;
+  padding: 20px 18px 12px;
 }
-.flow-header-left { display: flex; flex-direction: column; gap: 6px; }
-.flow-stats { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-.flow-stat {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 13px; color: var(--fg-3);
-  font-variant-numeric: tabular-nums;
-  strong { color: var(--fg); font-weight: 600; }
-}
-.flow-dot {
-  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-  &.income-dot   { background: var(--teal); }
-  &.spending-dot { background: var(--blue); }
-}
-.flow-net-block { text-align: right; }
-.flow-net-label {
-  font-family: var(--font-mono);
-  font-size: 10px; font-weight: 500;
-  text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--fg-3); margin-bottom: 4px;
-}
-.flow-net-value {
-  font-size: 26px; font-weight: 600;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-  &.pos { color: var(--teal); }
-  &.neg { color: var(--red); }
-}
-.flow-chart-wrap { height: 160px; padding: 8px 16px 16px; }
 
 /* ── ACTIVITY ──────────────────────────────────────────────── */
+/* A real <button>, so these rows are keyboard-reachable — they open the
+   transaction view, which was previously only clickable with a mouse. */
 .activity-row {
   display: grid;
   grid-template-columns: 38px 1fr auto;
   gap: 12px;
   align-items: center;
+  width: 100%;
   padding: 11px 18px;
   cursor: pointer;
+  border: none;
   border-bottom: 1px solid var(--line);
+  background: transparent;
+  font-family: var(--font-ui);
+  text-align: left;
   transition: background 0.18s ease;
 
   &:last-child { border-bottom: none; }
   &:hover { background: var(--bg-3); }
+  &:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 }
 
 .activity-icon {
@@ -370,8 +400,9 @@
   &.transfer { color: var(--fg-3); }
 }
 
-.activity-main { min-width: 0; }
+.activity-main { min-width: 0; display: block; }
 .activity-title {
+  display: block;
   font-size: 13.5px; font-weight: 600; color: var(--fg);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -478,119 +509,22 @@
 }
 
 /* ── TRANSACTION VIEW PANEL ────────────────────────────────── */
-.view-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(4px);
-  z-index: 50;
-  animation: fadeIn 0.2s ease;
-}
-
-.view-panel {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: var(--surface-hi);
-  border-radius: 24px 24px 0 0;
-  border: 1px solid var(--line);
-  border-bottom: none;
-  z-index: 51;
-  padding: 0 0 calc(40px + env(safe-area-inset-bottom));
-  animation: slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-@media (min-width: 640px) {
-  .view-panel {
-    bottom: auto; left: 50%; top: 50%;
-    transform: translate(-50%, -50%);
-    width: 480px; max-height: 85vh; overflow-y: auto;
-    border-radius: 20px; border: 1px solid var(--line);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 24px 64px rgba(0,0,0,0.1);
-    animation: popIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-  .view-handle { display: none; }
-}
-
-.view-handle { width: 36px; height: 4px; border-radius: 999px; background: var(--line); margin: 12px auto 0; }
-
-.view-header {
-  display: flex; justify-content: space-between;
-  align-items: center; padding: 16px 20px 0;
-}
-
-.view-close {
-  width: 32px; height: 32px; border-radius: 50%;
-  background: var(--bg-3); border: none;
-  color: var(--fg-3); font-size: 13px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.18s ease;
-  &:hover { color: var(--fg); }
-}
-
-.view-edit-btn {
-  padding: 7px 16px; border-radius: 8px;
-  background: var(--surface); border: 1px solid var(--line-strong); color: var(--fg);
-  font-size: 13px; font-weight: 600;
-  font-family: inherit; border: none; cursor: pointer;
-  transition: background 0.18s ease;
-  &:hover { background: var(--bg-3); }
-}
-
-.view-amount-wrap { padding: 20px 24px 8px; text-align: center; }
-
-.view-amount {
-  font-size: 42px; font-weight: 700;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums; color: var(--fg);
-  &.pos { color: var(--teal); }
-  &.neg { color: var(--fg); }
-}
-
-.view-refunded-badge {
-  display: inline-block; margin-top: 8px;
-  padding: 4px 12px; border-radius: 999px;
-  background: var(--teal-bg); color: var(--teal);
-  font-size: 12px; font-weight: 600;
-}
-
-.view-details {
-  margin: 16px 20px 0;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 16px; overflow: hidden;
-}
-
-.view-row {
-  display: flex; justify-content: space-between;
-  align-items: flex-start;
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--line);
-  gap: 16px;
-  &:last-child { border-bottom: none; }
-}
-
-.view-row-label { font-size: 13px; color: var(--fg-3); font-weight: 500; flex-shrink: 0; }
-.view-row-value { font-size: 13px; font-weight: 600; color: var(--fg); text-align: right; }
-
-.notes-text {
-  color: var(--fg-2); font-weight: 400;
-  line-height: 1.5; white-space: pre-wrap;
-  word-break: break-word; text-align: left;
-}
-
-.view-type-badge {
-  font-size: 12px; padding: 3px 10px;
-  border-radius: 999px; font-weight: 600;
-  &.income   { background: var(--teal-bg); color: var(--teal); }
-  &.expense  { background: var(--red-bg); color: var(--red); }
-  &.transfer { background: var(--bg-3); color: var(--fg-3); }
-}
+/* The transaction view panel now lives in
+   components/transaction-view/ — its styles moved with it. */
 
 /* ── RESPONSIVE ────────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .accts-strip { grid-template-columns: repeat(3, 1fr); }
 }
+/* Below this the rail can no longer sit beside a seven-column calendar without
+   squeezing both, so it drops underneath and becomes a normal list. */
 @media (max-width: 1100px) {
-  .main-grid { grid-template-columns: 1fr; }
-  .right-col { display: grid; grid-template-columns: repeat(2, 1fr); }
+  .spend-layout { grid-template-columns: 1fr; }
+  .spend-rail {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+  .spend-rail-head { padding-top: 14px; }
 }
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
@@ -599,17 +533,8 @@
   .kpi-grid { grid-template-columns: 1fr; }
   .accts-strip { grid-template-columns: repeat(2, 1fr); }
   .hero-top { flex-wrap: wrap; gap: 12px; }
-  .right-col { grid-template-columns: 1fr; }
-  .flow-header { flex-direction: column; gap: 10px; }
-  .flow-net-block { text-align: left; display: flex; align-items: center; gap: 10px; }
-  .flow-net-label { margin-bottom: 0; font-size: 10px; }
-  .flow-net-value { font-size: 22px; }
-}
-
-/* ── ANIMATIONS ────────────────────────────────────────────── */
-@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes popIn   {
-  from { transform: translate(-50%, -48%) scale(0.97); opacity: 0; }
-  to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  .spend-main { padding: 16px 14px 18px; }
+  .spend-total { font-size: 32px; margin: 8px 0 16px; }
+  .spend-rail-head { padding-left: 14px; padding-right: 14px; }
+  .activity-row { padding-left: 14px; padding-right: 14px; }
 }

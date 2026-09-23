@@ -1,0 +1,135 @@
+/* Heat ramp.
+ *
+ * The percentages differ per theme on purpose. Light mode blends the accent
+ * toward white, so it can run all the way to full --blue and still carry the
+ * normal --fg ink. Dark mode blends toward near-black, so the same ramp would
+ * cross into a bright blue that light ink cannot sit on — it stops at 72%.
+ * Measured with --fg as the ink, every level clears 4.5:1 in both themes
+ * (light 16.0 / 12.8 / 9.2 / 5.8, dark 14.0 / 10.5 / 7.4 / 5.0), which is why
+ * the text colour never changes with the heat. */
+:host {
+  --heat-1: color-mix(in srgb, var(--blue) 14%, var(--surface));
+  --heat-2: color-mix(in srgb, var(--blue) 34%, var(--surface));
+  --heat-3: color-mix(in srgb, var(--blue) 62%, var(--surface));
+  --heat-4: color-mix(in srgb, var(--blue) 100%, var(--surface));
+  display: block;
+}
+
+:host-context([data-theme="dark"]) {
+  --heat-1: color-mix(in srgb, var(--blue) 18%, var(--surface));
+  --heat-2: color-mix(in srgb, var(--blue) 34%, var(--surface));
+  --heat-3: color-mix(in srgb, var(--blue) 52%, var(--surface));
+  --heat-4: color-mix(in srgb, var(--blue) 72%, var(--surface));
+}
+
+.cal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cal-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.cal-weekdays { margin-bottom: 2px; }
+
+.cal-weekday {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  text-align: center;
+  padding-bottom: 2px;
+}
+
+.cal-pad { /* keeps the week aligned without drawing a cell */ }
+
+.cal-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 62px;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--line-strong);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+
+  &.heat-1 { background: var(--heat-1); border-color: transparent; }
+  &.heat-2 { background: var(--heat-2); border-color: transparent; }
+  &.heat-3 { background: var(--heat-3); border-color: transparent; }
+  &.heat-4 { background: var(--heat-4); border-color: transparent; }
+
+  /* Today is marked by its border, not by a fill, so it cannot be mistaken for
+     a heat level. */
+  &.today { border-color: var(--fg-3); }
+
+  &.selected {
+    border-color: var(--fg);
+    box-shadow: inset 0 0 0 1px var(--fg);
+  }
+
+  &.future {
+    background: transparent;
+    border-style: dashed;
+    border-color: var(--line);
+    color: var(--fg-4);
+    cursor: default;
+  }
+}
+
+.cal-num {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  opacity: 0.75;
+}
+
+.cal-amt {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* A day with nothing spent stays quiet — the figure is there if you look for
+   it, but it does not compete with the days that cost something. */
+.cal-day.heat-0:not(.future) .cal-amt { color: var(--fg-4); }
+
+@media (max-width: 900px) {
+  .cal-row { gap: 4px; }
+  .cal-day { min-height: 52px; padding: 6px 7px; }
+  .cal-amt { font-size: 11.5px; }
+  .cal-num { font-size: 11px; }
+}
+
+@media (max-width: 520px) {
+  .cal-day { min-height: 44px; padding: 5px; gap: 2px; }
+  .cal-amt { font-size: 10px; letter-spacing: -0.03em; }
+  .cal-num { font-size: 10px; }
+  .cal-weekday { font-size: 9px; letter-spacing: 0.02em; }
+}

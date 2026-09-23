@@ -1,0 +1,37 @@
+<div class="cal">
+  <div class="cal-row cal-weekdays" aria-hidden="true">
+    @for (d of weekdays; track d) {
+      <span class="cal-weekday">{{ d }}</span>
+    }
+  </div>
+
+  @for (week of grid().weeks; track $index) {
+    <div class="cal-row">
+      @for (cell of week; track cell.date || 'pad-' + $index) {
+        @if (!cell.inMonth) {
+          <span class="cal-pad"></span>
+        } @else {
+          <button type="button"
+                  class="cal-day"
+                  [class.heat-0]="cell.heat === 0"
+                  [class.heat-1]="cell.heat === 1"
+                  [class.heat-2]="cell.heat === 2"
+                  [class.heat-3]="cell.heat === 3"
+                  [class.heat-4]="cell.heat === 4"
+                  [class.today]="cell.isToday"
+                  [class.future]="cell.future"
+                  [class.selected]="selected() === cell.date"
+                  [disabled]="cell.future"
+                  [attr.aria-label]="ariaLabel(cell)"
+                  [attr.aria-pressed]="selected() === cell.date"
+                  (click)="pick(cell)">
+            <span class="cal-num">{{ cell.day }}</span>
+            <!-- A day that hasn't happened shows a dash: "$0 spent" would be a
+                 claim about the future rather than a fact about the past. -->
+            <span class="cal-amt">{{ cell.future ? '–' : cellAmount(cell) }}</span>
+          </button>
+        }
+      }
+    </div>
+  }
+</div>

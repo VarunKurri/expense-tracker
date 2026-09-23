@@ -63,6 +63,12 @@ The app is what we copy. Do not "correct" this back to dark.
   `.label-mono`, `.num`, `.num-display`, `.display`.
 - `.glass` / `.glass-strong` are legacy aliases for flat surfaces, kept only so
   un-converted templates still render. Do not use them in new markup.
+- Shared components worth reaching for before writing new markup:
+  `app-spend-calendar` (month heat grid), `app-day-detail` (what one day cost),
+  `app-transaction-view` (read-only transaction sheet), `app-transaction-form`,
+  `app-confirm`, `app-modal`, `app-toast`, `app-logo`, `app-icon`.
+  The Analysis page still has its own inline copy of the transaction view —
+  migrate it to `app-transaction-view` when that page is next touched.
 - Desktop-first, responsive down to mobile.
 - Microcopy follows Origin: mono uppercase eyebrow → plain-English sentence
   headline → a calm sentence explaining *why it matters*. Never just a number.

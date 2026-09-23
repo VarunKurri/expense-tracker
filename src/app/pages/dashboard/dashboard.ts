@@ -14,24 +14,25 @@ import { ToastService } from '../../services/toast.service';
 import { Account, Bill, Transaction } from '../../models';
 import { chartColors } from '../../utils/theme-colors';
 import { ThemeService } from '../../services/theme.service';
+import { SpendCalendar } from '../../components/spend-calendar/spend-calendar';
+import { DayDetail } from '../../components/day-detail/day-detail';
+import { TransactionView } from '../../components/transaction-view/transaction-view';
+import { DayCell, monthKeyOf, monthLabel } from '../../utils/calendar';
+import { spendingTransactions } from '../../utils/reporting';
 import {
   Chart, ArcElement, DoughnutController,
-  CategoryScale, LinearScale, BarElement, BarController,
-  LineController, LineElement, PointElement, Filler,
   Tooltip, Legend
 } from 'chart.js';
 
-Chart.register(
-  ArcElement, DoughnutController,
-  CategoryScale, LinearScale, BarElement, BarController,
-  LineController, LineElement, PointElement, Filler,
-  Tooltip, Legend
-);
+Chart.register(ArcElement, DoughnutController, Tooltip, Legend);
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, TransactionForm, BillForm, Confirm],
+  imports: [
+    CommonModule, TransactionForm, BillForm, Confirm,
+    SpendCalendar, DayDetail, TransactionView,
+  ],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -50,9 +51,6 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   @ViewChild('miniDonutCanvas') miniDonutCanvas!: ElementRef<HTMLCanvasElement>;
   private miniDonut: Chart | null = null;
 
-  @ViewChild('cashFlowCanvas') cashFlowCanvas!: ElementRef<HTMLCanvasElement>;
-  private cashFlowChart: Chart | null = null;
-
   activeRange = signal<'7D' | '30D' | '90D' | 'YTD'>('30D');
 
   testToasts() {
@@ -68,21 +66,15 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   txConfirmOpen = signal(false);
   txToDelete = signal<Transaction | null>(null);
 
-  openTxView(tx: Transaction) {
-    this.viewingTx.set(tx);
-    document.body.style.overflow = 'hidden';
-  }
+  // The view panel owns its own body-scroll lock, so these only move state.
+  openTxView(tx: Transaction) { this.viewingTx.set(tx); }
 
-  closeTxView() {
-    this.viewingTx.set(null);
-    document.body.style.overflow = '';
-  }
+  closeTxView() { this.viewingTx.set(null); }
 
-  editFromTxView() {
-    const tx = this.viewingTx();
+  editFromTxView(tx: Transaction) {
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
-    if (tx) { this.editingTx.set(tx); this.txFormOpen.set(true); }
+    this.editingTx.set(tx);
+    this.txFormOpen.set(true);
   }
 
   closeTxForm() { this.txFormOpen.set(false); this.editingTx.set(null); }
@@ -188,35 +180,57 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     ) / 100;
   });
 
-  cashFlowData = computed(() => {
-    const days: { date: string; label: string; income: number; expenses: number }[] = [];
-    const now = new Date();
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const date = this.localDateString(d);
-      const label = i % 7 === 0 || i === 0
-        ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-      days.push({ date, label, income: 0, expenses: 0 });
-    }
-    for (const t of this.txService.transactions()) {
-      if (t.isInternalTransfer) continue;
-      const entry = days.find(d => d.date === t.date);
-      if (!entry) continue;
-      if (t.type === 'income') entry.income += t.amount;
-      if (t.type === 'expense') entry.expenses += t.amount;
-    }
-    return days;
-  });
+  // ── Spending calendar ─────────────────────────────────────
+  /**
+   * The month the calendar card shows. The dashboard is always "now" — stepping
+   * through months is what the Spending page is for.
+   */
+  calendarMonth = monthKeyOf();
+  calendarLabel = monthLabel(this.calendarMonth, false);
 
-  cashFlowNet = computed(() =>
-    Math.round(this.cashFlowData().reduce((s, d) => s + d.income - d.expenses, 0) * 100) / 100
+  /**
+   * What the calendar counts as spending. Deliberately the same rules the
+   * Analysis and Reports pages use by default — expenses only, no internal
+   * transfers, refunded transactions dropped, and partial reimbursements netted
+   * off — so the figure on this card matches what those pages show for the same
+   * month rather than being a fourth, slightly different number.
+   */
+  monthSpending = computed(() =>
+    spendingTransactions(this.txService.transactions())
+      .filter(t => !t.refunded && t.date.startsWith(this.calendarMonth))
   );
-  cashFlowIncome = computed(() =>
-    Math.round(this.cashFlowData().reduce((s, d) => s + d.income, 0) * 100) / 100
+
+  /** Bound into the calendar and day popup so both net reimbursements the same way. */
+  spendAmount = (t: Transaction) => this.txService.effectiveExpenseAmount(t);
+
+  monthTotal = computed(() =>
+    Math.round(this.monthSpending().reduce((s, t) => s + this.spendAmount(t), 0) * 100) / 100
   );
-  cashFlowExpenses = computed(() =>
-    Math.round(this.cashFlowData().reduce((s, d) => s + d.expenses, 0) * 100) / 100
-  );
+
+  /** The day popup's open state — null when closed. */
+  selectedDay = signal<string | null>(null);
+
+  openDay(cell: DayCell) {
+    this.selectedDay.set(cell.date);
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeDay() {
+    this.selectedDay.set(null);
+    document.body.style.overflow = '';
+  }
+
+  /** Day popup → the full transaction view, so one tap gets to the detail. */
+  openTxFromDay(tx: Transaction) {
+    this.closeDay();
+    this.openTxView(tx);
+  }
+
+  openSpending() {
+    this.router.navigate(['/analysis/spending'], {
+      queryParams: { month: this.calendarMonth },
+    });
+  }
 
   private rangeStart = computed((): string => {
     const now = new Date();
@@ -381,12 +395,6 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     if (n >= 1000) return '$' + (n / 1000).toFixed(1) + 'k';
     return '$' + Math.round(n);
   }
-  formatFullDate(date: string): string {
-    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-    });
-  }
-
   isNegative(n: number): boolean { return n < 0; }
   navigate(path: string) { this.router.navigate([path]); }
   setRange(r: string) { this.activeRange.set(r as '7D' | '30D' | '90D' | 'YTD'); }
@@ -411,25 +419,17 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   constructor() {
     effect(() => {
       const donutData = this.categoryBreakdown();
-      const flowData = this.cashFlowData();
-      // Init/update each chart independently — the donut canvas only exists when there
-      // is current-month spending, and the cash-flow chart must not depend on it.
-      this.ensureCashFlow();
-      if (this.cashFlowChart) this.updateCashFlow(flowData);
       this.ensureDonut();
       if (this.miniDonut) this.updateMiniDonut(donutData);
     });
 
     // Chart.js bakes colours in at construction time, so a theme switch would
-    // otherwise leave the charts painted for the old theme. Rebuild both when
-    // the theme changes.
+    // otherwise leave the chart painted for the old theme. Rebuild on change.
     effect(() => {
       this.themeService.theme();
-      this.cashFlowChart?.destroy();
-      this.cashFlowChart = null;
       this.miniDonut?.destroy();
       this.miniDonut = null;
-      queueMicrotask(() => { this.ensureCashFlow(); this.ensureDonut(); });
+      queueMicrotask(() => this.ensureDonut());
     });
   }
 
@@ -437,18 +437,13 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     this.initChartsWhenReady();
   }
 
-  // The cash-flow canvas is always rendered; retry until it (and, if present, the donut
-  // canvas) exist. Each chart is created independently so a hidden donut can't block it.
+  // The donut canvas is only in the DOM when there is spending to show, and it
+  // arrives a tick after the data does; retry until it exists.
   private initChartsWhenReady(attempt = 0) {
-    this.ensureCashFlow();
     this.ensureDonut();
-    if (!this.cashFlowChart && attempt < 20) {
+    if (!this.miniDonut && this.recentTotal() > 0 && attempt < 20) {
       setTimeout(() => this.initChartsWhenReady(attempt + 1), 100);
     }
-  }
-
-  private ensureCashFlow() {
-    if (!this.cashFlowChart && this.cashFlowCanvas?.nativeElement) this.initCashFlow();
   }
 
   private ensureDonut() {
@@ -460,48 +455,9 @@ export class Dashboard implements AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     this.miniDonut?.destroy();
-    this.cashFlowChart?.destroy();
-  }
-
-  private initCashFlow() {
-    const ctx = this.cashFlowCanvas?.nativeElement?.getContext('2d');
-    if (!ctx) return;
-    const data = this.cashFlowData();
-    const c = chartColors();
-    this.cashFlowChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: data.map(d => d.label),
-        datasets: [
-          { label: 'Income', data: data.map(d => d.income), backgroundColor: c.positive, borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 },
-          { label: 'Spending', data: data.map(d => d.expenses), backgroundColor: c.accent, borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 }
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title: (items) => data[items[0].dataIndex].date,
-              label: (ctx) => ` ${ctx.dataset.label}: ${this.formatCurrency(ctx.raw as number)}`
-            }
-          }
-        },
-        scales: {
-          x: { grid: { display: false }, border: { display: false }, ticks: { color: c.tick, font: { size: 10 }, maxRotation: 0 } },
-          y: { grid: { color: c.grid }, border: { display: false }, ticks: { color: c.tick, font: { size: 10 }, callback: (val) => this.formatCurrencyShort(val as number) } }
-        }
-      }
-    });
-  }
-
-  private updateCashFlow(data: any[]) {
-    if (!this.cashFlowChart) return;
-    this.cashFlowChart.data.labels = data.map(d => d.label);
-    this.cashFlowChart.data.datasets[0].data = data.map(d => d.income);
-    this.cashFlowChart.data.datasets[1].data = data.map(d => d.expenses);
-    this.cashFlowChart.update('none');
+    // The day popup locks body scroll; leaving the page with it open would
+    // otherwise leave the whole app unscrollable.
+    document.body.style.overflow = '';
   }
 
   private initMiniDonut() {

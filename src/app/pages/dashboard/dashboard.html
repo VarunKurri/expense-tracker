@@ -121,50 +121,32 @@
     </div>
   }
 
-  <!-- MAIN CONTENT GRID -->
-  <div class="main-grid">
+  <!-- SPENT THIS MONTH — calendar + recent activity, after Origin's card.
+       This replaced the 30-day cash-flow chart: a calendar answers "which days
+       cost me money" far better than a bar chart, and the activity list that
+       used to sit below it now lives in this card's right-hand rail. -->
+  <div class="panel spend-card">
+    <div class="spend-layout">
 
-    <!-- LEFT COLUMN -->
-    <div class="left-col">
+      <div class="spend-main">
+        <button type="button" class="spend-link" (click)="openSpending()">
+          <span class="card-label">Spent in {{ calendarLabel }}</span>
+          <span class="spend-chev" aria-hidden="true">›</span>
+        </button>
 
-      <!-- Cash flow chart -->
-      <div class="panel">
-        <div class="flow-header">
-          <div class="flow-header-left">
-            <div class="panel-title">Cash flow</div>
-            <div class="flow-stats">
-              <span class="flow-stat">
-                <span class="flow-dot income-dot"></span>
-                Income <strong>{{ formatCurrency(cashFlowIncome()) }}</strong>
-              </span>
-              <span class="flow-stat">
-                <span class="flow-dot spending-dot"></span>
-                Spending <strong>{{ formatCurrency(cashFlowExpenses()) }}</strong>
-              </span>
-            </div>
-          </div>
-          <div class="flow-net-block">
-            <div class="flow-net-label">NET</div>
-            <div class="flow-net-value"
-                [class.pos]="cashFlowNet() >= 0"
-                [class.neg]="cashFlowNet() < 0">
-              {{ cashFlowNet() >= 0 ? '+' : '−' }}{{ formatCurrency(cashFlowNet()) }}
-            </div>
-          </div>
-        </div>
-        <div class="flow-chart-wrap">
-          <canvas #cashFlowCanvas></canvas>
-        </div>
+        <div class="spend-total num-display">{{ formatCurrency(monthTotal()) }}</div>
+
+        <app-spend-calendar
+          [month]="calendarMonth"
+          [transactions]="monthSpending()"
+          [amountOf]="spendAmount"
+          [selected]="selectedDay()"
+          (daySelected)="openDay($event)" />
       </div>
 
-      <!-- Activity -->
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <div class="panel-title">Activity</div>
-            <div class="panel-sub-text">Recent transactions</div>
-          </div>
-          <!-- View all → goes to transactions page -->
+      <div class="spend-rail">
+        <div class="spend-rail-head">
+          <span class="card-label">Recent transactions</span>
           <button class="panel-link" (click)="navigate('/transactions')">View all →</button>
         </div>
 
@@ -173,47 +155,45 @@
         }
 
         @for (tx of recentTransactions(); track tx.id) {
-          <!-- Fixed: click opens view panel, not /transactions page -->
-          <div class="activity-row" (click)="openTxView(tx)">
-            <div class="activity-icon"
+          <button type="button" class="activity-row" (click)="openTxView(tx)">
+            <span class="activity-icon"
                 [class.income]="tx.type === 'income'"
                 [class.transfer]="tx.type === 'transfer'">
               @if (categoryFor(tx.categoryId); as cat) { {{ cat.icon }} }
               @else if (tx.type === 'income') { ↓ }
               @else if (tx.type === 'transfer') { ↔ }
               @else { ↑ }
-            </div>
-            <div class="activity-main">
-              <div class="activity-title">
+            </span>
+            <span class="activity-main">
+              <span class="activity-title">
                 {{ tx.type === 'transfer' ? 'Transfer' : (tx.merchant || 'Untitled') }}
-              </div>
-              <div class="activity-meta">
+              </span>
+              <span class="activity-meta">
                 @if (categoryFor(tx.categoryId); as cat) {
                   <span>{{ cat.name }}</span>
                   <span class="meta-dot">·</span>
                 }
-                <span>{{ accountName(tx.accountId) }}</span>
-                <span class="meta-dot">·</span>
                 <span>{{ timeAgo(tx.date) }}</span>
-              </div>
-            </div>
-            <div class="activity-amount"
+              </span>
+            </span>
+            <span class="activity-amount"
                 [class.pos]="tx.type === 'income'"
                 [class.neg]="tx.type === 'expense'">
               @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
               @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
               @else { {{ formatCurrency(tx.amount) }} }
-            </div>
-          </div>
+            </span>
+          </button>
         }
       </div>
 
     </div>
+  </div>
 
-    <!-- RIGHT COLUMN -->
-    <div class="right-col">
+  <!-- MAIN CONTENT GRID -->
+  <div class="main-grid">
 
-      <!-- Where it went -->
+    <!-- Where it went -->
       @if (recentTotal() > 0) {
         <div class="panel">
           <div class="panel-head">
@@ -338,81 +318,23 @@
         </div>
       }
 
-    </div>
   </div>
 
 </div>
 
+<!-- ── DAY DETAIL POPUP ───────────────────────────────────── -->
+<app-day-detail
+  [date]="selectedDay()"
+  [transactions]="monthSpending()"
+  [amountOf]="spendAmount"
+  (closed)="closeDay()"
+  (txPicked)="openTxFromDay($event)" />
+
 <!-- ── TRANSACTION VIEW PANEL ─────────────────────────────── -->
-@if (viewingTx()) {
-  <div class="view-backdrop" (click)="closeTxView()"></div>
-  <div class="view-panel">
-    <div class="view-handle"></div>
-    <div class="view-header">
-      <button class="view-close" (click)="closeTxView()">✕</button>
-      <button class="view-edit-btn" (click)="editFromTxView()">Edit</button>
-    </div>
-    @if (viewingTx(); as tx) {
-      <div class="view-amount-wrap">
-        <div class="view-amount"
-             [class.pos]="tx.type === 'income'"
-             [class.neg]="tx.type === 'expense'">
-          @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
-          @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
-          @else { {{ formatCurrency(tx.amount) }} }
-        </div>
-        @if (tx.refunded) {
-          <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
-        }
-      </div>
-      <div class="view-details">
-        @if (tx.type !== 'transfer') {
-          <div class="view-row">
-            <span class="view-row-label">{{ tx.type === 'income' ? 'Source' : 'Merchant' }}</span>
-            <span class="view-row-value">{{ tx.merchant || '—' }}</span>
-          </div>
-        }
-        <div class="view-row">
-          <span class="view-row-label">Date</span>
-          <span class="view-row-value">{{ formatFullDate(tx.date) }}</span>
-        </div>
-        @if (tx.type === 'transfer') {
-          <div class="view-row">
-            <span class="view-row-label">From</span>
-            <span class="view-row-value">{{ accountName(tx.fromAccountId) }}</span>
-          </div>
-          <div class="view-row">
-            <span class="view-row-label">To</span>
-            <span class="view-row-value">{{ accountName(tx.toAccountId) }}</span>
-          </div>
-        } @else {
-          <div class="view-row">
-            <span class="view-row-label">Account</span>
-            <span class="view-row-value">{{ accountName(tx.accountId) }}</span>
-          </div>
-          @if (categoryFor(tx.categoryId); as cat) {
-            <div class="view-row">
-              <span class="view-row-label">Category</span>
-              <span class="view-row-value">{{ cat.icon }} {{ cat.name }}</span>
-            </div>
-          }
-        }
-        @if (tx.notes) {
-          <div class="view-row">
-            <span class="view-row-label">Notes</span>
-            <span class="view-row-value notes-text">{{ tx.notes }}</span>
-          </div>
-        }
-        <div class="view-row">
-          <span class="view-row-label">Type</span>
-          <span class="view-row-value view-type-badge" [class]="tx.type">
-            {{ tx.type === 'income' ? 'Income' : tx.type === 'expense' ? 'Expense' : 'Transfer' }}
-          </span>
-        </div>
-      </div>
-    }
-  </div>
-}
+<app-transaction-view
+  [transaction]="viewingTx()"
+  (closed)="closeTxView()"
+  (editRequested)="editFromTxView($event)" />
 
 <!-- TRANSACTION EDIT FORM -->
 <app-transaction-form
