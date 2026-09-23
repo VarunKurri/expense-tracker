@@ -1,11 +1,11 @@
 {
   "name": "Trackr",
   "short_name": "Trackr",
-  "description": "A zero-knowledge encrypted expense tracker — track spending, budgets, and bills across your linked bank accounts.",
+  "description": "A zero-knowledge encrypted expense tracker \u2014 track spending, budgets, and bills across your linked bank accounts.",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#F5F5F7",
-  "background_color": "#F5F5F7",
+  "theme_color": "#F7F7F8",
+  "background_color": "#F7F7F8",
   "scope": "./",
   "start_url": "./",
   "icons": [

@@ -24,7 +24,8 @@
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(circle at 70% 20%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+    radial-gradient(ellipse 75% 55% at 78% 12%, rgba(59, 142, 255, 0.32) 0%, transparent 62%),
+    radial-gradient(ellipse 65% 50% at 10% 78%, rgba(14, 159, 110, 0.24) 0%, transparent 58%);
   pointer-events: none;
 
   &::after {
@@ -62,14 +63,13 @@
 
 .login-hero-text {
   h1 {
-    font-size: clamp(36px, 4vw, 52px);
-    font-weight: 800;
-    letter-spacing: -0.05em;
-    line-height: 1.08;
+    font-family: var(--font-display);
+    font-size: clamp(36px, 4vw, 54px);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    line-height: 1.18;
     color: #fff;
     margin-bottom: 20px;
-
-
   }
 
   p {
@@ -99,7 +99,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--fg-4);
+  background: linear-gradient(135deg, var(--blue), var(--teal));
   flex-shrink: 0;
 }
 
@@ -1169,7 +1169,9 @@
   position: fixed;
   inset: 0;
   background-image:
-    radial-gradient(circle at 70% 10%, rgba(255, 255, 255, 0.05) 0%, transparent 45%);
+    radial-gradient(ellipse 70% 55% at 72% 8%, rgba(59, 142, 255, 0.30) 0%, transparent 62%),
+    radial-gradient(ellipse 60% 50% at 12% 68%, rgba(14, 159, 110, 0.22) 0%, transparent 58%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, rgba(124, 92, 196, 0.16) 0%, transparent 60%);
   pointer-events: none;
 }
 
@@ -1246,11 +1248,21 @@
   gap: 22px;
 
   h1 {
-    font-size: clamp(38px, 6vw, 64px);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    line-height: 1.06;
+    font-size: clamp(38px, 6vw, 66px);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    line-height: 1.16;
     margin: 0;
+
+    em {
+      font-style: italic;
+      // A gradient-filled accent phrase — the one place the brand colours
+      // appear in type.
+      background: linear-gradient(100deg, var(--blue) 0%, var(--teal) 70%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
   }
 
   p {
@@ -1268,9 +1280,9 @@
   gap: 7px;
   padding: 7px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(14, 159, 110, 0.38);
+  background: rgba(14, 159, 110, 0.12);
+  color: #4FD8A8;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
@@ -1317,7 +1329,23 @@
     background: rgba(255, 255, 255, 0.05);
   }
 
-  .landing-feature-icon { font-size: 26px; margin-bottom: 12px; }
+  .landing-feature-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 21px;
+    margin-bottom: 14px;
+
+    &.c1 { background: rgba(59, 142, 255, 0.18);  box-shadow: inset 0 0 0 1px rgba(59, 142, 255, 0.30); }
+    &.c2 { background: rgba(14, 159, 110, 0.18);  box-shadow: inset 0 0 0 1px rgba(14, 159, 110, 0.30); }
+    &.c3 { background: rgba(240, 168, 48, 0.18);  box-shadow: inset 0 0 0 1px rgba(240, 168, 48, 0.30); }
+    &.c4 { background: rgba(232, 115, 74, 0.18);  box-shadow: inset 0 0 0 1px rgba(232, 115, 74, 0.30); }
+    &.c5 { background: rgba(124, 92, 196, 0.18);  box-shadow: inset 0 0 0 1px rgba(124, 92, 196, 0.30); }
+    &.c6 { background: rgba(74, 171, 232, 0.18);  box-shadow: inset 0 0 0 1px rgba(74, 171, 232, 0.30); }
+  }
 
   h3 {
     font-size: 15.5px;

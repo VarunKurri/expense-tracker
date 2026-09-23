@@ -5,8 +5,8 @@
 
 .card {
   padding: 20px;
-  border-radius: 18px;
-  background: var(--surface);
+  border-radius: var(--radius);
+  background: var(--card-grad);
   border: 1px solid var(--line);
   cursor: pointer;
   min-height: 170px;
@@ -16,27 +16,11 @@
   gap: 6px;
   position: relative;
   overflow: hidden;
-  transition: all 0.18s ease;
+  transition: border-color 0.18s ease;
   box-sizing: border-box;
 
-  &:hover {
-    background: var(--surface-hi);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  }
-
-  // Subtle green glow in top-right corner
-  &::after {
-    content: '';
-    position: absolute;
-    top: -40px;
-    right: -40px;
-    width: 120px;
-    height: 120px;
-    background: radial-gradient(circle, var(--teal-bg), transparent 70%);
-    pointer-events: none;
-    border-radius: 50%;
-  }
+  // Origin's cards don't lift or glow — the border does the work.
+  &:hover { border-color: var(--line-strong); }
 }
 
 .card-head {

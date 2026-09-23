@@ -19,6 +19,7 @@ import { CategoryService } from './services/category.service';
 import { TransactionService } from './services/transaction.service';
 import { BudgetService } from './services/budget.service';
 import { Account } from './models';
+import { Logo } from './components/logo/logo';
 
 interface NavItem {
   path: string;
@@ -49,7 +50,7 @@ interface PaletteEntry {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, Icon, Toast, UpdateBanner, AuthAction],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, Icon, Logo, Toast, UpdateBanner, AuthAction],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

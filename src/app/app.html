@@ -5,7 +5,7 @@
   <app-auth-action />
 } @else if (showSplash()) {
   <div class="boot-splash">
-    <div class="brand-mark" style="width:48px;height:48px;border-radius:15px;font-size:24px;">T</div>
+    <app-logo [size]="48" tone="brand" />
     <div class="boot-spinner"></div>
   </div>
 } @else if (!auth.user()) {
@@ -15,7 +15,7 @@
 
       <nav class="landing-nav">
         <div class="landing-brand">
-          <div class="brand-mark" style="width:38px;height:38px;border-radius:12px;font-size:19px;">T</div>
+          <app-logo [size]="38" tone="brand" />
           <span class="landing-wordmark">Trackr</span>
         </div>
         <div class="landing-nav-actions">
@@ -25,8 +25,8 @@
       </nav>
 
       <header class="landing-hero">
-        <div class="landing-badge">🔒 Zero-knowledge encrypted</div>
-        <h1>Your money, finally<br>under control.</h1>
+        <div class="landing-badge">Zero-knowledge encrypted</div>
+        <h1 class="display">Your money, finally<br><em>under control.</em></h1>
         <p>
           Trackr connects to your bank, pulls in transactions automatically, and sorts them
           into your budgets. Everything is encrypted on your device, so only you can read it.
@@ -40,32 +40,32 @@
 
       <section class="landing-features">
         <div class="landing-feature">
-          <div class="landing-feature-icon">🏦</div>
+          <div class="landing-feature-icon c1">🏦</div>
           <h3>Automatic bank sync</h3>
           <p>Link your bank once and new transactions arrive on their own. No manual entry.</p>
         </div>
         <div class="landing-feature">
-          <div class="landing-feature-icon">🔐</div>
+          <div class="landing-feature-icon c2">🔐</div>
           <h3>Private by design</h3>
           <p>Your records are encrypted with keys only you hold. Not even we can read them.</p>
         </div>
         <div class="landing-feature">
-          <div class="landing-feature-icon">🏷️</div>
+          <div class="landing-feature-icon c3">🏷️</div>
           <h3>Smart categorization</h3>
           <p>Synced transactions land in your own categories, and you can always override.</p>
         </div>
         <div class="landing-feature">
-          <div class="landing-feature-icon">🎯</div>
+          <div class="landing-feature-icon c4">🎯</div>
           <h3>Budgets by category</h3>
           <p>Set monthly limits and watch them fill in real time, with overrides per month.</p>
         </div>
         <div class="landing-feature">
-          <div class="landing-feature-icon">📅</div>
+          <div class="landing-feature-icon c5">📅</div>
           <h3>Bills & subscriptions</h3>
           <p>Due dates, autopay tracking, and reminders so nothing slips past you.</p>
         </div>
         <div class="landing-feature">
-          <div class="landing-feature-icon">📊</div>
+          <div class="landing-feature-icon c6">📊</div>
           <h3>Clear insights</h3>
           <p>Net worth, cash flow, top merchants, and exactly where every dollar went.</p>
         </div>
@@ -80,7 +80,7 @@
     <div class="login-left">
       <div class="login-left-content">
         <div class="login-logo">
-          <div class="brand-mark" style="width:52px;height:52px;border-radius:16px;font-size:26px;">T</div>
+          <app-logo [size]="52" tone="brand" />
           <span class="login-wordmark">Trackr</span>
         </div>
 
@@ -111,7 +111,7 @@
     <div class="login-right">
       <div class="login-card">
         <div class="login-card-logo">
-          <div class="brand-mark" style="width:44px;height:44px;border-radius:13px;font-size:22px;">T</div>
+          <app-logo [size]="44" tone="brand" />
         </div>
 
         <div class="login-card-heading">
@@ -225,7 +225,7 @@
 } @else if (!encryption.unlocked()) {
   <div class="unlock-shell">
     <div class="unlock-card">
-      <div class="brand-mark" style="width:44px;height:44px;border-radius:13px;font-size:22px;">T</div>
+      <app-logo [size]="44" tone="brand" />
       <div>
         @if (encryption.hasProfile() === null && !encryption.error()) {
           <h1>Checking encrypted data</h1>
@@ -308,7 +308,7 @@
 
     <aside class="sidebar" [class.open]="sidebarOpen()">
       <div class="brand">
-        <div class="brand-mark">T</div>
+        <app-logo [size]="28" />
         <div class="brand-name">Trackr</div>
       </div>
 
@@ -381,7 +381,7 @@
           }
         </button>
         <div class="topbar-brand">
-          <div class="brand-mark" style="width:26px;height:26px;border-radius:7px;font-size:13px;">T</div>
+          <app-logo [size]="26" />
           <span class="brand-name">Trackr</span>
         </div>
         <div class="topbar-actions">
