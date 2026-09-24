@@ -102,9 +102,9 @@
 
   &:hover { color: var(--fg); }
   &.active {
-    background: var(--teal-bg);
-    border-color: var(--teal);
-    color: var(--teal);
+    background: var(--accent);
+    border-color: transparent;
+    color: var(--accent-on);
   }
 }
 
@@ -201,11 +201,12 @@
   color: var(--fg);
   font-size: 13px;
   font-family: inherit;
-  color-scheme: light dark;
+  /* Inherits :root's color-scheme, which now follows the app theme. */
 
   &:focus {
     outline: none;
-    border-color: var(--teal);
+    border-color: var(--fg-3);
+    box-shadow: 0 0 0 3px var(--focus-ring);
   }
 }
 
@@ -372,12 +373,12 @@
 .see-all-link {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--teal);
+  color: var(--fg-2);
   text-decoration: none;
   white-space: nowrap;
   flex-shrink: 0;
 
-  &:hover { color: var(--teal-hi); }
+  &:hover { color: var(--fg); }
 }
 
 .panel-empty {
@@ -504,6 +505,17 @@
   color: var(--fg);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-align: right;
+}
+
+/* The original charge, under the net figure — smaller and quieter, because the
+   net is the number this page is actually counting. */
+.merchant-tx-net {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-3);
 }
 
 /* ── DONUT CHART ───────────────────────────────────────────── */
@@ -609,162 +621,7 @@
 }
 
 /* ── TRANSACTION VIEW PANEL ────────────────────────────────── */
-.view-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(4px);
-  z-index: 50;
-  animation: fadeIn 0.2s ease;
-}
-
-.view-panel {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--surface-hi);
-  border-radius: 24px 24px 0 0;
-  border: 1px solid var(--line);
-  border-bottom: none;
-  z-index: 51;
-  padding: 0 0 calc(40px + env(safe-area-inset-bottom));
-  animation: slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
 @media (min-width: 640px) {
-  .view-panel {
-    bottom: auto;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 480px;
-    max-height: 85vh;
-    overflow-y: auto;
-    border-radius: 20px;
-    border: 1px solid var(--line);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 24px 64px rgba(0,0,0,0.1);
-    animation: popIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-  .view-handle { display: none; }
-}
-
-.view-handle {
-  width: 36px; height: 4px;
-  border-radius: 999px;
-  background: var(--line);
-  margin: 12px auto 0;
-}
-
-.view-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px 0;
-}
-
-.view-close {
-  width: 32px; height: 32px;
-  border-radius: 50%;
-  background: var(--bg-3);
-  border: none;
-  color: var(--fg-3);
-  font-size: 13px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.18s ease;
-  &:hover { color: var(--fg); }
-}
-
-.view-edit-btn {
-  padding: 7px 16px;
-  border-radius: 8px;
-  background: var(--bg-3);
-  color: var(--fg);
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
-  border: none;
-  cursor: pointer;
-  transition: background 0.18s ease;
-  &:hover { background: var(--bg-3); }
-}
-
-.view-amount-wrap {
-  padding: 20px 24px 8px;
-  text-align: center;
-}
-
-.view-amount {
-  font-size: 42px;
-  font-weight: 600;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-  color: var(--fg);
-  &.neg { color: var(--fg); }
-}
-
-.view-refunded-badge {
-  display: inline-block;
-  margin-top: 8px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--teal-bg);
-  color: var(--teal);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.view-details {
-  margin: 16px 20px 0;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.view-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--line);
-  gap: 16px;
-  &:last-child { border-bottom: none; }
-}
-
-.view-row-label {
-  font-size: 13px;
-  color: var(--fg-3);
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.view-row-value {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--fg);
-  text-align: right;
-}
-
-.view-row-notes .view-row-value { text-align: left; }
-
-.notes-text {
-  color: var(--fg-2);
-  font-weight: 400;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.view-type-badge {
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-weight: 600;
-  &.expense { background: var(--red-bg); color: var(--red); }
 }
 
 /* ── RESPONSIVE ────────────────────────────────────────────── */

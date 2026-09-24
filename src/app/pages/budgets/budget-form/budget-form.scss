@@ -33,8 +33,8 @@
   appearance: none;
 
   &:focus {
-    border-color: var(--teal);
-    box-shadow: 0 0 0 3px var(--teal-bg);
+    border-color: var(--fg-3);
+    box-shadow: 0 0 0 3px var(--focus-ring);
   }
 
   &:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -88,8 +88,8 @@ select.input-field {
   &:hover { background: var(--surface-hi); }
 
   &.active {
-    border-color: var(--teal);
-    background: var(--teal-bg);
+    border-color: var(--fg-3);
+    background: var(--accent-bg);
   }
 }
 

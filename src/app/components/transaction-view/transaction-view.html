@@ -1,4 +1,4 @@
-@if (transaction(); as tx) {
+@if (tx(); as tx) {
   <div class="view-backdrop" (click)="close()"></div>
   <div class="view-panel" role="dialog" aria-modal="true" aria-label="Transaction details">
     <div class="view-handle"></div>
@@ -20,7 +20,7 @@
         <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
       }
       @if (tx.isInternalTransfer) {
-        <div class="view-internal-badge">⇄ Internal transfer — not counted as spending</div>
+        <div class="view-refunded-badge">↔ Internal transfer — excluded from analysis</div>
       }
     </div>
 
@@ -57,7 +57,7 @@
         }
       }
       @if (tx.notes) {
-        <div class="view-row">
+        <div class="view-row view-row-notes">
           <span class="view-row-label">Notes</span>
           <span class="view-row-value notes-text">{{ tx.notes }}</span>
         </div>
@@ -69,5 +69,87 @@
         </span>
       </div>
     </div>
+
+    <!-- REIMBURSEMENTS — on every expense, whether or not any are linked yet, so
+         the same transaction reads the same way opened from anywhere. -->
+    @if (tx.type === 'expense') {
+      <div class="view-reimburse">
+        <div class="view-reimburse-head">Reimbursements</div>
+        @if (reimbursedTotal() > 0) {
+          <div class="reimburse-summary">
+            Reimbursed <strong>{{ formatCurrency(reimbursedTotal()) }}</strong>
+            of {{ formatCurrency(tx.amount) }}
+            @if (reimbursementSurplus() > 0.005) {
+              · Surplus <strong class="amt-surplus">{{ formatCurrency(reimbursementSurplus()) }}</strong>
+            } @else {
+              · Net expense <strong [class.amt-expense]="netExpense() > 0.005">{{ formatCurrency(netExpense()) }}</strong>
+            }
+          </div>
+          @for (r of reimbursements(); track r.id) {
+            <div class="reimburse-row">
+              <span class="reimburse-row-text">
+                ↩ {{ r.merchant || 'Income' }} · +{{ formatCurrency(r.amount) }} · {{ formatDate(r.date) }}
+              </span>
+              <button class="reimburse-unlink" (click)="unlinkReimbursement(r)" title="Unlink">✕</button>
+            </div>
+          }
+        } @else {
+          <p class="reimburse-hint">
+            Link money a friend paid you back so analysis counts only what you truly spent.
+          </p>
+        }
+        <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Link a reimbursement</button>
+      </div>
+    }
+
+    @if (tx.type === 'income') {
+      <div class="view-reimburse">
+        <div class="view-reimburse-head">Reimbursement</div>
+        @if (reimbursesExpense(); as exp) {
+          @if (reimbursesSurplus() > 0) {
+            <div class="reimburse-summary">
+              ↩ Reimburses <strong>{{ exp.merchant || 'an expense' }}</strong> ·
+              {{ formatCurrency(reimbursesCovered()) }} covered +
+              <strong class="amt-surplus">{{ formatCurrency(reimbursesSurplus()) }} surplus</strong>
+            </div>
+          } @else {
+            <div class="reimburse-summary">
+              ↩ Reimburses <strong>{{ exp.merchant || 'an expense' }}</strong> ·
+              {{ formatCurrency(exp.amount) }} on {{ formatDate(exp.date) }}
+            </div>
+          }
+          <button class="reimburse-add" (click)="unlinkReimbursement(tx)">Unlink reimbursement</button>
+        } @else {
+          <p class="reimburse-hint">
+            Did this pay you back for an expense? Link it so it doesn't count as income.
+          </p>
+          <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Mark as reimbursement</button>
+        }
+      </div>
+    }
   </div>
 }
+
+<!-- REIMBURSEMENT LINK PICKER -->
+<app-modal
+  [open]="!!linkingFrom()"
+  [title]="linkingFrom()?.type === 'income' ? 'Reimburses which expense?' : 'Which income paid this back?'"
+  size="sm"
+  (closed)="closeLinkPicker()">
+  <input class="link-search input-field"
+         [ngModel]="linkSearch()"
+         (ngModelChange)="linkSearch.set($event)"
+         placeholder="Search merchant or amount…" />
+  <div class="link-list">
+    @for (c of linkCandidates(); track c.id) {
+      <button class="link-item" (click)="confirmLink(c)">
+        <span class="link-item-main">{{ c.merchant || (c.type === 'income' ? 'Income' : 'Expense') }}</span>
+        <span class="link-item-meta">
+          {{ formatDate(c.date) }} · {{ c.type === 'expense' ? '−' : '+' }}{{ formatCurrency(c.amount) }}
+        </span>
+      </button>
+    } @empty {
+      <div class="link-empty">No matching transactions.</div>
+    }
+  </div>
+</app-modal>

@@ -52,6 +52,16 @@ The app is what we copy. Do not "correct" this back to dark.
   borders. Colour is a data signal only: `--blue` = the chart accent (spend
   areas, calendar heat), `--teal` = positive/income, `--red` = negative,
   `--forecast-grad` = projections, `--cat-1..7` = category icon chips.
+- **The UI accent is monochrome.** Selection, focus and "you are here" use
+  `--accent` (= `--fg`) / `--accent-on` / `--accent-bg` / `--focus-ring`, never
+  a palette colour: a selected pill is ink-filled, a focused field gets a
+  neutral ring. Teal had leaked into these states, which made "selected" and
+  "this is income" the same colour so neither meant anything on sight. If you
+  reach for `--teal` or `--green` for a hover, focus, active or checked state,
+  that is the bug.
+- `color-scheme` is set per theme on `:root`, so browser-drawn controls (the
+  date field's calendar button, native dropdowns, scrollbars) follow the app
+  rather than the OS. Don't `filter: invert()` them.
 - **Buttons are outlined, not filled.** `.btn-primary` is a white button with a
   `--line-strong` border, matching "Add account" / "Create budget" / "Save".
   `.btn-solid` (dark fill) exists for the rare high-emphasis CTA — use sparingly.
@@ -67,8 +77,11 @@ The app is what we copy. Do not "correct" this back to dark.
   `app-spend-calendar` (month heat grid), `app-day-detail` (what one day cost),
   `app-transaction-view` (read-only transaction sheet), `app-transaction-form`,
   `app-confirm`, `app-modal`, `app-toast`, `app-logo`, `app-icon`.
-  The Analysis page still has its own inline copy of the transaction view —
-  migrate it to `app-transaction-view` when that page is next touched.
+  `app-transaction-view` is the **only** transaction view — Dashboard, Spending,
+  Analysis and Transactions all render it, including reimbursement linking.
+  Never fork a second copy: the three that existed before drifted, and only one
+  of them had reimbursements, so the same transaction read differently
+  depending on which screen you opened it from.
 - Desktop-first, responsive down to mobile.
 - Microcopy follows Origin: mono uppercase eyebrow → plain-English sentence
   headline → a calm sentence explaining *why it matters*. Never just a number.

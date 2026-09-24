@@ -45,6 +45,24 @@
   --input-grad: #FFFFFF;
   --forecast-grad: linear-gradient(180deg, rgba(59, 142, 255, 0.22), rgba(59, 142, 255, 0.02));
 
+  /* UI accent — selection, focus, "you are here".
+   *
+   * Monochrome on purpose. Origin's product spends no colour on chrome: a
+   * selected pill is ink-filled, a focused field gets a neutral ring, and the
+   * palette below is kept for what the numbers are doing. Teal used to leak
+   * into these states, which made "selected" and "this is income" the same
+   * colour and stopped either from meaning anything on sight. */
+  --accent:      var(--fg);
+  --accent-on:   var(--bg);                    /* text on an ink-filled accent */
+  --accent-bg:   rgba(19, 19, 19, 0.06);       /* subtle selected background */
+  --focus-ring:  rgba(19, 19, 19, 0.12);
+
+  /* Tells the browser which way to paint the controls it draws itself — the
+   * date field's calendar button, native dropdowns, scrollbars. Without it the
+   * browser follows the OS instead of the app, so the date picker's icon stayed
+   * black-on-black whenever the app was dark and the OS was light. */
+  color-scheme: light;
+
   /* Data signals — charts and amounts only, never UI chrome. */
   --blue:     #3B8EFF;      /* the chart accent: spend area, calendar heat */
   --blue-bg:  rgba(59, 142, 255, 0.12);
@@ -87,6 +105,13 @@
   --card-grad:  linear-gradient(135deg, rgba(250, 250, 250, 0.06), rgba(250, 250, 250, 0.015));
   --input-grad: linear-gradient(0deg, #131313, #222222);
   --forecast-grad: linear-gradient(180deg, rgba(77, 140, 255, 0.22), rgba(77, 140, 255, 0.02));
+
+  --accent:      var(--fg);
+  --accent-on:   var(--bg);
+  --accent-bg:   rgba(250, 250, 250, 0.08);
+  --focus-ring:  rgba(250, 250, 250, 0.16);
+
+  color-scheme: dark;
 
   --blue:     #4D8CFF;
   --blue-bg:  rgba(77, 140, 255, 0.14);
@@ -434,14 +459,22 @@ input, select, textarea {
   transition: all var(--t);
 
   &:focus {
-    border-color: var(--fg-4);
-    box-shadow: 0 0 0 3px rgba(250, 250, 250, 0.06);
+    border-color: var(--fg-3);
+    box-shadow: 0 0 0 3px var(--focus-ring);
   }
   &::placeholder { color: var(--fg-4); }
 }
 
 .input       { @include field-base; }
 .input-field { @include field-base; }
+
+/* The browser paints this button itself; `color-scheme` on :root is what makes
+   it follow the app's theme. This only sizes the hit area and softens it. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+  &:hover { opacity: 1; }
+}
 
 /* ============================================
    SECTION SUB-NAV

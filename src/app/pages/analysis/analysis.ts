@@ -10,6 +10,7 @@ import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
+import { TransactionView } from '../../components/transaction-view/transaction-view';
 import { Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { filterForAnalysis } from '../../utils/analysis-filter';
@@ -35,7 +36,7 @@ type RangeKey = 'this-month' | 'last-month' | '3-months' | 'this-year' | 'all' |
 @Component({
   selector: 'app-analysis',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TransactionForm, Confirm],
+  imports: [CommonModule, FormsModule, RouterLink, TransactionForm, Confirm, TransactionView],
   templateUrl: './analysis.html',
   styleUrl: './analysis.scss'
 })
@@ -69,20 +70,18 @@ export class Analysis implements AfterViewInit, OnDestroy {
     );
   }
 
+  // The view panel owns its own body-scroll lock.
   openTxView(tx: Transaction) {
     this.viewingTx.set(tx);
-    document.body.style.overflow = 'hidden';
   }
 
   closeTxView() {
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
   }
 
   editFromTxView() {
     const tx = this.viewingTx();
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
     if (tx) {
       this.editingTx.set(tx);
       this.txFormOpen.set(true);
@@ -211,10 +210,20 @@ export class Analysis implements AfterViewInit, OnDestroy {
   });
 
   /** An expense's true cost after any linked reimbursements — unless netting is
-   *  off ("Include refunded"), in which case every expense counts as recorded. */
-  private eff(t: Transaction): number {
+   *  off ("Include refunded"), in which case every expense counts as recorded.
+   *
+   *  Public because the drill-down lists have to show the same figure this page
+   *  totals: a $173.27 charge that was $101.76 paid back counts as $71.51 here,
+   *  and a row printing $173.27 under a $117.28 header does not add up. */
+  eff(t: Transaction): number {
     if (!this.excludeRefunded()) return t.amount;
     return this.txService.effectiveExpenseAmount(t);
+  }
+
+  /** How much of an expense came back, for the "was $X, $Y back" note. */
+  reimbursedOn(t: Transaction): number {
+    if (!this.excludeRefunded()) return 0;
+    return this.txService.reimbursedAmountFor(t.id);
   }
 
   // ── KPIs ───────────────────────────────────────────────────

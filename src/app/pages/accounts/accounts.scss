@@ -350,11 +350,11 @@
   .btn-primary-outline {
     cursor: pointer;
     white-space: nowrap;
-    color: var(--teal);
+    color: var(--fg-2);
     border-color: var(--line);
     background: transparent;
 
-    &:hover { background: var(--teal-bg); }
+    &:hover { background: var(--bg-3); color: var(--fg); }
     &:disabled { opacity: 0.6; cursor: default; }
   }
 }
@@ -397,8 +397,8 @@
     transition: background 0.15s ease;
 
     &:hover { background: var(--surface-hi); }
-    &.active { border-color: var(--teal); background: var(--surface-hi); }
-    input { accent-color: var(--teal); }
+    &.active { border-color: var(--fg-3); background: var(--surface-hi); }
+    input { accent-color: var(--accent); }
   }
 
   .input-field { margin-top: 2px; }
