@@ -4,117 +4,51 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 import { CategoryService } from '../../services/category.service';
-import { CategoryGroupService } from '../../services/category-group.service';
 import { TransactionRuleService } from '../../services/transaction-rule.service';
 import { TransactionService } from '../../services/transaction.service';
 import { AccountService } from '../../services/account.service';
 import { ToastService } from '../../services/toast.service';
-import { Category, CategoryGroup, TransactionRule } from '../../models';
+import { TransactionRule } from '../../models';
 import {
   describeRule, planBulkApply, ruleHasAction, ruleHasCondition, hasMissingCategory,
 } from '../../utils/rules';
-import { categoryPalette } from '../../utils/theme-colors';
 
 /** A blank rule, ready for the editor. */
 function emptyRule(): TransactionRule {
   return { enabled: true, priority: 0, createdAt: 0 };
 }
 
+/**
+ * Settings → Rules: file transactions automatically, and run those rules over
+ * what is already there.
+ *
+ * This page used to be "Categories & rules" with a Groups tab. Groups were
+ * removed (part 65): nothing in the app read them, so creating one had no
+ * effect anywhere, and making them count needed budget calculations reworked.
+ * The git history has the implementation if they come back.
+ */
 @Component({
-  selector: 'app-categories',
+  selector: 'app-rules',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
-  templateUrl: './categories.html',
-  styleUrl: './categories.scss',
+  templateUrl: './rules.html',
+  styleUrl: './rules.scss',
 })
-export class Categories {
+export class Rules {
   private categoryService = inject(CategoryService);
-  private groupService = inject(CategoryGroupService);
   private ruleService = inject(TransactionRuleService);
   private txService = inject(TransactionService);
   private accountService = inject(AccountService);
   private toast = inject(ToastService);
 
-  tab = signal<'groups' | 'rules'>('groups');
-
   categories = this.categoryService.categories;
-  groups = this.groupService.groups;
   rules = this.ruleService.rules;
   accounts = computed(() => this.accountService.accounts().filter(a => !a.archived));
 
   /** Surfaced so a decryption failure is visible rather than silent. */
-  loadError = computed(() =>
-    this.groupService.error() || this.ruleService.error() || this.categoryService.error());
+  loadError = computed(() => this.ruleService.error() || this.categoryService.error());
 
-  // ── Groups ─────────────────────────────────────────────────
-  newGroupName = signal('');
   busy = signal(false);
-
-  /** Categories under each group, plus an "Ungrouped" bucket that is never hidden. */
-  grouped = computed(() => {
-    const palette = categoryPalette();
-    const byGroup = this.groups().map((g, i) => ({
-      group: g,
-      color: g.color || palette[i % palette.length],
-      members: this.categories().filter(c => c.groupId === g.id && !c.archived),
-    }));
-    const known = new Set(this.groups().map(g => g.id));
-    const ungrouped = this.categories()
-      .filter(c => !c.archived && (!c.groupId || !known.has(c.groupId)));
-    return { byGroup, ungrouped };
-  });
-
-  async addGroup() {
-    const name = this.newGroupName().trim();
-    if (!name) return;
-    if (this.groups().some(g => g.name.toLowerCase() === name.toLowerCase())) {
-      this.toast.error(`There is already a group called "${name}".`);
-      return;
-    }
-    this.busy.set(true);
-    try {
-      await this.groupService.add({ name, sortOrder: this.groups().length });
-      this.newGroupName.set('');
-    } catch {
-      this.toast.error('Could not create the group. Please try again.');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  async renameGroup(g: CategoryGroup, name: string) {
-    const trimmed = name.trim();
-    if (!trimmed || trimmed === g.name) return;
-    try { await this.groupService.update(g.id!, { name: trimmed }); }
-    catch { this.toast.error('Could not rename the group.'); }
-  }
-
-  /**
-   * Removes the group and clears it off its members first, so no category is
-   * left pointing at something that no longer exists.
-   */
-  async deleteGroup(g: CategoryGroup) {
-    this.busy.set(true);
-    try {
-      const members = this.categories().filter(c => c.groupId === g.id);
-      for (const c of members) await this.categoryService.update(c.id!, { groupId: '' });
-      await this.groupService.remove(g.id!);
-      this.toast.success(
-        members.length
-          ? `Deleted "${g.name}". ${members.length} categor${members.length === 1 ? 'y is' : 'ies are'} now ungrouped.`
-          : `Deleted "${g.name}".`
-      );
-    } catch {
-      this.toast.error('Could not delete the group.');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  async assignCategory(c: Category, groupId: string) {
-    try { await this.categoryService.update(c.id!, { groupId }); }
-    catch { this.toast.error(`Could not move ${c.name}.`); }
-  }
 
   // ── Rules ──────────────────────────────────────────────────
   editing = signal<TransactionRule | null>(null);

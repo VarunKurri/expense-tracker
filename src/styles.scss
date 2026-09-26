@@ -452,6 +452,10 @@ input, select, textarea {
   padding: 10px 16px;
   border-radius: var(--radius-sm);
   background: var(--input-grad);
+  /* A solid colour under the gradient. In dark mode --input-grad is an image,
+     which leaves background-color transparent — and the browser builds a
+     <select>'s dropdown list from that colour, so it fell back to white. */
+  background-color: var(--surface);
   border: 1px solid var(--line);
   color: var(--fg);
   font-size: 14px;
@@ -467,6 +471,15 @@ input, select, textarea {
 
 .input       { @include field-base; }
 .input-field { @include field-base; }
+
+/* Every dropdown's list, including selects that don't use .input-field.
+   The options inherit the select's text colour, so without an explicit
+   background they rendered white-on-white in dark mode. */
+select option,
+select optgroup {
+  background-color: var(--surface);
+  color: var(--fg);
+}
 
 /* The browser paints this button itself; `color-scheme` on :root is what makes
    it follow the app's theme. This only sizes the hit area and softens it. */

@@ -2,100 +2,17 @@
 
   <div class="header-row">
     <div>
-      <h1>Categories &amp; rules</h1>
-      <div class="hint">Group your categories, and file transactions automatically</div>
+      <h1>Rules</h1>
+      <div class="hint">File transactions automatically</div>
     </div>
     <a class="btn-primary" routerLink="/settings">← Settings</a>
   </div>
 
-  <nav class="subnav">
-    <button class="subnav-tab" [class.active]="tab() === 'groups'"
-            (click)="tab.set('groups')">Groups</button>
-    <button class="subnav-tab" [class.active]="tab() === 'rules'"
-            (click)="tab.set('rules')">Rules</button>
-  </nav>
 
   @if (loadError()) {
     <div class="notice error">{{ loadError() }}</div>
   }
 
-  @if (tab() === 'groups') {
-    <section class="card">
-      <div class="card-head">
-        <span class="card-label">Category groups</span>
-      </div>
-
-      <p class="section-note">
-        Groups let you read spending at a coarser level than categories — "Essentials"
-        rather than rent, groceries and utilities separately. A category belongs to at
-        most one group, and anything ungrouped still shows up below.
-      </p>
-
-      <div class="add-row">
-        <input class="input-field" placeholder="New group name, e.g. Essentials"
-               [value]="newGroupName()"
-               (input)="newGroupName.set($any($event.target).value)"
-               (keyup.enter)="addGroup()" />
-        <button class="btn-primary" [disabled]="!newGroupName().trim() || busy()"
-                (click)="addGroup()">Add group</button>
-      </div>
-
-      @for (g of grouped().byGroup; track g.group.id) {
-        <div class="group">
-          <div class="group-head">
-            <span class="group-dot" [style.background]="g.color"></span>
-            <input class="group-name" [value]="g.group.name"
-                   (change)="renameGroup(g.group, $any($event.target).value)" />
-            <span class="group-count">
-              {{ g.members.length }} categor{{ g.members.length === 1 ? 'y' : 'ies' }}
-            </span>
-            <button class="btn-danger sm" [disabled]="busy()"
-                    (click)="deleteGroup(g.group)">Delete</button>
-          </div>
-
-          @if (g.members.length) {
-            <div class="chips">
-              @for (c of g.members; track c.id) {
-                <button class="chip" (click)="assignCategory(c, '')"
-                        title="Remove from this group">{{ c.name }} ✕</button>
-              }
-            </div>
-          } @else {
-            <p class="group-empty">No categories yet — add one from Ungrouped below.</p>
-          }
-        </div>
-      } @empty {
-        <p class="group-empty pad">No groups yet. Create one above to get started.</p>
-      }
-    </section>
-
-    <section class="card">
-      <div class="card-head"><span class="card-label">Ungrouped</span></div>
-      <table class="rule-table">
-        <thead><tr><th>Category</th><th>Group</th></tr></thead>
-        <tbody>
-          @for (c of grouped().ungrouped; track c.id) {
-            <tr>
-              <td>{{ c.name }}</td>
-              <td>
-                <select class="input-field slim"
-                        (change)="assignCategory(c, $any($event.target).value)">
-                  <option value="">— none —</option>
-                  @for (g of groups(); track g.id) {
-                    <option [value]="g.id">{{ g.name }}</option>
-                  }
-                </select>
-              </td>
-            </tr>
-          } @empty {
-            <tr><td colspan="2" class="empty-cell">Every category belongs to a group.</td></tr>
-          }
-        </tbody>
-      </table>
-    </section>
-  }
-
-  @if (tab() === 'rules') {
     <section class="card">
       <div class="card-head">
         <span class="card-label">Rules</span>
@@ -178,7 +95,6 @@
         </p>
       </section>
     }
-  }
 
   <!-- ── Rule editor ─────────────────────────────────────── -->
   @if (editing(); as r) {

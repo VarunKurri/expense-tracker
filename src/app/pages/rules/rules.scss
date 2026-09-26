@@ -66,74 +66,6 @@
   em { font-style: italic; }
 }
 
-/* ── Groups ───────────────────────────────────────────────── */
-.add-row {
-  display: flex;
-  gap: 10px;
-  padding: 16px 20px;
-  flex-wrap: wrap;
-
-  .input-field { flex: 1; min-width: 220px; }
-}
-
-.group {
-  padding: 14px 20px;
-  border-top: 1px solid var(--line);
-}
-
-.group-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.group-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.group-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--fg);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  padding: 3px 6px;
-  font-family: inherit;
-  min-width: 140px;
-
-  &:hover { border-color: var(--line); }
-  &:focus { border-color: var(--line-strong); outline: none; background: var(--bg); }
-}
-
-.group-count {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--fg-3);
-  margin-right: auto;
-}
-
-.chips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-.group-empty {
-  font-size: 13px;
-  color: var(--fg-3);
-  margin: 10px 0 0;
-
-  &.pad { padding: 0 20px 18px; }
-}
-
 /* ── Tables ───────────────────────────────────────────────── */
 .rule-table {
   width: 100%;
@@ -336,6 +268,6 @@
   .header-row { flex-direction: column; align-items: flex-start; }
   .apply-row { grid-template-columns: 1fr; }
   .rule-table { th, td { padding: 11px 12px; } }
-  .card-head, .section-note, .add-row, .group { padding-left: 14px; padding-right: 14px; }
+  .card-head, .section-note { padding-left: 14px; padding-right: 14px; }
   .editor { max-height: calc(100vh - 32px); }
 }
