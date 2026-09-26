@@ -26,3 +26,16 @@ export function plaidCategoryName(pfcPrimary: string | undefined, type: 'income'
   if (type === 'income') return 'Other Income';
   return (pfcPrimary && EXPENSE_MAP[pfcPrimary]) || 'Other';
 }
+
+/**
+ * Every category name Plaid transactions can be matched to, by kind.
+ *
+ * Plaid transactions are matched to a category by *name*, at read time, and
+ * nothing is stored. So these names are load-bearing: renaming or deleting the
+ * category that carries one would silently uncategorise every bank transaction
+ * that used to land there. See `utils/categories.ts` for how that is handled.
+ */
+export const PLAID_TARGET_NAMES: Record<'income' | 'expense', ReadonlySet<string>> = {
+  expense: new Set([...Object.values(EXPENSE_MAP), 'Other']),
+  income: new Set(['Other Income']),
+};

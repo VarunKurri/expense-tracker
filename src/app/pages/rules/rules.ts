@@ -42,6 +42,15 @@ export class Rules {
   private toast = inject(ToastService);
 
   categories = this.categoryService.categories;
+
+  /**
+   * Categories the rule editor offers: archived ones are hidden like in every
+   * other picker, except the one a rule already uses, so editing an older rule
+   * still shows its current value rather than a blank field.
+   */
+  pickable(current?: string) {
+    return this.categories().filter(c => !c.archived || c.id === current);
+  }
   rules = this.ruleService.rules;
   accounts = computed(() => this.accountService.accounts().filter(a => !a.archived));
 

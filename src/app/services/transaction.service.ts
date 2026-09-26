@@ -14,6 +14,7 @@ import { Transaction } from '../models';
 import { Account } from '../models';
 import { availableCredit, creditCardBalance, transactionDeltaForAccount } from '../utils/finance';
 import { plaidCategoryName } from '../utils/plaid-category-map';
+import { resolvePlaidCategory } from '../utils/categories';
 import { TransactionRuleService } from './transaction-rule.service';
 import { applyRulesToDraft } from '../utils/rules';
 
@@ -98,14 +99,30 @@ export class TransactionService {
       }
 
       if (!out.categoryId && out.plaidPersonalFinanceCategory && (out.type === 'income' || out.type === 'expense')) {
+        // Alias-aware, so renaming a category Plaid matches on doesn't
+        // uncategorise every bank transaction that used to land there.
         const name = plaidCategoryName(out.plaidPersonalFinanceCategory, out.type);
-        const cat = categories.find(c => c.name === name && c.kind === out.type);
+        const cat = resolvePlaidCategory(categories, name, out.type);
         if (cat?.id) out = { ...out, categoryId: cat.id };
       }
 
       return out;
     });
   });
+
+  /**
+   * Transactions with this category actually stored on them. Excludes bank
+   * transactions that only match it by name — those carry no stored category
+   * and follow the category's Plaid aliases instead.
+   */
+  storedInCategory(categoryId: string): Transaction[] {
+    return this.rawTransactions().filter(t => t.categoryId === categoryId);
+  }
+
+  /** How many transactions show this category, stored or matched by name. */
+  countInCategory(categoryId: string): number {
+    return this.transactions().filter(t => t.categoryId === categoryId).length;
+  }
 
   balanceForAccount(accountId: string): number {
     return transactionDeltaForAccount(this.transactions(), accountId);

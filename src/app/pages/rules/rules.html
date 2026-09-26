@@ -166,7 +166,7 @@
             <select class="input-field" [value]="r.categoryId || ''"
                     (change)="patchDraft({ categoryId: $any($event.target).value })">
               <option value="">Any category</option>
-              @for (c of categories(); track c.id) {
+              @for (c of pickable(r.categoryId); track c.id) {
                 <option [value]="c.id">{{ c.name }}</option>
               }
             </select>
@@ -181,7 +181,7 @@
             <select class="input-field" [value]="r.setCategoryId || ''"
                     (change)="patchDraft({ setCategoryId: $any($event.target).value })">
               <option value="">Leave the category alone</option>
-              @for (c of categories(); track c.id) {
+              @for (c of pickable(r.setCategoryId); track c.id) {
                 <option [value]="c.id">{{ c.name }}</option>
               }
             </select>

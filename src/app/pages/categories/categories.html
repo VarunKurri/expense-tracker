@@ -1,0 +1,261 @@
+<div class="page">
+
+  <div class="header-row">
+    <div>
+      <h1>Categories</h1>
+      <div class="hint">What your spending and income get filed under</div>
+    </div>
+    <div class="header-actions">
+      <a class="btn-ghost" routerLink="/settings">← Settings</a>
+      <button class="btn-primary" (click)="startCreate()">+ New category</button>
+    </div>
+  </div>
+
+  @if (loadError()) {
+    <div class="notice error">{{ loadError() }}</div>
+  }
+
+  <!-- ── Active lists ─────────────────────────────────────── -->
+  @for (section of [
+    { kind: 'expense', label: 'Expense categories', rows: expense() },
+    { kind: 'income', label: 'Income categories', rows: income() }
+  ]; track section.kind) {
+    <section class="card">
+      <div class="card-head">
+        <span class="card-label">{{ section.label }}</span>
+        <button class="btn-ghost sm" (click)="startCreate($any(section.kind))">+ Add</button>
+      </div>
+
+      @for (c of section.rows; track c.id) {
+        <div class="cat-row">
+          <span class="cat-icon"
+                [style.background]="c.color ? c.color + '22' : null"
+                [style.border-color]="c.color ? c.color + '44' : null">{{ c.icon || '📦' }}</span>
+          <div class="cat-main">
+            <div class="cat-name">{{ c.name }}</div>
+            <div class="cat-meta">
+              {{ plural(count(c), 'transaction') }}
+              @if (hasBudget(c)) { <span class="dot">·</span> Budgeted }
+              @if (receivesBank(c)) { <span class="dot">·</span> Bank transactions land here }
+            </div>
+          </div>
+          <div class="cat-actions">
+            <button class="btn-ghost sm" (click)="startEdit(c)">Edit</button>
+            <button class="btn-ghost sm" [disabled]="busy()" (click)="archive(c)">Archive</button>
+            <button class="btn-danger sm" [disabled]="busy()" (click)="startDelete(c)">Delete</button>
+          </div>
+        </div>
+      } @empty {
+        <p class="empty">No {{ section.kind }} categories yet.</p>
+      }
+    </section>
+  }
+
+  <!-- ── Archived ─────────────────────────────────────────── -->
+  @if (archived().length) {
+    <section class="card">
+      <div class="card-head"><span class="card-label">Archived</span></div>
+      <p class="section-note">
+        Hidden from every picker, so you can't file anything new here. Past
+        transactions keep their category, and bank transactions Plaid files here
+        still land here — delete it to send those somewhere else.
+      </p>
+      @for (c of archived(); track c.id) {
+        <div class="cat-row archived">
+          <span class="cat-icon">{{ c.icon || '📦' }}</span>
+          <div class="cat-main">
+            <div class="cat-name">{{ c.name }}</div>
+            <div class="cat-meta">{{ c.kind === 'income' ? 'Income' : 'Expense' }} · {{ plural(count(c), 'transaction') }}</div>
+          </div>
+          <div class="cat-actions">
+            <button class="btn-ghost sm" [disabled]="busy()" (click)="restore(c)">Restore</button>
+            <button class="btn-danger sm" [disabled]="busy()" (click)="startDelete(c)">Delete</button>
+          </div>
+        </div>
+      }
+    </section>
+  }
+
+  <!-- ── Create / edit ─────────────────────────────────────── -->
+  @if (editing(); as e) {
+    <div class="sheet-backdrop" (click)="!busy() && editing.set(null)"></div>
+    <div class="sheet" role="dialog" aria-modal="true"
+         [attr.aria-label]="e.category ? 'Edit category' : 'New category'">
+      <div class="sheet-head">
+        <span class="card-label">{{ e.category ? 'Edit category' : 'New category' }}</span>
+        <button class="icon-btn" (click)="editing.set(null)" aria-label="Close">✕</button>
+      </div>
+
+      <div class="sheet-body">
+        <label class="field">
+          <span class="label-mono">Name</span>
+          <input class="input-field" [value]="e.name" [attr.maxlength]="maxName"
+                 placeholder="Coffee"
+                 (input)="patch({ name: $any($event.target).value })"
+                 (keyup.enter)="save()" autofocus />
+          @if (e.name.trim() && editError()) {
+            <span class="field-error">{{ editError() }}</span>
+          }
+          @if (renameNote(); as note) {
+            <span class="field-note">{{ note }}</span>
+          }
+        </label>
+
+        <div class="field">
+          <span class="label-mono">Type</span>
+          @if (e.category) {
+            <!-- Fixed once created: switching kind would leave its existing
+                 transactions filed under a category of the wrong kind. -->
+            <div class="kind-fixed">
+              {{ e.kind === 'income' ? 'Income' : 'Expense' }}
+              <span>· can't be changed once created</span>
+            </div>
+          } @else {
+            <div class="seg">
+              <button type="button" [class.active]="e.kind === 'expense'"
+                      (click)="patch({ kind: 'expense' })">Expense</button>
+              <button type="button" [class.active]="e.kind === 'income'"
+                      (click)="patch({ kind: 'income' })">Income</button>
+            </div>
+          }
+        </div>
+
+        <div class="field">
+          <span class="label-mono">Icon</span>
+          <div class="icon-row">
+            <input class="input-field icon-input" [value]="e.icon" maxlength="4"
+                   placeholder="📦" aria-label="Icon (any emoji)"
+                   (input)="patch({ icon: $any($event.target).value })" />
+            <div class="icon-picks">
+              @for (i of iconPicks; track i) {
+                <button type="button" class="icon-pick" [class.active]="e.icon === i"
+                        (click)="patch({ icon: i })">{{ i }}</button>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="label-mono">Colour</span>
+          <div class="swatches">
+            @for (c of palette(); track c) {
+              <button type="button" class="swatch" [style.background]="c"
+                      [class.active]="e.color === c" [attr.aria-label]="'Colour ' + c"
+                      (click)="patch({ color: c })"></button>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="sheet-actions">
+        <button class="btn-ghost" (click)="editing.set(null)">Cancel</button>
+        <button class="btn-primary" [disabled]="!!editError() || busy()" (click)="save()">
+          {{ e.category ? 'Save' : 'Add category' }}
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ── Delete ────────────────────────────────────────────── -->
+  @if (deleting(); as d) {
+    <div class="sheet-backdrop" (click)="!busy() && deleting.set(null)"></div>
+    <div class="sheet" role="alertdialog" aria-modal="true" aria-label="Delete category">
+      <div class="sheet-head">
+        <span class="card-label">Delete category</span>
+        <button class="icon-btn" (click)="deleting.set(null)" aria-label="Close">✕</button>
+      </div>
+
+      <div class="sheet-body">
+        <p class="lead">
+          Delete <strong>{{ d.category.name }}</strong>? This can't be undone, so
+          everything filed under it needs somewhere to go.
+        </p>
+
+        <label class="field">
+          <span class="label-mono">Move its transactions to</span>
+          <select class="input-field" (change)="setTarget($any($event.target).value)">
+            @for (t of targets(); track t.id) {
+              <option [value]="t.id" [selected]="d.targetId === t.id">{{ t.icon }} {{ t.name }}</option>
+            }
+            <option value="" [selected]="!d.targetId">Leave them uncategorised</option>
+          </select>
+        </label>
+
+        @if (plan(); as p) {
+          <div class="effects">
+            <div class="label-mono">What will happen</div>
+            <ul>
+              <li>
+                @if (planTxCount() === 0) {
+                  No transactions are filed here.
+                } @else if (d.targetId) {
+                  <strong>{{ plural(planTxCount(), 'transaction') }}</strong> move to {{ targetName() }}.
+                } @else {
+                  <strong>{{ plural(planTxCount(), 'transaction') }}</strong> become uncategorised.
+                }
+              </li>
+
+              @if (receivesBank(d.category)) {
+                <li>
+                  @if (d.targetId) {
+                    Future bank transactions Plaid files here will go to {{ targetName() }}.
+                  } @else {
+                    Future bank transactions Plaid files here will arrive uncategorised —
+                    a rule can file them.
+                  }
+                </li>
+              }
+
+              @if (p.budgetMoves.length) {
+                <li>{{ plural(p.budgetMoves.length, 'budget') }} move{{ p.budgetMoves.length === 1 ? 's' : '' }} to {{ targetName() }}.</li>
+              }
+              @if (p.budgetDeletes.length) {
+                <li class="warn">
+                  <strong>{{ plural(p.budgetDeletes.length, 'budget') }} will be deleted</strong>
+                  @if (d.targetId) {
+                    — {{ targetName() }} already has a budget for the same period, and that one is kept.
+                  } @else {
+                    — a budget needs a category.
+                  }
+                </li>
+              }
+              @if (p.rulePatches.length - p.rulesDisabled > 0) {
+                <li>{{ plural(p.rulePatches.length - p.rulesDisabled, 'rule') }} updated to use {{ targetName() || 'no category' }}.</li>
+              }
+              @if (p.rulesDisabled) {
+                <li class="warn">
+                  <strong>{{ plural(p.rulesDisabled, 'rule') }} switched off</strong> — {{ p.rulesDisabled === 1 ? 'it only applies' : 'they only apply' }} to
+                  transactions in this category, and removing that condition would make
+                  {{ p.rulesDisabled === 1 ? 'it' : 'them' }} match far more.
+                </li>
+              }
+              @if (p.billPatches.length) {
+                <li>{{ plural(p.billPatches.length, 'bill') }} updated.</li>
+              }
+              @if (p.templatePatches.length) {
+                <li>{{ plural(p.templatePatches.length, 'saved template') }} updated.</li>
+              }
+            </ul>
+          </div>
+        }
+
+        @if (!d.category.archived) {
+          <div class="alt">
+            <div>
+              <strong>Just want it out of the way?</strong>
+              Archiving hides it from pickers and changes nothing else. You can restore it any time.
+            </div>
+            <button class="btn-ghost sm" [disabled]="busy()" (click)="archive(d.category)">Archive instead</button>
+          </div>
+        }
+      </div>
+
+      <div class="sheet-actions">
+        <button class="btn-ghost" [disabled]="busy()" (click)="deleting.set(null)">Cancel</button>
+        <button class="btn-danger" [disabled]="busy()" (click)="confirmDelete()">
+          {{ busy() ? 'Deleting…' : 'Delete category' }}
+        </button>
+      </div>
+    </div>
+  }
+</div>

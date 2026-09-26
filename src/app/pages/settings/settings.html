@@ -36,6 +36,14 @@
 
     <div class="settings-section">
       <div class="settings-section-title">Spending</div>
+      <div class="settings-row" (click)="navigate('/settings/categories')">
+        <div class="settings-icon">🏷️</div>
+        <div class="settings-info">
+          <div class="settings-label">Categories</div>
+          <div class="settings-sub">Add, rename, archive or delete categories</div>
+        </div>
+        <div class="settings-arrow">›</div>
+      </div>
       <div class="settings-row" (click)="navigate('/settings/rules')">
         <div class="settings-icon">🗂️</div>
         <div class="settings-info">
