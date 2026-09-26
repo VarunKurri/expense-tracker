@@ -12,6 +12,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
 
   h1 {
     font-size: 34px;
@@ -23,6 +24,8 @@
 
   .hint { color: var(--fg-3); font-size: 14px; }
 }
+
+.header-actions { display: flex; gap: 10px; }
 
 .card {
   background: var(--card-grad);
@@ -265,7 +268,6 @@
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
-  .header-row { flex-direction: column; align-items: flex-start; }
   .apply-row { grid-template-columns: 1fr; }
   .rule-table { th, td { padding: 11px 12px; } }
   .card-head, .section-note { padding-left: 14px; padding-right: 14px; }

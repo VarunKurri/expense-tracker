@@ -5,7 +5,12 @@
       <h1>Rules</h1>
       <div class="hint">File transactions automatically</div>
     </div>
-    <a class="btn-primary" routerLink="/settings">← Settings</a>
+    <!-- Same header as Settings → Categories: a quiet way back, and the
+         page's one primary action beside it. -->
+    <div class="header-actions">
+      <a class="btn-ghost" routerLink="/settings">← Settings</a>
+      <button class="btn-primary" (click)="startNewRule()">+ New rule</button>
+    </div>
   </div>
 
 
@@ -16,7 +21,6 @@
     <section class="card">
       <div class="card-head">
         <span class="card-label">Rules</span>
-        <button class="btn-primary" (click)="startNewRule()">+ New rule</button>
       </div>
 
       <p class="section-note">
