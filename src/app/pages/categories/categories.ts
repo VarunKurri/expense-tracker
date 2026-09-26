@@ -10,7 +10,9 @@ import { TransactionService } from '../../services/transaction.service';
 import { AccountService } from '../../services/account.service';
 import { ToastService } from '../../services/toast.service';
 import { Category, CategoryGroup, TransactionRule } from '../../models';
-import { describeRule, planBulkApply, ruleHasAction, ruleHasCondition } from '../../utils/rules';
+import {
+  describeRule, planBulkApply, ruleHasAction, ruleHasCondition, hasMissingCategory,
+} from '../../utils/rules';
 import { categoryPalette } from '../../utils/theme-colors';
 
 /** A blank rule, ready for the editor. */
@@ -203,10 +205,16 @@ export class Categories {
     catch { this.toast.error('Could not reorder the rules.'); }
   }
 
+  /** A rule whose target category was deleted — shown with a warning, and not run. */
+  isBroken(r: TransactionRule): boolean {
+    return hasMissingCategory(r,
+      new Set(this.categories().map(c => c.id).filter((id): id is string => !!id)));
+  }
+
   describe(r: TransactionRule): string {
     return describeRule(
       r,
-      id => this.categories().find(c => c.id === id)?.name ?? 'Uncategorized',
+      id => this.categories().find(c => c.id === id)?.name ?? 'a deleted category',
       id => this.accounts().find(a => a.id === id)?.name ?? 'that account',
     );
   }
@@ -218,13 +226,13 @@ export class Categories {
    * read them.
    */
   pendingCount = computed(() =>
-    planBulkApply(this.rules(), this.txService.transactions(), { onlyUncategorised: true }).length);
+    planBulkApply(this.ruleService.activeRules(), this.txService.transactions(), { onlyUncategorised: true }).length);
 
   recategoriseCount = computed(() =>
-    planBulkApply(this.rules(), this.txService.transactions()).length);
+    planBulkApply(this.ruleService.activeRules(), this.txService.transactions()).length);
 
   async applyRules(all: boolean) {
-    const plan = planBulkApply(this.rules(), this.txService.transactions(),
+    const plan = planBulkApply(this.ruleService.activeRules(), this.txService.transactions(),
       { onlyUncategorised: !all });
     if (!plan.length) {
       this.toast.info('Nothing to change — every transaction already matches your rules.');

@@ -176,7 +176,7 @@ availableCredit(account: Account): number {
     const now = Date.now();
     // Rules run before the write, so a manually added transaction lands already
     // filed rather than needing a second pass.
-    const ruled = applyRulesToDraft(this.ruleService.rules(), tx);
+    const ruled = applyRulesToDraft(this.ruleService.activeRules(), tx);
     const data = {
       ...ruled, createdAt: now, updatedAt: now
     };
@@ -194,7 +194,7 @@ availableCredit(account: Account): number {
     const now = Date.now();
 
     // CSV imports come through here too, so rules apply to them as well.
-    const rules = this.ruleService.rules();
+    const rules = this.ruleService.activeRules();
 
     for (const tx of txs) {
       const ruled = applyRulesToDraft(rules, tx);

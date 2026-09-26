@@ -171,6 +171,13 @@
 
 .rule-name { font-weight: 500; color: var(--fg); }
 .rule-desc { font-size: 12.5px; color: var(--fg-3); margin-top: 2px; }
+.rule-warn {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--amber);
+  max-width: 52ch;
+}
 
 .icon-btn {
   width: 26px;

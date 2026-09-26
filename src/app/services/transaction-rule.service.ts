@@ -1,4 +1,4 @@
-import { Injectable, inject, NgZone, signal } from '@angular/core';
+import { Injectable, inject, NgZone, signal, computed } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
   collection, query, orderBy, onSnapshot,
@@ -8,6 +8,8 @@ import { Observable, of, switchMap, combineLatest } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
 import { EncryptionService } from './encryption.service';
+import { CategoryService } from './category.service';
+import { dropMissingCategories } from '../utils/rules';
 import { TransactionRule } from '../models';
 
 /**
@@ -25,6 +27,7 @@ export class TransactionRuleService {
   private auth = inject(AuthService);
   private encryption = inject(EncryptionService);
   private ngZone = inject(NgZone);
+  private categoryService = inject(CategoryService);
   error = signal<string | null>(null);
 
   private rules$: Observable<TransactionRule[]> = combineLatest([
@@ -73,7 +76,20 @@ export class TransactionRuleService {
     })
   );
 
+  /** Every rule as stored — for listing and editing. */
   rules = toSignal(this.rules$, { initialValue: [] });
+
+  /**
+   * The rules that are safe to *run*: any action filing into a category that
+   * has since been deleted is dropped. Everything that applies rules — manual
+   * add, CSV import, bulk apply and its preview counts — must read this rather
+   * than `rules`, or a deleted category gets written back onto transactions.
+   */
+  activeRules = computed(() => {
+    const valid = new Set(
+      this.categoryService.categories().map(c => c.id).filter((id): id is string => !!id));
+    return dropMissingCategories(this.rules(), valid);
+  });
 
   /** New rules go to the end of the run order unless a priority is given. */
   async add(rule: Omit<TransactionRule, 'id' | 'createdAt'>) {

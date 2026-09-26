@@ -31,6 +31,32 @@ export function ruleHasCondition(rule: TransactionRule): boolean {
 }
 
 /** Rules that are safe to run: enabled, and both a condition and an action. */
+/**
+ * True when a rule files into a category that no longer exists.
+ *
+ * Categories can be hard-deleted, and nothing ties a rule to the category it
+ * files into — so a deleted category leaves the rule pointing at an id with no
+ * record behind it. Left alone, "Re-file everything" would stamp that dead id
+ * onto every matching transaction and they would all read as broken.
+ */
+export function hasMissingCategory(rule: TransactionRule, validCategoryIds: Set<string>): boolean {
+  return !!rule.setCategoryId && !validCategoryIds.has(rule.setCategoryId);
+}
+
+/**
+ * Rules with any file-into-a-deleted-category action removed.
+ *
+ * Only that one action is dropped, not the whole rule: a rule that also flags
+ * internal transfers keeps doing that. A rule left with no action at all then
+ * falls out of `usableRules` on its own, the same as any other inert rule.
+ */
+export function dropMissingCategories(
+  rules: TransactionRule[], validCategoryIds: Set<string>,
+): TransactionRule[] {
+  return rules.map(r =>
+    hasMissingCategory(r, validCategoryIds) ? { ...r, setCategoryId: undefined } : r);
+}
+
 export function usableRules(rules: TransactionRule[]): TransactionRule[] {
   return rules
     .filter(r => r.enabled && ruleHasCondition(r) && ruleHasAction(r))

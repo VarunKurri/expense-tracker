@@ -3,6 +3,7 @@ import { Transaction, TransactionRule } from '../models';
 import {
   ruleMatches, evaluateRules, usableRules, applyRulesToDraft,
   planBulkApply, describeRule, ruleHasAction, ruleHasCondition,
+  hasMissingCategory, dropMissingCategories,
 } from './rules';
 
 function tx(over: Partial<Transaction> = {}): Transaction {
@@ -34,6 +35,51 @@ describe('rules — guards', () => {
   it('skips disabled rules', () => {
     const r = rule({ enabled: false, merchantContains: 'lyft', setCategoryId: 'ride' });
     expect(usableRules([r])).toEqual([]);
+  });
+});
+
+describe('rules — deleted categories', () => {
+  const valid = new Set(['food', 'ride']);
+
+  it('flags a rule that files into a category that no longer exists', () => {
+    expect(hasMissingCategory(rule({ merchantContains: 'x', setCategoryId: 'gone' }), valid)).toBe(true);
+    expect(hasMissingCategory(rule({ merchantContains: 'x', setCategoryId: 'food' }), valid)).toBe(false);
+    // A rule that only flags transfers files into nothing, so nothing can be missing.
+    expect(hasMissingCategory(rule({ merchantContains: 'x', setInternalTransfer: true }), valid)).toBe(false);
+  });
+
+  it('never writes a deleted category onto transactions', () => {
+    // This is the failure being guarded: "Re-file everything" stamping a dead
+    // id onto every matching transaction after its category was deleted.
+    const broken = rule({ merchantContains: 'lyft', setCategoryId: 'gone' });
+    const plan = planBulkApply(dropMissingCategories([broken], valid),
+      [tx({ id: 'a', merchant: 'Lyft', categoryId: 'food' })]);
+    expect(plan).toEqual([]);
+  });
+
+  it('keeps the rest of a rule running when only its category is gone', () => {
+    const r = rule({ merchantContains: 'chase', setCategoryId: 'gone', setInternalTransfer: true });
+    const [cleaned] = dropMissingCategories([r], valid);
+    expect(cleaned.setCategoryId).toBeUndefined();
+    expect(cleaned.setInternalTransfer).toBe(true);
+    const plan = planBulkApply([cleaned], [tx({ id: 'a', merchant: 'Chase payment' })]);
+    expect(plan).toEqual([{ id: 'a', patch: { isInternalTransfer: true } }]);
+  });
+
+  it('lets a lower rule decide once a broken higher one is dropped', () => {
+    // Otherwise the dead rule would "win" the category decision and block
+    // a valid rule further down from ever applying.
+    const rules = dropMissingCategories([
+      rule({ id: 'r1', priority: 0, merchantContains: 'lyft', setCategoryId: 'gone' }),
+      rule({ id: 'r2', priority: 1, merchantContains: 'lyft', setCategoryId: 'ride' }),
+    ], valid);
+    const plan = planBulkApply(rules, [tx({ id: 'a', merchant: 'Lyft' })]);
+    expect(plan).toEqual([{ id: 'a', patch: { categoryId: 'ride' } }]);
+  });
+
+  it('leaves rules pointing at real categories untouched', () => {
+    const r = rule({ merchantContains: 'lyft', setCategoryId: 'ride' });
+    expect(dropMissingCategories([r], valid)[0]).toBe(r);
   });
 });
 

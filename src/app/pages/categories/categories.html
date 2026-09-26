@@ -125,6 +125,12 @@
               <td>
                 <div class="rule-name">{{ r.name || describe(r) }}</div>
                 @if (r.name) { <div class="rule-desc">{{ describe(r) }}</div> }
+                @if (isBroken(r)) {
+                  <div class="rule-warn">
+                    The category this rule files into was deleted, so that part of the
+                    rule is paused. Edit the rule to pick a new category.
+                  </div>
+                }
               </td>
               <td>
                 <button class="chip" [class.active]="r.enabled" (click)="toggleRule(r)">
