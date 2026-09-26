@@ -168,10 +168,9 @@
           <div class="field">
             <span class="label-sm">Frequency</span>
             <select class="input-field" [(ngModel)]="billFrequency" name="billFrequency">
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="yearly">Yearly</option>
+              @for (f of billFrequencies; track f.value) {
+                <option [value]="f.value">{{ f.label }}</option>
+              }
             </select>
           </div>
           <div class="field">

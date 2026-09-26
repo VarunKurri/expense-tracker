@@ -8,6 +8,7 @@ import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
 import { EncryptionService } from './encryption.service';
 import { Bill, BillFrequency } from '../models';
+import { advanceDueDate } from '../utils/bill-schedule';
 
 @Injectable({ providedIn: 'root' })
 export class BillService {
@@ -83,23 +84,9 @@ export class BillService {
     return this.advanceDate(bill.nextDueDate, bill.frequency);
   }
 
+  /** See utils/bill-schedule.ts — clamps to month end, and stays in local time. */
   advanceDate(from: string, frequency: BillFrequency): string {
-    const d = new Date(from + 'T00:00:00');
-    switch (frequency) {
-      case 'weekly':
-        d.setDate(d.getDate() + 7);
-        break;
-      case 'monthly':
-        d.setMonth(d.getMonth() + 1);
-        break;
-      case 'quarterly':
-        d.setMonth(d.getMonth() + 3);
-        break;
-      case 'yearly':
-        d.setFullYear(d.getFullYear() + 1);
-        break;
-    }
-    return d.toISOString().slice(0, 10);
+    return advanceDueDate(from, frequency);
   }
 
   async add(bill: Omit<Bill, 'id' | 'createdAt'>) {

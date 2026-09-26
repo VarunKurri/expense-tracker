@@ -11,7 +11,8 @@ import { CategoryService } from '../../../services/category.service';
 import { BillService } from '../../../services/bill.service';
 import { TransactionTemplateService } from '../../../services/transaction-template.service';
 import { TransactionService } from '../../../services/transaction.service';
-import { BillAmountMode, BillDueDateMode, Transaction, TransactionType } from '../../../models';
+import { BillAmountMode, BillDueDateMode, BillFrequency, Transaction, TransactionType } from '../../../models';
+import { BILL_FREQUENCIES } from '../../../utils/bill-schedule';
 import { TransactionTemplate } from '../../../models';
 import { QuickAddService } from '../../../services/quick-add.service';
 import { ToastService } from '../../../services/toast.service';
@@ -63,7 +64,8 @@ export class TransactionForm implements OnChanges {
   }
 
   // Bill fields — shown when Subscriptions category is selected
-  billFrequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly' = 'monthly';
+  billFrequency: BillFrequency = 'monthly';
+  billFrequencies = BILL_FREQUENCIES;
   billNextDueDate: string = '';
   billAmountMode: BillAmountMode = 'fixed';
   billDueDateMode: BillDueDateMode = 'exact';

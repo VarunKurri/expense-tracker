@@ -1,4 +1,4 @@
-export type BillFrequency = 'monthly' | 'yearly' | 'weekly' | 'quarterly';
+export type BillFrequency = 'weekly' | 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
 export type BillAmountMode = 'fixed' | 'variable';
 export type BillDueDateMode = 'exact' | 'flexible';
 

@@ -8,6 +8,7 @@ import { Modal } from '../../../components/modal/modal';
 import { AccountService } from '../../../services/account.service';
 import { CategoryService } from '../../../services/category.service';
 import { Bill, BillAmountMode, BillDueDateMode, BillFrequency } from '../../../models';
+import { BILL_FREQUENCIES } from '../../../utils/bill-schedule';
 import { ToastService } from '../../../services/toast.service';
 
 @Component({
@@ -43,12 +44,7 @@ export class BillForm implements OnChanges {
 
   submitting = signal(false);
 
-  frequencies: { value: BillFrequency; label: string }[] = [
-    { value: 'weekly',    label: 'Weekly' },
-    { value: 'monthly',   label: 'Monthly' },
-    { value: 'quarterly', label: 'Quarterly' },
-    { value: 'yearly',    label: 'Yearly' },
-  ];
+  frequencies = BILL_FREQUENCIES;
 
   iconOptions = ['📄', '📺', '🎵', '🎮', '☁️', '📱', '🛒', '💪', '📰', '🎬', '🏠', '🚗', '💊', '✈️', '🍔'];
 
