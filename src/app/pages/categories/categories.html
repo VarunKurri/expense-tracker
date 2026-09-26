@@ -77,18 +77,14 @@
   }
 
   <!-- ── Create / edit ─────────────────────────────────────── -->
-  @if (editing(); as e) {
-    <div class="sheet-backdrop" (click)="!busy() && editing.set(null)"></div>
-    <div class="sheet" role="dialog" aria-modal="true"
-         [attr.aria-label]="e.category ? 'Edit category' : 'New category'">
-      <div class="sheet-head">
-        <span class="card-label">{{ e.category ? 'Edit category' : 'New category' }}</span>
-        <button class="icon-btn" (click)="editing.set(null)" aria-label="Close">✕</button>
-      </div>
-
-      <div class="sheet-body">
+  <app-modal [open]="!!editing()"
+             [title]="editing()?.category ? 'Edit category' : 'New category'"
+             size="md"
+             (closed)="!busy() && editing.set(null)">
+    @if (editing(); as e) {
+      <div class="form">
         <label class="field">
-          <span class="label-mono">Name</span>
+          <span class="label-sm">Name</span>
           <input class="input-field" [value]="e.name" [attr.maxlength]="maxName"
                  placeholder="Coffee"
                  (input)="patch({ name: $any($event.target).value })"
@@ -97,12 +93,12 @@
             <span class="field-error">{{ editError() }}</span>
           }
           @if (renameNote(); as note) {
-            <span class="field-note">{{ note }}</span>
+            <span class="field-hint">{{ note }}</span>
           }
         </label>
 
         <div class="field">
-          <span class="label-mono">Type</span>
+          <span class="label-sm">Type</span>
           @if (e.category) {
             <!-- Fixed once created: switching kind would leave its existing
                  transactions filed under a category of the wrong kind. -->
@@ -121,14 +117,14 @@
         </div>
 
         <div class="field">
-          <span class="label-mono">Icon</span>
+          <span class="label-sm">Icon</span>
           <div class="icon-row">
             <input class="input-field icon-input" [value]="e.icon" maxlength="4"
                    placeholder="📦" aria-label="Icon (any emoji)"
                    (input)="patch({ icon: $any($event.target).value })" />
             <div class="icon-picks">
               @for (i of iconPicks; track i) {
-                <button type="button" class="icon-pick" [class.active]="e.icon === i"
+                <button type="button" class="icon-opt" [class.active]="e.icon === i"
                         (click)="patch({ icon: i })">{{ i }}</button>
               }
             </div>
@@ -136,43 +132,40 @@
         </div>
 
         <div class="field">
-          <span class="label-mono">Colour</span>
+          <span class="label-sm">Colour</span>
           <div class="swatches">
             @for (c of palette(); track c) {
-              <button type="button" class="swatch" [style.background]="c"
+              <button type="button" class="color-opt" [style.background]="c"
                       [class.active]="e.color === c" [attr.aria-label]="'Colour ' + c"
                       (click)="patch({ color: c })"></button>
             }
           </div>
         </div>
       </div>
+    }
 
-      <div class="sheet-actions">
+    <div class="modal-actions" modal-footer>
+      <div class="actions-right">
         <button class="btn-ghost" (click)="editing.set(null)">Cancel</button>
         <button class="btn-primary" [disabled]="!!editError() || busy()" (click)="save()">
-          {{ e.category ? 'Save' : 'Add category' }}
+          {{ editing()?.category ? 'Save' : 'Add category' }}
         </button>
       </div>
     </div>
-  }
+  </app-modal>
 
   <!-- ── Delete ────────────────────────────────────────────── -->
-  @if (deleting(); as d) {
-    <div class="sheet-backdrop" (click)="!busy() && deleting.set(null)"></div>
-    <div class="sheet" role="alertdialog" aria-modal="true" aria-label="Delete category">
-      <div class="sheet-head">
-        <span class="card-label">Delete category</span>
-        <button class="icon-btn" (click)="deleting.set(null)" aria-label="Close">✕</button>
-      </div>
-
-      <div class="sheet-body">
+  <app-modal [open]="!!deleting()" title="Delete category" size="md"
+             (closed)="!busy() && deleting.set(null)">
+    @if (deleting(); as d) {
+      <div class="form">
         <p class="lead">
           Delete <strong>{{ d.category.name }}</strong>? This can't be undone, so
           everything filed under it needs somewhere to go.
         </p>
 
         <label class="field">
-          <span class="label-mono">Move its transactions to</span>
+          <span class="label-sm">Move its transactions to</span>
           <select class="input-field" (change)="setTarget($any($event.target).value)">
             @for (t of targets(); track t.id) {
               <option [value]="t.id" [selected]="d.targetId === t.id">{{ t.icon }} {{ t.name }}</option>
@@ -183,7 +176,7 @@
 
         @if (plan(); as p) {
           <div class="effects">
-            <div class="label-mono">What will happen</div>
+            <div class="label-sm">What will happen</div>
             <ul>
               <li>
                 @if (planTxCount() === 0) {
@@ -249,13 +242,15 @@
           </div>
         }
       </div>
+    }
 
-      <div class="sheet-actions">
+    <div class="modal-actions" modal-footer>
+      <div class="actions-right">
         <button class="btn-ghost" [disabled]="busy()" (click)="deleting.set(null)">Cancel</button>
         <button class="btn-danger" [disabled]="busy()" (click)="confirmDelete()">
           {{ busy() ? 'Deleting…' : 'Delete category' }}
         </button>
       </div>
     </div>
-  }
+  </app-modal>
 </div>

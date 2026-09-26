@@ -1,8 +1,12 @@
 <app-modal [open]="open" [title]="title" size="sm" (closed)="cancelled.emit()">
   <p class="message">{{ message }}</p>
   <ng-content></ng-content>
-  <div class="actions">
-    <button class="btn ghost" (click)="cancelled.emit()">Cancel</button>
-    <button class="btn" [class.danger]="danger" (click)="confirmed.emit()">{{ confirmText }}</button>
+
+  <div class="modal-actions" modal-footer>
+    <div class="actions-right">
+      <button class="btn-ghost" (click)="cancelled.emit()">Cancel</button>
+      <button [class.btn-danger]="danger" [class.btn-primary]="!danger"
+              (click)="confirmed.emit()">{{ confirmText }}</button>
+    </div>
   </div>
 </app-modal>

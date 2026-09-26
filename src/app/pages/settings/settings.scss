@@ -156,41 +156,56 @@
 .settings-label .pill.on { background: var(--teal-bg); color: var(--teal); }
 .settings-label .pill.warn { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
 
+/* ── Dialogs ─────────────────────────────────────────────────
+   The shell, buttons and footer are the shared modal ones; these are only the
+   pieces particular to Settings' dialogs. */
 .recovery-intro {
-  font-size: 13px;
-  color: var(--fg-3);
+  margin: 0 0 16px;
+  font-size: 13.5px;
   line-height: 1.55;
-  margin: 0 0 14px;
+  color: var(--fg-2);
 }
+
 .recovery-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 18px;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-  text-align: center;
-  color: var(--fg);
-  background: var(--surface-hi);
-  border: 1px solid var(--line);
-  border-radius: 12px;
   padding: 16px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-align: center;
   word-break: break-all;
+  color: var(--fg);
   user-select: all;
 }
+
+/* Sits in the modal's pinned footer. */
 .recovery-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
-  .btn { cursor: pointer; }
+  gap: 10px;
+  width: 100%;
 }
 
+/* A labelled field — same mono label as every other form. */
 .modal-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 
-  span { font-size: 12px; font-weight: 600; color: var(--fg-3); }
+  &:last-of-type { margin-bottom: 0; }
+
+  > span {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
 }
 
 .file-picker {

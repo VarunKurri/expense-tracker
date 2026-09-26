@@ -378,7 +378,13 @@ input, select, textarea {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  white-space: nowrap;
+  cursor: pointer;
   transition: all var(--t);
+
+  /* Every page used to carry its own copy of these buttons just to get this. */
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+  &:focus-visible { outline: 2px solid var(--fg-3); outline-offset: 2px; }
 }
 
 .btn-primary {
@@ -386,14 +392,15 @@ input, select, textarea {
   background: var(--surface);
   border: 1px solid var(--line-strong);
   color: var(--fg);
-  &:hover { background: var(--bg-3); }
+  &:hover:not(:disabled) { background: var(--bg-3); }
 }
 
 .btn-solid {
   @include btn-base;
   background: var(--fg);
   color: var(--bg);
-  &:hover { opacity: 0.88; }
+  border: 1px solid transparent;
+  &:hover:not(:disabled) { opacity: 0.88; }
 }
 
 .btn-ghost {
@@ -401,14 +408,21 @@ input, select, textarea {
   background: transparent;
   border: 1px solid transparent;
   color: var(--fg-2);
-  &:hover { background: var(--bg-3); color: var(--fg); }
+  &:hover:not(:disabled) { background: var(--bg-3); color: var(--fg); }
 }
 
 .btn-danger {
   @include btn-base;
   background: var(--red-bg);
+  border: 1px solid transparent;
   color: var(--red);
-  &:hover { filter: brightness(1.05); }
+  &:hover:not(:disabled) { filter: brightness(1.05); }
+}
+
+/* Compact size, for buttons inside rows and card headers. */
+.btn-primary.sm, .btn-ghost.sm, .btn-danger.sm, .btn-solid.sm {
+  padding: 6px 12px;
+  font-size: 13px;
 }
 
 /* Legacy `.btn` kept for pages not yet converted. */
@@ -487,6 +501,272 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
   opacity: 0.7;
   &:hover { opacity: 1; }
+}
+
+/* ============================================
+   FORMS
+
+   Every form in the app is built from these, inside the shared <app-modal>
+   shell. They used to be redefined privately by each form — with a dark input
+   fill, a bordered Cancel, a teal toggle — and the copies drifted apart. A
+   form's own stylesheet should now hold only what is genuinely unique to it.
+
+   Monochrome throughout: a selected segment is ink-filled, a switched-on
+   toggle is ink, a picked icon gets an ink border. Colour stays reserved for
+   what the numbers are doing (see --accent in the tokens).
+   ============================================ */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Field label — the same mono eyebrow as .label-mono, sized for forms. */
+.label-sm {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.label-optional {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fg-4);
+}
+
+.field-hint  { font-size: 12px; line-height: 1.45; color: var(--fg-3); }
+.field-error { font-size: 12.5px; line-height: 1.45; color: var(--red); }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* A bordered group of related fields — "Credit card details", "Recurring bill". */
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.form-section-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+
+.form-note {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--fg-3);
+}
+
+/* "$" in front of an amount input. */
+.input-affix {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  > .affix {
+    position: absolute;
+    left: 14px;
+    font-size: 14px;
+    color: var(--fg-3);
+    pointer-events: none;
+  }
+  > .input-field, > .input { padding-left: 28px; }
+}
+
+/* ── Segmented control ─────────────────────────────────────
+   .seg sizes to its content (Type: Expense / Income); .type-seg and .mini-seg
+   stretch to fill their field, with equal-width options. */
+@mixin seg-base {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+
+  > button {
+    min-height: 32px;
+    padding: 6px 14px;
+    border: none;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--fg-3);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--t), color var(--t);
+
+    &:hover:not(.active):not(:disabled) { color: var(--fg); }
+    &.active { background: var(--accent); color: var(--accent-on); }
+    &:disabled { opacity: 0.45; cursor: not-allowed; }
+    &:focus-visible { outline: 2px solid var(--fg-3); outline-offset: 1px; }
+  }
+}
+
+.seg      { @include seg-base; display: inline-grid; align-self: flex-start; }
+.type-seg { @include seg-base; }
+.mini-seg { @include seg-base; }
+
+/* ── Toggle switch ─────────────────────────────────────────── */
+.toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--bg-3);
+  cursor: pointer;
+  transition: background var(--t), border-color var(--t);
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--fg-3);
+    transition: left var(--t), background var(--t);
+  }
+
+  &.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    &::after { left: 19px; background: var(--accent-on); }
+  }
+
+  &:disabled { opacity: 0.45; cursor: not-allowed; }
+  &:focus-visible { outline: 2px solid var(--fg-3); outline-offset: 2px; }
+}
+
+/* A setting with a toggle: label and explanation on the left, switch right. */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.toggle-label { font-size: 13.5px; font-weight: 500; color: var(--fg); }
+.toggle-sub   { margin-top: 2px; font-size: 12px; line-height: 1.45; color: var(--fg-3); }
+
+/* ── Icon and colour pickers ───────────────────────────────── */
+.icon-picks { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.icon-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  font-size: 16px;
+  cursor: pointer;
+
+  &:hover { background: var(--bg-3); }
+  &.active { border-color: var(--fg); box-shadow: 0 0 0 2px var(--focus-ring); }
+}
+
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.color-opt {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+
+  /* An ink ring with a gap, so the choice reads on any swatch colour. */
+  &.active { border-color: var(--fg); box-shadow: inset 0 0 0 2px var(--surface); }
+}
+
+/* ── Choice cards — two options that each need a sentence ─── */
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.choice {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t);
+
+  &:hover { border-color: var(--line-strong); }
+  &.active { border-color: var(--fg); box-shadow: 0 0 0 3px var(--focus-ring); }
+}
+
+.choice-title { font-size: 13.5px; font-weight: 600; color: var(--fg); }
+.choice-sub   { margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--fg-3); }
+
+/* ── Footer actions ────────────────────────────────────────
+   Lives in <app-modal>'s pinned footer (mark it `modal-footer`). Delete sits
+   on the left, apart from Cancel / Save, so it is never hit by reflex. */
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.actions-right {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+@media (max-width: 560px) {
+  .form-grid, .choice-grid { grid-template-columns: 1fr; }
 }
 
 /* ============================================

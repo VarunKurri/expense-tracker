@@ -1,6 +1,7 @@
-import { Component, HostListener, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { Modal } from '../../components/modal/modal';
 
 import { CategoryService } from '../../services/category.service';
 import { CategoryAdminService } from '../../services/category-admin.service';
@@ -42,7 +43,7 @@ interface Editing {
 @Component({
   selector: 'app-categories',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, Modal],
   templateUrl: './categories.html',
   styleUrl: './categories.scss',
 })
@@ -226,12 +227,5 @@ export class Categories {
   // ── Helpers ────────────────────────────────────────────────
   plural(n: number, one: string, many = one + 's'): string {
     return `${n} ${n === 1 ? one : many}`;
-  }
-
-  @HostListener('document:keydown.escape')
-  onEscape() {
-    if (this.busy()) return;
-    this.editing.set(null);
-    this.deleting.set(null);
   }
 }

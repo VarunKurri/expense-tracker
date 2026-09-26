@@ -35,38 +35,6 @@
 }
 
 /* ── BUTTONS ───────────────────────────────────────────────── */
-.btn-primary {
-  padding: 10px 18px;
-  border-radius: 10px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  color: var(--fg);
-  font-weight: 600;
-  font-size: 13.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.18s ease;
-  white-space: nowrap;
-
-  &:hover { background: var(--bg-3); }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
-}
-
-.btn-ghost {
-  padding: 10px 18px;
-  border-radius: 10px;
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--fg);
-  font-weight: 500;
-  font-size: 13.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.18s ease;
-
-  &:hover { background: var(--surface-hi); }
-}
-
 /* ── UPLOAD GRID ───────────────────────────────────────────── */
 .upload-grid {
   display: grid;

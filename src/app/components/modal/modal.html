@@ -1,17 +1,19 @@
 @if (open) {
   <div class="backdrop" (click)="onBackdropClick($event)">
-    <div class="modal glass-strong" [class.sm]="size === 'sm'" [class.lg]="size === 'lg'">
+    <div class="modal" [class.sm]="size === 'sm'" [class.lg]="size === 'lg'"
+         role="dialog" aria-modal="true" [attr.aria-label]="title">
       <header class="modal-header">
-        <h2>{{ title }}</h2>
+        <span class="card-label">{{ title }}</span>
         <button class="close-btn" (click)="close()" aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
             <path d="M4 4l12 12M16 4L4 16"/>
           </svg>
         </button>
       </header>
-      <div class="modal-body">
-        <ng-content />
-      </div>
+      <div class="modal-body"><ng-content /></div>
+      <!-- Anything marked `modal-footer` lands here, pinned below the scrolling
+           body, so a form's buttons stay in reach however long it gets. -->
+      <footer class="modal-footer"><ng-content select="[modal-footer]" /></footer>
     </div>
   </div>
 }

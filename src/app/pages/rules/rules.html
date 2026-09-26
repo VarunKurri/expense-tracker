@@ -101,35 +101,30 @@
     }
 
   <!-- ── Rule editor ─────────────────────────────────────── -->
-  @if (editing(); as r) {
-    <div class="editor-backdrop" (click)="cancelEdit()"></div>
-    <div class="editor" role="dialog" aria-label="Edit rule">
-      <div class="editor-head">
-        <span class="card-label">{{ isNew() ? 'New rule' : 'Edit rule' }}</span>
-        <button class="icon-btn" (click)="cancelEdit()" aria-label="Close">✕</button>
-      </div>
-
-      <div class="editor-body">
+  <app-modal [open]="!!editing()" [title]="isNew() ? 'New rule' : 'Edit rule'"
+             size="md" (closed)="cancelEdit()">
+    @if (editing(); as r) {
+      <div class="form">
         <label class="field">
-          <span class="label-mono">Name (optional)</span>
+          <span class="label-sm">Name (optional)</span>
           <input class="input-field" [value]="r.name || ''"
                  placeholder="Rideshare"
                  (input)="patchDraft({ name: $any($event.target).value })" />
         </label>
 
-        <div class="field-group">
-          <div class="label-mono group-label">When</div>
+        <div class="form-section">
+          <div class="form-section-title">When</div>
 
           <label class="field">
-            <span class="label-mono">Merchant or notes contain</span>
+            <span class="label-sm">Merchant or notes contain</span>
             <input class="input-field" [value]="r.merchantContains || ''"
                    placeholder="lyft"
                    (input)="patchDraft({ merchantContains: $any($event.target).value })" />
           </label>
 
-          <div class="field-row">
+          <div class="form-grid">
             <label class="field">
-              <span class="label-mono">Type</span>
+              <span class="label-sm">Type</span>
               <select class="input-field" [value]="r.type || ''"
                       (change)="patchDraft({ type: $any($event.target).value || undefined })">
                 <option value="">Any</option>
@@ -139,7 +134,7 @@
               </select>
             </label>
             <label class="field">
-              <span class="label-mono">Account</span>
+              <span class="label-sm">Account</span>
               <select class="input-field" [value]="r.accountId || ''"
                       (change)="patchDraft({ accountId: $any($event.target).value })">
                 <option value="">Any</option>
@@ -150,15 +145,15 @@
             </label>
           </div>
 
-          <div class="field-row">
+          <div class="form-grid">
             <label class="field">
-              <span class="label-mono">Amount at least</span>
+              <span class="label-sm">Amount at least</span>
               <input class="input-field" type="number" step="0.01" min="0"
                      [value]="r.amountMin ?? ''"
                      (input)="patchDraft({ amountMin: $any($event.target).valueAsNumber })" />
             </label>
             <label class="field">
-              <span class="label-mono">Amount at most</span>
+              <span class="label-sm">Amount at most</span>
               <input class="input-field" type="number" step="0.01" min="0"
                      [value]="r.amountMax ?? ''"
                      (input)="patchDraft({ amountMax: $any($event.target).valueAsNumber })" />
@@ -166,7 +161,7 @@
           </div>
 
           <label class="field">
-            <span class="label-mono">Currently filed as</span>
+            <span class="label-sm">Currently filed as</span>
             <select class="input-field" [value]="r.categoryId || ''"
                     (change)="patchDraft({ categoryId: $any($event.target).value })">
               <option value="">Any category</option>
@@ -177,11 +172,11 @@
           </label>
         </div>
 
-        <div class="field-group">
-          <div class="label-mono group-label">Then</div>
+        <div class="form-section">
+          <div class="form-section-title">Then</div>
 
           <label class="field">
-            <span class="label-mono">File as</span>
+            <span class="label-sm">File as</span>
             <select class="input-field" [value]="r.setCategoryId || ''"
                     (change)="patchDraft({ setCategoryId: $any($event.target).value })">
               <option value="">Leave the category alone</option>
@@ -191,11 +186,18 @@
             </select>
           </label>
 
-          <label class="check">
-            <input type="checkbox" [checked]="r.setInternalTransfer === true"
-                   (change)="patchDraft({ setInternalTransfer: $any($event.target).checked ? true : undefined })" />
-            <span>Mark as an internal transfer (keeps it out of spending and income totals)</span>
-          </label>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Mark as an internal transfer</div>
+              <div class="toggle-sub">Keeps it out of spending and income totals.</div>
+            </div>
+            <button type="button" class="toggle"
+                    [class.on]="r.setInternalTransfer === true"
+                    [attr.aria-pressed]="r.setInternalTransfer === true"
+                    aria-label="Mark as an internal transfer"
+                    (click)="patchDraft({ setInternalTransfer: r.setInternalTransfer === true ? undefined : true })">
+            </button>
+          </div>
         </div>
 
         <div class="summary" [class.invalid]="!draftValid()">
@@ -208,12 +210,14 @@
           }
         </div>
       </div>
+    }
 
-      <div class="editor-actions">
+    <div class="modal-actions" modal-footer>
+      <div class="actions-right">
         <button class="btn-ghost" (click)="cancelEdit()">Cancel</button>
         <button class="btn-primary" [disabled]="!draftValid() || busy()"
                 (click)="saveRule()">Save rule</button>
       </div>
     </div>
-  }
+  </app-modal>
 </div>

@@ -129,11 +129,6 @@
   &:disabled { opacity: 0.35; cursor: not-allowed; }
 }
 
-.btn-ghost.sm, .btn-danger.sm {
-  padding: 6px 12px;
-  font-size: 13px;
-}
-
 .input-field.slim { padding: 7px 10px; min-height: 34px; width: auto; min-width: 150px; }
 
 /* ── Bulk apply ───────────────────────────────────────────── */
@@ -170,76 +165,8 @@
   margin-bottom: 10px;
 }
 
-/* ── Rule editor ──────────────────────────────────────────── */
-.editor-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 40;
-}
-
-.editor {
-  position: fixed;
-  z-index: 41;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(560px, calc(100vw - 32px));
-  max-height: min(86vh, 900px);
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-}
-
-.editor-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 15px 20px;
-  border-bottom: 1px solid var(--line);
-}
-
-.editor-body {
-  padding: 18px 20px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field-row { display: flex; gap: 12px; flex-wrap: wrap; > .field { flex: 1; min-width: 150px; } }
-
-.field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-}
-
-.group-label { color: var(--fg-2); }
-
-.check {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  font-size: 13.5px;
-  color: var(--fg-2);
-  line-height: 1.45;
-  cursor: pointer;
-
-  input { margin-top: 2px; accent-color: var(--blue); cursor: pointer; }
-}
-
+/* ── Rule editor — only the live summary is unique here; the dialog, fields,
+   sections and toggle are shared (components/modal, styles.scss → FORMS). */
 .summary {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
@@ -257,13 +184,6 @@
   color: var(--fg-3);
 }
 
-.editor-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--line);
-}
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -271,5 +191,4 @@
   .apply-row { grid-template-columns: 1fr; }
   .rule-table { th, td { padding: 11px 12px; } }
   .card-head, .section-note { padding-left: 14px; padding-right: 14px; }
-  .editor { max-height: calc(100vh - 32px); }
 }

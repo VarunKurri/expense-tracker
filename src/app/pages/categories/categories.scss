@@ -68,8 +68,6 @@
   color: var(--fg-3);
 }
 
-.btn-ghost.sm, .btn-danger.sm { padding: 6px 12px; font-size: 13px; }
-
 /* ── Rows ──────────────────────────────────────────────────── */
 .cat-row {
   display: grid;
@@ -115,101 +113,13 @@
 
 .cat-actions { display: flex; gap: 6px; }
 
-/* ── Sheets (edit / delete) ────────────────────────────────── */
-.sheet-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-}
-
-.sheet {
-  position: fixed;
-  z-index: 41;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(520px, calc(100vw - 32px));
-  max-height: min(88vh, 860px);
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-}
-
-.sheet-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--line);
-}
-
-.sheet-body {
-  padding: 18px 20px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.sheet-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--line);
-}
-
-.icon-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-xs);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--fg-3);
-  cursor: pointer;
-  &:hover { color: var(--fg); border-color: var(--line); }
-}
-
-.field { display: flex; flex-direction: column; gap: 6px; }
-
-.field-error { font-size: 12.5px; color: var(--red); }
-.field-note  { font-size: 12.5px; color: var(--fg-3); line-height: 1.45; }
-
+/* ── Dialog pieces unique to this page ───────────────────────
+   The dialog shell, fields, segmented control, pickers and footer are the
+   shared ones (components/modal, styles.scss → FORMS). */
 .kind-fixed {
   font-size: 14px;
   color: var(--fg);
   span { color: var(--fg-3); font-size: 12.5px; }
-}
-
-.seg {
-  display: inline-flex;
-  align-self: flex-start;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--bg);
-
-  button {
-    padding: 6px 16px;
-    border: none;
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--fg-3);
-    font-family: var(--font-ui);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-
-    &.active { background: var(--accent); color: var(--accent-on); }
-  }
 }
 
 .icon-row { display: flex; gap: 10px; align-items: flex-start; }
@@ -220,33 +130,6 @@
   text-align: center;
   font-size: 18px;
   padding: 6px !important;
-}
-
-.icon-picks { display: flex; flex-wrap: wrap; gap: 4px; }
-
-.icon-pick {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: var(--surface);
-  font-size: 15px;
-  cursor: pointer;
-
-  &:hover { background: var(--bg-3); }
-  &.active { border-color: var(--fg); box-shadow: 0 0 0 2px var(--focus-ring); }
-}
-
-.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
-
-.swatch {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-
-  &.active { border-color: var(--fg); box-shadow: 0 0 0 2px var(--surface) inset; }
 }
 
 /* ── Delete summary ────────────────────────────────────────── */

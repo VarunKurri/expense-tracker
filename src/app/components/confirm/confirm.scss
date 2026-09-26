@@ -1,23 +1,12 @@
+/* The buttons and footer are the shared modal ones (styles.scss → FORMS).
+   A destructive confirm uses the same .btn-danger as every Delete in a form,
+   rather than the solid red with a glow this dialog used to have. */
 .message {
-  color: var(--fg-2);
+  margin: 0;
   font-size: 14px;
   line-height: 1.55;
-  margin: 0 0 24px 0;
+  color: var(--fg-2);
 }
 
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.btn.danger {
-  background: var(--red);
-  color: white;
-  border-color: transparent;
-
-  &:hover {
-    background: #dc2626;
-    box-shadow: 0 4px 14px rgba(255, 59, 48, 0.3);
-  }
-}
+/* Content a caller projects below the message (e.g. a checkbox) gets room. */
+.message + * { margin-top: 14px; }

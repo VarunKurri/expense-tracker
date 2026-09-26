@@ -73,6 +73,19 @@ The app is what we copy. Do not "correct" this back to dark.
   `.label-mono`, `.num`, `.num-display`, `.display`.
 - `.glass` / `.glass-strong` are legacy aliases for flat surfaces, kept only so
   un-converted templates still render. Do not use them in new markup.
+- **Every form and dialog uses `<app-modal>`** (components/modal) — one shell:
+  mono eyebrow title, scrolling body, pinned footer. Put the button row on an
+  element marked `modal-footer` that is a **direct child** of `<app-modal>`
+  (content projection only matches top-level nodes). Build the inside from the
+  shared pieces in `styles.scss → FORMS`: `.form`, `.field`, `.label-sm`,
+  `.label-optional`, `.field-hint`, `.field-error`, `.form-grid`,
+  `.form-section` / `.form-section-title`, `.form-note`, `.input-affix`,
+  `.seg` / `.type-seg` / `.mini-seg`, `.toggle` / `.toggle-row`,
+  `.icon-picks` / `.icon-opt`, `.swatches` / `.color-opt`, `.choice-grid` /
+  `.choice`, `.modal-actions` / `.actions-right`. A form's own stylesheet
+  should hold only what is genuinely unique to it. **Never redefine buttons,
+  inputs, labels or toggles in a page stylesheet** — every form used to, and
+  that is exactly how they drifted apart.
 - Shared components worth reaching for before writing new markup:
   `app-spend-calendar` (month heat grid), `app-day-detail` (what one day cost),
   `app-transaction-view` (read-only transaction sheet), `app-transaction-form`,

@@ -189,9 +189,9 @@
         <p class="connect-note">Plaid provides at most 24 months of history, so earlier dates are capped at 2 years.</p>
       }
     </div>
-    <div class="connect-actions">
-      <button class="btn ghost" (click)="connectChooserOpen.set(false)">Cancel</button>
-      <button class="btn primary" (click)="continueConnect()" [disabled]="plaidSvc.connecting()">Continue</button>
+    <div class="connect-actions" modal-footer>
+      <button class="btn-ghost" (click)="connectChooserOpen.set(false)">Cancel</button>
+      <button class="btn-primary" (click)="continueConnect()" [disabled]="plaidSvc.connecting()">Continue</button>
     </div>
   </app-modal>
 

@@ -18,23 +18,23 @@
 
     <div class="field">
       <label class="label-sm">Monthly limit</label>
-      <div class="amount-wrap">
-        <span class="curr">$</span>
-        <input class="input-field budget-amount-input" type="number" step="1"
+      <div class="input-affix">
+        <span class="affix">$</span>
+        <input class="input-field" type="number" step="1"
                [(ngModel)]="amount" name="amount" placeholder="0" />
       </div>
     </div>
 
-    <div class="type-toggle">
-      <button type="button" class="type-btn" [class.active]="isDefault"
+    <div class="choice-grid">
+      <button type="button" class="choice" [class.active]="isDefault"
               (click)="isDefault = true">
-        <div class="type-btn-title">Every month</div>
-        <div class="type-btn-sub">Default budget for this category</div>
+        <div class="choice-title">Every month</div>
+        <div class="choice-sub">Default budget for this category</div>
       </button>
-      <button type="button" class="type-btn" [class.active]="!isDefault"
+      <button type="button" class="choice" [class.active]="!isDefault"
               (click)="isDefault = false">
-        <div class="type-btn-title">Specific month</div>
-        <div class="type-btn-sub">Override for one month only</div>
+        <div class="choice-title">Specific month</div>
+        <div class="choice-sub">Override for one month only</div>
       </button>
     </div>
 
@@ -49,17 +49,18 @@
       </div>
     }
 
-    <div class="actions">
-      @if (budget) {
-        <button type="button" class="btn-danger"
-                (click)="deleteRequested.emit()">Delete</button>
-      }
-      <div class="actions-right">
-        <button type="button" class="btn-ghost" (click)="closed.emit()">Cancel</button>
-        <button type="button" class="btn-primary" (click)="save()">
-          {{ budget ? 'Save changes' : 'Add budget' }}
-        </button>
-      </div>
+  </div>
+
+  <div class="modal-actions" modal-footer>
+    @if (budget) {
+      <button type="button" class="btn-danger"
+              (click)="deleteRequested.emit()">Delete</button>
+    }
+    <div class="actions-right">
+      <button type="button" class="btn-ghost" (click)="closed.emit()">Cancel</button>
+      <button type="button" class="btn-primary" (click)="save()">
+        {{ budget ? 'Save changes' : 'Add budget' }}
+      </button>
     </div>
   </div>
 </app-modal>

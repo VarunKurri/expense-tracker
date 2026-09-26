@@ -2,6 +2,7 @@ import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Modal } from '../../components/modal/modal';
 
 import { CategoryService } from '../../services/category.service';
 import { TransactionRuleService } from '../../services/transaction-rule.service';
@@ -30,7 +31,7 @@ function emptyRule(): TransactionRule {
 @Component({
   selector: 'app-rules',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, Modal],
   templateUrl: './rules.html',
   styleUrl: './rules.scss',
 })
