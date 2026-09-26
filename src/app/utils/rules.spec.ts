@@ -3,7 +3,7 @@ import { Transaction, TransactionRule } from '../models';
 import {
   ruleMatches, evaluateRules, usableRules, applyRulesToDraft,
   planBulkApply, describeRule, ruleHasAction, ruleHasCondition,
-  hasMissingCategory, dropMissingCategories,
+  hasMissingCategory, dropMissingCategories, reorderPriorities,
 } from './rules';
 
 function tx(over: Partial<Transaction> = {}): Transaction {
@@ -80,6 +80,54 @@ describe('rules — deleted categories', () => {
   it('leaves rules pointing at real categories untouched', () => {
     const r = rule({ merchantContains: 'lyft', setCategoryId: 'ride' });
     expect(dropMissingCategories([r], valid)[0]).toBe(r);
+  });
+});
+
+describe('rules — reordering', () => {
+  it('moves a rule when every rule shares priority 0', () => {
+    // The state every existing list is in: the editor saved each new rule at
+    // 0, so swapping priorities traded 0 for 0 and the arrows did nothing.
+    const list = [
+      rule({ id: 'beer', priority: 0 }),
+      rule({ id: 'newbeer', priority: 0 }),
+      rule({ id: 'kebab', priority: 0 }),
+    ];
+    const changes = reorderPriorities(list, 'newbeer', -1);
+    const applied = list.map(r => ({ ...r, ...changes.find(c => c.id === r.id) }));
+    const order = [...applied].sort((a, b) => a.priority - b.priority).map(r => r.id);
+    expect(order).toEqual(['newbeer', 'beer', 'kebab']);
+    // Every position is now distinct, so the next move has something to work with.
+    expect(new Set(applied.map(r => r.priority)).size).toBe(3);
+  });
+
+  it('only writes the rules whose position changes', () => {
+    const list = [
+      rule({ id: 'a', priority: 0 }), rule({ id: 'b', priority: 1 }),
+      rule({ id: 'c', priority: 2 }), rule({ id: 'd', priority: 3 }),
+    ];
+    expect(reorderPriorities(list, 'c', 1)).toEqual([
+      { id: 'd', priority: 2 }, { id: 'c', priority: 3 },
+    ]);
+  });
+
+  it('does nothing past either end', () => {
+    const list = [rule({ id: 'a', priority: 0 }), rule({ id: 'b', priority: 1 })];
+    expect(reorderPriorities(list, 'a', -1)).toEqual([]);
+    expect(reorderPriorities(list, 'b', 1)).toEqual([]);
+    expect(reorderPriorities(list, 'missing', 1)).toEqual([]);
+  });
+
+  it('changes which rule wins once applied', () => {
+    // End to end: the move has to change the outcome, not just the numbers.
+    const beer = rule({ id: 'beer', priority: 0, merchantContains: 'first mart', setCategoryId: 'groceries' });
+    const newBeer = rule({ id: 'newbeer', priority: 0, merchantContains: 'first mart', setCategoryId: 'utilities' });
+    const t = tx({ merchant: 'First Mart' });
+    expect(evaluateRules([beer, newBeer], t)?.patch.categoryId).toBe('groceries');
+
+    const pos = Object.fromEntries(
+      reorderPriorities([beer, newBeer], 'newbeer', -1).map(c => [c.id, c.priority]));
+    const moved = [{ ...beer, priority: pos['beer'] }, { ...newBeer, priority: pos['newbeer'] }];
+    expect(evaluateRules(moved, t)?.patch.categoryId).toBe('utilities');
   });
 });
 

@@ -163,10 +163,11 @@ export class Categories {
     const r = this.editing();
     if (!r || !this.draftValid()) return;
     this.busy.set(true);
-    const payload: Omit<TransactionRule, 'id' | 'createdAt'> = {
+    // No priority here: a new rule is appended by the service, and editing a
+    // rule leaves its position where it is.
+    const payload: Omit<TransactionRule, 'id' | 'createdAt' | 'priority'> = {
       name: this.clean(r.name ?? ''),
       enabled: r.enabled,
-      priority: r.priority ?? 0,
       merchantContains: this.clean(r.merchantContains ?? ''),
       type: r.type || undefined,
       accountId: this.clean(r.accountId ?? ''),
@@ -200,9 +201,17 @@ export class Categories {
     } catch { this.toast.error('Could not delete the rule.'); }
   }
 
+  /**
+   * Busy while the move is in flight: the list only updates once Firestore
+   * echoes the write back, so a second click before then would renumber from
+   * the old order and undo the first.
+   */
   async move(r: TransactionRule, direction: -1 | 1) {
+    if (this.busy()) return;
+    this.busy.set(true);
     try { await this.ruleService.reorder(r.id!, direction); }
     catch { this.toast.error('Could not reorder the rules.'); }
+    finally { this.busy.set(false); }
   }
 
   /** A rule whose target category was deleted — shown with a warning, and not run. */

@@ -9,7 +9,7 @@ import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
 import { EncryptionService } from './encryption.service';
 import { CategoryService } from './category.service';
-import { dropMissingCategories } from '../utils/rules';
+import { dropMissingCategories, reorderPriorities } from '../utils/rules';
 import { TransactionRule } from '../models';
 
 /**
@@ -91,14 +91,18 @@ export class TransactionRuleService {
     return dropMissingCategories(this.rules(), valid);
   });
 
-  /** New rules go to the end of the run order unless a priority is given. */
-  async add(rule: Omit<TransactionRule, 'id' | 'createdAt'>) {
+  /**
+   * A new rule always goes to the end of the run order. Callers do not pass a
+   * priority: the editor used to send 0, which counts as "given", so every rule
+   * was saved at 0 and reordering had nothing to work with.
+   */
+  async add(rule: Omit<TransactionRule, 'id' | 'createdAt' | 'priority'>) {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
     const existing = this.rules();
-    const priority = rule.priority ?? (existing.length
+    const priority = existing.length
       ? Math.max(...existing.map(r => r.priority ?? 0)) + 1
-      : 0);
+      : 0;
     const data = { ...rule, priority, createdAt: Date.now() };
     await addDoc(
       collection(this.db, `users/${user.uid}/transactionRules`),
@@ -122,16 +126,13 @@ export class TransactionRuleService {
     await deleteDoc(doc(this.db, `users/${user.uid}/transactionRules/${id}`));
   }
 
-  /** Moves a rule up or down the run order by swapping priorities. */
+  /**
+   * Moves a rule one place up or down. `rules` is already in display order —
+   * the same order they run in — so that is the order that gets renumbered.
+   * See `reorderPriorities` for why this renumbers instead of swapping.
+   */
   async reorder(id: string, direction: -1 | 1) {
-    const ordered = [...this.rules()].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
-    const i = ordered.findIndex(r => r.id === id);
-    const j = i + direction;
-    if (i < 0 || j < 0 || j >= ordered.length) return;
-    const a = ordered[i], b = ordered[j];
-    await Promise.all([
-      this.update(a.id!, { priority: b.priority ?? j }),
-      this.update(b.id!, { priority: a.priority ?? i }),
-    ]);
+    const changes = reorderPriorities(this.rules(), id, direction);
+    await Promise.all(changes.map(c => this.update(c.id, { priority: c.priority })));
   }
 }

@@ -57,6 +57,32 @@ export function dropMissingCategories(
     hasMissingCategory(r, validCategoryIds) ? { ...r, setCategoryId: undefined } : r);
 }
 
+/**
+ * New run positions after moving one rule up (-1) or down (+1).
+ *
+ * `rules` must be in display order. Rather than swapping the two rules'
+ * priorities, the whole list is renumbered 0..n-1 in its new order. Swapping
+ * breaks as soon as two rules share a priority — it trades 0 for 0 and nothing
+ * moves — and earlier rules were all saved at priority 0, so every existing
+ * list is in exactly that state. Renumbering repairs it on the first move.
+ *
+ * Returns only the rules whose priority actually changes, so a move writes as
+ * few documents as it needs to.
+ */
+export function reorderPriorities(
+  rules: TransactionRule[], id: string, direction: -1 | 1,
+): { id: string; priority: number }[] {
+  const order = [...rules];
+  const i = order.findIndex(r => r.id === id);
+  const j = i + direction;
+  if (i < 0 || j < 0 || j >= order.length) return [];
+  [order[i], order[j]] = [order[j], order[i]];
+  return order
+    .map((r, index) => ({ id: r.id!, priority: index, was: r.priority }))
+    .filter(r => r.id && r.was !== r.priority)
+    .map(({ id, priority }) => ({ id, priority }));
+}
+
 export function usableRules(rules: TransactionRule[]): TransactionRule[] {
   return rules
     .filter(r => r.enabled && ruleHasCondition(r) && ruleHasAction(r))

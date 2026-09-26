@@ -117,9 +117,9 @@
           @for (r of rules(); track r.id; let i = $index) {
             <tr [class.off]="!r.enabled">
               <td class="order">
-                <button class="icon-btn" [disabled]="i === 0"
+                <button class="icon-btn" [disabled]="i === 0 || busy()"
                         (click)="move(r, -1)" aria-label="Move up">↑</button>
-                <button class="icon-btn" [disabled]="i === rules().length - 1"
+                <button class="icon-btn" [disabled]="i === rules().length - 1 || busy()"
                         (click)="move(r, 1)" aria-label="Move down">↓</button>
               </td>
               <td>
