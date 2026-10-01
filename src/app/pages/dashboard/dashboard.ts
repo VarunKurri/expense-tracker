@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, AfterViewInit, ViewChild, ElementRef, OnDestroy, effect } from '@angular/core';
+import { Component, inject, signal, computed, ViewChild, ElementRef, OnDestroy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AccountService } from '../../services/account.service';
@@ -36,7 +36,7 @@ Chart.register(ArcElement, DoughnutController, Tooltip, Legend);
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
-export class Dashboard implements AfterViewInit, OnDestroy {
+export class Dashboard implements OnDestroy {
   private accountService = inject(AccountService);
   private txService = inject(TransactionService);
   private categoryService = inject(CategoryService);
@@ -48,7 +48,28 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   private themeService = inject(ThemeService);
   Math = Math
 
-  @ViewChild('miniDonutCanvas') miniDonutCanvas!: ElementRef<HTMLCanvasElement>;
+  /**
+   * The donut's canvas only exists while there is spending to show, so it
+   * appears some time after the page does — on a cold start, only once every
+   * transaction has been decrypted, which takes longer the more there are.
+   *
+   * Angular calls this setter the moment the canvas enters or leaves the page,
+   * so the chart is built exactly then. The previous version polled on a
+   * timer, checked once at first render, and gave up immediately if no
+   * spending had loaded yet — so on a fresh load or hard refresh the donut
+   * never appeared, and only showed after navigating away and back, when the
+   * data was already there.
+   */
+  @ViewChild('miniDonutCanvas') set miniDonutCanvasRef(ref: ElementRef<HTMLCanvasElement> | undefined) {
+    this.miniDonutCanvas = ref;
+    if (!ref) {
+      this.miniDonut?.destroy();
+      this.miniDonut = null;
+    } else if (!this.miniDonut) {
+      this.initMiniDonut();
+    }
+  }
+  private miniDonutCanvas?: ElementRef<HTMLCanvasElement>;
   private miniDonut: Chart | null = null;
 
   activeRange = signal<'7D' | '30D' | '90D' | 'YTD'>('30D');
@@ -432,40 +453,22 @@ export class Dashboard implements AfterViewInit, OnDestroy {
 
   // ── Charts ────────────────────────────────────────────────
   constructor() {
+    // Creating and removing the chart is the canvas setter's job; this only
+    // keeps an existing chart's numbers current.
     effect(() => {
       const donutData = this.categoryBreakdown();
-      this.ensureDonut();
       if (this.miniDonut) this.updateMiniDonut(donutData);
     });
 
     // Chart.js bakes colours in at construction time, so a theme switch would
-    // otherwise leave the chart painted for the old theme. Rebuild on change.
+    // otherwise leave the chart painted for the old theme. Rebuild on change,
+    // if the canvas is on the page.
     effect(() => {
       this.themeService.theme();
       this.miniDonut?.destroy();
       this.miniDonut = null;
-      queueMicrotask(() => this.ensureDonut());
+      if (this.miniDonutCanvas) this.initMiniDonut();
     });
-  }
-
-  ngAfterViewInit() {
-    this.initChartsWhenReady();
-  }
-
-  // The donut canvas is only in the DOM when there is spending to show, and it
-  // arrives a tick after the data does; retry until it exists.
-  private initChartsWhenReady(attempt = 0) {
-    this.ensureDonut();
-    if (!this.miniDonut && this.recentTotal() > 0 && attempt < 20) {
-      setTimeout(() => this.initChartsWhenReady(attempt + 1), 100);
-    }
-  }
-
-  private ensureDonut() {
-    const el = this.miniDonutCanvas?.nativeElement;
-    // The donut canvas is added/removed with current-month data; keep the chart in sync.
-    if (this.miniDonut && !el) { this.miniDonut.destroy(); this.miniDonut = null; }
-    if (!this.miniDonut && el) this.initMiniDonut();
   }
 
   ngOnDestroy() {
