@@ -18,7 +18,8 @@ import { SpendCalendar } from '../../components/spend-calendar/spend-calendar';
 import { DayDetail } from '../../components/day-detail/day-detail';
 import { TransactionView } from '../../components/transaction-view/transaction-view';
 import { DayCell, monthKeyOf, monthLabel } from '../../utils/calendar';
-import { spendingTransactions } from '../../utils/reporting';
+import { MoneyRules, spendingTransactions } from '../../utils/reporting';
+import { budgetProgress, budgetSpent, effectiveBudgets } from '../../utils/budgets';
 import {
   Chart, ArcElement, DoughnutController,
   Tooltip, Legend
@@ -350,26 +351,21 @@ export class Dashboard implements OnDestroy {
 
   budgetSummary = computed(() => {
     const month = this.currentMonth;
-    return this.budgetService.defaultBudgets()
-      .map(budget => {
-        const effective = this.budgetService.getBudgetForCategory(budget.categoryId, month);
-        if (!effective) return null;
-        const cat = this.categoryService.categories().find(c => c.id === budget.categoryId);
-        const spent = this.txService.transactions()
-          .filter(t =>
-            t.type === 'expense' &&
-            !t.isInternalTransfer &&
-            t.categoryId === budget.categoryId &&
-            t.date.startsWith(month) &&
-            !t.refunded
-          )
-          .reduce((s, t) => s + t.amount, 0);
-        const pct = effective.amount > 0 ? Math.round((spent / effective.amount) * 100) : 0;
+    const rules: MoneyRules = {
+      netting: true,
+      effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
+      reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
+    };
+    const txs = this.txService.transactions();
+    return effectiveBudgets(this.budgetService.budgets(), month)
+      .map(e => {
+        const cat = this.categoryService.categories().find(c => c.id === e.categoryId);
+        if (!cat) return null;
+        const spent = budgetSpent(txs, e.categoryId, month, rules);
+        const { pct, status } = budgetProgress(spent, e.budget.amount);
         return {
-          name: cat?.name || 'Unknown', icon: cat?.icon || '📦',
-          spent: Math.round(spent * 100) / 100,
-          budget: effective.amount, pct,
-          status: pct >= 100 ? 'over' : pct >= 75 ? 'warn' : 'ok'
+          name: cat.name, icon: cat.icon || '📦',
+          spent, budget: e.budget.amount, pct, status,
         };
       })
       .filter(Boolean)

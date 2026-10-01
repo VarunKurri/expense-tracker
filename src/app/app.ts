@@ -18,6 +18,7 @@ import { AccountService } from './services/account.service';
 import { CategoryService } from './services/category.service';
 import { TransactionService } from './services/transaction.service';
 import { BudgetService } from './services/budget.service';
+import { monthKeyOf } from './utils/calendar';
 import { Account } from './models';
 import { Logo } from './components/logo/logo';
 
@@ -502,7 +503,7 @@ export class App {
   }
 
   private budgetSearchEntries(query: string): PaletteEntry[] {
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentMonth = monthKeyOf();
     return this.budgetService.budgets()
       .filter(budget => {
         const category = this.categoryService.categories().find(c => c.id === budget.categoryId);

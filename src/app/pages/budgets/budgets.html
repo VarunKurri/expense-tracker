@@ -61,8 +61,8 @@
                 <option [value]="c.id">{{ c.name }}</option>
               }
             </select>
-            <button class="btn" (click)="reassignBudget(b)">Reassign</button>
-            <button class="btn danger" (click)="removeOrphan(b)">Delete</button>
+            <button class="btn-ghost sm" (click)="reassignBudget(b)">Reassign</button>
+            <button class="btn-danger sm" (click)="removeOrphan(b)">Delete</button>
           </div>
         </div>
       }
@@ -83,7 +83,7 @@
     </div>
   }
 
-  @if (budgetService.defaultBudgets().length === 0) {
+  @if (budgetService.budgets().length === 0) {
 
     <!-- EMPTY STATE -->
     <div class="empty">
@@ -94,6 +94,28 @@
     </div>
 
   } @else {
+
+    @if (elsewhere().length > 0) {
+      <div class="elsewhere">
+        @for (e of elsewhere(); track e.categoryId) {
+          <p class="form-note">
+            {{ e.name }} has a limit only in
+            @for (m of e.months; track m; let i = $index; let last = $last) {
+              <button class="link-btn" (click)="goToMonth(m)">{{ e.labels[i] }}</button>{{ last ? '' : ', ' }}
+            }
+            and none every month. To make it every month, open it there and choose
+            <em>Every month</em>.
+          </p>
+        }
+      </div>
+    }
+
+    @if (budgetRows().length === 0) {
+      <div class="empty">
+        <h3>No budgets in {{ subtitle().split(' · ')[0] }}</h3>
+        <p>None of your budgets apply to this month.</p>
+      </div>
+    } @else {
 
     <!-- SUMMARY BAR -->
     <div class="summary-bar">
@@ -131,7 +153,7 @@
         <div class="budget-card"
              [class.over]="row.status === 'over'"
              [class.warn]="row.status === 'warn'"
-             (click)="openDetail(row.budget.categoryId)">
+             (click)="openDetail(row.categoryId)">
 
           <!-- Card top: icon + name + override chip -->
           <div class="card-top">
@@ -143,13 +165,22 @@
             </div>
             <div class="card-title-wrap">
               <div class="card-name">{{ row.categoryName }}</div>
-              <div class="card-freq">Monthly</div>
+              <div class="card-freq" [class.override]="row.isOverride">{{ freqLabel(row) }}</div>
             </div>
-            <button class="override-chip"
-                    (click)="$event.stopPropagation(); openOverride(row.budget.categoryId)"
-                    title="Set a one-off limit for this month">
-              Override
-            </button>
+            <div class="card-actions">
+              <button class="override-chip"
+                      (click)="$event.stopPropagation(); openEdit(row)"
+                      [title]="row.isOverride ? 'Change this month\'s limit' : 'Change the every-month limit'">
+                Edit
+              </button>
+              @if (!row.isOverride) {
+                <button class="override-chip"
+                        (click)="$event.stopPropagation(); openOverride(row)"
+                        title="Set a different limit for this month only">
+                  Override
+                </button>
+              }
+            </div>
           </div>
 
           <!-- Spent amount + budget limit -->
@@ -187,6 +218,7 @@
       }
     </div>
 
+    }
   }
 
 </div>
@@ -194,17 +226,17 @@
 <!-- MODALS -->
 <app-budget-form
   [open]="formOpen()"
-  [budget]="editing()"
-  [preselectedCategoryId]="preselectedCategoryId()"
-  [preselectedMonth]="preselectedMonth()"
+  [categoryId]="formCategoryId()"
+  [viewMonth]="selectedMonth()"
+  [initialScope]="formScope()"
   (closed)="closeForm()"
   (saved)="handleSave($event)"
-  (deleteRequested)="askDelete()" />
+  (deleteRequested)="askDelete($event)" />
 
 <app-confirm
   [open]="confirmOpen()"
-  title="Delete budget?"
-  message="This will remove the budget limit for this category."
-  confirmText="Delete"
+  [title]="toDelete()?.isDefault === false ? 'Remove this month\'s limit?' : 'Delete budget?'"
+  [message]="deleteMessage()"
+  [confirmText]="toDelete()?.isDefault === false ? 'Remove' : 'Delete'"
   (confirmed)="confirmDelete()"
-  (cancelled)="confirmOpen.set(false)" />
+  (cancelled)="cancelDelete()" />

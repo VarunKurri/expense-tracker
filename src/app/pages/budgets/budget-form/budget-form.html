@@ -1,14 +1,14 @@
 <app-modal
   [open]="open"
-  [title]="budget ? 'Edit Budget' : 'New Budget'"
+  [title]="editingExisting() ? 'Edit budget' : 'New budget'"
   size="sm"
   (closed)="closed.emit()">
 
   <div class="form">
     <div class="field">
       <label class="label-sm">Category</label>
-      <select class="input-field" [(ngModel)]="categoryId" name="categoryId"
-              [disabled]="!!budget">
+      <select class="input-field" [ngModel]="category()" (ngModelChange)="setCategory($event)"
+              name="categoryId" [disabled]="lockCategory">
         <option value="" disabled>Select category</option>
         @for (c of expenseCategories(); track c.id) {
           <option [value]="c.id">{{ c.icon }} {{ c.name }}</option>
@@ -16,50 +16,54 @@
       </select>
     </div>
 
-    <div class="field">
-      <label class="label-sm">Monthly limit</label>
-      <div class="input-affix">
-        <span class="affix">$</span>
-        <input class="input-field" type="number" step="1"
-               [(ngModel)]="amount" name="amount" placeholder="0" />
-      </div>
-    </div>
-
     <div class="choice-grid">
-      <button type="button" class="choice" [class.active]="isDefault"
-              (click)="isDefault = true">
+      <button type="button" class="choice" [class.active]="scope() === 'default'"
+              (click)="setScope('default')">
         <div class="choice-title">Every month</div>
-        <div class="choice-sub">Default budget for this category</div>
+        <div class="choice-sub">The usual limit for this category</div>
       </button>
-      <button type="button" class="choice" [class.active]="!isDefault"
-              (click)="isDefault = false">
-        <div class="choice-title">Specific month</div>
-        <div class="choice-sub">Override for one month only</div>
+      <button type="button" class="choice" [class.active]="scope() === 'month'"
+              (click)="setScope('month')">
+        <div class="choice-title">One month only</div>
+        <div class="choice-sub">A one-off limit; other months keep theirs</div>
       </button>
     </div>
 
-    @if (!isDefault) {
+    @if (scope() === 'month') {
       <div class="field">
         <label class="label-sm">Month</label>
-        <select class="input-field" [(ngModel)]="month" name="month">
-          @for (m of months; track m.value) {
+        <select class="input-field" [ngModel]="month()" (ngModelChange)="setMonth($event)" name="month">
+          @for (m of months(); track m.value) {
             <option [value]="m.value">{{ m.label }}</option>
           }
         </select>
       </div>
     }
 
+    <div class="field">
+      <label class="label-sm">{{ scope() === 'month' ? 'Limit for ' + monthName() : 'Monthly limit' }}</label>
+      <div class="input-affix">
+        <span class="affix">$</span>
+        <input class="input-field" type="number" step="1" min="0"
+               [ngModel]="amount" (ngModelChange)="setAmount($event)" name="amount" placeholder="0" />
+      </div>
+    </div>
+
+    @if (note()) {
+      <p class="form-note">{{ note() }}</p>
+    }
   </div>
 
   <div class="modal-actions" modal-footer>
-    @if (budget) {
-      <button type="button" class="btn-danger"
-              (click)="deleteRequested.emit()">Delete</button>
+    @if (target()) {
+      <button type="button" class="btn-danger" (click)="requestDelete()">
+        {{ scope() === 'month' ? 'Remove limit' : 'Delete budget' }}
+      </button>
     }
     <div class="actions-right">
       <button type="button" class="btn-ghost" (click)="closed.emit()">Cancel</button>
       <button type="button" class="btn-primary" (click)="save()">
-        {{ budget ? 'Save changes' : 'Add budget' }}
+        {{ editingExisting() ? 'Save changes' : 'Add budget' }}
       </button>
     </div>
   </div>

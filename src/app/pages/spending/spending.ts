@@ -25,6 +25,7 @@ import { Confirm } from '../../components/confirm/confirm';
 import { filterForAnalysis } from '../../utils/analysis-filter';
 import { chartColors, categoryPalette, otherColor } from '../../utils/theme-colors';
 import { MoneyRules, categoryTotals, spendingTransactions, totalExpenses } from '../../utils/reporting';
+import { budgetProgress, budgetSpent, effectiveBudgets } from '../../utils/budgets';
 import {
   DayCell, addMonths, cumulativeSeries, dateKeyOf,
   monthKeyOf, monthLabel, monthRange,
@@ -218,21 +219,17 @@ export class Spending implements AfterViewInit, OnDestroy {
   budgetRows = computed(() => {
     const month = this.month();
     const rules = this.rules();
-    return this.budgetService.defaultBudgets()
-      .map(b => {
-        const effective = this.budgetService.getBudgetForCategory(b.categoryId, month);
-        if (!effective) return null;
-        const cat = this.categoryService.categories().find(c => c.id === b.categoryId);
-        const spent = totalExpenses(
-          this.monthTx().filter(t => t.categoryId === b.categoryId), rules);
-        const pct = effective.amount > 0 ? Math.round((spent / effective.amount) * 100) : 0;
+    return effectiveBudgets(this.budgetService.budgets(), month)
+      .map(e => {
+        const cat = this.categoryService.categories().find(c => c.id === e.categoryId);
+        if (!cat) return null;
+        const spent = budgetSpent(this.monthTx(), e.categoryId, month, rules);
         return {
-          categoryId: b.categoryId,
-          name: cat?.name ?? 'Unknown',
-          icon: cat?.icon ?? '📦',
-          spent, budget: effective.amount, pct,
-          remaining: Math.round((effective.amount - spent) * 100) / 100,
-          status: pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok',
+          categoryId: e.categoryId,
+          name: cat.name,
+          icon: cat.icon ?? '📦',
+          spent, budget: e.budget.amount,
+          ...budgetProgress(spent, e.budget.amount),
         };
       })
       .filter((b): b is NonNullable<typeof b> => b !== null)

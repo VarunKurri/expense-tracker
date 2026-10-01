@@ -255,10 +255,39 @@
   transition: all 0.18s ease;
 
   &:hover {
-    background: var(--teal-bg);
-    color: var(--teal);
-    border-color: rgba(34, 197, 94, 0.3);
+    background: var(--accent-bg);
+    color: var(--fg);
+    border-color: var(--line-strong);
   }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+}
+
+.card-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.card-freq.override { color: var(--fg-2); }
+
+/* "Subscriptions has a limit only in October" — quiet pointers, not warnings */
+.elsewhere {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  .form-note { margin: 0; }
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 /* Amounts row */
@@ -417,6 +446,4 @@
   flex-wrap: wrap;
 
   .input-field { min-width: 150px; }
-  .btn { cursor: pointer; }
-  .btn.danger { color: var(--red); }
 }

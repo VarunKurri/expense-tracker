@@ -9,6 +9,9 @@ import { TransactionForm } from '../../transactions/transaction-form/transaction
 import { Confirm } from '../../../components/confirm/confirm';
 import { Transaction } from '../../../models';
 import { ToastService } from '../../../services/toast.service';
+import { MoneyRules } from '../../../utils/reporting';
+import { monthKeyOf } from '../../../utils/calendar';
+import { budgetProgress, budgetSpent } from '../../../utils/budgets';
 
 @Component({
   selector: 'app-budget-detail',
@@ -40,7 +43,7 @@ export class BudgetDetail {
     this.route.snapshot.paramMap.get('categoryId') || ''
   );
   private month = computed(() =>
-    this.route.snapshot.paramMap.get('month') || new Date().toISOString().slice(0, 7)
+    this.route.snapshot.paramMap.get('month') || monthKeyOf()
   );
 
   // Respect the excludeRefunded toggle from the budgets list page
@@ -77,24 +80,24 @@ export class BudgetDetail {
     this.transactions().filter(t => !(this.excludeRefunded && t.refunded))
   );
 
+  // Same total as the card on the Budgets page: reimbursements netted off.
+  private rules: MoneyRules = {
+    netting: this.excludeRefunded,
+    effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
+    reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
+  };
+
   spent = computed(() =>
-    this.spendingTransactions().reduce((s, t) => s + t.amount, 0)
+    budgetSpent(this.txService.transactions(), this.categoryId(), this.month(), this.rules)
   );
 
   remaining = computed(() => (this.budget()?.amount || 0) - this.spent());
 
-  pct = computed(() => {
-    const b = this.budget();
-    if (!b || b.amount === 0) return 0;
-    return Math.min(100, Math.round((this.spent() / b.amount) * 100));
-  });
+  private progress = computed(() => budgetProgress(this.spent(), this.budget()?.amount || 0));
 
-  status = computed((): 'ok' | 'warn' | 'over' => {
-    const p = this.pct();
-    if (p >= 100) return 'over';
-    if (p >= 75) return 'warn';
-    return 'ok';
-  });
+  pct = computed(() => Math.min(100, this.progress().pct));
+
+  status = computed(() => this.progress().status);
 
   resetDate = computed(() => {
     const [y, m] = this.month().split('-').map(Number);
