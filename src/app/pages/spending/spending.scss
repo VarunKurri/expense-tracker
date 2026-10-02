@@ -27,36 +27,6 @@
   .hint { color: var(--fg-3); font-size: 14px; }
 }
 
-/* ── Month stepper ─────────────────────────────────────────── */
-.month-nav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.month-btn {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--fg-2);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-
-  &:hover:not(:disabled) { border-color: var(--line-strong); color: var(--fg); }
-  &:disabled { opacity: 0.35; cursor: not-allowed; }
-}
-
-.month-current {
-  min-width: 150px;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--fg);
-}
-
 /* ── Cards ─────────────────────────────────────────────────── */
 .card {
   background: var(--card-grad);
@@ -363,7 +333,6 @@
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
   .header-row { align-items: flex-start; }
-  .month-nav { width: 100%; justify-content: space-between; }
   .hero-total { font-size: 34px; }
   .hero-body { padding: 16px 14px 20px; }
   .card-head, .tabs, .cat-row, .tx-row, .empty {

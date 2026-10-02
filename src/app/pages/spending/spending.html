@@ -5,14 +5,7 @@
       <h1>Spending</h1>
       <div class="hint">What {{ monthName() }} has cost you, day by day</div>
     </div>
-    <div class="month-nav">
-      <button class="month-btn" (click)="step(-1)" aria-label="Previous month">‹</button>
-      <span class="month-current">{{ monthTitle() }}</span>
-      <button class="month-btn" (click)="step(1)"
-              [disabled]="!canGoNext()"
-              [title]="canGoNext() ? 'Next month' : 'This is the current month'"
-              aria-label="Next month">›</button>
-    </div>
+    <app-month-picker [month]="month()" [max]="thisMonth" (monthChange)="goToMonth($event)" />
   </div>
 
   <nav class="subnav">

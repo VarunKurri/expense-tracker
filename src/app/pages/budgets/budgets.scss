@@ -21,71 +21,106 @@
     margin-bottom: 4px;
   }
 
-  .sub { color: var(--fg-3); font-size: 13.5px; margin: 0; }
+  .sub { color: var(--fg-3); font-size: 14px; margin: 0; }
 }
 
-/* ── MONTH NAV ─────────────────────────────────────────────── */
-.month-nav {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
-}
-
-.month-btn {
-  padding: 7px 14px;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  color: var(--fg-3);
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.18s ease;
-  flex-shrink: 0;
-
-  &:hover { color: var(--fg); background: var(--surface-hi); }
-
-  &.active {
-    background: var(--fg);
-    color: var(--bg);
-    border-color: transparent;
-  }
-
-  /* "This month", when you are looking at a different one. A neutral outline,
-     so it reads as a landmark rather than as a second selected chip — colour
-     here would compete with the ink-filled selection beside it. */
-  &.current:not(.active) {
-    border-color: var(--fg-3);
-    color: var(--fg);
-  }
-}
-
-/* ── FILTER ROW ────────────────────────────────────────────── */
-.filter-row {
+.head-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: -8px; // pull it closer to the month nav
+  gap: 12px;
 }
 
+/* ── Progress bar (hero and cards) ──────────────────────────
+   The track is mixed from --fg rather than a surface token, so it stays
+   visible whatever the card behind it is doing (hover used to make it vanish). */
+.bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+  overflow: hidden;
+
+  .bar-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--blue);
+    transition: width 0.4s ease;
+  }
+
+  &.warn .bar-fill { background: var(--amber); }
+  &.over .bar-fill { background: var(--red); }
+}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+.hero {
+  padding: 20px 24px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hero-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hero-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+
+  .hero-of {
+    font-size: 15px;
+    color: var(--fg-3);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.hero-sentence {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg-2);
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+
+  .stat { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+  .stat-value {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+    &.over { color: var(--red); }
+  }
+}
+
+/* Same pill as the Analysis page's refund filter. */
 .refunded-toggle {
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 12.5px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   transition: all 0.18s ease;
-  border: 1.5px solid var(--line);
+  border: 1px solid var(--line);
   background: transparent;
   color: var(--fg-3);
+  white-space: nowrap;
 
-  &:hover { color: var(--fg); border-color: var(--fg-3); }
+  &:hover { color: var(--fg); border-color: var(--line-strong); }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
 
   &.active {
     background: var(--accent);
@@ -94,101 +129,28 @@
   }
 }
 
-/* ── PAST / FUTURE BANNERS ─────────────────────────────────── */
-.month-banner {
-  padding: 10px 16px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  &.past {
-    background: var(--bg-3);
-    border: 1px solid var(--line);
-    color: var(--fg-3);
-  }
-
-  &.future {
-    background: var(--bg-3);
-    border: 1px solid var(--line);
-    color: var(--fg-3);
-  }
-}
-
-/* ── SUMMARY BAR ───────────────────────────────────────────── */
-.summary-bar {
-  display: flex;
-  align-items: center;
-  padding: 20px 24px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  gap: 24px;
-}
-
-.summary-stat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.summary-label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--fg-4);
-}
-
-.summary-value {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: var(--fg);
-  font-variant-numeric: tabular-nums;
-  &.over { color: var(--red); }
-}
-
-.summary-divider {
-  width: 1px;
-  height: 40px;
-  background: var(--line);
-  flex-shrink: 0;
-}
-
-/* ── BUDGET GRID ───────────────────────────────────────────── */
+/* ── Budget grid ──────────────────────────────────────────── */
 .budget-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
-/* ── BUDGET CARD ───────────────────────────────────────────── */
 .budget-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 16px;
   padding: 16px 18px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  transition: all 0.18s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 
-  &:hover {
-    background: var(--surface-hi);
-    transform: translateY(-1px);
-  }
+  &:hover { border-color: var(--line-strong); box-shadow: var(--shadow-sm); }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
 
-  &.over { border-color: rgba(255, 77, 94, 0.3); }
-  &.warn { border-color: rgba(245, 158, 11, 0.25); }
+  &.over { border-color: color-mix(in srgb, var(--red) 35%, var(--line)); }
+  &.warn { border-color: color-mix(in srgb, var(--amber) 35%, var(--line)); }
 }
 
-/* Card top row */
 .card-top {
   display: flex;
   align-items: center;
@@ -198,7 +160,7 @@
 .card-icon {
   width: 40px;
   height: 40px;
-  border-radius: 11px;
+  border-radius: var(--radius-sm);
   background: var(--bg-3);
   border: 1px solid var(--line);
   display: flex;
@@ -206,12 +168,6 @@
   justify-content: center;
   font-size: 20px;
   flex-shrink: 0;
-  transition: background 0.18s ease, border-color 0.18s ease;
-
-  /* Status tints — matching the bar colors */
-  &.icon-ok   { background: var(--teal-bg); border-color: transparent; }
-  &.icon-warn { background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.2); }
-  &.icon-over { background: var(--red-bg); border-color: rgba(255, 77, 94, 0.2); }
 }
 
 .card-title-wrap {
@@ -237,21 +193,27 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-top: 2px;
+
+  &.override { color: var(--fg-2); }
 }
 
-/* Override chip — replaces the confusing pencil emoji button */
+.card-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .override-chip {
   padding: 4px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   border: 1px solid var(--line);
-  color: var(--fg-4);
-  font-size: 11px;
-  font-weight: 600;
+  color: var(--fg-3);
+  font-size: 11.5px;
+  font-weight: 500;
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;
   transition: all 0.18s ease;
 
   &:hover {
@@ -262,13 +224,56 @@
   &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
 }
 
-.card-actions {
+.card-amounts {
   display: flex;
+  align-items: baseline;
   gap: 6px;
-  flex-shrink: 0;
 }
 
-.card-freq.override { color: var(--fg-2); }
+.card-spent {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+
+  &.warn { color: var(--amber); }
+  &.over { color: var(--red); }
+}
+
+.card-of {
+  font-size: 13px;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+
+  .muted { color: var(--fg-4); font-weight: 400; }
+  .over-text { color: var(--red); }
+}
+
+/* ── Empty states (editorial moment: serif headline) ──────── */
+.empty {
+  padding: 48px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  .display { font-size: 32px; color: var(--fg); margin: 0; }
+  p { color: var(--fg-3); font-size: 14px; line-height: 1.5; margin: 0; max-width: 380px; }
+  .btn-primary { margin-top: 4px; }
+}
 
 /* "Subscriptions has a limit only in October" — quiet pointers, not warnings */
 .elsewhere {
@@ -290,129 +295,19 @@
   cursor: pointer;
 }
 
-/* Amounts row */
-.card-amounts {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-}
-
-.card-spent {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-  color: var(--fg);
-
-  &.warn { color: var(--amber); }
-  &.over { color: var(--red); }
-}
-
-.card-of {
-  font-size: 13px;
-  color: var(--fg-3);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Progress bar — bumped to 8px */
-.card-bar-wrap {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--bg-3);
-  overflow: hidden;
-}
-
-.card-bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: var(--blue);
-  transition: width 0.4s ease;
-  &.warn { background: var(--amber); }
-  &.over { background: var(--red); }
-}
-
-/* Bottom meta row */
-.card-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-}
-
-.remaining-text {
-  color: var(--teal);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.no-activity {
-  color: var(--fg-4);
-  font-style: italic;
-}
-
-.resets-text {
-  color: var(--fg-4);
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.over-badge {
-  background: var(--red-bg);
-  color: var(--red);
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-/* ── EMPTY ─────────────────────────────────────────────────── */
-.empty {
-  padding: 64px 24px;
-  text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-
-  .empty-icon { font-size: 40px; opacity: 0.4; }
-  h3 { font-size: 18px; font-weight: 600; color: var(--fg); margin: 0; }
-  p { color: var(--fg-3); font-size: 14px; margin: 0; max-width: 340px; }
-}
-
-/* ── RESPONSIVE ────────────────────────────────────────────── */
-@media (max-width: 900px) {
-  .budget-grid { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 768px) {
-  .page { padding: 20px 16px 40px; }
-  .page-head { flex-direction: column; align-items: stretch; }
-  // Stacking page-head to a column adds the "+ New Budget" button as a full-width
-  // block above the month pills — on top of .page's uniform 20px gap between
-  // sections, that reads as an oddly large gap under just this one button. Pull
-  // the month row closer, same technique .filter-row already uses above.
-  .month-nav { margin-top: -8px; }
-  .summary-bar { flex-wrap: wrap; gap: 16px; }
-  .summary-divider { display: none; }
-  .budget-grid { grid-template-columns: 1fr; }
-}
+/* ── Orphaned budgets ─────────────────────────────────────── */
 .orphan-panel {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--red-bg);
-  padding: 14px 16px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  border-color: color-mix(in srgb, var(--red) 35%, var(--line));
 }
 
 .orphan-head {
-  font-size: 13px;
-  color: var(--fg);
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--fg-2);
   line-height: 1.5;
 }
 
@@ -424,7 +319,7 @@
   padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   flex-wrap: wrap;
 }
 
@@ -434,9 +329,9 @@
   gap: 3px;
 
   .orphan-top { display: flex; align-items: center; gap: 10px; }
-  .orphan-amount { font-weight: 600; font-size: 14px; color: var(--fg); }
-  .orphan-tag { font-size: 12px; color: var(--fg-3); }
-  .orphan-sub { font-size: 11.5px; color: var(--fg-3); }
+  .orphan-amount { font-weight: 600; font-size: 14px; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .orphan-tag { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-3); }
+  .orphan-sub { font-size: 12px; color: var(--fg-3); }
 }
 
 .orphan-actions {
@@ -446,4 +341,19 @@
   flex-wrap: wrap;
 
   .input-field { min-width: 150px; }
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .budget-grid { grid-template-columns: 1fr; }
+  .hero-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .page { padding: 20px 16px 40px; }
+  .page-head { flex-direction: column; align-items: stretch; }
+  .head-actions { justify-content: space-between; }
+  .hero { padding: 16px; }
+  .hero-head { flex-wrap: wrap; }
+  .hero-figure .num-display { font-size: 30px; }
 }

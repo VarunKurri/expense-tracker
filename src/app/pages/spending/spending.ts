@@ -18,6 +18,7 @@ import { Transaction } from '../../models';
 
 import { SpendCalendar } from '../../components/spend-calendar/spend-calendar';
 import { DayDetail } from '../../components/day-detail/day-detail';
+import { MonthPicker } from '../../components/month-picker/month-picker';
 import { TransactionView } from '../../components/transaction-view/transaction-view';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
@@ -53,7 +54,7 @@ Chart.register(
   standalone: true,
   imports: [
     CommonModule, RouterLink,
-    SpendCalendar, DayDetail, TransactionView, TransactionForm, Confirm,
+    SpendCalendar, DayDetail, TransactionView, TransactionForm, Confirm, MonthPicker,
   ],
   templateUrl: './spending.html',
   styleUrl: './spending.scss',
@@ -75,11 +76,10 @@ export class Spending implements AfterViewInit, OnDestroy {
   view = signal<'calendar' | 'trend'>('calendar');
   breakdown = signal<'expenses' | 'budget'>('expenses');
 
-  private thisMonth = monthKeyOf();
+  readonly thisMonth = monthKeyOf();
   monthTitle = computed(() => monthLabel(this.month()));
   monthName = computed(() => monthLabel(this.month(), false));
   /** No stepping into a month that hasn't started. */
-  canGoNext = computed(() => this.month() < this.thisMonth);
   isCurrentMonth = computed(() => this.month() === this.thisMonth);
 
   constructor() {
@@ -105,12 +105,11 @@ export class Spending implements AfterViewInit, OnDestroy {
     });
   }
 
-  step(by: -1 | 1) {
-    const next = addMonths(this.month(), by);
-    if (by > 0 && next > this.thisMonth) return;
+  goToMonth(month: string) {
+    if (month > this.thisMonth) return;
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { month: next },
+      queryParams: { month },
       queryParamsHandling: 'merge',
     });
   }

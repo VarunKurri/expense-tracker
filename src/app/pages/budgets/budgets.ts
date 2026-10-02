@@ -1,20 +1,21 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { BudgetService } from '../../services/budget.service';
 import { CategoryService } from '../../services/category.service';
 import { TransactionService } from '../../services/transaction.service';
 import { BudgetForm } from './budget-form/budget-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { ErrorBanner } from '../../components/error-banner/error-banner';
+import { MonthPicker } from '../../components/month-picker/month-picker';
 import { Budget } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { MoneyRules } from '../../utils/reporting';
-import { monthKeyOf, monthLabel } from '../../utils/calendar';
+import { addMonths, monthKeyOf, monthLabel } from '../../utils/calendar';
 import {
   BudgetDraft, BudgetScope, BudgetStatus, budgetProgress, budgetSpent, budgetsElsewhere,
-  describeBudgetDeletion, effectiveBudgets, monthOptions, planBudgetSave, wouldClash,
+  describeBudgetDeletion, effectiveBudgets, planBudgetSave, wouldClash,
 } from '../../utils/budgets';
 
 interface BudgetRow {
@@ -35,7 +36,7 @@ interface BudgetRow {
 @Component({
   selector: 'app-budgets',
   standalone: true,
-  imports: [CommonModule, FormsModule, BudgetForm, Confirm, ErrorBanner],
+  imports: [CommonModule, FormsModule, BudgetForm, Confirm, ErrorBanner, MonthPicker],
   templateUrl: './budgets.html',
   styleUrl: './budgets.scss'
 })
@@ -47,6 +48,7 @@ export class Budgets {
   categoryService = inject(CategoryService);
   txService = inject(TransactionService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   formOpen = signal(false);
   formCategoryId = signal('');
@@ -59,31 +61,65 @@ export class Budgets {
   // last day of a month (west of UTC) or the first morning (east) in the wrong month.
   private currentMonth = monthKeyOf();
 
+  /**
+   * The month and the refund toggle live in the URL (`?month=2026-07`), so
+   * coming back from a budget's detail page — with the browser's Back or the
+   * page's own "← Budgets" — lands on the month you were looking at instead of
+   * snapping to this month.
+   */
   selectedMonth = signal(this.currentMonth);
 
-  // Exclude refunded transactions from budget calculations
+  // Exclude refunded transactions, and net reimbursements, in budget totals
   excludeRefunded = signal(true);
 
-  // Is the selected month in the past?
-  isPastMonth = computed(() => this.selectedMonth() < this.currentMonth);
+  constructor() {
+    this.route.queryParamMap.subscribe(params => {
+      const m = params.get('month');
+      this.selectedMonth.set(m && /^\d{4}-\d{2}$/.test(m) ? m : this.currentMonth);
+      this.excludeRefunded.set(params.get('excludeRefunded') !== 'false');
+    });
+  }
 
-  // Is the selected month in the future?
+  /** Month changes replace the history entry, so Back leaves Budgets rather than stepping through months. */
+  setMonth(month: string) {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { month: month === this.currentMonth ? null : month },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  toggleRefunded() {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { excludeRefunded: this.excludeRefunded() ? 'false' : null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  isPastMonth = computed(() => this.selectedMonth() < this.currentMonth);
   isFutureMonth = computed(() => this.selectedMonth() > this.currentMonth);
 
-  // "Resets May 1" — first day of the month after selectedMonth
+  // "Resets November 1" — first day of the month after selectedMonth
   resetDate = computed(() => {
     const [y, m] = this.selectedMonth().split('-').map(Number);
-    const next = new Date(y, m, 1); // JS month is 0-based, so m (not m-1) = next month
-    return next.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    return new Date(y, m, 1).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   });
 
-  // Five months back to three ahead, plus the selected month if you jumped
-  // further (e.g. from "Also budgeted in…").
-  availableMonths = computed(() =>
-    monthOptions(this.currentMonth, 5, 3, [this.selectedMonth()]).map(m => ({
-      value: m.value,
-      label: new Date(m.value + '-01T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-    })));
+  /** Back as far as your first transaction; a year ahead for planning one-offs. */
+  pickerMin = computed(() => {
+    let first = this.currentMonth;
+    for (const t of this.txService.transactions()) if (t.date.slice(0, 7) < first) first = t.date.slice(0, 7);
+    for (const b of this.budgetService.budgets()) if (b.month && b.month < first) first = b.month;
+    return first;
+  });
+  pickerMax = addMonths(this.currentMonth, 12);
+
+  /** Months with a one-off limit get a dot in the month grid. */
+  oneOffMonths = computed(() =>
+    [...new Set(this.budgetService.budgets().filter(b => !b.isDefault && b.month).map(b => b.month!))]);
 
   // Budgets whose category no longer exists (e.g. after a category was merged/deleted).
   // Their amount is intact — they just need re-pointing to a current category.
@@ -198,21 +234,49 @@ export class Budgets {
 
   totals = computed(() => {
     const rows = this.budgetRows();
+    const budget = rows.reduce((s, r) => s + r.budget.amount, 0);
+    const spent = Math.round(rows.reduce((s, r) => s + r.spent, 0) * 100) / 100;
     return {
-      budget: rows.reduce((s, r) => s + r.budget.amount, 0),
-      spent: rows.reduce((s, r) => s + r.spent, 0),
+      budget, spent,
+      left: Math.round((budget - spent) * 100) / 100,
+      pct: budget > 0 ? Math.round((spent / budget) * 100) : 0,
       over: rows.filter(r => r.status === 'over').length,
       warn: rows.filter(r => r.status === 'warn').length,
     };
   });
 
-  // Dynamic subtitle: "May 2026 · $20 of $3,900"
-  subtitle = computed(() => {
-    const label = monthLabel(this.selectedMonth());
+  monthName = computed(() => monthLabel(this.selectedMonth(), false));
+
+  heroLabel = computed(() =>
+    this.isFutureMonth() ? `Budgeted for ${this.monthName()}` : `Spent in ${this.monthName()}`);
+
+  /** One plain sentence on how the month is going — Origin's "why it matters" line. */
+  heroSentence = computed(() => {
     const t = this.totals();
-    if (t.budget === 0) return label;
-    return `${label} · ${this.formatCurrency(t.spent)} of ${this.formatCurrency(t.budget)}`;
+    const n = this.budgetRows().length;
+    const m = this.monthName();
+    const budgets = `${n} budget${n === 1 ? '' : 's'}`;
+    if (this.isFutureMonth()) {
+      return `${m} hasn't started. These are the limits that will apply.`;
+    }
+    if (this.isPastMonth()) {
+      if (t.left >= 0) return `${m} came in ${this.formatCurrency(t.left)} under across ${budgets}.`;
+      return `${m} went ${this.formatCurrency(-t.left)} over across ${budgets}.`;
+    }
+    if (t.over > 0) {
+      const cats = `${t.over} categor${t.over === 1 ? 'y is' : 'ies are'}`;
+      return `${cats} already over. ${this.daysLeft()} left in ${m}.`;
+    }
+    if (t.spent === 0) return `Nothing spent against your budgets yet. ${this.formatCurrency(t.budget)} to work with.`;
+    return `${this.formatCurrency(t.left)} left across ${budgets}, with ${this.daysLeft()} to go.`;
   });
+
+  private daysLeft(): string {
+    const now = new Date();
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const d = last - now.getDate() + 1;
+    return `${d} day${d === 1 ? '' : 's'}`;
+  }
 
   formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-US', {
@@ -232,20 +296,21 @@ export class Budgets {
     return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  isCurrentMonth(month: string): boolean {
-    return month === this.currentMonth;
-  }
-
   // Navigate to budget detail page
   openDetail(categoryId: string) {
     this.router.navigate(
       ['/budgets', categoryId, this.selectedMonth()],
-      { queryParams: { excludeRefunded: this.excludeRefunded() } }
+      {
+        queryParams: { excludeRefunded: this.excludeRefunded() },
+        // Lets the detail page's "← Budgets" step back in history (to this
+        // month) instead of pushing a fresh Budgets entry.
+        state: { fromBudgets: true },
+      }
     );
   }
 
   goToMonth(month: string) {
-    this.selectedMonth.set(month);
+    this.setMonth(month);
   }
 
   openNew() {

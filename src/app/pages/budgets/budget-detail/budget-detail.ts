@@ -1,37 +1,47 @@
 import { Component, inject, computed, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { BudgetService } from '../../../services/budget.service';
 import { CategoryService } from '../../../services/category.service';
 import { TransactionService } from '../../../services/transaction.service';
 import { AccountService } from '../../../services/account.service';
 import { TransactionForm } from '../../transactions/transaction-form/transaction-form';
+import { TransactionView } from '../../../components/transaction-view/transaction-view';
 import { Confirm } from '../../../components/confirm/confirm';
 import { Transaction } from '../../../models';
 import { ToastService } from '../../../services/toast.service';
 import { MoneyRules } from '../../../utils/reporting';
-import { monthKeyOf } from '../../../utils/calendar';
+import { monthKeyOf, monthLabel } from '../../../utils/calendar';
 import { budgetProgress, budgetSpent } from '../../../utils/budgets';
 
+/**
+ * One budget, one month: how far through the limit you are and the
+ * transactions that got you there.
+ *
+ * With "Excluding refunded" on (the default, carried over from the Budgets
+ * page), every figure here is net: refunded purchases are left out and money
+ * friends paid back is subtracted, so the rows add up to the total above them
+ * and to the card you clicked on.
+ */
 @Component({
   selector: 'app-budget-detail',
   standalone: true,
-  imports: [CommonModule, TransactionForm, Confirm],
+  imports: [CommonModule, TransactionForm, TransactionView, Confirm],
   templateUrl: './budget-detail.html',
   styleUrl: './budget-detail.scss'
 })
 export class BudgetDetail {
   private toastService = inject(ToastService);
-  Math = Math;
 
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private location = inject(Location);
   private budgetService = inject(BudgetService);
   private categoryService = inject(CategoryService);
   private txService = inject(TransactionService);
   private accountService = inject(AccountService);
 
-  // Transaction view/edit panel
+  // Transaction view / edit
   viewingTx = signal<Transaction | null>(null);
   editingTx = signal<Transaction | null>(null);
   txFormOpen = signal(false);
@@ -39,92 +49,104 @@ export class BudgetDetail {
   txToDelete = signal<Transaction | null>(null);
 
   // Route params
-  private categoryId = computed(() =>
-    this.route.snapshot.paramMap.get('categoryId') || ''
-  );
-  private month = computed(() =>
-    this.route.snapshot.paramMap.get('month') || monthKeyOf()
-  );
+  private categoryId = this.route.snapshot.paramMap.get('categoryId') || '';
+  private month = this.route.snapshot.paramMap.get('month') || monthKeyOf();
 
-  // Respect the excludeRefunded toggle from the budgets list page
+  /** The Budgets page's toggle, carried in the URL. */
   excludeRefunded = this.route.snapshot.queryParamMap.get('excludeRefunded') !== 'false';
 
   category = computed(() =>
-    this.categoryService.categories().find(c => c.id === this.categoryId()) || null
+    this.categoryService.categories().find(c => c.id === this.categoryId) || null
   );
 
   budget = computed(() =>
-    this.budgetService.getBudgetForCategory(this.categoryId(), this.month()) || null
+    this.budgetService.getBudgetForCategory(this.categoryId, this.month) || null
   );
 
-  monthLabel = computed(() => {
-    const [y, m] = this.month().split('-').map(Number);
-    return new Date(y, m - 1, 1).toLocaleDateString('en-US', {
-      month: 'long', year: 'numeric'
-    });
-  });
+  monthLabel = monthLabel(this.month);
 
-  transactions = computed(() =>
-    this.txService.transactions()
-      .filter(t =>
-        t.type === 'expense' &&
-        !t.isInternalTransfer &&
-        t.categoryId === this.categoryId() &&
-        t.date.startsWith(this.month())
-      )
-      .sort((a, b) => b.date.localeCompare(a.date))
-  );
-
-  // Transactions used for budget calculation — respects excludeRefunded
-  spendingTransactions = computed(() =>
-    this.transactions().filter(t => !(this.excludeRefunded && t.refunded))
-  );
-
-  // Same total as the card on the Budgets page: reimbursements netted off.
   private rules: MoneyRules = {
     netting: this.excludeRefunded,
     effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
     reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
   };
 
+  /** Every expense in this category and month, newest first — refunded ones included, shown dimmed. */
+  transactions = computed(() =>
+    this.txService.transactions()
+      .filter(t =>
+        t.type === 'expense' &&
+        !t.isInternalTransfer &&
+        t.categoryId === this.categoryId &&
+        t.date.startsWith(this.month)
+      )
+      .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? 0) - (a.createdAt ?? 0))
+  );
+
+  /** The ones that count toward the budget. */
+  counted = computed(() =>
+    this.transactions().filter(t => !this.isExcluded(t))
+  );
+
+  /** What a row counts for: net of reimbursements when excluding refunded. */
+  amountOf(t: Transaction): number {
+    return this.excludeRefunded ? this.txService.effectiveExpenseAmount(t) : t.amount;
+  }
+
+  reimbursedOf(t: Transaction): number {
+    return t.id ? this.txService.reimbursedAmountFor(t.id) : 0;
+  }
+
+  isExcluded(t: Transaction): boolean {
+    return this.excludeRefunded && !!t.refunded;
+  }
+
   spent = computed(() =>
-    budgetSpent(this.txService.transactions(), this.categoryId(), this.month(), this.rules)
+    budgetSpent(this.txService.transactions(), this.categoryId, this.month, this.rules)
   );
 
   remaining = computed(() => (this.budget()?.amount || 0) - this.spent());
 
   private progress = computed(() => budgetProgress(this.spent(), this.budget()?.amount || 0));
-
-  pct = computed(() => Math.min(100, this.progress().pct));
-
+  pct = computed(() => this.progress().pct);
   status = computed(() => this.progress().status);
 
-  resetDate = computed(() => {
-    const [y, m] = this.month().split('-').map(Number);
-    return new Date(y, m, 1).toLocaleDateString('en-US', {
-      month: 'long', day: 'numeric'
-    });
+  average = computed(() => {
+    const n = this.counted().length;
+    return n ? this.spent() / n : 0;
   });
 
-  // Transaction view panel
-  openTxView(tx: Transaction) {
-    this.viewingTx.set(tx);
-    document.body.style.overflow = 'hidden';
-  }
+  largest = computed(() => this.counted().reduce((m, t) => Math.max(m, this.amountOf(t)), 0));
 
-  closeTxView() {
-    this.viewingTx.set(null);
-    document.body.style.overflow = '';
-  }
+  /** Money paid back on this month's purchases — explains why the total is net. */
+  reimbursedTotal = computed(() =>
+    this.excludeRefunded
+      ? Math.round(this.counted().reduce((s, t) => s + Math.min(t.amount, this.reimbursedOf(t)), 0) * 100) / 100
+      : 0
+  );
 
-  editFromTxView() {
-    const tx = this.viewingTx();
+  netNote = computed(() => {
+    if (!this.excludeRefunded) return 'Every purchase at its full amount, including refunded ones.';
+    const back = this.reimbursedTotal();
+    return back > 0
+      ? `Net of refunds and reimbursements — ${this.formatCurrency(back)} was paid back to you.`
+      : 'Net of refunds and reimbursements.';
+  });
+
+  resetDate = computed(() => {
+    const [y, m] = this.month.split('-').map(Number);
+    return new Date(y, m, 1).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  });
+
+  // ── Transaction view / edit ────────────────────────────────
+  openTxView(tx: Transaction) { this.viewingTx.set(tx); }
+
+  closeTxView() { this.viewingTx.set(null); }
+
+  editFromTxView(tx: Transaction) {
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
-    if (tx) {
-      this.editingTx.set(tx);
-      this.txFormOpen.set(true);
-    }
+    this.editingTx.set(tx);
+    this.txFormOpen.set(true);
   }
 
   closeTxForm() {
@@ -138,8 +160,8 @@ export class BudgetDetail {
     try {
       await this.txService.update(tx.id, data);
       this.closeTxForm();
-    } catch (err) {
-      this.toastService.error('Failed. Please try again.');
+    } catch {
+      this.toastService.error('Could not save. Please try again.');
     }
   }
 
@@ -154,6 +176,8 @@ export class BudgetDetail {
     if (!tx?.id) return;
     try {
       await this.txService.remove(tx.id);
+    } catch {
+      this.toastService.error('Could not delete. Please try again.');
     } finally {
       this.txConfirmOpen.set(false);
       this.txToDelete.set(null);
@@ -161,28 +185,17 @@ export class BudgetDetail {
     }
   }
 
-  // Helpers
+  // ── Helpers ────────────────────────────────────────────────
   accountName(id?: string): string {
     if (!id) return '—';
     const a = this.accountService.accounts().find(a => a.id === id);
     return a ? `${a.icon} ${a.name}` : '—';
   }
 
-  categoryFor(id?: string) {
-    if (!id) return null;
-    return this.categoryService.categories().find(c => c.id === id) || null;
-  }
-
   formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-US', {
       style: 'currency', currency: 'USD'
     }).format(Math.abs(n));
-  }
-
-  formatFullDate(date: string): string {
-    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-    });
   }
 
   formatDate(date: string): string {
@@ -196,7 +209,22 @@ export class BudgetDetail {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
+  /**
+   * Back to Budgets, on the month this page is about. Arriving from the
+   * Budgets page, step back through history so this button and the browser's
+   * own Back agree; arriving from anywhere else (Spending, the command
+   * palette, a shared link), open Budgets on this month.
+   */
   goBack() {
-    this.router.navigate(['/budgets']);
+    if ((this.location.getState() as { fromBudgets?: boolean } | null)?.fromBudgets) {
+      this.location.back();
+      return;
+    }
+    this.router.navigate(['/budgets'], {
+      queryParams: {
+        month: this.month === monthKeyOf() ? null : this.month,
+        excludeRefunded: this.excludeRefunded ? null : 'false',
+      },
+    });
   }
 }

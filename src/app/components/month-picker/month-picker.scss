@@ -1,0 +1,141 @@
+:host { display: inline-block; }
+
+.picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.step {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg-2);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { border-color: var(--line-strong); color: var(--fg); }
+  &:disabled { opacity: 0.35; cursor: not-allowed; }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+
+  &.sm { width: 28px; height: 28px; font-size: 14px; }
+}
+
+.label-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 150px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+
+  svg { color: var(--fg-3); }
+  &:hover, &[aria-expanded='true'] { background: var(--accent-bg); }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+}
+
+.pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  width: 264px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.year {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--fg-2);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.cell {
+  position: relative;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover:not(:disabled):not(.selected) { background: var(--accent-bg); color: var(--fg); }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+  &:disabled { color: var(--fg-4); opacity: 0.5; cursor: not-allowed; }
+
+  // "This month" is a landmark, not a selection: a neutral outline.
+  &.current { border-color: var(--line-strong); color: var(--fg); }
+
+  &.selected {
+    background: var(--accent);
+    border-color: transparent;
+    color: var(--accent-on);
+  }
+}
+
+.dot {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.today {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover { color: var(--fg); }
+}
+
+@media (max-width: 640px) {
+  .pop { right: auto; left: 0; }
+}

@@ -89,6 +89,8 @@ The app is what we copy. Do not "correct" this back to dark.
 - Shared components worth reaching for before writing new markup:
   `app-spend-calendar` (month heat grid), `app-day-detail` (what one day cost),
   `app-transaction-view` (read-only transaction sheet), `app-transaction-form`,
+  `app-month-picker` (`‹ Month ›` stepper with a jump-to-month grid — use it for
+  any month selection rather than a row of month pills),
   `app-confirm`, `app-modal`, `app-toast`, `app-logo`, `app-icon`.
   `app-transaction-view` is the **only** transaction view — Dashboard, Spending,
   Analysis and Transactions all render it, including reimbursement linking.
