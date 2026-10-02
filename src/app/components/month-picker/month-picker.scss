@@ -42,7 +42,6 @@
   font-weight: 600;
   cursor: pointer;
 
-  svg { color: var(--fg-3); }
   &:hover, &[aria-expanded='true'] { background: var(--accent-bg); }
   &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
 }
