@@ -79,7 +79,8 @@ The app is what we copy. Do not "correct" this back to dark.
   (content projection only matches top-level nodes). Build the inside from the
   shared pieces in `styles.scss → FORMS`: `.form`, `.field`, `.label-sm`,
   `.label-optional`, `.field-hint`, `.field-error`, `.form-grid`,
-  `.form-section` / `.form-section-title`, `.form-note`, `.input-affix`,
+  `.form-section` / `.form-section-title`, `.form-note`, `.input-affix`
+  (`.input-affix.suffix` for a unit after the number), `.link-btn`,
   `.seg` / `.type-seg` / `.mini-seg`, `.toggle` / `.toggle-row`,
   `.icon-picks` / `.icon-opt`, `.swatches` / `.color-opt`, `.choice-grid` /
   `.choice`, `.modal-actions` / `.actions-right`. A form's own stylesheet
@@ -123,6 +124,7 @@ src/app/
     budgets/
     analysis/
     net-worth/      accounts + manual assets/debts (ManualAsset, dated valuations)
+      loan-detail/  one loan: payments made/missed/to come (maths in utils/loans.ts)
   app.ts            shell with sidebar
   app.html
   app.scss

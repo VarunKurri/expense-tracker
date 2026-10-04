@@ -26,6 +26,7 @@ import {
   Chart, ArcElement, DoughnutController,
   Tooltip, Legend
 } from 'chart.js';
+import { owesMoney } from '../../utils/finance';
 
 Chart.register(ArcElement, DoughnutController, Tooltip, Legend);
 
@@ -182,7 +183,7 @@ export class Dashboard implements OnDestroy {
 
   balanceFor(account: Account): number {
     const txDelta = this.txService.balanceForAccount(account.id!);
-    const balance = account.type === 'credit'
+    const balance = owesMoney(account.type)
       ? account.openingBalance - txDelta
       : (account.openingBalance || 0) + txDelta;
     return Math.round(balance * 100) / 100;

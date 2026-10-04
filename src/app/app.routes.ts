@@ -37,6 +37,11 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/net-worth/net-worth').then(m => m.NetWorth)
   },
   {
+    path: 'net-worth/loans/:id',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/net-worth/loan-detail/loan-detail').then(m => m.LoanDetail)
+  },
+  {
     path: 'transactions',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/transactions/transactions').then(m => m.Transactions)

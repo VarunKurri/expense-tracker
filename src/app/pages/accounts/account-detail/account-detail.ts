@@ -9,6 +9,7 @@ import { TransactionForm } from '../../transactions/transaction-form/transaction
 import { Confirm } from '../../../components/confirm/confirm';
 import { Account, Transaction } from '../../../models';
 import { ToastService } from '../../../services/toast.service';
+import { owesMoney } from '../../../utils/finance';
 
 @Component({
   selector: 'app-account-detail',
@@ -44,7 +45,7 @@ export class AccountDetail {
     const a = this.account();
     if (!a) return 0;
     const txDelta = this.txService.balanceForAccount(a.id!);
-    if (a.type === 'credit') return a.openingBalance - txDelta;
+    if (owesMoney(a.type)) return a.openingBalance - txDelta;
     return (a.openingBalance || 0) + txDelta;
   });
 

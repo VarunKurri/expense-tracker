@@ -1,4 +1,4 @@
-import { Account, Transaction } from '../models';
+import { Account, AccountType, Transaction } from '../models';
 
 export function transactionDeltaForAccount(transactions: Transaction[], accountId: string): number {
   let balance = 0;
@@ -15,9 +15,18 @@ export function transactionDeltaForAccount(transactions: Transaction[], accountI
   return roundMoney(balance);
 }
 
+/**
+ * Accounts whose balance is what you owe rather than what you have: credit
+ * cards, and loan accounts linked through Plaid. Their balance is opening −
+ * transactions, and it counts against net worth.
+ */
+export function owesMoney(type: AccountType): boolean {
+  return type === 'credit' || type === 'loan';
+}
+
 export function accountBalance(account: Account, transactions: Transaction[]): number {
   const delta = transactionDeltaForAccount(transactions, account.id || '');
-  const balance = account.type === 'credit'
+  const balance = owesMoney(account.type)
     ? account.openingBalance - delta
     : (account.openingBalance || 0) + delta;
   return roundMoney(balance);

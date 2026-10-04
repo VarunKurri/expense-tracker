@@ -1,5 +1,7 @@
 import { Account, AccountType, ManualAsset, ManualAssetType, Transaction } from '../models';
 import { localDateString, parseLocalDate } from './date';
+import { owesMoney } from './finance';
+import { LoanPayment, countsInNetWorth, estimatedValue, loanOwedOn, loanPayments } from './loans';
 
 /**
  * Net worth: everything you own minus everything you owe, today and on any
@@ -21,7 +23,7 @@ import { localDateString, parseLocalDate } from './date';
 export type Side = 'asset' | 'liability';
 
 export type GroupKey =
-  | 'cash' | 'savings' | 'investments' | 'property' | 'vehicles' | 'other-assets'
+  | 'cash' | 'savings' | 'investments' | 'property' | 'vehicles' | 'owed-to-you' | 'other-assets'
   | 'credit' | 'loans' | 'other-liabilities';
 
 /** Groups in the order the page lists them. */
@@ -31,6 +33,7 @@ export const GROUPS: { key: GroupKey; label: string; side: Side }[] = [
   { key: 'investments',       label: 'Investments',    side: 'asset' },
   { key: 'property',          label: 'Real estate',    side: 'asset' },
   { key: 'vehicles',          label: 'Vehicles',       side: 'asset' },
+  { key: 'owed-to-you',       label: 'Owed to you',    side: 'asset' },
   { key: 'other-assets',      label: 'Other assets',   side: 'asset' },
   { key: 'credit',            label: 'Credit cards',   side: 'liability' },
   { key: 'loans',             label: 'Loans',          side: 'liability' },
@@ -46,6 +49,7 @@ export const MANUAL_TYPES: {
   { value: 'investment',      label: 'Investment or retirement', side: 'asset', group: 'investments', icon: '📈' },
   { value: 'cash',            label: 'Cash or deposit',  side: 'asset',     group: 'cash',              icon: '💵' },
   { value: 'valuable',        label: 'Valuable item',    side: 'asset',     group: 'other-assets',      icon: '💎' },
+  { value: 'loan-given',      label: 'Money I lent',     side: 'asset',     group: 'owed-to-you',       icon: '🤲' },
   { value: 'other-asset',     label: 'Other asset',      side: 'asset',     group: 'other-assets',      icon: '📦' },
   { value: 'mortgage',        label: 'Mortgage',         side: 'liability', group: 'loans',             icon: '🏦' },
   { value: 'auto-loan',       label: 'Auto loan',        side: 'liability', group: 'loans',             icon: '🚙' },
@@ -55,7 +59,7 @@ export const MANUAL_TYPES: {
 ];
 
 export function manualType(type: ManualAssetType) {
-  return MANUAL_TYPES.find(t => t.value === type) ?? MANUAL_TYPES[5];
+  return MANUAL_TYPES.find(t => t.value === type) ?? MANUAL_TYPES.find(t => t.value === 'other-asset')!;
 }
 
 export function accountGroup(type: AccountType): GroupKey {
@@ -63,6 +67,7 @@ export function accountGroup(type: AccountType): GroupKey {
     case 'savings': return 'savings';
     case 'investment': return 'investments';
     case 'credit': return 'credit';
+    case 'loan': return 'loans';
     default: return 'cash'; // checking, cash
   }
 }
@@ -91,7 +96,7 @@ function deltasOf(t: Transaction): [string, number][] {
  * `accountBalance` in finance.ts.
  */
 function contribution(account: Account, txTotal: number): number {
-  return account.type === 'credit'
+  return owesMoney(account.type)
     ? -(account.openingBalance - txTotal)
     : (account.openingBalance || 0) + txTotal;
 }
@@ -103,7 +108,7 @@ export function balanceOn(account: Account, txs: Transaction[], date: string): n
     if (t.date > date) continue;
     for (const [id, d] of deltasOf(t)) if (id === account.id) total += d;
   }
-  return round2(account.type === 'credit' ? account.openingBalance - total : (account.openingBalance || 0) + total);
+  return round2(owesMoney(account.type) ? account.openingBalance - total : (account.openingBalance || 0) + total);
 }
 
 // ── Manual entries ───────────────────────────────────────────
@@ -135,6 +140,24 @@ export function withValuation(valuations: ManualAsset['valuations'], date: strin
   return [...rest, { date, value: round2(value) }].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/**
+ * What a manual entry is worth on a date, by the best information there is:
+ * a loan's running balance from its terms and payments; a car's estimated
+ * value as it loses worth; otherwise the latest value you entered. Null
+ * before it existed.
+ *
+ * `payments` lets a caller that asks about many dates find a loan's
+ * payments once rather than per date.
+ */
+export function entryValueOn(
+  asset: ManualAsset, txs: Transaction[], date: string, payments?: LoanPayment[],
+): number | null {
+  if (asset.loan) return loanOwedOn(asset, txs, date, payments ?? loanPayments(asset, txs));
+  const estimate = estimatedValue(asset, date);
+  if (estimate !== null) return estimate;
+  return valueOn(asset, date);
+}
+
 // ── Holdings: everything on one date, grouped ────────────────
 
 export interface Holding {
@@ -162,12 +185,13 @@ export function holdingsOn(
   for (const a of accounts) {
     if (a.archived || !a.id) continue;
     const bal = balanceOn(a, txs, date);
-    const c = a.type === 'credit' ? -bal : bal;
+    const c = owesMoney(a.type) ? -bal : bal;
     if (c === 0) continue;
     const side: Side = c > 0 ? 'asset' : 'liability';
     let group = accountGroup(a.type);
-    if (side === 'asset' && group === 'credit') group = 'other-assets';
-    if (side === 'liability' && group !== 'credit') group = 'other-liabilities';
+    const debtGroup = group === 'credit' || group === 'loans';
+    if (side === 'asset' && debtGroup) group = 'other-assets';
+    if (side === 'liability' && !debtGroup) group = 'other-liabilities';
     out.push({
       key: `a:${a.id}`, kind: 'account', id: a.id, name: a.name, icon: a.icon || '🏦',
       subtitle: [a.institution, a.last4 ? `•••• ${a.last4}` : ''].filter(Boolean).join(' · ') || accountTypeLabel(a.type),
@@ -175,8 +199,8 @@ export function holdingsOn(
     });
   }
   for (const m of manual) {
-    if (m.archived || !m.id) continue;
-    const v = valueOn(m, date);
+    if (m.archived || !m.id || !countsInNetWorth(m)) continue;
+    const v = entryValueOn(m, txs, date);
     if (v === null || v === 0) continue;
     const t = manualType(m.type);
     out.push({
@@ -188,7 +212,7 @@ export function holdingsOn(
 }
 
 function accountTypeLabel(type: AccountType): string {
-  return { checking: 'Checking', savings: 'Savings', credit: 'Credit card', cash: 'Cash', investment: 'Investment' }[type];
+  return { checking: 'Checking', savings: 'Savings', credit: 'Credit card', cash: 'Cash', investment: 'Investment', loan: 'Loan' }[type];
 }
 
 export interface HoldingGroup {
@@ -253,7 +277,9 @@ export function netWorthSeries(
   moves.sort((a, b) => a.date.localeCompare(b.date));
 
   const totals = new Map<string, number>(active.map(a => [a.id!, 0]));
-  const liveManual = manual.filter(m => !m.archived && m.id);
+  const liveManual = manual.filter(m => !m.archived && m.id && countsInNetWorth(m));
+  // Find each loan's payments once, not once per date.
+  const loanPays = new Map(liveManual.filter(m => m.loan).map(m => [m.id!, loanPayments(m, txs)]));
   const out: NetWorthPoint[] = [];
   let i = 0;
   for (const date of dates) {
@@ -267,7 +293,7 @@ export function netWorthSeries(
       if (c > 0) assets += c; else liabilities -= c;
     }
     for (const m of liveManual) {
-      const v = valueOn(m, date);
+      const v = entryValueOn(m, txs, date, loanPays.get(m.id!));
       if (v === null) continue;
       if (manualType(m.type).side === 'asset') assets += Math.abs(v); else liabilities += Math.abs(v);
     }
@@ -283,7 +309,11 @@ export const RANGES: Range[] = ['1M', '3M', '6M', '1Y', 'ALL'];
 export function earliestDate(txs: Transaction[], manual: ManualAsset[]): string | null {
   let first: string | null = null;
   for (const t of txs) if (!first || t.date < first) first = t.date;
-  for (const m of manual) for (const v of m.valuations ?? []) if (!first || v.date < first) first = v.date;
+  for (const m of manual) {
+    for (const v of m.valuations ?? []) if (!first || v.date < first) first = v.date;
+    const start = m.loan?.startDate ?? m.purchase?.date;
+    if (start && (!first || start < first)) first = start;
+  }
   return first;
 }
 

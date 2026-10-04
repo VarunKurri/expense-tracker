@@ -71,7 +71,8 @@ export class ManualAssetService {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
     const ref = collection(this.db, `users/${user.uid}/manualAssets`);
-    await addDoc(ref, await this.encryption.encryptForWrite({ ...item, createdAt: Date.now(), updatedAt: Date.now() }));
+    const created = await addDoc(ref, await this.encryption.encryptForWrite({ ...item, createdAt: Date.now(), updatedAt: Date.now() }));
+    return created.id;
   }
 
   async update(id: string, patch: Partial<ManualAsset>) {

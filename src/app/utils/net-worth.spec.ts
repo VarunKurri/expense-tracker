@@ -156,3 +156,64 @@ describe('small pieces', () => {
     expect(manualType('vehicle').side).toBe('asset');
   });
 });
+
+describe('loans and estimates in net worth', () => {
+  const carLoan: ManualAsset = {
+    id: 'cl', name: 'Car loan', type: 'auto-loan', valuations: [], createdAt: 0, updatedAt: 0,
+    loan: {
+      method: 'reducing', startDate: '2026-07-05', amountFinanced: 18000, rate: 4.2, termMonths: 60,
+      firstPaymentDate: '2026-08-05', payment: 333.12, match: { text: 'toyota financial' },
+      paymentIds: [], ignoredIds: [],
+    },
+  };
+  const car: ManualAsset = {
+    id: 'car', name: 'Corolla', type: 'vehicle', valuations: [], createdAt: 0, updatedAt: 0,
+    purchase: { price: 18000, date: '2026-07-05' }, depreciationRate: 0.15,
+  };
+  const chk = acct({ id: 'chk', openingBalance: 5000 });
+  const payment = tx({ type: 'expense', accountId: 'chk', amount: 333.12, date: '2026-08-05', merchant: 'TOYOTA FINANCIAL', id: 'p1' } as Partial<Transaction>);
+
+  it('buying a car on finance barely moves net worth on the day', () => {
+    const [before, day] = netWorthSeries([chk], [carLoan, car], [], ['2026-07-04', '2026-07-05']);
+    expect(day.net).toBe(before.net); // +$18,000 car, −$18,000 loan
+  });
+
+  it('a payment lowers net worth by about its interest, not the whole payment', () => {
+    const [before, after] = netWorthSeries([chk], [carLoan], [payment], ['2026-08-04', '2026-08-05']);
+    // Cash −$333.12; loan −$270.12 principal (the $63 interest built up on the due date).
+    expect(round2(before.net - after.net)).toBe(63);
+  });
+
+  it('the series still agrees with a full recount, loans and estimates included', () => {
+    const dates = ['2026-07-01', '2026-07-05', '2026-08-04', '2026-08-05', '2026-12-31'];
+    for (const p of netWorthSeries([chk], [carLoan, car], [payment], dates)) {
+      const c = composition(holdingsOn([chk], [carLoan, car], [payment], p.date));
+      expect(p.net).toBe(c.net);
+    }
+  });
+
+  it('Dad\'s loan, repaid to you, never touches your net worth', () => {
+    const dads: ManualAsset = {
+      ...carLoan, id: 'dad', type: 'loan-given',
+      loan: { ...carLoan.loan!, owedTo: 'someone-else', match: { text: 'ravi' } },
+    };
+    const [p] = netWorthSeries([chk], [dads], [], ['2026-09-01']);
+    expect(p.net).toBe(5000);
+    expect(holdingsOn([chk], [dads], [], '2026-09-01').map(h => h.id)).toEqual(['chk']);
+  });
+});
+
+function round2(n: number) { return Math.round(n * 100) / 100; }
+
+describe('loan accounts from Plaid', () => {
+  it('count what you owe as a debt, under Loans — not as cash', () => {
+    const plaidLoan = acct({ id: 'pl', type: 'loan', openingBalance: 18000 });
+    const payment = tx({ type: 'income', accountId: 'pl', amount: 333.12, date: '2026-09-05' });
+    const c = composition(holdingsOn([plaidLoan], [], [payment], '2026-09-30'));
+    expect(c.assets).toBe(0);
+    expect(c.liabilities).toBe(17666.88);
+    expect(c.liabilityGroups[0].label).toBe('Loans');
+    const [p] = netWorthSeries([plaidLoan], [], [payment], ['2026-09-30']);
+    expect(p.net).toBe(-17666.88);
+  });
+});

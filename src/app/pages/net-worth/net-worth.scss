@@ -196,6 +196,21 @@
   color: var(--fg-3);
 }
 
+/* Repaid to you for someone else: listed, deliberately quieter than the counted lists. */
+.tracked {
+  border-style: dashed;
+
+  .tracked-note {
+    margin: 0;
+    padding: 0 20px 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--fg-3);
+  }
+
+  .row-amount { font-weight: 500; color: var(--fg-2); }
+}
+
 /* ── Editorial moments ────────────────────────────────────── */
 .empty, .promo {
   padding: 40px 24px;

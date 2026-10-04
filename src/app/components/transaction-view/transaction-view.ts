@@ -6,8 +6,12 @@ import { AccountService } from '../../services/account.service';
 import { TransactionService } from '../../services/transaction.service';
 import { ToastService } from '../../services/toast.service';
 import { ScrollLockService } from '../../services/scroll-lock.service';
+import { ManualAssetService } from '../../services/manual-asset.service';
+import { Router } from '@angular/router';
+import { loanDirection, loanPayments, loanState } from '../../utils/loans';
+import { localDateString } from '../../utils/date';
 import { Modal } from '../modal/modal';
-import { Transaction } from '../../models';
+import { ManualAsset, Transaction } from '../../models';
 
 let nextLockId = 0;
 
@@ -110,6 +114,100 @@ export class TransactionView {
     if (!exp) return 0;
     return Math.min(exp.amount, this.txService.reimbursedAmountFor(exp.id));
   });
+
+  // ── Loans ──────────────────────────────────────────────────
+  private manualAssets = inject(ManualAssetService);
+  private router = inject(Router);
+
+  private loans = computed(() => this.manualAssets.items().filter(m => m.loan && !m.archived));
+
+  /**
+   * The loan this transaction belongs to, if any, and how it was split.
+   * Worked out from the loan's own payment list, so it reads the same on
+   * every page and a bank sync rewriting the transaction can't lose it.
+   */
+  loanLink = computed(() => {
+    const tx = this.tx();
+    if (!tx?.id) return null;
+    const txs = this.txService.transactions();
+    for (const loan of this.loans()) {
+      const pays = loanPayments(loan, txs);
+      const p = pays.find(x => x.tx.id === tx.id);
+      if (!p) continue;
+      if (p.kind === 'down') return { loan, kind: 'down' as const, how: p.how, split: null };
+      const split = loanState(loan, txs, localDateString(), pays).splits.find(x => x.tx.id === tx.id) ?? null;
+      return { loan, kind: 'payment' as const, how: p.how, split };
+    }
+    return null;
+  });
+
+  /** Loans this transaction could belong to: repayments go the loan's way. */
+  loanOptions = computed(() => {
+    const tx = this.tx();
+    if (!tx || tx.type === 'transfer') return [];
+    return this.loans().filter(l =>
+      tx.type === 'expense' ? true /* a payment you made, or money you lent out */ : loanDirection(l.type) === 'lent');
+  });
+
+  linkLoanId = signal('');
+
+  /** The loan picked in the Loan section (the only one, if there's just one). */
+  selectedLoan = computed(() => {
+    const opts = this.loanOptions();
+    return opts.find(l => l.id === this.linkLoanId()) ?? opts[0] ?? null;
+  });
+
+  /** What this transaction can be on the selected loan. */
+  loanRoles = computed(() => {
+    const tx = this.tx(), loan = this.selectedLoan();
+    if (!tx || !loan) return [];
+    const lent = loanDirection(loan.type) === 'lent';
+    if (tx.type === 'income') return [{ kind: 'payment' as const, label: 'Repayment' }];
+    if (lent) return loan.loan?.owedTo === 'someone-else' ? [] : [{ kind: 'down' as const, label: 'Money I lent' }];
+    return [
+      { kind: 'payment' as const, label: 'Monthly payment' },
+      { kind: 'down' as const, label: 'Down payment' },
+    ];
+  });
+
+  async linkToLoan(kind: 'payment' | 'down') {
+    const tx = this.tx();
+    const loan = this.selectedLoan();
+    if (!tx?.id || !loan?.id || !loan.loan) return;
+    const t = loan.loan;
+    const patch = kind === 'down'
+      ? { ...t, downPaymentId: tx.id, downPayment: tx.amount }
+      : { ...t, paymentIds: [...new Set([...(t.paymentIds ?? []), tx.id])], ignoredIds: (t.ignoredIds ?? []).filter(x => x !== tx.id) };
+    try {
+      await this.manualAssets.update(loan.id, { loan: patch });
+      this.toast.success(`Linked to ${loan.name}.`);
+    } catch {
+      this.toast.error('Could not link. Please try again.');
+    }
+  }
+
+  async unlinkFromLoan() {
+    const link = this.loanLink();
+    const tx = this.tx();
+    if (!link?.loan.id || !link.loan.loan || !tx?.id) return;
+    const t = link.loan.loan;
+    const patch = link.kind === 'down'
+      ? { ...t, downPaymentId: undefined }
+      : t.paymentIds?.includes(tx.id)
+        ? { ...t, paymentIds: t.paymentIds.filter(x => x !== tx.id) }
+        : { ...t, ignoredIds: [...new Set([...(t.ignoredIds ?? []), tx.id])] };
+    try {
+      await this.manualAssets.update(link.loan.id, { loan: patch });
+      this.toast.success(`Unlinked from ${link.loan.name}.`);
+    } catch {
+      this.toast.error('Could not unlink. Please try again.');
+    }
+  }
+
+  openLoan(loan: ManualAsset) {
+    this.close();
+    this.router.navigate(['/net-worth/loans', loan.id]);
+  }
 
   // ── Link picker ────────────────────────────────────────────
   linkingFrom = signal<Transaction | null>(null);

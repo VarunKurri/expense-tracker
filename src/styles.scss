@@ -624,6 +624,26 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     pointer-events: none;
   }
   > .input-field, > .input { padding-left: 28px; }
+
+  /* Unit after the number: "4.2 %", "60 months". */
+  &.suffix {
+    > .affix { left: auto; right: 14px; }
+    > .input-field, > .input { padding-left: 14px; padding-right: 64px; }
+  }
+}
+
+/* An inline text link inside a sentence ("Use calculated", "Go to October"). */
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+
+  &:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 3px var(--focus-ring); }
 }
 
 /* ── Segmented control ─────────────────────────────────────

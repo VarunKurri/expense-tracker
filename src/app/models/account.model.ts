@@ -1,4 +1,6 @@
-export type AccountType = 'checking' | 'savings' | 'credit' | 'cash' | 'investment';
+// 'loan': a loan account linked through Plaid (car, mortgage, student). Like a card,
+// its balance is what you owe — see `owesMoney` in utils/finance.ts.
+export type AccountType = 'checking' | 'savings' | 'credit' | 'cash' | 'investment' | 'loan';
 
 export interface Account {
   id?: string;

@@ -81,7 +81,7 @@
                   <span class="row-icon">{{ h.icon }}</span>
                   <span class="row-main">
                     <span class="row-name">{{ h.name }}</span>
-                    <span class="row-sub">{{ h.subtitle }}{{ h.kind === 'manual' ? ' · added by you' : '' }}</span>
+                    <span class="row-sub">{{ loanProgress(h) ?? h.subtitle }}{{ h.kind === 'manual' && !loanProgress(h) ? ' · added by you' : '' }}</span>
                   </span>
                   <span class="row-amount">{{ money(h.amount) }}</span>
                 </button>
@@ -100,6 +100,25 @@
       }
     </div>
 
+    @if (tracked().length) {
+      <section class="card side tracked">
+        <div class="side-head">
+          <span class="card-label">Tracked, not counted</span>
+        </div>
+        <p class="tracked-note">Loans being repaid to you for someone else. The money is theirs, so it isn't in your net worth — the payments you receive still count as income.</p>
+        @for (t of tracked(); track t.id) {
+          <button type="button" class="row" (click)="openLoan(t.id)">
+            <span class="row-icon">🤲</span>
+            <span class="row-main">
+              <span class="row-name">{{ t.name }}</span>
+              <span class="row-sub">{{ t.made }} of {{ t.of }} payments</span>
+            </span>
+            <span class="row-amount">{{ money(t.owed) }} to go</span>
+          </button>
+        }
+      </section>
+    }
+
     @if (!hasManual()) {
       <section class="card promo">
         <span class="card-label">Beyond your accounts</span>
@@ -115,6 +134,7 @@
 <app-asset-form
   [open]="formOpen()"
   [asset]="editing()"
+  [linkedName]="linkedName()"
   (closed)="closeForm()"
   (saved)="handleSave($event)"
   (deleteRequested)="askDelete()" />

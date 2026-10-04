@@ -14,7 +14,7 @@ import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Account, Bill } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { PlaidService, PlaidItem } from '../../services/plaid.service';
-import { monthActivityForAccount, transactionDeltaForAccount, roundMoney } from '../../utils/finance';
+import { monthActivityForAccount, transactionDeltaForAccount, roundMoney, owesMoney } from '../../utils/finance';
 
 type CardDueStatus = 'paid' | 'settled' | 'overdue' | 'due' | 'no-date';
 interface CardDue {
@@ -109,7 +109,7 @@ export class Accounts {
     let total = 0;
     for (const a of this.activeAccounts()) {
       const bal = this.balanceFor(a);
-      if (a.type === 'credit') continue;
+      if (owesMoney(a.type)) { if (bal < 0) total += Math.abs(bal); continue; }
       if (bal > 0) total += bal;
     }
     return total;
@@ -119,9 +119,9 @@ export class Accounts {
     let total = 0;
     for (const a of this.activeAccounts()) {
       const bal = this.balanceFor(a);
-      if (a.type === 'credit' && bal > 0) {
+      if (owesMoney(a.type) && bal > 0) {
         total += bal;
-      } else if (a.type !== 'credit' && bal < 0) {
+      } else if (!owesMoney(a.type) && bal < 0) {
         total += Math.abs(bal);
       }
     }

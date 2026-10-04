@@ -1,0 +1,287 @@
+@if (loan(); as l) {
+  @if (terms(); as t) {
+  @if (state(); as s) {
+  @if (outlook(); as o) {
+  <div class="page">
+
+    <div class="top-bar">
+      <button class="btn-ghost sm" (click)="back()">← Net worth</button>
+      <button class="btn-ghost sm" (click)="formOpen.set(true)">Edit loan</button>
+    </div>
+
+    <!-- HERO -->
+    <section class="card hero" [class.behind]="o.behindBy > 0">
+      <div class="hero-top">
+        <div class="hero-icon">{{ icon() }}</div>
+        <div class="hero-info">
+          <span class="card-label">{{ eyebrow() }}</span>
+          <h1 class="hero-name">{{ l.name }}</h1>
+        </div>
+        @if (tracked()) {
+          <span class="tag">Tracked, not counted</span>
+        }
+      </div>
+
+      <div class="hero-figure">
+        <span class="num-display">{{ money(s.owed) }}</span>
+        <span class="hero-of">of {{ money(t.amountFinanced) }}</span>
+      </div>
+
+      <div class="bar" role="img"
+           [attr.aria-label]="(progress() * 100 | number:'1.0-0') + '% repaid'">
+        <div class="bar-fill" [style.width]="(progress() * 100) + '%'"></div>
+      </div>
+      <div class="bar-labels">
+        <span>{{ s.paymentsMade }} of {{ t.termMonths }} payments · {{ progress() * 100 | number:'1.0-0' }}% {{ lent() ? 'repaid' : 'paid off' }}</span>
+        <span>{{ methodLabel() }} · {{ money(t.payment) }}/mo</span>
+      </div>
+
+      <p class="hero-sentence" [class.alert]="o.behindBy > 0">{{ sentence() }}</p>
+    </section>
+
+    <!-- THE NUMBERS -->
+    <div class="stats">
+      <div class="card stat">
+        <span class="label-mono">{{ lent() ? 'Received so far' : 'Paid so far' }}</span>
+        <span class="stat-value">{{ money(s.totalPaid) }}</span>
+        <span class="stat-sub">{{ money(s.principalPaid) }} principal · {{ money(s.interestPaid) }} interest</span>
+      </div>
+      <div class="card stat">
+        <span class="label-mono">{{ lent() ? 'Still to come' : 'Left to pay' }}</span>
+        <span class="stat-value">{{ money(o.leftToPay) }}</span>
+        <span class="stat-sub">{{ o.paymentsLeft }} payment{{ o.paymentsLeft === 1 ? '' : 's' }}, interest included</span>
+      </div>
+      <div class="card stat">
+        <span class="label-mono">{{ lent() ? 'Interest earned, in all' : 'Interest, in all' }}</span>
+        <span class="stat-value">{{ money(o.lifetimeInterest) }}</span>
+        <span class="stat-sub">{{ money(s.interestPaid) }} so far · {{ money(o.futureInterest) }} to come</span>
+      </div>
+      <div class="card stat">
+        <span class="label-mono">{{ lent() ? 'Repaid by' : 'Paid off' }}</span>
+        <span class="stat-value">{{ o.payoffDate ? formatDate(o.payoffDate) : '—' }}</span>
+        <span class="stat-sub">Started {{ formatDate(t.startDate) }}</span>
+      </div>
+    </div>
+
+    @if (!lent()) {
+      <section class="card cost">
+        <span class="card-label">What it really costs</span>
+        <p>
+          @if (t.price) {
+            {{ money(t.price) }} price
+            @if (s.downPayment) { ({{ money(s.downPayment) }} down) }
+            + {{ money(o.lifetimeInterest) }} interest =
+          } @else {
+            {{ money(t.amountFinanced) }} borrowed + {{ money(o.lifetimeInterest) }} interest =
+          }
+          <strong>{{ money(trueCost() ?? 0) }}</strong> in all.
+          @if (bought(); as b) {
+            {{ b.name }} is worth about {{ money(b.value) }} today.
+          }
+        </p>
+        <div class="cost-actions">
+          @if (downPayment(); as d) {
+            <span class="muted">Down payment: {{ d.tx.merchant || 'Untitled' }}, {{ formatDate(d.tx.date) }} · {{ money(d.tx.amount) }}</span>
+            <button class="btn-ghost sm" (click)="unlink(d.tx)">Unlink</button>
+          } @else {
+            <button class="btn-ghost sm" (click)="openLink('down')">Link the down payment</button>
+          }
+          <button class="btn-ghost sm" (click)="openCorrection()">Enter statement balance</button>
+        </div>
+      </section>
+    } @else {
+      <div class="cost-actions plain">
+        @if (!tracked()) {
+          @if (downPayment(); as d) {
+            <span class="muted">Sent: {{ d.tx.merchant || 'Untitled' }}, {{ formatDate(d.tx.date) }} · {{ money(d.tx.amount) }}</span>
+            <button class="btn-ghost sm" (click)="unlink(d.tx)">Unlink</button>
+          } @else {
+            <button class="btn-ghost sm" (click)="openLink('down')">Link the money you sent</button>
+          }
+        }
+        <button class="btn-ghost sm" (click)="openCorrection()">Enter the balance</button>
+      </div>
+    }
+
+    <!-- PAYMENTS -->
+    <section class="card list">
+      <div class="list-head">
+        <span class="card-label">Payments</span>
+        <button class="btn-ghost sm" (click)="openLink('payment')">+ Link a payment</button>
+      </div>
+
+      @for (d of o.missedDates; track d) {
+        <div class="row missed">
+          <span class="row-date">{{ formatDate(d) }}</span>
+          <span class="row-main">
+            <span class="row-name">Not found</span>
+            <span class="row-sub">Payment due {{ formatDate(d) }}</span>
+          </span>
+          <button class="btn-ghost sm" (click)="openLink('payment')">Link it</button>
+        </div>
+      }
+
+      @for (p of made(); track p.tx.id) {
+        <div class="row">
+          <button type="button" class="row-open" (click)="viewingTx.set(p.tx)">
+            <span class="row-date">#{{ p.n }}</span>
+            <span class="row-main">
+              <span class="row-name">{{ p.tx.merchant || 'Untitled' }}</span>
+              <span class="row-sub">
+                {{ formatDate(p.tx.date) }} · {{ money(p.interest) }} interest · {{ money(p.principal) }} principal{{ p.surplus > 0 ? ' · ' + money(p.surplus) + ' extra' : '' }}
+                · {{ p.how === 'linked' ? 'linked by you' : 'matched' }}
+              </span>
+            </span>
+            <span class="row-amount">{{ money(p.tx.amount) }}</span>
+          </button>
+          <button class="btn-ghost sm unlink" (click)="unlink(p.tx)"
+                  [title]="p.how === 'linked' ? 'Remove from this loan' : 'Not a payment for this loan'">Unlink</button>
+        </div>
+      } @empty {
+        @if (!o.missedDates.length) {
+          <p class="empty">
+            No payments yet.
+            @if (t.match?.text) { Anything named “{{ t.match!.text }}” near {{ money(t.payment) }} will show up here. }
+            @else { Add “How payments show up” in Edit loan, or link them by hand. }
+          </p>
+        }
+      }
+
+      @if (t.corrections?.length) {
+        @for (c of t.corrections; track c.date) {
+          <div class="row correction">
+            <span class="row-date">{{ formatDate(c.date) }}</span>
+            <span class="row-main">
+              <span class="row-name">Statement balance</span>
+              <span class="row-sub">Entered by you — the balance was reset to this</span>
+            </span>
+            <span class="row-amount">{{ money(c.value) }}</span>
+            <button class="btn-ghost sm" (click)="removeCorrection(c.date)">Remove</button>
+          </div>
+        }
+      }
+    </section>
+
+    @if (o.upcoming.length) {
+      <section class="card list ahead">
+        <div class="list-head">
+          <span class="card-label">Still to come</span>
+          <span class="muted">If each payment is {{ money(t.payment) }}</span>
+        </div>
+        @for (r of upcoming(); track r.n) {
+          <div class="row projected">
+            <span class="row-date">#{{ r.n }}</span>
+            <span class="row-main">
+              <span class="row-name">{{ formatDate(r.date) }}</span>
+              <span class="row-sub">{{ money(r.interest) }} interest · {{ money(r.principal) }} principal · {{ money(r.balance) }} left after</span>
+            </span>
+            <span class="row-amount">{{ money(r.payment) }}</span>
+          </div>
+        }
+        @if (o.upcoming.length > 6) {
+          <button class="show-all" (click)="showAllUpcoming.set(!showAllUpcoming())">
+            {{ showAllUpcoming() ? 'Show fewer' : 'Show all ' + o.upcoming.length }}
+          </button>
+        }
+      </section>
+    }
+
+  </div>
+  }
+  }
+  }
+} @else {
+  <div class="page">
+    <div class="top-bar"><button class="btn-ghost sm" (click)="back()">← Net worth</button></div>
+    <section class="card empty-card">
+      <h2 class="display">This loan <em>isn't here</em>.</h2>
+      <p>It may have been deleted. Head back to Net worth to see what's set up.</p>
+    </section>
+  </div>
+}
+
+<!-- LINK PICKER -->
+<app-modal
+  [open]="!!linking()"
+  [title]="linking() === 'down' ? (lent() ? 'Which transaction sent the money?' : 'Which transaction was the down payment?') : 'Which transaction was a payment?'"
+  size="sm"
+  (closed)="closeLink()">
+  <div class="form">
+    <input class="input-field" type="search" placeholder="Search by name or amount"
+           [ngModel]="linkSearch()" (ngModelChange)="linkSearch.set($event)" name="linkSearch" />
+    @if (!linkSearch()) {
+      <p class="field-hint">
+        {{ linking() === 'down' ? 'Showing money out around ' + formatDate(terms()?.startDate ?? today) + '.' : 'Showing amounts close to ' + money(terms()?.payment ?? 0) + '.' }}
+        Search to see everything.
+      </p>
+    }
+    <div class="pick-list">
+      @for (t of linkOptions(); track t.id) {
+        <button type="button" class="pick" (click)="link(t)">
+          <span class="pick-main">
+            <span class="pick-name">{{ t.merchant || 'Untitled' }}</span>
+            <span class="pick-sub">{{ formatDate(t.date) }}</span>
+          </span>
+          <span class="pick-amount">{{ money(t.amount) }}</span>
+        </button>
+      } @empty {
+        <p class="field-hint">Nothing found.</p>
+      }
+    </div>
+  </div>
+</app-modal>
+
+<!-- STATEMENT BALANCE -->
+<app-modal [open]="correcting()" [title]="lent() ? 'Enter the balance' : 'Enter statement balance'" size="sm" (closed)="correcting.set(false)">
+  <div class="form">
+    <p class="form-note">
+      If {{ lent() ? 'the amount still owed' : 'your lender’s statement' }} differs from what Trackr worked out — lenders that charge interest daily drift a few dollars —
+      enter it here. The balance resets to it on that date, and payments after it carry on from there.
+    </p>
+    <div class="form-grid">
+      <div class="field">
+        <label class="label-sm">{{ lent() ? 'Still owed' : 'Balance owed' }}</label>
+        <div class="input-affix"><span class="affix">$</span>
+          <input class="input-field" type="number" step="0.01" min="0" [(ngModel)]="correctionValue" name="correctionValue" />
+        </div>
+      </div>
+      <div class="field">
+        <label class="label-sm">As of</label>
+        <input class="input-field" type="date" [max]="today" [(ngModel)]="correctionDate" name="correctionDate" />
+      </div>
+    </div>
+  </div>
+  <div class="modal-actions" modal-footer>
+    <div class="actions-right">
+      <button type="button" class="btn-ghost" (click)="correcting.set(false)">Cancel</button>
+      <button type="button" class="btn-primary" (click)="saveCorrection()">Save balance</button>
+    </div>
+  </div>
+</app-modal>
+
+<app-asset-form
+  [open]="formOpen()"
+  [asset]="loan()"
+  [linkedName]="linkedName()"
+  (closed)="formOpen.set(false)"
+  (saved)="handleSave($event)"
+  (deleteRequested)="askDelete()" />
+
+<app-confirm
+  [open]="confirmOpen()"
+  title="Delete this loan?"
+  [message]="(loan()?.name ?? 'It') + ' will be removed, past months included. Its payments stay as normal transactions' + (bought() ? ', and ' + bought()!.name + ' stays in your assets.' : '.')"
+  confirmText="Delete"
+  (confirmed)="confirmDelete()"
+  (cancelled)="confirmOpen.set(false)" />
+
+<app-transaction-view
+  [transaction]="viewingTx()"
+  (closed)="viewingTx.set(null)"
+  (editRequested)="editFromTxView($event)" />
+
+<app-transaction-form
+  [open]="txFormOpen()"
+  [transaction]="editingTx()"
+  (closed)="txFormOpen.set(false)"
+  (saved)="handleTxSave($event)" />

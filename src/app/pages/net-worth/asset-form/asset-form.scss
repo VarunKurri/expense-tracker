@@ -21,3 +21,13 @@
     .btn-ghost { justify-self: end; }
   }
 }
+
+/* "Amount borrowed" when it is worked out from price − down payment. */
+.computed {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+
+  span { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--fg-3); }
+}

@@ -1,0 +1,306 @@
+/* Same reading width as an account's or a budget's detail page. */
+.page {
+  padding: 28px 32px 48px;
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+.hero {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  &.behind { border-color: color-mix(in srgb, var(--amber) 40%, var(--line)); }
+}
+
+.hero-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hero-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.hero-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+
+.hero-name {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+.tag {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+
+.hero-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+
+  .num-display { font-size: 44px; }
+  .hero-of { font-size: 15px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+}
+
+/* Repaid so far — positive progress, one hue. */
+.bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+  overflow: hidden;
+
+  .bar-fill { height: 100%; border-radius: inherit; background: var(--teal); transition: width 0.4s ease; }
+}
+
+.bar-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-sentence {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg-2);
+
+  &.alert { color: var(--fg); }
+}
+
+/* ── Numbers ──────────────────────────────────────────────── */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.stat {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.stat-sub { font-size: 12px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+
+.cost {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--fg-2); font-variant-numeric: tabular-nums; }
+  strong { color: var(--fg); font-weight: 600; }
+}
+
+.cost-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  &.plain { justify-content: flex-end; }
+  .muted { font-size: 12.5px; color: var(--fg-3); margin-right: auto; }
+}
+
+/* ── Payment lists ────────────────────────────────────────── */
+.list { overflow: hidden; }
+
+.list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 12px 20px;
+  border-bottom: 1px solid var(--line);
+
+  .muted { font-size: 12px; color: var(--fg-3); }
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 0 0;
+  border-bottom: 1px solid var(--line);
+
+  &:last-child { border-bottom: 0; }
+  > .row-date, > .row-main { padding-top: 11px; padding-bottom: 11px; }
+  > .row-date { padding-left: 20px; }
+  > .row-amount { margin-left: auto; }
+
+  /* Due but not found: the one thing on the page that needs you. */
+  &.missed {
+    background: color-mix(in srgb, var(--amber) 8%, transparent);
+    .row-name { color: var(--fg); }
+  }
+
+  &.correction .row-name { color: var(--fg-2); }
+}
+
+/* Clicking a payment opens the shared transaction view. */
+.row-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 8px 11px 20px;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover { background: var(--accent-bg); }
+  &:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+}
+
+.row-date {
+  width: 44px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.missed .row-date, .correction .row-date { width: auto; min-width: 90px; }
+
+.row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.row-name { font-size: 13.5px; font-weight: 500; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-sub { font-size: 12px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.row-amount { font-size: 13.5px; font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* What hasn't happened yet: the forecast treatment, so it never reads as real. */
+.ahead {
+  background: var(--forecast-grad), var(--card-grad);
+
+  .projected {
+    padding-right: 20px;
+    .row-name { font-weight: 400; color: var(--fg-2); }
+    .row-amount { font-weight: 500; color: var(--fg-2); }
+  }
+}
+
+.show-all {
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--fg-2);
+  cursor: pointer;
+
+  &:hover { color: var(--fg); }
+}
+
+.empty {
+  margin: 0;
+  padding: 18px 20px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--fg-3);
+}
+
+.empty-card {
+  padding: 40px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .display { font-size: 28px; margin: 0; color: var(--fg); }
+  p { margin: 0; color: var(--fg-3); font-size: 14px; }
+}
+
+/* ── Link picker ──────────────────────────────────────────── */
+.pick-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:last-child { border-bottom: 0; }
+  &:hover { background: var(--accent-bg); }
+  &:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+}
+
+.pick-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pick-name { font-size: 13.5px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-sub { font-size: 12px; color: var(--fg-3); }
+.pick-amount { font-size: 13.5px; font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .page { padding: 20px 16px 40px; }
+  .hero { padding: 18px 16px; }
+  .hero-figure .num-display { font-size: 34px; }
+  .stats { gap: 8px; }
+  .stat-value { font-size: 17px; }
+  .row-sub { white-space: normal; }
+}

@@ -13,7 +13,8 @@ import { ThemeService } from '../../services/theme.service';
 import { ToastService } from '../../services/toast.service';
 import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Confirm } from '../../components/confirm/confirm';
-import { AssetForm, AssetFormResult } from './asset-form/asset-form';
+import { AssetForm, AssetFormSave } from './asset-form/asset-form';
+import { countsInNetWorth, loanState } from '../../utils/loans';
 import { Holding, RANGES, Range, changeOver, composition, earliestDate, holdingsOn, netWorthSeries, rangeDates } from '../../utils/net-worth';
 import { localDateString, parseLocalDate } from '../../utils/date';
 import { chartColors } from '../../utils/theme-colors';
@@ -117,6 +118,29 @@ export class NetWorth implements OnDestroy {
       { kind: 'liability', label: 'Liabilities', total: c.liabilities, groups: c.liabilityGroups },
     ];
   });
+
+  /**
+   * Loans repaid to you on someone else's behalf (Dad lent it, the friend pays
+   * you). Followed here so you can find them, but not part of your net worth.
+   */
+  tracked = computed(() => {
+    const txs = this.txs();
+    return this.manual()
+      .filter(m => m.loan && !m.archived && !countsInNetWorth(m))
+      .map(m => {
+        const s = loanState(m, txs, this.today);
+        return { id: m.id!, name: m.name, owed: s.owed, made: s.paymentsMade, of: m.loan!.termMonths };
+      });
+  });
+
+  /** "4 of 60 payments" under each loan in the lists. */
+  loanProgress(h: Holding): string | null {
+    if (h.kind !== 'manual') return null;
+    const m = this.manual().find(x => x.id === h.id);
+    if (!m?.loan) return null;
+    const s = loanState(m, this.txs(), this.today);
+    return `${s.paymentsMade} of ${m.loan.termMonths} payments`;
+  }
 
   hasManual = computed(() => this.manual().some(m => !m.archived));
   isEmpty = computed(() => this.now().assets === 0 && this.now().liabilities === 0);
@@ -254,13 +278,16 @@ export class NetWorth implements OnDestroy {
   open(h: Holding) {
     if (h.kind === 'manual') {
       const m = this.manual().find(x => x.id === h.id);
-      if (m) this.openEdit(m);
+      if (m?.loan) this.router.navigate(['/net-worth/loans', m.id]);
+      else if (m) this.openEdit(m);
       return;
     }
     const a = this.accounts().find(x => x.id === h.id);
     if (!a) return;
     this.router.navigate(a.type === 'credit' ? ['/accounts', a.id] : ['/accounts/overview', a.id]);
   }
+
+  openLoan(id: string) { this.router.navigate(['/net-worth/loans', id]); }
 
   // ── Manual entries: add / edit / delete ────────────────────
   formOpen = signal(false);
@@ -272,17 +299,35 @@ export class NetWorth implements OnDestroy {
   openEdit(m: ManualAsset) { this.editing.set(m); this.formOpen.set(true); }
   closeForm() { this.formOpen.set(false); this.editing.set(null); }
 
-  async handleSave(result: AssetFormResult) {
+  async handleSave(save: AssetFormSave) {
     const e = this.editing();
+    const { entry, alsoCreate } = save;
     try {
-      if (e?.id) await this.manualService.update(e.id, result);
-      else await this.manualService.add(result);
-      this.toast.success(`${result.name} saved.`);
+      if (e?.id) {
+        // Clear what the new version doesn't have (e.g. a loan turned into a plain debt).
+        await this.manualService.update(e.id, {
+          loan: undefined, purchase: undefined, depreciationRate: undefined, ...entry,
+        });
+      } else {
+        const id = await this.manualService.add(entry);
+        // A loan that bought a car: add the car and point the two at each other.
+        if (alsoCreate) {
+          const boughtId = await this.manualService.add({ ...alsoCreate, linkedId: id });
+          await this.manualService.update(id, { linkedId: boughtId });
+        }
+      }
+      this.toast.success(alsoCreate ? `${entry.name} and ${alsoCreate.name} added.` : `${entry.name} saved.`);
       this.closeForm();
     } catch {
       this.toast.error('Could not save. Please try again.');
     }
   }
+
+  /** Name of the entry linked to the one being edited (the car a loan bought). */
+  linkedName = computed(() => {
+    const id = this.editing()?.linkedId;
+    return id ? this.manual().find(m => m.id === id)?.name ?? null : null;
+  });
 
   askDelete() {
     this.toDelete.set(this.editing());
@@ -295,7 +340,12 @@ export class NetWorth implements OnDestroy {
   async confirmDelete() {
     const m = this.toDelete();
     try {
-      if (m?.id) await this.manualService.remove(m.id);
+      if (m?.id) {
+        await this.manualService.remove(m.id);
+        // The car stays; it just no longer points at a loan that's gone.
+        const other = m.linkedId && this.manual().find(x => x.id === m.linkedId);
+        if (other && other.id) await this.manualService.update(other.id, { linkedId: undefined });
+      }
     } catch {
       this.toast.error('Could not delete. Please try again.');
     } finally {

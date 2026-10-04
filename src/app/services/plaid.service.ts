@@ -10,6 +10,7 @@ import { TransactionService } from './transaction.service';
 import { ReconciliationService } from './reconciliation.service';
 import { ToastService } from './toast.service';
 import { Account, AccountType } from '../models';
+import { owesMoney } from '../utils/finance';
 import { roundMoney } from '../utils/finance';
 
 /** A linked bank (Plaid item). Metadata is plaintext; the access token is not stored here. */
@@ -47,6 +48,9 @@ interface PlaidAccount {
 function mapPlaidAccountType(type: string, subtype: string | null): AccountType {
   if (type === 'credit') return 'credit';
   if (type === 'investment') return 'investment';
+  // Car loans, mortgages, student loans: a debt. They used to fall through to
+  // 'checking', which counted what you owe as money you have.
+  if (type === 'loan') return 'loan';
   if (type === 'depository') {
     if (subtype === 'savings') return 'savings';
     return 'checking';
@@ -247,10 +251,19 @@ export class PlaidService {
           // using whatever's already synced locally at that moment. Only ever runs
           // once per account (flagged), so it never fights with balance changes the
           // user makes afterward.
-          if (!match.openingBalanceSeeded && a.current_balance != null && match.id) {
+          // A loan account created before 'loan' existed came in as checking. Correct
+          // it, and re-seed its opening balance with the owed-money formula.
+          if (a.type === 'loan' && match.type !== 'loan') {
+            patch.type = 'loan';
+            if (a.current_balance != null && match.id) {
+              patch.openingBalance = roundMoney(a.current_balance + this.txService.balanceForAccount(match.id));
+              patch.openingBalanceSeeded = true;
+            }
+          }
+          if (!match.openingBalanceSeeded && !patch.openingBalanceSeeded && a.current_balance != null && match.id) {
             const txDelta = this.txService.balanceForAccount(match.id);
             patch.openingBalance = roundMoney(
-              match.type === 'credit' ? a.current_balance + txDelta : a.current_balance - txDelta,
+              owesMoney(match.type) ? a.current_balance + txDelta : a.current_balance - txDelta,
             );
             patch.openingBalanceSeeded = true;
           }

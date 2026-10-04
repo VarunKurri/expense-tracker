@@ -48,6 +48,7 @@ export class AccountForm implements OnChanges {
     { value: 'credit',     label: 'Credit Card', defaultIcon: '💳', defaultColor: '#8b5cf6' },
     { value: 'cash',       label: 'Cash',        defaultIcon: '💵', defaultColor: '#22c55e' },
     { value: 'investment', label: 'Investment',  defaultIcon: '📈', defaultColor: '#f59e0b' },
+    { value: 'loan',       label: 'Loan',        defaultIcon: '🏦', defaultColor: '#ef4444' },
   ];
 
   iconOptions = ['🏦', '💳', '💰', '💵', '📈', '🏧', '💼', '🪙', '💴', '💶', '💷', '💸'];

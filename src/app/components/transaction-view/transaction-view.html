@@ -127,6 +127,46 @@
         }
       </div>
     }
+
+    <!-- LOAN — a payment on a loan (or money lent / repaid), on any page. -->
+    @if (loanLink(); as link) {
+      <div class="view-reimburse view-loan">
+        <div class="view-reimburse-head">Loan</div>
+        <div class="reimburse-summary">
+          @if (link.kind === 'down') {
+            {{ link.loan.type === 'loan-given' ? 'Money lent' : 'Down payment' }} for <strong>{{ link.loan.name }}</strong>
+          } @else if (link.split; as sp) {
+            <strong>{{ link.loan.name }}</strong> · payment {{ sp.n }} of {{ link.loan.loan!.termMonths }}
+            <br />{{ formatCurrency(sp.interest) }} interest · {{ formatCurrency(sp.principal) }} principal{{ sp.surplus > 0 ? ' · ' + formatCurrency(sp.surplus) + ' extra' : '' }}
+          } @else {
+            Payment on <strong>{{ link.loan.name }}</strong>
+          }
+        </div>
+        <div class="loan-actions">
+          <button class="reimburse-add" (click)="openLoan(link.loan)">Open loan</button>
+          <button class="reimburse-add" (click)="unlinkFromLoan()">Unlink</button>
+        </div>
+      </div>
+    } @else if (loanOptions().length) {
+      <div class="view-reimburse view-loan">
+        <div class="view-reimburse-head">Loan</div>
+        <p class="reimburse-hint">
+          {{ loanOptions().length === 1 ? 'Part of ' + loanOptions()[0].name + '?' : 'Part of a loan?' }}
+          Link it to track what's paid and what's left.
+        </p>
+        @if (loanOptions().length > 1) {
+          <select class="input-field" [ngModel]="selectedLoan()?.id"
+                  (ngModelChange)="linkLoanId.set($event)" name="linkLoan" aria-label="Which loan">
+            @for (l of loanOptions(); track l.id) { <option [value]="l.id">{{ l.name }}</option> }
+          </select>
+        }
+        <div class="loan-actions">
+          @for (r of loanRoles(); track r.kind) {
+            <button class="reimburse-add" (click)="linkToLoan(r.kind)">+ {{ r.label }}</button>
+          }
+        </div>
+      </div>
+    }
   </div>
 }
 

@@ -200,6 +200,13 @@
   overflow-y: auto;
 }
 
+/* Loan section: the reimbursement card's look, with room for two actions. */
+.view-loan {
+  .loan-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .loan-actions .reimburse-add { flex: 1; }
+  .input-field { margin-bottom: 8px; }
+}
+
 .link-item {
   display: flex;
   align-items: center;
