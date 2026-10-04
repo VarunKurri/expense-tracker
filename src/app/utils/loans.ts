@@ -244,6 +244,8 @@ export interface LoanState {
    * or a statement balance. What "4 of 60 payments" and missed months count against.
    */
   covered: number;
+  /** Installments whose interest has been charged (by due date or by an early payment). */
+  accruedThrough: number;
   principalPaid: number;
   interestPaid: number;
   totalPaid: number;
@@ -308,12 +310,31 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
   let settlePoint = startAt && assumed > 0 ? startAt : null;
   let paymentsSinceSettle = 0;
 
+  // Interest is charged per installment, once — when its due date arrives or
+  // when a payment is applied to it, whichever comes first. So a payment that
+  // lands a few days early splits exactly like it would on the day (as an EMI
+  // table has it), while a missed month still builds up interest on its date.
+  let accruedThrough = assumed;   // installments whose interest is already charged
+  let nextInstallment = assumed;  // the installment the next payment pays
+  const charge = (k: number) => {
+    if (k < accruedThrough) return;
+    if (principalLeft > 0 && (k < terms.termMonths || terms.method === 'reducing')) {
+      interestDue = round2(interestDue + periodInterest(terms, principalLeft));
+    }
+    accruedThrough = k + 1;
+  };
+  const duesUpTo = (date: string) => {
+    let n = 0;
+    while (n < terms.termMonths && dueDate(terms.firstPaymentDate, n) <= date) n++;
+    return n;
+  };
+
   for (const e of events) {
     if (e.kind === 'due') {
-      if (principalLeft > 0 && (e.index < terms.termMonths || terms.method === 'reducing')) {
-        interestDue = round2(interestDue + periodInterest(terms, principalLeft));
-      }
+      charge(e.index);
     } else if (e.kind === 'pay') {
+      charge(nextInstallment);
+      nextInstallment++;
       const amount = e.tx.amount;
       const toInterest = Math.min(amount, interestDue);
       const toPrincipal = Math.min(principalLeft, round2(amount - toInterest));
@@ -331,20 +352,19 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
       interestDue = 0;
       settlePoint = e.date;
       paymentsSinceSettle = 0;
+      const settled = duesUpTo(e.date);
+      accruedThrough = Math.max(accruedThrough, settled);
+      nextInstallment = Math.max(nextInstallment, settled);
     }
   }
 
   const paymentsMade = assumed + splits.length;
   let covered = paymentsMade;
-  if (settlePoint) {
-    let duesAtSettle = 0;
-    while (duesAtSettle < terms.termMonths && dueDate(terms.firstPaymentDate, duesAtSettle) <= settlePoint) duesAtSettle++;
-    covered = Math.max(paymentsMade, duesAtSettle + paymentsSinceSettle);
-  }
+  if (settlePoint) covered = Math.max(paymentsMade, duesUpTo(settlePoint) + paymentsSinceSettle);
 
   return {
     principalLeft, interestDue, owed: round2(principalLeft + interestDue),
-    paymentsMade, assumedPayments: assumed, covered,
+    paymentsMade, assumedPayments: assumed, covered, accruedThrough,
     principalPaid, interestPaid, totalPaid, downPayment, splits,
   };
 }
@@ -390,9 +410,6 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
   let principalLeft = now.principalLeft;
   let interestDue = now.interestDue;
 
-  // Due dates already passed — their interest is already in `interestDue`.
-  let duesPassed = 0;
-  while (duesPassed < terms.termMonths * 2 && dueDate(terms.firstPaymentDate, duesPassed) <= today) duesPassed++;
 
   // Due dates whose window has closed: a payment for them is now missed. Counted
   // against payments made, so a payment on the 2nd covers the 25th before it,
@@ -417,8 +434,8 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
   const upcoming: ScheduleRow[] = [];
   const accrues = (i: number) => principalLeft > 0 && (i < terms.termMonths || terms.method === 'reducing');
 
-  // Paid ahead: due dates already covered still charge their interest.
-  for (let i = duesPassed; i < nextIndex; i++) {
+  // Installments already covered whose interest hasn't been charged yet.
+  for (let i = now.accruedThrough; i < nextIndex; i++) {
     if (accrues(i)) {
       const interest = periodInterest(terms, principalLeft);
       interestDue = round2(interestDue + interest);
@@ -431,7 +448,7 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
   // Anything missed is folded into what's owed and paid off along the way.
   let due = nextIndex;
   while ((principalLeft > 0.004 || interestDue > 0.004) && due < terms.termMonths * 3) {
-    if (due >= duesPassed && accrues(due)) {
+    if (due >= now.accruedThrough && accrues(due)) {
       const i = periodInterest(terms, principalLeft);
       interestDue = round2(interestDue + i);
       futureInterest = round2(futureInterest + i);

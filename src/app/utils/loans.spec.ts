@@ -402,3 +402,83 @@ describe('a loan that started before Trackr could see it', () => {
     expect(loanState(l, [], today).owed).toBe(7300);
   });
 });
+
+describe('early, late and on-time payments split like an EMI table', () => {
+  // Vishal: $17,095.42 at 5%, 24 months, first due Aug 24 2025, paid on schedule
+  // through Jan 1 2026, then tracked payments of $750 from Jan 2026 to Sep 2026.
+  const terms = (): LoanTerms => ({
+    method: 'reducing', startDate: '2025-07-24', amountFinanced: 17095.42, rate: 5, termMonths: 24,
+    firstPaymentDate: '2025-08-24', payment: 750, match: { text: 'vishal' }, paymentIds: [], ignoredIds: [],
+    dueMode: 'flexible', lateDays: 10, settledThrough: '2026-01-01',
+  });
+  const vishal = (): ManualAsset => ({ id: 'v', name: 'Vishal', type: 'loan-given', valuations: [], createdAt: 0, updatedAt: 0, loan: terms() });
+  const pay = (date: string) => tx({ type: 'income', merchant: 'Zelle from Vishal', amount: 750, date });
+
+  /** The textbook table, worked out on its own: interest = balance × r, rounded per row. */
+  function table(n: number) {
+    let b = 17095.42, interest = 0;
+    for (let k = 0; k < n; k++) {
+      const i = Math.round(b * (0.05 / 12) * 100) / 100;
+      b = Math.round((b - (750 - i)) * 100) / 100;
+      interest += i;
+    }
+    return { balance: b, interest: Math.round(interest * 100) / 100 };
+  }
+
+  const onTime = ['2026-01-24', '2026-02-24', '2026-03-24', '2026-04-24', '2026-05-24', '2026-06-24', '2026-07-24', '2026-08-24', '2026-09-24'];
+  // Same months, some early (22nd, 23rd) and some late (26th, 2nd of next month).
+  const mixed = ['2026-01-22', '2026-02-26', '2026-03-23', '2026-05-02', '2026-05-24', '2026-06-21', '2026-07-26', '2026-08-23', '2026-09-28'];
+
+  it('on time: matches the table — $7,330.92 after 14 (Gemini: $7,330.95)', () => {
+    const s = loanState(vishal(), onTime.map(pay), '2026-10-04');
+    expect(s.paymentsMade).toBe(14);
+    expect(s.principalLeft).toBe(table(14).balance);
+    expect(s.principalLeft).toBe(7330.92);
+    expect(s.interestPaid).toBe(table(14).interest);
+  });
+
+  it('a payment a few days early or late changes nothing', () => {
+    const a = loanState(vishal(), onTime.map(pay), '2026-10-04');
+    const b = loanState(vishal(), mixed.map(pay), '2026-10-04');
+    expect(b.principalLeft).toBe(a.principalLeft);
+    expect(b.interestPaid).toBe(a.interestPaid);
+    expect(b.splits.map(x => [x.interest, x.principal])).toEqual(a.splits.map(x => [x.interest, x.principal]));
+  });
+
+  it('payment #14 splits $33.53 interest / $716.47 principal, as in the table', () => {
+    const s = loanState(vishal(), mixed.map(pay), '2026-10-04');
+    expect(s.splits[s.splits.length - 1]).toMatchObject({ n: 14, interest: 33.53, principal: 716.47 });
+  });
+
+  it('the rest of the loan agrees with the table too', () => {
+    const o = loanOutlook(vishal(), mixed.map(pay), '2026-10-04');
+    expect(o.paymentsLeft).toBe(10);
+    expect(o.nextDue).toBe('2026-10-24');
+    const all = schedule(terms());
+    const tableInterest = all.reduce((sum, r) => sum + r.interest, 0);
+    expect(Math.abs(o.lifetimeInterest - tableInterest)).toBeLessThan(0.05);
+  });
+
+  it('a missed month still costs interest; catching up pays both installments', () => {
+    const missed = onTime.filter(d => d !== '2026-03-24');
+    const behind = loanState(vishal(), missed.map(pay), '2026-04-30');
+    const fine = loanState(vishal(), onTime.map(pay), '2026-04-30');
+    // April's payment clears March's interest and April's first, so more principal is left.
+    expect(behind.principalLeft).toBeGreaterThan(fine.principalLeft);
+    // March's payment arrives late, alongside April's.
+    const caughtUp = loanState(vishal(), [...missed, '2026-04-28'].map(pay), '2026-10-04');
+    // A whole month late costs one month's interest on March's principal (~$3) —
+    // unlike a payment a few days off, which costs nothing.
+    expect(caughtUp.paymentsMade).toBe(14);
+    expect(caughtUp.principalLeft).toBeGreaterThan(7330.92);
+    expect(caughtUp.principalLeft - 7330.92).toBeLessThan(4);
+  });
+
+  it('paying ahead counts as the next installment, charged once', () => {
+    const ahead = loanState(vishal(), [...onTime, '2026-09-30'].map(pay), '2026-10-04');
+    expect(ahead.paymentsMade).toBe(15);
+    expect(ahead.principalLeft).toBe(table(15).balance);
+    const o = loanOutlook(vishal(), [...onTime, '2026-09-30'].map(pay), '2026-10-04');
+    expect(o.nextDue).toBe('2026-11-24');
+  });
+});
