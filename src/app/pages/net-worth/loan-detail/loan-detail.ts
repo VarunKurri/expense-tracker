@@ -12,7 +12,7 @@ import { TransactionForm } from '../../transactions/transaction-form/transaction
 import { AssetForm, AssetFormSave } from '../asset-form/asset-form';
 import { Transaction } from '../../../models';
 import {
-  LoanPayment, candidatePayments, countsInNetWorth, loanDirection, loanOutlook, loanPayments, loanState,
+  LoanPayment, candidatePayments, dueModeOf, countsInNetWorth, loanDirection, loanOutlook, loanPayments, loanState,
 } from '../../../utils/loans';
 import { entryValueOn, manualType, withValuation } from '../../../utils/net-worth';
 import { localDateString, parseLocalDate } from '../../../utils/date';
@@ -96,10 +96,21 @@ export class LoanDetail {
         : `${months.length} payments`;
       return `${which} ${one ? "hasn't" : "haven't"} shown up yet. If ${one ? 'it was' : 'they were'} ${verb}, link ${one ? 'it' : 'them'} below.`;
     }
-    if (s.paymentsMade === 0 && o.nextDue) return `No payments yet. The first ${this.lent() ? 'is due to arrive' : 'is due'} ${this.formatDate(o.nextDue)}.`;
-    return o.nextDue
-      ? `On track. Next payment of ${this.money(t.payment)} is due ${this.formatDate(o.nextDue)}.`
-      : 'On track.';
+    const mode = dueModeOf(t);
+    if (mode === 'none') {
+      const pace = o.payoffDate ? ` At this pace, ${this.lent() ? 'repaid' : 'paid off'} around ${this.monthYear(o.payoffDate)}.` : '';
+      return `${s.paymentsMade} of ${t.termMonths} payments ${this.lent() ? 'in' : 'made'} so far, roughly monthly.${pace}`;
+    }
+    if (!o.nextDue) return 'On track.';
+    // Due date passed but still inside its window: on its way, not missed.
+    if (o.nextIsLate) {
+      return `${this.monthName(o.nextDue)}'s payment is on its way — expected by ${this.formatDate(o.nextDueBy!)}.`;
+    }
+    const when = mode === 'flexible'
+      ? `expected around ${this.formatDate(o.nextDue)} (by ${this.formatDate(o.nextDueBy!)})`
+      : `due ${this.formatDate(o.nextDue)}`;
+    if (s.paymentsMade === 0) return `No payments yet. The first is ${when}.`;
+    return `On track. Next payment of ${this.money(t.payment)} is ${when}.`;
   });
 
   /** What it bought, and what that's worth now — the other side of the loan. */
@@ -316,6 +327,27 @@ export class LoanDetail {
 
   monthName(d: string) {
     return parseLocalDate(d).toLocaleDateString('en-US', { month: 'long' });
+  }
+
+  /** How an upcoming row names its date: exact, "around", or just the month. */
+  dueLabel(date: string): string {
+    const t = this.terms();
+    const mode = t ? dueModeOf(t) : 'exact';
+    if (mode === 'none') return `~${this.monthYear(date)}`;
+    return mode === 'flexible' ? `Around ${this.formatDate(date)}` : this.formatDate(date);
+  }
+
+  /** "Varies (up to 10 days late)", "No set day", or nothing for an exact day. */
+  timingLabel(): string {
+    const t = this.terms();
+    if (!t) return '';
+    const mode = dueModeOf(t);
+    if (mode === 'flexible') return `Varies (up to ${t.lateDays ?? 10} days late)`;
+    return mode === 'none' ? 'No set day' : '';
+  }
+
+  monthYear(d: string) {
+    return parseLocalDate(d).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   }
 
   methodLabel(): string {

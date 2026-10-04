@@ -31,3 +31,6 @@
 
   span { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--fg-3); }
 }
+
+/* "10  days late" — a short number with a longer unit. */
+.late { max-width: 220px; > .input-field { padding-right: 84px; } }

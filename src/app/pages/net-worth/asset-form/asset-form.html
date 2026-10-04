@@ -126,16 +126,43 @@
           </div>
         </div>
 
+        <div class="field">
+          <label class="label-sm">Payment date</label>
+          <div class="mini-seg">
+            <button type="button" [class.active]="dueMode === 'exact'" (click)="dueMode = 'exact'">Exact day</button>
+            <button type="button" [class.active]="dueMode === 'flexible'" (click)="dueMode = 'flexible'">Varies</button>
+            <button type="button" [class.active]="dueMode === 'none'" (click)="dueMode = 'none'">No set day</button>
+          </div>
+          <p class="field-hint">
+            @switch (dueMode) {
+              @case ('exact') { Paid on the same day each month, like bank autopay. }
+              @case ('flexible') { Usually around one day, sometimes a little later — e.g. around the 25th, sometimes the 2nd of next month. }
+              @case ('none') { Roughly monthly, whenever it suits. Trackr won't flag a payment as missed. }
+            }
+          </p>
+        </div>
+
         <div class="form-grid">
           <div class="field">
             <label class="label-sm">{{ isLent ? 'Lent on' : 'Loan started' }}</label>
             <input class="input-field" type="date" [max]="today" [(ngModel)]="startDate" (ngModelChange)="onStartChange()" name="startDate" />
           </div>
           <div class="field">
-            <label class="label-sm">First payment</label>
+            <label class="label-sm">{{ dueMode === 'exact' ? 'First payment' : dueMode === 'flexible' ? 'First payment, around' : 'Payments start around' }}</label>
             <input class="input-field" type="date" [(ngModel)]="firstPaymentDate" name="firstPaymentDate" />
           </div>
         </div>
+
+        @if (dueMode === 'flexible') {
+          <div class="field">
+            <label class="label-sm">Can arrive up to</label>
+            <div class="input-affix suffix late">
+              <input class="input-field" type="number" min="0" max="27" step="1" [(ngModel)]="lateDays" name="lateDays" />
+              <span class="affix">days late</span>
+            </div>
+            <p class="field-hint">A payment counts as missed only after this. Early payments always count.</p>
+          </div>
+        }
 
         <div class="field">
           <label class="label-sm">Monthly payment (EMI)</label>

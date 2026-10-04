@@ -46,6 +46,16 @@ export interface LoanTerms {
   rate: number;
   termMonths: number;
   firstPaymentDate: string;
+  /**
+   * When payments arrive.
+   * - exact: on the due day (bank autopay) — missed after 5 days.
+   * - flexible: around the due day, sometimes later — missed after `lateDays`.
+   * - none: no set day, roughly monthly — never flagged as missed.
+   * Absent means exact.
+   */
+  dueMode?: 'exact' | 'flexible' | 'none';
+  /** For flexible: how many days late a payment can be before it counts as missed. */
+  lateDays?: number;
   /** The monthly payment (EMI). Calculated, but editable to match the lender's figure. */
   payment: number;
   /** Payments are recognised automatically when the merchant or notes contain this. */

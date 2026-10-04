@@ -87,6 +87,8 @@ export class AssetForm implements OnChanges {
   startDate = this.today;
   firstPaymentDate = '';
   payment: number | null = null;
+  dueMode: 'exact' | 'flexible' | 'none' = 'exact';
+  lateDays: number | null = 10;
   /** Set once you type your own payment; until then it follows the terms. */
   paymentEdited = false;
   matchText = '';
@@ -127,6 +129,8 @@ export class AssetForm implements OnChanges {
     this.startDate = l?.startDate ?? (first && !l ? first.date : this.today);
     this.firstPaymentDate = l?.firstPaymentDate ?? this.oneMonthAfter(this.startDate);
     this.payment = l?.payment ?? null;
+    this.dueMode = l?.dueMode ?? (this.type === 'loan-given' ? 'flexible' : 'exact');
+    this.lateDays = l?.lateDays ?? 10;
     this.paymentEdited = !!l && l.payment !== this.calculatedPayment;
     this.matchText = l?.match?.text ?? '';
     this.matchAccountId = l?.match?.accountId ?? '';
@@ -144,6 +148,8 @@ export class AssetForm implements OnChanges {
 
   onTypeChange() {
     if (this.losesValue && !this.asset) this.depreciate = defaultDepreciation(this.type) > 0;
+    // Money lent between people rarely lands on the same day each month.
+    if (!this.existingLoan) this.dueMode = this.type === 'loan-given' ? 'flexible' : 'exact';
   }
 
   get namePlaceholder(): string {
@@ -236,10 +242,12 @@ export class AssetForm implements OnChanges {
       rate: this.method === 'none' ? 0 : Number(this.rate) || 0,
       termMonths: Number(this.termMonths) || 0,
       firstPaymentDate: this.firstPaymentDate || this.oneMonthAfter(this.startDate),
+      dueMode: this.dueMode,
       payment: this.effectivePayment,
       paymentIds: this.existingLoan?.paymentIds ?? [],
       ignoredIds: this.existingLoan?.ignoredIds ?? [],
     };
+    if (this.dueMode === 'flexible') terms.lateDays = Math.max(0, Math.round(Number(this.lateDays) || 0));
     if (this.isLent) terms.owedTo = this.owedTo;
     if (this.counterparty.trim()) terms.counterparty = this.counterparty.trim();
     if (this.price && this.price > 0) terms.price = Number(this.price);
@@ -307,6 +315,10 @@ export class AssetForm implements OnChanges {
     if (!this.startDate || this.startDate > this.today) { this.toast.error('Pick when the loan started (not in the future).'); return; }
     if (terms.firstPaymentDate < this.startDate) { this.toast.error('The first payment can\'t be before the loan starts.'); return; }
     if (!(terms.payment > 0)) { this.toast.error('Enter the monthly payment.'); return; }
+    if (this.dueMode === 'flexible' && !(Number(this.lateDays) >= 0 && Number(this.lateDays) <= 27)) {
+      this.toast.error('Enter how many days late a payment can be (0–27).');
+      return;
+    }
 
     // A loan's balance comes from its terms and payments; old plain values don't apply.
     const entry: AssetFormResult = { name, type: this.type, valuations: [], loan: terms };

@@ -229,4 +229,69 @@ describe('Loans', () => {
     await settle();
     expect(TestBed.inject(Router).url).toBe('/net-worth/loans/loan');
   });
+
+  // ── Payments that don't land on the same day ───────────────
+  /** A due date a few days ago (day ≤ 28, so "a month earlier" always exists). */
+  function recentDue(): { due: string; first: string } {
+    const d = new Date();
+    d.setDate(d.getDate() - 3);
+    while (d.getDate() > 28) d.setDate(d.getDate() - 1);
+    const first = new Date(d.getFullYear(), d.getMonth() - 1, d.getDate());
+    return { due: localDateString(d), first: localDateString(first) };
+  }
+  const lent = (over: Partial<NonNullable<ManualAsset['loan']>>): ManualAsset => ({
+    id: 'lent', name: 'Loan to Ravi', type: 'loan-given', valuations: [], createdAt: 1, updatedAt: 1,
+    loan: {
+      owedTo: 'me', method: 'none', startDate: monthsAgo(3), amountFinanced: 2400, rate: 0, termMonths: 24,
+      firstPaymentDate: monthsAgo(1), payment: 100, match: { text: 'ravi' }, paymentIds: [], ignoredIds: [],
+      ...over,
+    },
+  });
+  const fromRavi = (id: string, date: string): Transaction =>
+    ({ id, type: 'income', amount: 100, date, merchant: 'Zelle from Ravi', accountId: 'chk', createdAt: 0, updatedAt: 0 } as Transaction);
+
+  it('a payment a few days past its date is "on its way", not missed, when dates vary', async () => {
+    const { first } = recentDue();
+    await setup([lent({ firstPaymentDate: first, startDate: monthsAgo(3), dueMode: 'flexible', lateDays: 10 })],
+      [fromRavi('r1', first)], '/net-worth/loans/lent');
+    expect(el.querySelector('.row.missed')).toBeNull();
+    expect(el.querySelector('.hero-sentence')!.textContent).toContain('is on its way');
+    expect(el.querySelector('.bar-labels')!.textContent).toContain('Varies (up to 10 days late)');
+    const firstUpcoming = el.querySelector('.ahead .row-name')!.textContent!;
+    expect(firstUpcoming).toContain('Around');
+    expect(firstUpcoming).toContain('on its way');
+  });
+
+  it('the same payment on an exact-day loan is flagged once its 5 days pass', async () => {
+    const d = new Date(); d.setDate(d.getDate() - 8);
+    while (d.getDate() > 28) d.setDate(d.getDate() - 1);
+    const first = localDateString(new Date(d.getFullYear(), d.getMonth() - 1, d.getDate()));
+    await setup([lent({ firstPaymentDate: first, dueMode: 'exact' })], [fromRavi('r1', first)], '/net-worth/loans/lent');
+    expect(el.querySelector('.row.missed')).not.toBeNull();
+  });
+
+  it('with no set day, nothing is ever flagged', async () => {
+    await setup([lent({ firstPaymentDate: monthsAgo(6), startDate: monthsAgo(7), dueMode: 'none' })],
+      [fromRavi('r1', monthsAgo(5))], '/net-worth/loans/lent');
+    expect(el.querySelector('.row.missed')).toBeNull();
+    expect(el.querySelector('.hero-sentence')!.textContent).toContain('1 of 24 payments in so far, roughly monthly');
+  });
+
+  it('money lent defaults to "Varies", and the form saves the window', async () => {
+    await setup([], [], '/net-worth');
+    button('+ Add asset or debt').click();
+    await settle();
+    fill('select[name=type]', 'loan-given');
+    await settle();
+    fill('input[name=name]', 'Loan to Ravi');
+    button('No interest', document.querySelector('app-asset-form')!).click();
+    fill('input[name=amount]', '2400');
+    fill('input[name=startDate]', monthsAgo(1));
+    await settle();
+    fill('input[name=lateDays]', '8');
+    await settle();
+    button('Add', document.querySelector('app-asset-form')!).click();
+    await settle();
+    expect(manual.items()[0].loan).toMatchObject({ dueMode: 'flexible', lateDays: 8, method: 'none', amountFinanced: 2400 });
+  });
 });

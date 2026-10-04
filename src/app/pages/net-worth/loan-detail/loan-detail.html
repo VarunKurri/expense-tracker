@@ -33,7 +33,7 @@
       </div>
       <div class="bar-labels">
         <span>{{ s.paymentsMade }} of {{ t.termMonths }} payments · {{ progress() * 100 | number:'1.0-0' }}% {{ lent() ? 'repaid' : 'paid off' }}</span>
-        <span>{{ methodLabel() }} · {{ money(t.payment) }}/mo</span>
+        <span>{{ methodLabel() }} · {{ money(t.payment) }}/mo{{ timingLabel() ? ' · ' + timingLabel() : '' }}</span>
       </div>
 
       <p class="hero-sentence" [class.alert]="o.behindBy > 0">{{ sentence() }}</p>
@@ -172,7 +172,7 @@
           <div class="row projected">
             <span class="row-date">#{{ r.n }}</span>
             <span class="row-main">
-              <span class="row-name">{{ formatDate(r.date) }}</span>
+              <span class="row-name">{{ dueLabel(r.date) }}{{ $first && o.nextIsLate ? ' · on its way' : '' }}</span>
               <span class="row-sub">{{ money(r.interest) }} interest · {{ money(r.principal) }} principal · {{ money(r.balance) }} left after</span>
             </span>
             <span class="row-amount">{{ money(r.payment) }}</span>

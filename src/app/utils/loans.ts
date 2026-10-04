@@ -99,6 +99,37 @@ export function dueDate(firstPaymentDate: string, k: number): string {
   return localDateString(target);
 }
 
+// ── When payments arrive ─────────────────────────────────────
+
+export type DueMode = 'exact' | 'flexible' | 'none';
+
+export function dueModeOf(terms: LoanTerms): DueMode {
+  return terms.dueMode ?? 'exact';
+}
+
+/**
+ * How many days after a due date a payment can still arrive before it counts
+ * as missed. Bank autopay lands on the day, so a few days covers weekends;
+ * a friend paying "around the 25th" might pay on the 2nd. With no set day,
+ * nothing is ever missed.
+ */
+export function graceDays(terms: LoanTerms): number {
+  switch (dueModeOf(terms)) {
+    case 'flexible': return Math.max(0, terms.lateDays ?? 10);
+    case 'none': return Infinity;
+    default: return 5;
+  }
+}
+
+/** The last day a payment for `due` still counts as on time. */
+export function windowEnd(due: string, terms: LoanTerms): string | null {
+  const g = graceDays(terms);
+  if (!isFinite(g)) return null;
+  const d = parseLocalDate(due);
+  d.setDate(d.getDate() + g);
+  return localDateString(d);
+}
+
 // ── Planned schedule ─────────────────────────────────────────
 
 export interface ScheduleRow {
@@ -295,7 +326,12 @@ export interface LoanOutlook {
   behindBy: number;
   /** Those due dates, oldest first. */
   missedDates: string[];
+  /** The earliest due date no payment has covered yet (and that isn't missed). */
   nextDue: string | null;
+  /** The last day that payment still counts as on time; null with no set day. */
+  nextDueBy: string | null;
+  /** That due date has passed but its window hasn't — the payment is on its way. */
+  nextIsLate: boolean;
   /** The payments still to come, if you keep paying the regular amount. */
   upcoming: ScheduleRow[];
 }
@@ -310,25 +346,48 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
   let principalLeft = now.principalLeft;
   let interestDue = now.interestDue;
 
-  let k = 0;
-  while (k < terms.termMonths * 2 && dueDate(terms.firstPaymentDate, k) <= today) k++;
-  const duesPassed = k;
-  // Allow a few days' grace before calling a payment missed.
-  const graceCutoff = localDateString(new Date(parseLocalDate(today).getTime() - 5 * 86_400_000));
-  let duesOverdue = 0;
-  while (duesOverdue < terms.termMonths && dueDate(terms.firstPaymentDate, duesOverdue) <= graceCutoff) duesOverdue++;
-  const behindBy = Math.max(0, Math.min(duesOverdue, terms.termMonths) - now.paymentsMade);
+  // Due dates already passed — their interest is already in `interestDue`.
+  let duesPassed = 0;
+  while (duesPassed < terms.termMonths * 2 && dueDate(terms.firstPaymentDate, duesPassed) <= today) duesPassed++;
 
+  // Due dates whose window has closed: a payment for them is now missed. Counted
+  // against payments made, so a payment on the 2nd covers the 25th before it,
+  // and two payments in one month cover two due dates.
+  let duesClosed = 0;
+  while (duesClosed < terms.termMonths) {
+    const end = windowEnd(dueDate(terms.firstPaymentDate, duesClosed), terms);
+    if (end === null || end >= today) break;
+    duesClosed++;
+  }
+  const behindBy = Math.max(0, duesClosed - now.paymentsMade);
   const missedDates: string[] = [];
-  for (let i = now.paymentsMade; i < Math.min(duesOverdue, terms.termMonths); i++) missedDates.push(dueDate(terms.firstPaymentDate, i));
+  for (let i = now.paymentsMade; i < duesClosed; i++) missedDates.push(dueDate(terms.firstPaymentDate, i));
+
+  // The next payment expected: the first due date not covered by a payment and not missed.
+  const nextIndex = Math.max(now.paymentsMade, duesClosed);
+  const owing = now.owed > 0.004;
+  const nextDue = owing && nextIndex < terms.termMonths ? dueDate(terms.firstPaymentDate, nextIndex) : null;
 
   let leftToPay = 0, futureInterest = 0, paymentsLeft = 0;
   let payoffDate: string | null = null;
   const upcoming: ScheduleRow[] = [];
-  let due = duesPassed;
-  // Pay off anything already overdue on the next due date too.
+  const accrues = (i: number) => principalLeft > 0 && (i < terms.termMonths || terms.method === 'reducing');
+
+  // Paid ahead: due dates already covered still charge their interest.
+  for (let i = duesPassed; i < nextIndex; i++) {
+    if (accrues(i)) {
+      const interest = periodInterest(terms, principalLeft);
+      interestDue = round2(interestDue + interest);
+      futureInterest = round2(futureInterest + interest);
+    }
+  }
+
+  // From the next payment expected — which may be one whose due date has passed
+  // but is still within its window — paying the regular amount each time.
+  // Anything missed is folded into what's owed and paid off along the way.
+  let due = nextIndex;
   while ((principalLeft > 0.004 || interestDue > 0.004) && due < terms.termMonths * 3) {
-    if (principalLeft > 0 && (due < terms.termMonths || terms.method === 'reducing')) {
+    if (due >= duesPassed && accrues(due)) {
       const i = periodInterest(terms, principalLeft);
       interestDue = round2(interestDue + i);
       futureInterest = round2(futureInterest + i);
@@ -357,7 +416,9 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
     behindBy,
     missedDates,
     upcoming,
-    nextDue: duesPassed < terms.termMonths && now.owed > 0.004 ? dueDate(terms.firstPaymentDate, duesPassed) : null,
+    nextDue,
+    nextDueBy: nextDue ? windowEnd(nextDue, terms) : null,
+    nextIsLate: !!nextDue && nextDue < today,
   };
 }
 

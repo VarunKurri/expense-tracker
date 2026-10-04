@@ -250,3 +250,84 @@ describe('the rows ahead', () => {
     expect(o.missedDates).toEqual(['2026-09-05', '2026-10-05']);
   });
 });
+
+describe('payments that don\'t arrive on a fixed day', () => {
+  // Lent $2,400, no interest, $100 a month "around the 25th" — sometimes the 24th,
+  // sometimes the 26th, sometimes the 1st or 2nd of the next month.
+  const lending = (over: Partial<LoanTerms> = {}) => loan({
+    method: 'none', rate: 0, amountFinanced: 2400, termMonths: 24, payment: 100,
+    startDate: '2026-08-20', firstPaymentDate: '2026-09-25', match: { text: 'ravi' },
+    dueMode: 'flexible', lateDays: 10, ...over,
+  }, 'loan-given');
+  const repay = (date: string) => tx({ type: 'income', merchant: 'Zelle from Ravi', amount: 100, date });
+
+  it('a payment on the 2nd still counts for the 25th before it', () => {
+    const txs = [repay('2026-09-24'), repay('2026-10-26'), repay('2026-12-02')];
+    for (const day of ['2026-10-28', '2026-11-30', '2026-12-06']) {
+      const o = loanOutlook(lending(), txs.filter(t => t.date <= day), day);
+      expect(o.behindBy).toBe(0);
+    }
+  });
+
+  it('waits for the window before calling a payment missed', () => {
+    const txs = [repay('2026-09-24'), repay('2026-10-26')];
+    // November's is due around Nov 25, and may arrive up to Dec 5.
+    expect(loanOutlook(lending(), txs, '2026-12-05').behindBy).toBe(0);
+    const missed = loanOutlook(lending(), txs, '2026-12-06');
+    expect(missed.behindBy).toBe(1);
+    expect(missed.missedDates).toEqual(['2026-11-25']);
+  });
+
+  it('on its way: the next payment is the unpaid one, not next month\'s', () => {
+    const o = loanOutlook(lending(), [repay('2026-09-24')], '2026-10-28');
+    expect(o.nextDue).toBe('2026-10-25');
+    expect(o.nextDueBy).toBe('2026-11-04');
+    expect(o.nextIsLate).toBe(true);
+    expect(o.upcoming[0].date).toBe('2026-10-25');
+  });
+
+  it('two payments in one month cover two due dates', () => {
+    // October's arrives Nov 1, November's on Nov 26.
+    const txs = [repay('2026-09-24'), repay('2026-11-01'), repay('2026-11-26')];
+    const o = loanOutlook(lending(), txs, '2026-12-01');
+    expect(o.behindBy).toBe(0);
+    expect(o.nextDue).toBe('2026-12-25');
+    expect(o.nextIsLate).toBe(false);
+  });
+
+  it('the same dates on an exact-day loan flag the late one until it arrives', () => {
+    const exact = lending({ dueMode: 'exact' });
+    const txs = [repay('2026-09-24'), repay('2026-10-26')];
+    expect(loanOutlook(exact, txs, '2026-12-01').missedDates).toEqual(['2026-11-25']);
+    expect(loanOutlook(exact, [...txs, repay('2026-12-02')], '2026-12-02').behindBy).toBe(0);
+  });
+
+  it('with no set day, nothing is ever missed', () => {
+    const o = loanOutlook(lending({ dueMode: 'none' }), [repay('2026-09-24')], '2027-03-01');
+    expect(o.behindBy).toBe(0);
+    expect(o.nextDueBy).toBeNull();
+    expect(o.upcoming).toHaveLength(23); // still projected monthly
+  });
+
+  it('the payments still to come always add up to the rest of the term', () => {
+    for (const day of ['2026-09-01', '2026-10-28', '2026-11-30']) {
+      const txs = [repay('2026-09-24'), repay('2026-10-26')].filter(t => t.date <= day);
+      const o = loanOutlook(lending(), txs, day);
+      const made = loanState(lending(), txs, day).paymentsMade;
+      expect(made + o.paymentsLeft).toBe(24);
+      expect(o.leftToPay).toBe(2400 - made * 100);
+    }
+  });
+
+  it('paying ahead still charges the interest of the months covered', () => {
+    // An interest loan, November paid early on Oct 30.
+    const l = loan({ dueMode: 'flexible' });
+    const txs = [tx({ date: '2026-08-05' }), tx({ date: '2026-09-05' }), tx({ date: '2026-10-05' }), tx({ date: '2026-10-30' })];
+    const ahead = loanOutlook(l, txs, '2026-10-31');
+    const onTime = loanOutlook(l, txs.slice(0, 3), '2026-10-31');
+    expect(ahead.nextDue).toBe('2026-12-05');
+    expect(ahead.paymentsLeft).toBe(onTime.paymentsLeft - 1);
+    // Same loan, same payments in the end — the lifetime interest barely moves.
+    expect(Math.abs(ahead.lifetimeInterest - onTime.lifetimeInterest)).toBeLessThan(5);
+  });
+});
