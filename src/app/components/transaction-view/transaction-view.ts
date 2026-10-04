@@ -152,9 +152,11 @@ export class TransactionView {
   linkLoanId = signal('');
 
   /** The loan picked in the Loan section (the only one, if there's just one). */
-  selectedLoan = computed(() => {
+  selectedLoan = computed<ManualAsset | null>(() => {
     const opts = this.loanOptions();
-    return opts.find(l => l.id === this.linkLoanId()) ?? opts[0] ?? null;
+    // Typed with null on purpose: with no loans the list is empty, and opts[0]
+    // would be undefined even though TypeScript assumes an index always exists.
+    return opts.find(l => l.id === this.linkLoanId()) ?? (opts.length ? opts[0] : null);
   });
 
   /** What this transaction can be on the selected loan. */
