@@ -76,7 +76,7 @@ const LEGACY_KDF_ITERATIONS = 250_000;
 
 const ENCRYPTION_VERSION = 1;
 const VERIFIER_TEXT = 'trackr-encryption-verifier-v1';
-const COLLECTIONS = ['accounts', 'categories', 'transactions', 'transactionTemplates', 'bills', 'budgets'];
+const COLLECTIONS = ['accounts', 'categories', 'transactions', 'transactionTemplates', 'bills', 'budgets', 'transactionRules', 'manualAssets'];
 
 @Injectable({ providedIn: 'root' })
 export class EncryptionService {

@@ -39,6 +39,17 @@
   .dot { display: none; }
 }
 
+/* "NET WORTH ›" opens the Net worth page — a link that still reads as the eyebrow. */
+.hero-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+
+  &:hover { color: var(--fg); }
+  &:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 3px var(--focus-ring); }
+}
+
 .range-seg {
   display: flex;
   gap: 4px;

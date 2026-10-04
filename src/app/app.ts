@@ -135,6 +135,7 @@ export class App {
   nav = computed((): NavItem[] => [
     { path: '/dashboard',    label: 'Home',         iconName: 'home' },
     { path: '/accounts',     label: 'Accounts',     iconName: 'accounts' },
+    { path: '/net-worth',    label: 'Net worth',    iconName: 'networth' },
     { path: '/transactions', label: 'Transactions', iconName: 'tx' },
     { path: '/bills',        label: 'Bills',        iconName: 'bills',
       // Overdue always counts; "upcoming" only counts a bill due today/tomorrow —

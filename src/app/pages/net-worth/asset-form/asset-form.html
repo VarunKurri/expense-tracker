@@ -1,0 +1,82 @@
+<app-modal
+  [open]="open"
+  [title]="asset ? 'Edit ' + (isDebt ? 'debt' : 'asset') : 'Add asset or debt'"
+  size="sm"
+  (closed)="closed.emit()">
+
+  <div class="form">
+    <div class="field">
+      <label class="label-sm">What is it?</label>
+      <select class="input-field" [(ngModel)]="type" name="type">
+        <optgroup label="Something you own">
+          @for (t of owns; track t.value) {
+            <option [value]="t.value">{{ t.icon }} {{ t.label }}</option>
+          }
+        </optgroup>
+        <optgroup label="Something you owe">
+          @for (t of owes; track t.value) {
+            <option [value]="t.value">{{ t.icon }} {{ t.label }}</option>
+          }
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="label-sm">Name</label>
+      <input class="input-field" [(ngModel)]="name" name="name" [placeholder]="namePlaceholder" />
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label class="label-sm">{{ isDebt ? 'Amount owed' : 'Value' }}</label>
+        <div class="input-affix">
+          <span class="affix">$</span>
+          <input class="input-field" type="number" step="0.01" min="0"
+                 [(ngModel)]="value" name="value" placeholder="0.00" />
+        </div>
+      </div>
+      <div class="field">
+        <label class="label-sm">As of</label>
+        <input class="input-field" type="date" [max]="today" [(ngModel)]="asOf" name="asOf" />
+      </div>
+    </div>
+    <p class="field-hint">
+      {{ asset ? 'A new value is added to the history below; earlier months keep their old value.'
+               : 'It counts toward your net worth from this date on.' }}
+    </p>
+
+    @if (asset && history.length) {
+      <div class="form-section">
+        <span class="form-section-title">Value history</span>
+        <ul class="history">
+          @for (v of history; track v.date) {
+            <li>
+              <span>{{ formatDate(v.date) }}</span>
+              <span class="num">{{ money(v.value) }}</span>
+              @if (history.length > 1) {
+                <button type="button" class="btn-ghost sm" (click)="removeValuation(v)"
+                        [attr.aria-label]="'Remove the ' + formatDate(v.date) + ' value'">Remove</button>
+              }
+            </li>
+          }
+        </ul>
+      </div>
+    }
+
+    <div class="field">
+      <label class="label-sm">Notes <span class="label-optional">(optional)</span></label>
+      <input class="input-field" [(ngModel)]="notes" name="notes"
+             placeholder="e.g. Zillow estimate, 4.2% fixed rate" />
+    </div>
+  </div>
+
+  <div class="modal-actions" modal-footer>
+    @if (asset) {
+      <button type="button" class="btn-danger" (click)="deleteRequested.emit()">Delete</button>
+    }
+    <div class="actions-right">
+      <button type="button" class="btn-ghost" (click)="closed.emit()">Cancel</button>
+      <button type="button" class="btn-primary" (click)="save()">{{ asset ? 'Save changes' : 'Add' }}</button>
+    </div>
+  </div>
+</app-modal>

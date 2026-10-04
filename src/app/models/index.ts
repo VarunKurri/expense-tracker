@@ -5,3 +5,4 @@ export * from './transaction-template.model';
 export * from './transaction-rule.model';
 export * from './bill.model';
 export * from './budget.model';
+export * from './manual-asset.model';

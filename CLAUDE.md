@@ -122,6 +122,7 @@ src/app/
     bills/
     budgets/
     analysis/
+    net-worth/      accounts + manual assets/debts (ManualAsset, dated valuations)
   app.ts            shell with sidebar
   app.html
   app.scss

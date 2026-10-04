@@ -3,10 +3,10 @@
   <!-- HERO -->
   <div class="hero">
     <div class="hero-top">
-      <div class="hero-label">
-        <span class="dot"></span>
-        Net worth
-      </div>
+      <button type="button" class="hero-label hero-link" (click)="navigate('/net-worth')"
+              title="See what your net worth is made of">
+        Net worth ›
+      </button>
       <div class="range-seg">
         @for (r of ['7D','30D','90D','YTD']; track r) {
           <button class="range-btn"
@@ -30,7 +30,7 @@
          [class.pos]="netWorthChange() >= 0"
          [class.neg]="netWorthChange() < 0">
       {{ netWorthChange() >= 0 ? '+' : '−' }}{{ formatCurrency(netWorthChange()) }}
-      <span class="hero-change-label">in the last 30d</span>
+      <span class="hero-change-label">{{ netWorthChangeLabel() }}</span>
     </div>
 
     <div class="hero-actions">

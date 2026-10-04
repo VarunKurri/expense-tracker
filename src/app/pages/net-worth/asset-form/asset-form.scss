@@ -1,0 +1,23 @@
+/* Only what is unique to this form — everything else is the shared FORMS kit. */
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+
+  li {
+    display: grid;
+    grid-template-columns: 1fr auto 72px;
+    align-items: center;
+    gap: 12px;
+    min-height: 36px;
+    font-size: 13px;
+    color: var(--fg-2);
+    border-top: 1px solid var(--line);
+
+    &:first-child { border-top: 0; }
+    .num { color: var(--fg); text-align: right; }
+    .btn-ghost { justify-self: end; }
+  }
+}

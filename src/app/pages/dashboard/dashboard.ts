@@ -20,6 +20,8 @@ import { TransactionView } from '../../components/transaction-view/transaction-v
 import { DayCell, monthKeyOf, monthLabel } from '../../utils/calendar';
 import { MoneyRules, spendingTransactions } from '../../utils/reporting';
 import { budgetProgress, budgetSpent, effectiveBudgets } from '../../utils/budgets';
+import { netWorthSeries } from '../../utils/net-worth';
+import { ManualAssetService } from '../../services/manual-asset.service';
 import {
   Chart, ArcElement, DoughnutController,
   Tooltip, Legend
@@ -39,6 +41,7 @@ Chart.register(ArcElement, DoughnutController, Tooltip, Legend);
 })
 export class Dashboard implements OnDestroy {
   private accountService = inject(AccountService);
+  private manualAssets = inject(ManualAssetService);
   private txService = inject(TransactionService);
   private categoryService = inject(CategoryService);
   private billService = inject(BillService);
@@ -185,30 +188,26 @@ export class Dashboard implements OnDestroy {
     return Math.round(balance * 100) / 100;
   }
 
-  netWorth = computed(() => {
-    let assets = 0, liabilities = 0;
-    for (const a of this.activeAccounts()) {
-      const bal = this.balanceFor(a);
-      if (a.type === 'credit') { if (bal > 0) liabilities += bal; else assets += Math.abs(bal); }
-      else { if (bal >= 0) assets += bal; else liabilities += Math.abs(bal); }
-    }
-    return Math.round((assets - liabilities) * 100) / 100;
-  });
+  /**
+   * Net worth, counted exactly as the Net worth page counts it — accounts plus
+   * any homes, cars or loans you added there — so the two never disagree.
+   */
+  private netWorthPoints = computed(() =>
+    netWorthSeries(
+      this.accountService.accounts(), this.manualAssets.items(), this.txService.transactions(),
+      [this.rangeStart(), this.localDateString()],
+    ));
 
-  netWorthChange = computed(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    const cutoff = this.localDateString(d);
-    return Math.round(
-      this.txService.transactions()
-        .filter(t => t.date >= cutoff && !t.isInternalTransfer)
-        .reduce((s, t) => {
-          if (t.type === 'income') return s + t.amount;
-          if (t.type === 'expense') return s - t.amount;
-          return s;
-        }, 0) * 100
-    ) / 100;
-  });
+  netWorth = computed(() => this.netWorthPoints()[1].net);
+
+  /** How net worth moved over the selected range (it used to be income minus spending). */
+  netWorthChange = computed(() =>
+    Math.round((this.netWorthPoints()[1].net - this.netWorthPoints()[0].net) * 100) / 100);
+
+  netWorthChangeLabel = computed(() => ({
+    '7D': 'in the last 7 days', '30D': 'in the last 30 days',
+    '90D': 'in the last 90 days', 'YTD': 'this year',
+  } as Record<string, string>)[this.activeRange()]);
 
   // ── Spending calendar ─────────────────────────────────────
   /**

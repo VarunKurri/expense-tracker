@@ -9,7 +9,7 @@ import { EncryptionService } from './encryption.service';
 // can be restored even to a fresh account. Document ids are preserved so references
 // (transaction -> account/category, budget -> category) stay intact on restore.
 
-const COLLECTIONS = ['accounts', 'categories', 'transactions', 'transactionTemplates', 'bills', 'budgets'];
+const COLLECTIONS = ['accounts', 'categories', 'transactions', 'transactionTemplates', 'bills', 'budgets', 'transactionRules', 'manualAssets'];
 const BACKUP_ITERATIONS = 250_000;
 
 interface BackupFile {
