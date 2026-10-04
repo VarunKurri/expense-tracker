@@ -23,6 +23,7 @@ import {
   CategoryScale, LinearScale,
   Tooltip, Legend
 } from 'chart.js';
+import { localDateString } from '../../utils/date';
 
 Chart.register(
   ArcElement, DoughnutController,
@@ -129,7 +130,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
   excludedCategories = signal<Set<string>>(new Set());
   customStart = signal('');
   customEnd = signal('');
-  todayStr = new Date().toISOString().slice(0, 10);
+  todayStr = localDateString(); // local, not UTC — UTC is already tomorrow on a US evening
 
   ranges: { value: RangeKey; label: string }[] = [
     { value: 'this-month',  label: 'This month' },

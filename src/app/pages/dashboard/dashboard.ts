@@ -310,10 +310,15 @@ export class Dashboard implements OnDestroy {
 
   timeAgo(date: string): string {
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const d = new Date(date + 'T00:00:00');
-    const diff = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+    // Whole calendar days, so 11pm yesterday is still "Yesterday".
+    const diff = Math.round((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
     if (diff === 0) return 'Today';
     if (diff === 1) return 'Yesterday';
+    // Banks sometimes date a transaction ahead (a scheduled or pending payment).
+    if (diff === -1) return 'Tomorrow';
+    if (diff < 0) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     return `${diff}d ago`;
   }
 
@@ -378,9 +383,9 @@ export class Dashboard implements OnDestroy {
   recentExpenses = computed(() => {
     const now = new Date();
     const cutoff = this.localDateString(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
-    const today = this.localDateString(now);
+    // No end cap: a transaction the bank dated a day ahead is still recent (matches Transactions).
     return this.txService.transactions()
-      .filter(t => t.type === 'expense' && !t.refunded && !t.isInternalTransfer && t.date >= cutoff && t.date <= today);
+      .filter(t => t.type === 'expense' && !t.refunded && !t.isInternalTransfer && t.date >= cutoff);
   });
   recentTotal = computed(() =>
     Math.round(this.recentExpenses().reduce((s, t) => s + t.amount, 0) * 100) / 100

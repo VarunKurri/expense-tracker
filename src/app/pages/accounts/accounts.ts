@@ -15,6 +15,7 @@ import { Account, Bill } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { PlaidService, PlaidItem } from '../../services/plaid.service';
 import { monthActivityForAccount, transactionDeltaForAccount, roundMoney, owesMoney } from '../../utils/finance';
+import { localDateString } from '../../utils/date';
 
 type CardDueStatus = 'paid' | 'settled' | 'overdue' | 'due' | 'no-date';
 interface CardDue {
@@ -76,7 +77,7 @@ export class Accounts {
   connectChooserOpen = signal(false);
   historyChoice = signal<'30' | '90' | '180' | '365' | '730' | 'custom'>('90');
   customStartDate = signal('');
-  todayStr = new Date().toISOString().slice(0, 10);
+  todayStr = localDateString(); // local, not UTC — UTC is already tomorrow on a US evening
 
   activeAccounts = computed(() =>
     this.accountSvc.accounts().filter(a => !a.archived)

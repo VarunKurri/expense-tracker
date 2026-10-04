@@ -14,9 +14,9 @@ import { Transaction } from '../../models';
 import { QuickAddService } from '../../services/quick-add.service';
 import { ToastService } from '../../services/toast.service';
 import { ReconciliationService } from '../../services/reconciliation.service';
+import { DateRange, transactionRange } from '../../utils/date-ranges';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
-type DateRange = 'last-30' | 'this-month' | 'last-month' | 'this-year' | 'custom' | 'all';
 type SpecialFilter = 'all' | 'uncategorized' | 'refunded' | 'not-refunded' | 'internal-transfer';
 type QuickEditDraft = {
   amount: number;
@@ -109,46 +109,11 @@ export class Transactions {
       && this.txService.reimbursedAmountFor(tx.id) > 0;
   }
 
-  // Date range bounds
-  private dateRange = computed(() => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
-
-    const localDate = (year: number, month: number, day: number) => {
-      const mm = String(month + 1).padStart(2, '0');
-      const dd = String(day).padStart(2, '0');
-      return `${year}-${mm}-${dd}`;
-    };
-
-    const lastDay = (year: number, month: number) =>
-      new Date(year, month + 1, 0).getDate();
-
-    const todayStr = localDate(y, m, now.getDate());
-
-    switch (this.filterDateRange()) {
-      case 'last-30': {
-        const d30 = new Date(now);
-        d30.setDate(d30.getDate() - 29);
-        const s = localDate(d30.getFullYear(), d30.getMonth(), d30.getDate());
-        return { start: s, end: todayStr };
-      }
-      case 'this-month':
-        return { start: localDate(y, m, 1), end: localDate(y, m, lastDay(y, m)) };
-      case 'last-month': {
-        // Use Date constructor to handle January rollback correctly
-        const prev = new Date(y, m - 1, 1);
-        const py = prev.getFullYear(), pm = prev.getMonth();
-        return { start: localDate(py, pm, 1), end: localDate(py, pm, lastDay(py, pm)) };
-      }
-      case 'this-year':
-        return { start: `${y}-01-01`, end: `${y}-12-31` };
-      case 'custom':
-        return { start: this.customStartDate(), end: this.customEndDate() };
-      default:
-        return { start: '', end: '' };
-    }
-  });
+  // Date range bounds — see utils/date-ranges.ts ("Last 30 days" has no end,
+  // so transactions the bank dated a day ahead still show)
+  private dateRange = computed(() =>
+    transactionRange(this.filterDateRange(), new Date(), { start: this.customStartDate(), end: this.customEndDate() })
+  );
 
   // Filtered transactions
   filtered = computed(() => {

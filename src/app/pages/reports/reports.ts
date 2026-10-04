@@ -21,6 +21,7 @@ import {
   monthlySeries, monthsBetween, transferTotals, sankeyLinks, sankeyLabel,
   expenseAmount,
 } from '../../utils/reporting';
+import { localDateString } from '../../utils/date';
 
 Chart.register(
   BarController, BarElement, CategoryScale, LinearScale,
@@ -71,7 +72,7 @@ export class Reports implements AfterViewInit, OnDestroy {
   /** Netting matches the Analysis page's "exclude refunded" default. */
   netting = signal(true);
 
-  todayStr = new Date().toISOString().slice(0, 10);
+  todayStr = localDateString(); // local, not UTC — UTC is already tomorrow on a US evening
 
   reports: { value: ReportKey; label: string }[] = [
     { value: 'cash-flow', label: 'Cash flow' },

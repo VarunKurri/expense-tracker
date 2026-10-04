@@ -12,6 +12,7 @@ import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Bill, Transaction } from '../../models';
 import { frequencyLabel, monthlyCost } from '../../utils/bill-schedule';
 import { ToastService } from '../../services/toast.service';
+import { localDateString } from '../../utils/date';
 
 type BillTab = 'active' | 'paused';
 
@@ -147,7 +148,7 @@ export class Bills {
   futureBills = computed(() => {
     const future = new Date();
     future.setDate(future.getDate() + 30);
-    const futureStr = future.toISOString().slice(0, 10);
+    const futureStr = localDateString(future);
     return this.billService.bills().filter(b =>
       b.active && b.nextDueDate > futureStr
     );
