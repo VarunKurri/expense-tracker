@@ -88,6 +88,9 @@ export class AssetForm implements OnChanges {
   firstPaymentDate = '';
   payment: number | null = null;
   dueMode: 'exact' | 'flexible' | 'none' = 'exact';
+  /** For a loan that began before Trackr: earlier payments were made on schedule. */
+  settledEarlier = false;
+  settledThrough = this.today;
   lateDays: number | null = 10;
   /** Set once you type your own payment; until then it follows the terms. */
   paymentEdited = false;
@@ -131,6 +134,8 @@ export class AssetForm implements OnChanges {
     this.payment = l?.payment ?? null;
     this.dueMode = l?.dueMode ?? (this.type === 'loan-given' ? 'flexible' : 'exact');
     this.lateDays = l?.lateDays ?? 10;
+    this.settledEarlier = !!l?.settledThrough;
+    this.settledThrough = l?.settledThrough ?? this.today;
     this.paymentEdited = !!l && l.payment !== this.calculatedPayment;
     this.matchText = l?.match?.text ?? '';
     this.matchAccountId = l?.match?.accountId ?? '';
@@ -176,6 +181,11 @@ export class AssetForm implements OnChanges {
   /** The payment used: yours if you typed one, otherwise the calculated EMI. */
   get effectivePayment(): number {
     return this.paymentEdited && this.payment ? Number(this.payment) : this.calculatedPayment;
+  }
+
+  /** The first payment has already come round — so there's a past to account for. */
+  get startedInPast(): boolean {
+    return !!this.firstPaymentDate && this.firstPaymentDate < this.today;
   }
 
   onTermsChange() {
@@ -247,6 +257,7 @@ export class AssetForm implements OnChanges {
       paymentIds: this.existingLoan?.paymentIds ?? [],
       ignoredIds: this.existingLoan?.ignoredIds ?? [],
     };
+    if (this.startedInPast && this.settledEarlier && this.settledThrough) terms.settledThrough = this.settledThrough;
     if (this.dueMode === 'flexible') terms.lateDays = Math.max(0, Math.round(Number(this.lateDays) || 0));
     if (this.isLent) terms.owedTo = this.owedTo;
     if (this.counterparty.trim()) terms.counterparty = this.counterparty.trim();
@@ -314,6 +325,10 @@ export class AssetForm implements OnChanges {
     if (!(terms.termMonths > 0)) { this.toast.error('Enter how many months the loan runs.'); return; }
     if (!this.startDate || this.startDate > this.today) { this.toast.error('Pick when the loan started (not in the future).'); return; }
     if (terms.firstPaymentDate < this.startDate) { this.toast.error('The first payment can\'t be before the loan starts.'); return; }
+    if (terms.settledThrough && (terms.settledThrough > this.today || terms.settledThrough < this.startDate)) {
+      this.toast.error('"Paid on schedule up to" must be between the start and today.');
+      return;
+    }
     if (!(terms.payment > 0)) { this.toast.error('Enter the monthly payment.'); return; }
     if (this.dueMode === 'flexible' && !(Number(this.lateDays) >= 0 && Number(this.lateDays) <= 27)) {
       this.toast.error('Enter how many days late a payment can be (0–27).');

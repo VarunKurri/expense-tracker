@@ -235,7 +235,15 @@ export interface LoanState {
   interestDue: number;
   /** What you'd need to clear it today: principal + interest due. */
   owed: number;
+  /** Payments counted so far — real ones, plus any assumed made on schedule. */
   paymentsMade: number;
+  /** How many of those were assumed (paid on schedule before tracking began). */
+  assumedPayments: number;
+  /**
+   * Due dates accounted for: payments made, or settled by "paid on schedule"
+   * or a statement balance. What "4 of 60 payments" and missed months count against.
+   */
+  covered: number;
   principalPaid: number;
   interestPaid: number;
   totalPaid: number;
@@ -244,7 +252,7 @@ export interface LoanState {
 }
 
 type Event =
-  | { date: string; order: 0; kind: 'due' }
+  | { date: string; order: 0; kind: 'due'; index: number }
   | { date: string; order: 1; kind: 'pay'; tx: Transaction }
   | { date: string; order: 2; kind: 'correct'; value: number };
 
@@ -255,28 +263,54 @@ type Event =
  */
 export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, payments = loanPayments(asset, txs)): LoanState {
   const terms = asset.loan!;
+  const down = payments.find(p => p.kind === 'down' && p.tx.date <= asOf);
+  const downPayment = down ? down.tx.amount : (terms.downPayment ?? 0);
+
+  // Before tracking began, the loan followed its schedule: start from where the
+  // schedule says it was, counting those payments as made.
+  const settled = terms.settledThrough;
+  const startAt = settled ? (settled < asOf ? settled : asOf) : null;
+  let principalLeft = terms.amountFinanced;
+  let interestDue = 0;
+  let principalPaid = 0, interestPaid = 0, totalPaid = 0;
+  let assumed = 0;
+  if (startAt) {
+    for (const r of schedule(terms)) {
+      if (r.date > startAt) break;
+      assumed++;
+      principalLeft = r.balance;
+      principalPaid = round2(principalPaid + r.principal);
+      interestPaid = round2(interestPaid + r.interest);
+      totalPaid = round2(totalPaid + r.payment);
+    }
+  }
+  const after = (d: string) => !startAt || d > startAt;
+
   const events: Event[] = [];
   // Due dates keep coming after the term ends only if something is still owed
   // (a late loan keeps charging); cap generously so this can't run away.
   for (let k = 0; k < terms.termMonths * 2; k++) {
     const d = dueDate(terms.firstPaymentDate, k);
     if (d > asOf) break;
-    events.push({ date: d, order: 0, kind: 'due' });
+    if (after(d)) events.push({ date: d, order: 0, kind: 'due', index: k });
   }
-  for (const p of payments) if (p.kind === 'payment' && p.tx.date <= asOf) events.push({ date: p.tx.date, order: 1, kind: 'pay', tx: p.tx });
-  for (const c of terms.corrections ?? []) if (c.date <= asOf) events.push({ date: c.date, order: 2, kind: 'correct', value: c.value });
+  for (const p of payments) {
+    if (p.kind === 'payment' && p.tx.date <= asOf && after(p.tx.date)) events.push({ date: p.tx.date, order: 1, kind: 'pay', tx: p.tx });
+  }
+  for (const c of terms.corrections ?? []) {
+    if (c.date <= asOf && after(c.date)) events.push({ date: c.date, order: 2, kind: 'correct', value: c.value });
+  }
   events.sort((a, b) => a.date.localeCompare(b.date) || a.order - b.order);
 
-  let principalLeft = terms.amountFinanced;
-  let interestDue = 0;
-  let dues = 0;
-  let principalPaid = 0, interestPaid = 0, totalPaid = 0;
   const splits: PaymentSplit[] = [];
+  // The latest point where the balance was known for sure — after it, only
+  // real payments count towards covering due dates.
+  let settlePoint = startAt && assumed > 0 ? startAt : null;
+  let paymentsSinceSettle = 0;
 
   for (const e of events) {
     if (e.kind === 'due') {
-      dues++;
-      if (principalLeft > 0 && (dues <= terms.termMonths || terms.method === 'reducing')) {
+      if (principalLeft > 0 && (e.index < terms.termMonths || terms.method === 'reducing')) {
         interestDue = round2(interestDue + periodInterest(terms, principalLeft));
       }
     } else if (e.kind === 'pay') {
@@ -289,19 +323,29 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
       interestPaid = round2(interestPaid + toInterest);
       principalPaid = round2(principalPaid + toPrincipal);
       totalPaid = round2(totalPaid + amount);
-      splits.push({ tx: e.tx, n: splits.length + 1, interest: round2(toInterest), principal: round2(toPrincipal), surplus, principalLeft });
+      paymentsSinceSettle++;
+      splits.push({ tx: e.tx, n: assumed + splits.length + 1, interest: round2(toInterest), principal: round2(toPrincipal), surplus, principalLeft });
     } else {
+      // A statement balance: the figure is known, and everything due before it is settled.
       principalLeft = round2(e.value);
       interestDue = 0;
+      settlePoint = e.date;
+      paymentsSinceSettle = 0;
     }
   }
 
-  const down = payments.find(p => p.kind === 'down' && p.tx.date <= asOf);
+  const paymentsMade = assumed + splits.length;
+  let covered = paymentsMade;
+  if (settlePoint) {
+    let duesAtSettle = 0;
+    while (duesAtSettle < terms.termMonths && dueDate(terms.firstPaymentDate, duesAtSettle) <= settlePoint) duesAtSettle++;
+    covered = Math.max(paymentsMade, duesAtSettle + paymentsSinceSettle);
+  }
+
   return {
     principalLeft, interestDue, owed: round2(principalLeft + interestDue),
-    paymentsMade: splits.length, principalPaid, interestPaid, totalPaid,
-    downPayment: down ? down.tx.amount : (terms.downPayment ?? 0),
-    splits,
+    paymentsMade, assumedPayments: assumed, covered,
+    principalPaid, interestPaid, totalPaid, downPayment, splits,
   };
 }
 
@@ -359,12 +403,12 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
     if (end === null || end >= today) break;
     duesClosed++;
   }
-  const behindBy = Math.max(0, duesClosed - now.paymentsMade);
+  const behindBy = Math.max(0, duesClosed - now.covered);
   const missedDates: string[] = [];
-  for (let i = now.paymentsMade; i < duesClosed; i++) missedDates.push(dueDate(terms.firstPaymentDate, i));
+  for (let i = now.covered; i < duesClosed; i++) missedDates.push(dueDate(terms.firstPaymentDate, i));
 
   // The next payment expected: the first due date not covered by a payment and not missed.
-  const nextIndex = Math.max(now.paymentsMade, duesClosed);
+  const nextIndex = Math.max(now.covered, duesClosed);
   const owing = now.owed > 0.004;
   const nextDue = owing && nextIndex < terms.termMonths ? dueDate(terms.firstPaymentDate, nextIndex) : null;
 
@@ -393,8 +437,12 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
       futureInterest = round2(futureInterest + i);
     }
     const owedNow = round2(principalLeft + interestDue);
-    // The final scheduled payment settles whatever rounding left behind, as lenders do.
-    const pay = due < terms.termMonths - 1 ? Math.min(owedNow, terms.payment) : owedNow;
+    // Regular payments until it's cleared. On the last scheduled one, a few
+    // cents of rounding are settled with it, as lenders do; anything more
+    // (payments missed along the way) carries on at the regular amount, so the
+    // loan honestly runs longer instead of ending in one huge payment.
+    const settlesRounding = due >= terms.termMonths - 1 && owedNow - terms.payment < 1;
+    const pay = settlesRounding ? owedNow : Math.min(owedNow, terms.payment);
     const toInterest = Math.min(pay, interestDue);
     const toPrincipal = Math.min(principalLeft, round2(pay - toInterest));
     interestDue = round2(interestDue - toInterest);
@@ -403,16 +451,18 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
     paymentsLeft++;
     payoffDate = dueDate(terms.firstPaymentDate, due);
     upcoming.push({
-      n: now.paymentsMade + paymentsLeft, date: payoffDate, payment: round2(pay),
+      n: now.covered + paymentsLeft, date: payoffDate, payment: round2(pay),
       interest: round2(toInterest), principal: round2(toPrincipal), balance: principalLeft,
     });
     due++;
   }
 
   return {
-    paymentsLeft, leftToPay, futureInterest,
+    paymentsLeft, leftToPay,
     payoffDate: now.owed > 0.004 ? payoffDate : null,
-    lifetimeInterest: round2(now.interestPaid + futureInterest),
+    // Interest already built up but not yet paid is part of the cost too.
+    futureInterest: round2(now.interestDue + futureInterest),
+    lifetimeInterest: round2(now.interestPaid + now.interestDue + futureInterest),
     behindBy,
     missedDates,
     upcoming,

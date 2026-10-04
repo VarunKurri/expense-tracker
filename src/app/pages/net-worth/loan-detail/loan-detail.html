@@ -26,13 +26,16 @@
         <span class="num-display">{{ money(s.owed) }}</span>
         <span class="hero-of">of {{ money(t.amountFinanced) }}</span>
       </div>
+      @if (s.interestDue > 0.004) {
+        <p class="hero-note">Includes {{ money(s.interestDue) }} interest that has built up and not been {{ lent() ? 'received' : 'paid' }} yet.</p>
+      }
 
       <div class="bar" role="img"
            [attr.aria-label]="(progress() * 100 | number:'1.0-0') + '% repaid'">
         <div class="bar-fill" [style.width]="(progress() * 100) + '%'"></div>
       </div>
       <div class="bar-labels">
-        <span>{{ s.paymentsMade }} of {{ t.termMonths }} payments · {{ progress() * 100 | number:'1.0-0' }}% {{ lent() ? 'repaid' : 'paid off' }}</span>
+        <span>{{ s.covered }} of {{ t.termMonths }} payments · {{ progress() * 100 | number:'1.0-0' }}% {{ lent() ? 'repaid' : 'paid off' }}</span>
         <span>{{ methodLabel() }} · {{ money(t.payment) }}/mo{{ timingLabel() ? ' · ' + timingLabel() : '' }}</span>
       </div>
 
@@ -45,6 +48,9 @@
         <span class="label-mono">{{ lent() ? 'Received so far' : 'Paid so far' }}</span>
         <span class="stat-value">{{ money(s.totalPaid) }}</span>
         <span class="stat-sub">{{ money(s.principalPaid) }} principal · {{ money(s.interestPaid) }} interest</span>
+        @if (s.assumedPayments) {
+          <span class="stat-sub">Includes {{ s.assumedPayments }} payment{{ s.assumedPayments === 1 ? '' : 's' }} made on schedule before tracking</span>
+        }
       </div>
       <div class="card stat">
         <span class="label-mono">{{ lent() ? 'Still to come' : 'Left to pay' }}</span>
@@ -110,15 +116,31 @@
         <button class="btn-ghost sm" (click)="openLink('payment')">+ Link a payment</button>
       </div>
 
-      @for (d of o.missedDates; track d) {
+      <!-- Months with nothing to show. A loan that began before Trackr could see
+           it usually just needs its past marked as paid on schedule. -->
+      @if (o.missedDates.length >= 2 && !t.settledThrough) {
+        <div class="settle-prompt">
+          <p>
+            <strong>{{ o.missedDates.length }} payments aren't linked.</strong>
+            If this loan started before Trackr could see its payments, mark them as
+            {{ lent() ? 'received' : 'made' }} on schedule and tracking starts from today.
+          </p>
+          <button class="btn-primary sm" (click)="settleToToday()">{{ lent() ? 'Received' : 'Paid' }} on schedule up to today</button>
+        </div>
+      }
+
+      @for (d of visibleMissed(); track d) {
         <div class="row missed">
           <span class="row-date">{{ formatDate(d) }}</span>
           <span class="row-main">
             <span class="row-name">Not found</span>
-            <span class="row-sub">Payment due {{ formatDate(d) }}</span>
+            <span class="row-sub">{{ dueText(d) }}</span>
           </span>
           <button class="btn-ghost sm" (click)="openLink('payment')">Link it</button>
         </div>
+      }
+      @if (o.missedDates.length > visibleMissed().length) {
+        <button class="show-all" (click)="showAllMissed.set(true)">Show all {{ o.missedDates.length }} missing</button>
       }
 
       @for (p of made(); track p.tx.id) {
@@ -138,13 +160,24 @@
                   [title]="p.how === 'linked' ? 'Remove from this loan' : 'Not a payment for this loan'">Unlink</button>
         </div>
       } @empty {
-        @if (!o.missedDates.length) {
+        @if (!o.missedDates.length && !s.assumedPayments) {
           <p class="empty">
             No payments yet.
             @if (t.match?.text) { Anything named “{{ t.match!.text }}” near {{ money(t.payment) }} will show up here. }
             @else { Add “How payments show up” in Edit loan, or link them by hand. }
           </p>
         }
+      }
+
+      @if (t.settledThrough && s.assumedPayments) {
+        <div class="row correction">
+          <span class="row-date">{{ formatDate(t.settledThrough) }}</span>
+          <span class="row-main">
+            <span class="row-name">Payments 1–{{ s.assumedPayments }} {{ lent() ? 'received' : 'made' }} on schedule</span>
+            <span class="row-sub">Before tracking began · {{ money(assumedTotal()) }} in all</span>
+          </span>
+          <button class="btn-ghost sm" (click)="unsettle()">Undo</button>
+        </div>
       }
 
       @if (t.corrections?.length) {

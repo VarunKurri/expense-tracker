@@ -66,6 +66,11 @@ export interface LoanTerms {
   ignoredIds: string[];
   /** The down payment you made (borrowed) or the money you sent out (lent). */
   downPaymentId?: string;
+  /**
+   * For a loan that began before Trackr could see it: every payment due up to
+   * this date was made on schedule. Tracking from transactions starts after it.
+   */
+  settledThrough?: string;
   /** Balances you entered from a statement; each resets the running balance on its date. */
   corrections?: Valuation[];
 }

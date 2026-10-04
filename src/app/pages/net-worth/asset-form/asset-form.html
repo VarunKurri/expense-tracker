@@ -153,6 +153,23 @@
           </div>
         </div>
 
+        @if (startedInPast) {
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Earlier payments were {{ isLent ? 'received' : 'made' }} on schedule</div>
+              <div class="toggle-sub">For a loan that began before Trackr could see its payments. Tracking from transactions starts after this date.</div>
+            </div>
+            <button type="button" class="toggle" [class.on]="settledEarlier" (click)="settledEarlier = !settledEarlier"
+                    [attr.aria-pressed]="settledEarlier" aria-label="Earlier payments were made on schedule"></button>
+          </div>
+          @if (settledEarlier) {
+            <div class="field">
+              <label class="label-sm">On schedule up to</label>
+              <input class="input-field" type="date" [min]="startDate" [max]="today" [(ngModel)]="settledThrough" name="settledThrough" />
+            </div>
+          }
+        }
+
         @if (dueMode === 'flexible') {
           <div class="field">
             <label class="label-sm">Can arrive up to</label>

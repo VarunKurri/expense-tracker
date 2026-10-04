@@ -12,7 +12,7 @@ import { TransactionForm } from '../../transactions/transaction-form/transaction
 import { AssetForm, AssetFormSave } from '../asset-form/asset-form';
 import { Transaction } from '../../../models';
 import {
-  LoanPayment, candidatePayments, dueModeOf, countsInNetWorth, loanDirection, loanOutlook, loanPayments, loanState,
+  LoanPayment, candidatePayments, dueModeOf, schedule, countsInNetWorth, loanDirection, loanOutlook, loanPayments, loanState,
 } from '../../../utils/loans';
 import { entryValueOn, manualType, withValuation } from '../../../utils/net-worth';
 import { localDateString, parseLocalDate } from '../../../utils/date';
@@ -138,6 +138,42 @@ export class LoanDetail {
     const how = new Map(this.payments().map(p => [p.tx.id, p.how]));
     return [...s.splits].reverse().map(sp => ({ ...sp, how: how.get(sp.tx.id) ?? 'matched' }));
   });
+
+  showAllMissed = signal(false);
+  /** Three missing months is enough to make the point; the rest fold away. */
+  visibleMissed = computed(() => {
+    const all = this.outlook()?.missedDates ?? [];
+    return this.showAllMissed() ? all : all.slice(0, 3);
+  });
+
+  /** What the payments assumed made on schedule add up to. */
+  assumedTotal = computed(() => {
+    const t = this.terms(), s = this.state();
+    if (!t || !s?.assumedPayments) return 0;
+    return Math.round(schedule(t).slice(0, s.assumedPayments).reduce((sum, r) => sum + r.payment, 0) * 100) / 100;
+  });
+
+  /** "Paid on schedule up to today": the past is settled, tracking starts now. */
+  async settleToToday() {
+    const l = this.loan();
+    if (!l?.id || !l.loan) return;
+    try {
+      await this.manualService.update(l.id, { loan: { ...l.loan, settledThrough: this.today } });
+      this.toast.success('Marked as paid on schedule up to today.');
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
+
+  async unsettle() {
+    const l = this.loan();
+    if (!l?.id || !l.loan) return;
+    try {
+      await this.manualService.update(l.id, { loan: { ...l.loan, settledThrough: undefined } });
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
 
   showAllUpcoming = signal(false);
   upcoming = computed(() => {
@@ -335,6 +371,14 @@ export class LoanDetail {
     const mode = t ? dueModeOf(t) : 'exact';
     if (mode === 'none') return `~${this.monthYear(date)}`;
     return mode === 'flexible' ? `Around ${this.formatDate(date)}` : this.formatDate(date);
+  }
+
+  /** The same, as a sentence: "Due Oct 24", "Due around Oct 24". */
+  dueText(date: string): string {
+    const t = this.terms();
+    const mode = t ? dueModeOf(t) : 'exact';
+    if (mode === 'none') return `Expected ${this.monthYear(date)}`;
+    return `Due ${mode === 'flexible' ? 'around ' : ''}${this.formatDate(date)}`;
   }
 
   /** "Varies (up to 10 days late)", "No set day", or nothing for an exact day. */

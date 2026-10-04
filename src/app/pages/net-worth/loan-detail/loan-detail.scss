@@ -96,6 +96,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.hero-note {
+  margin: -4px 0 0;
+  font-size: 12.5px;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
 .hero-sentence {
   margin: 0;
   padding-top: 12px;
@@ -186,6 +193,20 @@
   &.correction .row-name { color: var(--fg-2); }
 }
 
+/* "These months aren't linked — were they paid on schedule?" */
+.settle-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+
+  p { margin: 0; flex: 1; min-width: 240px; font-size: 13.5px; line-height: 1.5; color: var(--fg-2); }
+  strong { color: var(--fg); font-weight: 600; }
+}
+
 /* Clicking a payment opens the shared transaction view. */
 .row-open {
   flex: 1;
@@ -212,7 +233,9 @@
   color: var(--fg-3);
 }
 
-.missed .row-date, .correction .row-date { width: auto; min-width: 90px; }
+.missed, .correction { gap: 16px; }
+.correction .row-name { white-space: normal; }
+.missed .row-date, .correction .row-date { width: auto; min-width: 104px; }
 
 .row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .row-name { font-size: 13.5px; font-weight: 500; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

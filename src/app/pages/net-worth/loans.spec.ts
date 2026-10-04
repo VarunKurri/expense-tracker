@@ -12,6 +12,7 @@ import { ManualAssetService } from '../../services/manual-asset.service';
 import { CategoryService } from '../../services/category.service';
 import { Account, ManualAsset, Transaction } from '../../models';
 import { localDateString } from '../../utils/date';
+import { schedule } from '../../utils/loans';
 
 /** In-memory stand-in that serialises like the encrypted Firestore service. */
 class FakeManual {
@@ -293,5 +294,47 @@ describe('Loans', () => {
     button('Add', document.querySelector('app-asset-form')!).click();
     await settle();
     expect(manual.items()[0].loan).toMatchObject({ dueMode: 'flexible', lateDays: 8, method: 'none', amountFinanced: 2400 });
+  });
+
+  // ── A loan that began before Trackr could see it (the Vishal case) ──
+  const vishal = (over: Partial<NonNullable<ManualAsset['loan']>> = {}): ManualAsset => ({
+    id: 'v', name: 'Loan to Vishal', type: 'loan-given', valuations: [], createdAt: 1, updatedAt: 1,
+    loan: {
+      owedTo: 'someone-else', method: 'reducing', startDate: monthsAgo(15, 24), amountFinanced: 17095.42, rate: 5,
+      termMonths: 24, firstPaymentDate: monthsAgo(14, 24), payment: 750, counterparty: 'Vishal',
+      match: { text: 'vishal' }, paymentIds: [], ignoredIds: [], dueMode: 'flexible', lateDays: 10, ...over,
+    },
+  });
+
+  it('with nothing linked, it offers to mark the past as paid on schedule, and folds the missing months', async () => {
+    await setup([vishal()], [], '/net-worth/loans/v');
+    expect(el.querySelector('.settle-prompt')!.textContent).toContain("payments aren't linked");
+    expect(el.querySelectorAll('.row.missed').length).toBe(3);
+    expect(el.querySelector('.list .show-all')!.textContent).toContain('missing');
+    // The owed figure explains why it's above the amount lent.
+    expect(el.querySelector('.hero-note')!.textContent).toContain('interest that has built up');
+    // No giant final payment.
+    const amounts = [...el.querySelectorAll('.ahead .row-amount')].map(e => Number(e.textContent!.replace(/[$,]/g, '')));
+    expect(Math.max(...amounts)).toBeLessThanOrEqual(750);
+  });
+
+  it('"received on schedule up to today" lines the page up with the plan', async () => {
+    await setup([vishal()], [], '/net-worth/loans/v');
+    button('Received on schedule up to today', el).click();
+    await settle();
+    expect(manual.items()[0].loan!.settledThrough).toBe(today);
+    expect(el.querySelector('.row.missed')).toBeNull();
+    expect(el.querySelector('.settle-prompt')).toBeNull();
+    expect(el.querySelector('.hero-note')).toBeNull();
+    expect(el.querySelector('.bar-labels')!.textContent).toMatch(/1[34] of 24 payments/);
+    expect(el.querySelector('.list')!.textContent).toContain('received on schedule');
+    // Interest in all now matches what the form promised.
+    const planInterest = schedule(vishal().loan!).reduce((sum, r) => sum + r.interest, 0);
+    const shown = Number(el.querySelectorAll('.stat .stat-value')[2].textContent!.replace(/[$,]/g, ''));
+    expect(Math.abs(shown - planInterest)).toBeLessThan(1);
+
+    button('Undo', el).click();
+    await settle();
+    expect(manual.items()[0].loan!.settledThrough).toBeUndefined();
   });
 });

@@ -331,3 +331,74 @@ describe('payments that don\'t arrive on a fixed day', () => {
     expect(Math.abs(ahead.lifetimeInterest - onTime.lifetimeInterest)).toBeLessThan(5);
   });
 });
+
+describe('a loan that started before Trackr could see it', () => {
+  // The real case: $17,095.42 at 5% (EMI), 24 months, lent Jul 24 2025, first payment Aug 24.
+  const vishal = (over: Partial<LoanTerms> = {}) => loan({
+    method: 'reducing', amountFinanced: 17095.42, rate: 5, termMonths: 24, payment: 750,
+    startDate: '2025-07-24', firstPaymentDate: '2025-08-24', match: { text: 'vishal' },
+    dueMode: 'flexible', lateDays: 10, ...over,
+  }, 'loan-given');
+  const today = '2026-10-04';
+  const plan = schedule(vishal().loan!);
+  const planInterest = plan.reduce((s, r) => s + r.interest, 0);
+
+  it('the form\'s figure is the plan: ~$904.55 interest over 24 payments', () => {
+    expect(monthlyPayment(17095.42, 5, 24, 'reducing')).toBeCloseTo(750, 0);
+    expect(planInterest).toBeCloseTo(904.55, 0);
+  });
+
+  it('with no payments linked, the interest already built up counts towards the total', () => {
+    const o = loanOutlook(vishal(), [], today);
+    const s = loanState(vishal(), [], today);
+    expect(s.interestDue).toBeGreaterThan(0);
+    expect(o.missedDates).toHaveLength(13); // Sep 24's window is still open
+    // Interest in all = paid + built up + still to come. It used to leave out the middle one.
+    expect(o.futureInterest).toBeGreaterThan(s.interestDue); // "to come" includes what has built up
+    expect(o.lifetimeInterest).toBeCloseTo(s.interestPaid + o.futureInterest, 2);
+    expect(o.lifetimeInterest).toBeGreaterThan(planInterest); // being behind costs more
+  });
+
+  it('no giant final payment: a backlog carries on at the regular amount', () => {
+    const o = loanOutlook(vishal(), [], today);
+    expect(Math.max(...o.upcoming.map(r => r.payment))).toBeLessThanOrEqual(750);
+    expect(o.paymentsLeft).toBeGreaterThan(10);
+    expect(o.upcoming.reduce((s, r) => s + r.payment, 0)).toBeCloseTo(o.leftToPay, 2);
+  });
+
+  it('"paid on schedule up to today" picks up where the plan says, with nothing missed', () => {
+    const l = vishal({ settledThrough: today });
+    const s = loanState(l, [], today);
+    const o = loanOutlook(l, [], today);
+    expect(s.paymentsMade).toBe(14);
+    expect(s.assumedPayments).toBe(14);
+    expect(s.owed).toBe(plan[13].balance);
+    expect(o.behindBy).toBe(0);
+    expect(o.nextDue).toBe('2026-10-24');
+    expect(o.paymentsLeft).toBe(10);
+    expect(Math.abs(o.lifetimeInterest - planInterest)).toBeLessThan(1); // same as the form
+  });
+
+  it('payments after that date are tracked; ones before it aren\'t counted twice', () => {
+    const l = vishal({ settledThrough: '2026-09-30' });
+    const before = tx({ type: 'income', merchant: 'Zelle from Vishal', amount: 750, date: '2026-09-25' });
+    const afterwards = tx({ type: 'income', merchant: 'Zelle from Vishal', amount: 750, date: '2026-10-25' });
+    const s = loanState(l, [before, afterwards], '2026-10-26');
+    expect(s.paymentsMade).toBe(15);
+    expect(s.splits.map(x => x.tx.id)).toEqual([afterwards.id]);
+    expect(s.splits[0].n).toBe(15);
+  });
+
+  it('the net worth history before that date follows the plan too', () => {
+    const l = vishal({ settledThrough: today });
+    expect(loanOwedOn(l, [], '2025-12-31')).toBe(plan[4].balance); // after Aug–Dec payments
+  });
+
+  it('a statement balance settles the months before it', () => {
+    const l = vishal({ corrections: [{ date: '2026-10-01', value: 7300 }] });
+    const o = loanOutlook(l, [], today);
+    expect(o.behindBy).toBe(0);
+    expect(loanState(l, [], today).covered).toBe(14);
+    expect(loanState(l, [], today).owed).toBe(7300);
+  });
+});
