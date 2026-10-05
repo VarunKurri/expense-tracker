@@ -98,17 +98,14 @@
           <button class="btn-ghost sm" (click)="openCorrection()">Enter statement balance</button>
         </div>
       </section>
-    } @else {
+    } @else if (!tracked()) {
       <div class="cost-actions plain">
-        @if (!tracked()) {
-          @if (downPayment(); as d) {
-            <span class="muted">Sent: {{ d.tx.merchant || 'Untitled' }}, {{ formatDate(d.tx.date) }} · {{ money(d.tx.amount) }}</span>
-            <button class="btn-ghost sm" (click)="unlink(d.tx)">Unlink</button>
-          } @else {
-            <button class="btn-ghost sm" (click)="openLink('down')">Link the money you sent</button>
-          }
+        @if (downPayment(); as d) {
+          <span class="muted">Sent: {{ d.tx.merchant || 'Untitled' }}, {{ formatDate(d.tx.date) }} · {{ money(d.tx.amount) }}</span>
+          <button class="btn-ghost sm" (click)="unlink(d.tx)">Unlink</button>
+        } @else {
+          <button class="btn-ghost sm" (click)="openLink('down')">Link the money you sent</button>
         }
-        <button class="btn-ghost sm" (click)="openCorrection()">Enter the balance</button>
       </div>
     }
 
@@ -116,7 +113,13 @@
     <section class="card list">
       <div class="list-head">
         <span class="card-label">Payments</span>
-        <button class="btn-ghost sm" (click)="openLink('payment')">+ Link a payment</button>
+        <div class="list-actions">
+          @if (lent()) {
+            <!-- Money lent has no cost card, so the balance lives with the payments. -->
+            <button class="btn-ghost sm" (click)="openCorrection()">Enter the balance</button>
+          }
+          <button class="btn-ghost sm" (click)="openLink('payment')">+ Link a payment</button>
+        </div>
       </div>
 
       <!-- Months with nothing to show. A loan that began before Trackr could see

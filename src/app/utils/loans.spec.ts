@@ -237,6 +237,20 @@ describe('estimated value', () => {
 function round(n: number) { return Math.round(n * 100) / 100; }
 
 describe('the rows ahead', () => {
+  it('a 30-year mortgage ends on payment 360, not a stray 361st for rounding', () => {
+    const m = loan({ amountFinanced: 300000, rate: 6.5, termMonths: 360, payment: monthlyPayment(300000, 6.5, 360, 'reducing') }, 'mortgage');
+    const o = loanOutlook(m, [], '2026-07-10');
+    expect(o.paymentsLeft).toBe(360);
+    expect(o.upcoming[359].balance).toBe(0);
+    // The last one carries the few dollars the rounded EMI left behind — like the plan.
+    expect(o.upcoming[359].payment).toBe(schedule(m.loan!)[359].payment);
+    // Same when a month was missed on a loan with the penalty waived.
+    const waived = loan({ ...m.loan!, onSchedule: true }, 'mortgage');
+    const pays = [tx({ date: '2026-08-05', amount: m.loan!.payment })];
+    const s = loanState(waived, pays, '2026-10-20');
+    expect(s.paymentsMade + loanOutlook(waived, pays, '2026-10-20').paymentsLeft).toBe(360);
+  });
+
   it('lists every payment still to come, ending at zero', () => {
     const o = loanOutlook(loan(), [], '2026-07-10');
     expect(o.upcoming).toHaveLength(60);

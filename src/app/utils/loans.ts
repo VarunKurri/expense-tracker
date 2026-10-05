@@ -179,6 +179,16 @@ function rightDirection(asset: ManualAsset, t: Transaction): boolean {
   return loanDirection(asset.type) === 'borrowed' ? t.type === 'expense' : t.type === 'income';
 }
 
+/**
+ * What's left after the last scheduled payment that is just rounding — the
+ * EMI is rounded to the cent, which over 30 years can leave a few dollars. It
+ * rides along with the last payment, as lenders do. A real backlog (a missed
+ * month) is far bigger and carries on at the regular amount instead.
+ */
+function roundingLeftover(payment: number): number {
+  return Math.max(1, payment * 0.05);
+}
+
 /** How close an amount must be to the payment to be recognised automatically. */
 export function matchTolerance(payment: number): number {
   return Math.max(5, payment * 0.05);
@@ -448,8 +458,8 @@ function monthsToClear(terms: LoanTerms, principal: number, payment: number): nu
   while (left > 0.004 && n < 1200) {
     const step = round2(payment - periodInterest(terms, left));
     if (step <= 0) return 1200; // the payment doesn't even cover the interest
-    // A few cents of rounding ride along with the last payment.
-    left = left - step < 1 ? 0 : round2(left - step);
+    // Rounding rides along with the last payment.
+    left = left - step < roundingLeftover(payment) ? 0 : round2(left - step);
     n++;
   }
   return n;
@@ -540,11 +550,11 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
     const k = waived ? now.covered + paymentsLeft : due;
     if ((waived || due >= now.duesPassed) && accrues(k)) charge();
     const owedNow = round2(principalLeft + interestDue);
-    // Regular payments until it's cleared. On the last scheduled one, a few
-    // cents of rounding are settled with it, as lenders do; anything more
-    // (payments missed along the way) carries on at the regular amount, so the
-    // loan honestly runs longer instead of ending in one huge payment.
-    const settlesRounding = k >= now.termMonths - 1 && owedNow - now.payment < 1;
+    // Regular payments until it's cleared. On the last scheduled one, rounding
+    // is settled with it, as lenders do; anything more (payments missed along
+    // the way) carries on at the regular amount, so the loan honestly runs
+    // longer instead of ending in one huge payment.
+    const settlesRounding = k >= now.termMonths - 1 && owedNow - now.payment < roundingLeftover(now.payment);
     const pay = settlesRounding ? owedNow : Math.min(owedNow, now.payment);
     const toInterest = Math.min(pay, interestDue);
     const toPrincipal = Math.min(principalLeft, round2(pay - toInterest));

@@ -220,6 +220,9 @@ describe('Loans', () => {
     await settle();
     expect(el.textContent).toContain('Tracked, not counted');
     expect(el.querySelector('.bar-labels')!.textContent).toContain('1 of 24 payments');
+    // No cost card for money lent: the balance button sits with the payments, not on its own.
+    expect(el.querySelector('.list-head')!.textContent).toContain('Enter the balance');
+    expect(el.querySelector('.cost-actions')).toBeNull();
   });
 
   it('a loan row on Net worth opens its page', async () => {
