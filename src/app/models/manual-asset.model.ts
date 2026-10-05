@@ -73,6 +73,33 @@ export interface LoanTerms {
   settledThrough?: string;
   /** Balances you entered from a statement; each resets the running balance on its date. */
   corrections?: Valuation[];
+  /**
+   * Penalty waiver. Every payment counts as if it arrived on its due date:
+   * payment N is split exactly like row N of the EMI table, however early or
+   * late it came. No extra interest for a late month, no saving for an early
+   * one. Suits a loan between family or friends. Absent means the standard
+   * model, where interest builds up on each due date.
+   */
+  onSchedule?: boolean;
+  /** Payments you marked as lump sums, and what each one changes. */
+  lumpSums?: LumpSum[];
+}
+
+/**
+ * A payment bigger than the regular one (or extra, on top of it) that pays
+ * down the principal early. What happens next is your choice:
+ * - reduce-emi: the monthly payment drops; the loan still ends when planned.
+ * - reduce-tenure: the monthly payment stays; the loan ends sooner.
+ */
+export interface LumpSum {
+  txId: string;
+  mode: 'reduce-emi' | 'reduce-tenure';
+  /**
+   * Paid on top of the month's regular payment, so it doesn't count as one
+   * of the monthly payments. Absent/false: it was this month's payment, with
+   * the rest going to principal.
+   */
+  onTop?: boolean;
 }
 
 export interface ManualAsset {

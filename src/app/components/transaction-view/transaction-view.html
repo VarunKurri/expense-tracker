@@ -136,8 +136,11 @@
           @if (link.kind === 'down') {
             {{ link.loan.type === 'loan-given' ? 'Money lent' : 'Down payment' }} for <strong>{{ link.loan.name }}</strong>
           } @else if (link.split; as sp) {
-            <strong>{{ link.loan.name }}</strong> · payment {{ sp.n }} of {{ link.loan.loan!.termMonths }}
+            <strong>{{ link.loan.name }}</strong> · {{ sp.installment ? 'payment ' + sp.n + ' of ' + link.termMonths : 'extra payment' }}
             <br />{{ formatCurrency(sp.interest) }} interest · {{ formatCurrency(sp.principal) }} principal{{ sp.surplus > 0 ? ' · ' + formatCurrency(sp.surplus) + ' extra' : '' }}
+            @if (sp.lump; as lump) {
+              <br />Lump sum · {{ lump.mode === 'reduce-emi' ? 'payment lowered to ' + formatCurrency(lump.payment) : 'loan shortened to ' + lump.termMonths + ' payments' }}
+            }
           } @else {
             Payment on <strong>{{ link.loan.name }}</strong>
           }

@@ -181,6 +181,20 @@
           </div>
         }
 
+        @if (chargesInterest) {
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Penalty waiver: count every payment as on time</div>
+              <div class="toggle-sub">
+                Each payment is split as if it arrived on its due date, so a late month adds no extra interest
+                and an early one saves none. The balance follows the EMI table. Suits a loan between family or friends.
+              </div>
+            </div>
+            <button type="button" class="toggle" [class.on]="onSchedule" (click)="onSchedule = !onSchedule"
+                    [attr.aria-pressed]="onSchedule" aria-label="Count every payment as on time"></button>
+          </div>
+        }
+
         <div class="field">
           <label class="label-sm">Monthly payment (EMI)</label>
           <div class="input-affix"><span class="affix">$</span>

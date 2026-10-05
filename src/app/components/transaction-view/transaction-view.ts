@@ -134,9 +134,10 @@ export class TransactionView {
       const pays = loanPayments(loan, txs);
       const p = pays.find(x => x.tx.id === tx.id);
       if (!p) continue;
-      if (p.kind === 'down') return { loan, kind: 'down' as const, how: p.how, split: null };
-      const split = loanState(loan, txs, localDateString(), pays).splits.find(x => x.tx.id === tx.id) ?? null;
-      return { loan, kind: 'payment' as const, how: p.how, split };
+      if (p.kind === 'down') return { loan, kind: 'down' as const, how: p.how, split: null, termMonths: 0 };
+      const state = loanState(loan, txs, localDateString(), pays);
+      const split = state.splits.find(x => x.tx.id === tx.id) ?? null;
+      return { loan, kind: 'payment' as const, how: p.how, split, termMonths: state.termMonths };
     }
     return null;
   });
@@ -192,7 +193,7 @@ export class TransactionView {
     const link = this.loanLink();
     const tx = this.tx();
     if (!link?.loan.id || !link.loan.loan || !tx?.id) return;
-    const t = link.loan.loan;
+    const t = { ...link.loan.loan, lumpSums: (link.loan.loan.lumpSums ?? []).filter(x => x.txId !== tx.id) };
     const patch = link.kind === 'down'
       ? { ...t, downPaymentId: undefined }
       : t.paymentIds?.includes(tx.id)

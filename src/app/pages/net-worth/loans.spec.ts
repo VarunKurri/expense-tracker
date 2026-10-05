@@ -337,4 +337,82 @@ describe('Loans', () => {
     await settle();
     expect(manual.items()[0].loan!.settledThrough).toBeUndefined();
   });
+
+  // ── Lump sums and the penalty waiver ───────────────────────
+  const lumpModal = () => [...document.querySelectorAll('app-modal')].find(m => m.textContent!.includes('Lower the monthly payment'))!;
+
+  async function linkBigPayment() {
+    const big = { ...pay('big', monthsAgo(1, 15), 3000), merchant: 'Online payment' };
+    await setup([carLoan()], [pay('p1', monthsAgo(2)), pay('p2', monthsAgo(1)), big], '/net-worth/loans/loan');
+    button('+ Link a payment', el).click();
+    await settle();
+    const search = document.querySelector('app-modal input[type=search]') as HTMLInputElement;
+    search.value = '3000';
+    search.dispatchEvent(new Event('input'));
+    await settle();
+    button('Online payment').click();
+    await settle();
+  }
+
+  it('linking a payment well above the usual asks what the lump sum should change', async () => {
+    await linkBigPayment();
+    const modal = lumpModal();
+    expect(modal).toBeTruthy();
+    expect(modal.textContent).toContain('Finish sooner');
+    // Paid in the same month as the regular payment, so it starts as "on top".
+    expect(modal.querySelector('.toggle')!.classList).toContain('on');
+
+    button('Lower the monthly payment', modal).click();
+    await settle();
+    button('Save', modal).click();
+    await settle();
+    const loan = manual.items()[0].loan!;
+    expect(loan.lumpSums).toEqual([{ txId: 'big', mode: 'reduce-emi', onTop: true }]);
+    expect(loan.paymentIds).toContain('big');
+    // Still 60 payments; each one smaller now.
+    const labels = el.querySelector('.bar-labels')!.textContent!;
+    expect(labels).toContain('2 of 60 payments');
+    expect(labels).not.toContain('$333.12/mo');
+    const row = [...el.querySelectorAll('.row')].find(r => r.textContent!.includes('Online payment'))!;
+    expect(row.textContent).toContain('Extra');
+    expect(row.textContent).toContain('Lump sum · payment lowered to');
+  });
+
+  it('or keeps the payment and finishes sooner', async () => {
+    await linkBigPayment();
+    const modal = lumpModal();
+    button('Finish sooner', modal).click();
+    await settle();
+    button('Save', modal).click();
+    await settle();
+    const labels = el.querySelector('.bar-labels')!.textContent!;
+    expect(labels).toContain('$333.12/mo');
+    const total = Number(labels.match(/2 of (\d+) payments/)![1]);
+    expect(total).toBeLessThan(60);
+    expect(total).toBeGreaterThan(45);
+
+    // Changing your mind: back to an ordinary payment.
+    const row = [...el.querySelectorAll('.row')].find(r => r.textContent!.includes('Online payment'))!;
+    button('Change', row).click();
+    await settle();
+    button('Not a lump sum', lumpModal()).click();
+    await settle();
+    expect(manual.items()[0].loan!.lumpSums).toEqual([]);
+  });
+
+  it('the penalty waiver is a choice in the form, and shows on the loan page', async () => {
+    await setup([vishal({ owedTo: 'me' })], [], '/net-worth/loans/v');
+    button('Edit loan', el).click();
+    await settle();
+    const form = document.querySelector('app-asset-form')!;
+    expect(form.textContent).toContain('Penalty waiver');
+    (form.querySelector('[aria-label="Count every payment as on time"]') as HTMLButtonElement).click();
+    await settle();
+    button('Save changes', form).click();
+    await settle();
+    expect(manual.items()[0].loan!.onSchedule).toBe(true);
+    expect(el.querySelector('.hero-top')!.textContent).toContain('Penalty waived');
+    // Nothing builds up between payments while it's waived.
+    expect(el.querySelector('.hero-note')).toBeNull();
+  });
 });

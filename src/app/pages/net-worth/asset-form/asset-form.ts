@@ -92,6 +92,8 @@ export class AssetForm implements OnChanges {
   settledEarlier = false;
   settledThrough = this.today;
   lateDays: number | null = 10;
+  /** Penalty waiver: every payment is counted as made on its due date. */
+  onSchedule = false;
   /** Set once you type your own payment; until then it follows the terms. */
   paymentEdited = false;
   matchText = '';
@@ -134,6 +136,7 @@ export class AssetForm implements OnChanges {
     this.payment = l?.payment ?? null;
     this.dueMode = l?.dueMode ?? (this.type === 'loan-given' ? 'flexible' : 'exact');
     this.lateDays = l?.lateDays ?? 10;
+    this.onSchedule = !!l?.onSchedule;
     this.settledEarlier = !!l?.settledThrough;
     this.settledThrough = l?.settledThrough ?? this.today;
     this.paymentEdited = !!l && l.payment !== this.calculatedPayment;
@@ -181,6 +184,11 @@ export class AssetForm implements OnChanges {
   /** The payment used: yours if you typed one, otherwise the calculated EMI. */
   get effectivePayment(): number {
     return this.paymentEdited && this.payment ? Number(this.payment) : this.calculatedPayment;
+  }
+
+  /** Timing only changes the money when there is interest to charge. */
+  get chargesInterest(): boolean {
+    return this.method !== 'none' && Number(this.rate) > 0;
   }
 
   /** The first payment has already come round — so there's a past to account for. */
@@ -259,6 +267,7 @@ export class AssetForm implements OnChanges {
     };
     if (this.startedInPast && this.settledEarlier && this.settledThrough) terms.settledThrough = this.settledThrough;
     if (this.dueMode === 'flexible') terms.lateDays = Math.max(0, Math.round(Number(this.lateDays) || 0));
+    if (this.onSchedule && this.chargesInterest) terms.onSchedule = true;
     if (this.isLent) terms.owedTo = this.owedTo;
     if (this.counterparty.trim()) terms.counterparty = this.counterparty.trim();
     if (this.price && this.price > 0) terms.price = Number(this.price);
@@ -269,6 +278,7 @@ export class AssetForm implements OnChanges {
     }
     if (this.existingLoan?.downPaymentId) terms.downPaymentId = this.existingLoan.downPaymentId;
     if (this.existingLoan?.corrections?.length) terms.corrections = this.existingLoan.corrections;
+    if (this.existingLoan?.lumpSums?.length) terms.lumpSums = this.existingLoan.lumpSums;
     return terms;
   }
 

@@ -20,6 +20,9 @@
         @if (tracked()) {
           <span class="tag">Tracked, not counted</span>
         }
+        @if (t.onSchedule) {
+          <span class="tag" title="Every payment is counted as made on its due date">Penalty waived</span>
+        }
       </div>
 
       <div class="hero-figure">
@@ -35,8 +38,8 @@
         <div class="bar-fill" [style.width]="(progress() * 100) + '%'"></div>
       </div>
       <div class="bar-labels">
-        <span>{{ s.covered }} of {{ t.termMonths }} payments · {{ progress() * 100 | number:'1.0-0' }}% {{ lent() ? 'repaid' : 'paid off' }}</span>
-        <span>{{ methodLabel() }} · {{ money(t.payment) }}/mo{{ timingLabel() ? ' · ' + timingLabel() : '' }}</span>
+        <span>{{ s.covered }} of {{ s.termMonths }} payments · {{ progress() * 100 | number:'1.0-0' }}% {{ lent() ? 'repaid' : 'paid off' }}</span>
+        <span>{{ methodLabel() }} · {{ money(s.payment) }}/mo{{ timingLabel() ? ' · ' + timingLabel() : '' }}</span>
       </div>
 
       <p class="hero-sentence" [class.alert]="o.behindBy > 0">{{ sentence() }}</p>
@@ -144,18 +147,25 @@
       }
 
       @for (p of made(); track p.tx.id) {
-        <div class="row">
+        <div class="row" [class.two-actions]="p.lump || p.unusual">
           <button type="button" class="row-open" (click)="viewingTx.set(p.tx)">
-            <span class="row-date">#{{ p.n }}</span>
+            <span class="row-date">{{ p.installment ? '#' + p.n : 'Extra' }}</span>
             <span class="row-main">
               <span class="row-name">{{ p.tx.merchant || 'Untitled' }}</span>
               <span class="row-sub">
                 {{ formatDate(p.tx.date) }} · {{ money(p.interest) }} interest · {{ money(p.principal) }} principal{{ p.surplus > 0 ? ' · ' + money(p.surplus) + ' extra' : '' }}
                 · {{ p.how === 'linked' ? 'linked by you' : 'matched' }}
               </span>
+              @if (p.lumpNote) {
+                <span class="row-sub lump-note">{{ p.lumpNote }}</span>
+              }
             </span>
             <span class="row-amount">{{ money(p.tx.amount) }}</span>
           </button>
+          @if (p.lump || p.unusual) {
+            <button class="btn-ghost sm" (click)="openLump(p.tx)"
+                    [title]="p.lump ? 'Change what this lump sum does' : 'Mark as a lump sum'">{{ p.lump ? 'Change' : 'Lump sum?' }}</button>
+          }
           <button class="btn-ghost sm unlink" (click)="unlink(p.tx)"
                   [title]="p.how === 'linked' ? 'Remove from this loan' : 'Not a payment for this loan'">Unlink</button>
         </div>
@@ -163,7 +173,7 @@
         @if (!o.missedDates.length && !s.assumedPayments) {
           <p class="empty">
             No payments yet.
-            @if (t.match?.text) { Anything named “{{ t.match!.text }}” near {{ money(t.payment) }} will show up here. }
+            @if (t.match?.text) { Anything named “{{ t.match!.text }}” near {{ money(s.payment) }} will show up here. }
             @else { Add “How payments show up” in Edit loan, or link them by hand. }
           </p>
         }
@@ -199,7 +209,7 @@
       <section class="card list ahead">
         <div class="list-head">
           <span class="card-label">Still to come</span>
-          <span class="muted">If each payment is {{ money(t.payment) }}</span>
+          <span class="muted">If each payment is {{ money(s.payment) }}</span>
         </div>
         @for (r of upcoming(); track r.n) {
           <div class="row projected">
@@ -244,7 +254,7 @@
            [ngModel]="linkSearch()" (ngModelChange)="linkSearch.set($event)" name="linkSearch" />
     @if (!linkSearch()) {
       <p class="field-hint">
-        {{ linking() === 'down' ? 'Showing money out around ' + formatDate(terms()?.startDate ?? today) + '.' : 'Showing amounts close to ' + money(terms()?.payment ?? 0) + '.' }}
+        {{ linking() === 'down' ? 'Showing money out around ' + formatDate(terms()?.startDate ?? today) + '.' : 'Showing amounts close to ' + money(state()?.payment ?? 0) + '.' }}
         Search to see everything.
       </p>
     }
@@ -260,6 +270,59 @@
       } @empty {
         <p class="field-hint">Nothing found.</p>
       }
+    </div>
+  </div>
+</app-modal>
+
+<!-- LUMP SUM -->
+<app-modal [open]="!!lumpTx()" title="Lump sum" size="sm" (closed)="lumpTx.set(null)">
+  @if (lumpTx(); as tx) {
+    <div class="form">
+      <p class="form-note">
+        {{ money(tx.amount) }} on {{ formatDate(tx.date) }}. Beyond the interest owed, all of it pays down the
+        principal early. Choose what that changes.
+      </p>
+      @if (lumpPreview(); as pv) {
+        <div class="choice-grid">
+          <button type="button" class="choice" [class.active]="lumpMode() === 'reduce-emi'" (click)="lumpMode.set('reduce-emi')">
+            <div class="choice-title">Lower the monthly payment</div>
+            <div class="choice-sub">
+              Same end date{{ pv.emi.payoff ? ', ' + monthYear(pv.emi.payoff) : '' }}.
+              Payments drop to {{ money(pv.emi.payment) }}.
+            </div>
+          </button>
+          <button type="button" class="choice" [class.active]="lumpMode() === 'reduce-tenure'" (click)="lumpMode.set('reduce-tenure')">
+            <div class="choice-title">Finish sooner</div>
+            <div class="choice-sub">
+              Same {{ money(pv.tenure.payment) }} a month{{ pv.tenure.payoff ? ', done by ' + monthYear(pv.tenure.payoff) : '' }}
+              · {{ pv.tenure.left }} payment{{ pv.tenure.left === 1 ? '' : 's' }} left.
+            </div>
+          </button>
+        </div>
+        @if (!lent() && pv.tenure.interest < pv.emi.interest - 0.5) {
+          <p class="field-hint">Finishing sooner saves {{ money(pv.emi.interest - pv.tenure.interest) }} more interest.</p>
+        }
+      }
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Paid on top of that month's payment</div>
+          <div class="toggle-sub">
+            On: the regular payment was {{ lent() ? 'received' : 'made' }} separately, so this doesn't count as one of the monthly payments.
+            Off: this was the month's payment, with extra.
+          </div>
+        </div>
+        <button type="button" class="toggle" [class.on]="lumpOnTop()" (click)="lumpOnTop.set(!lumpOnTop())"
+                [attr.aria-pressed]="lumpOnTop()" aria-label="Paid on top of that month's payment"></button>
+      </div>
+    </div>
+  }
+  <div class="modal-actions" modal-footer>
+    @if (isLump()) {
+      <button type="button" class="btn-ghost" (click)="removeLump()">Not a lump sum</button>
+    }
+    <div class="actions-right">
+      <button type="button" class="btn-ghost" (click)="lumpTx.set(null)">Cancel</button>
+      <button type="button" class="btn-primary" (click)="saveLump()">Save</button>
     </div>
   </div>
 </app-modal>

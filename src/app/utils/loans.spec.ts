@@ -403,15 +403,17 @@ describe('a loan that started before Trackr could see it', () => {
   });
 });
 
-describe('early, late and on-time payments split like an EMI table', () => {
+describe('early, late and on-time payments', () => {
   // Vishal: $17,095.42 at 5%, 24 months, first due Aug 24 2025, paid on schedule
   // through Jan 1 2026, then tracked payments of $750 from Jan 2026 to Sep 2026.
-  const terms = (): LoanTerms => ({
+  const terms = (over: Partial<LoanTerms> = {}): LoanTerms => ({
     method: 'reducing', startDate: '2025-07-24', amountFinanced: 17095.42, rate: 5, termMonths: 24,
     firstPaymentDate: '2025-08-24', payment: 750, match: { text: 'vishal' }, paymentIds: [], ignoredIds: [],
-    dueMode: 'flexible', lateDays: 10, settledThrough: '2026-01-01',
+    dueMode: 'flexible', lateDays: 10, settledThrough: '2026-01-01', ...over,
   });
-  const vishal = (): ManualAsset => ({ id: 'v', name: 'Vishal', type: 'loan-given', valuations: [], createdAt: 0, updatedAt: 0, loan: terms() });
+  const vishal = (over: Partial<LoanTerms> = {}): ManualAsset =>
+    ({ id: 'v', name: 'Vishal', type: 'loan-given', valuations: [], createdAt: 0, updatedAt: 0, loan: terms(over) });
+  const waived = () => vishal({ onSchedule: true });
   const pay = (date: string) => tx({ type: 'income', merchant: 'Zelle from Vishal', amount: 750, date });
 
   /** The textbook table, worked out on its own: interest = balance × r, rounded per row. */
@@ -430,55 +432,143 @@ describe('early, late and on-time payments split like an EMI table', () => {
   const mixed = ['2026-01-22', '2026-02-26', '2026-03-23', '2026-05-02', '2026-05-24', '2026-06-21', '2026-07-26', '2026-08-23', '2026-09-28'];
 
   it('on time: matches the table — $7,330.92 after 14 (Gemini: $7,330.95)', () => {
-    const s = loanState(vishal(), onTime.map(pay), '2026-10-04');
-    expect(s.paymentsMade).toBe(14);
-    expect(s.principalLeft).toBe(table(14).balance);
-    expect(s.principalLeft).toBe(7330.92);
-    expect(s.interestPaid).toBe(table(14).interest);
+    for (const l of [vishal(), waived()]) {
+      const s = loanState(l, onTime.map(pay), '2026-10-04');
+      expect(s.paymentsMade).toBe(14);
+      expect(s.principalLeft).toBe(table(14).balance);
+      expect(s.principalLeft).toBe(7330.92);
+      expect(s.interestPaid).toBe(table(14).interest);
+    }
   });
 
-  it('a payment a few days early or late changes nothing', () => {
-    const a = loanState(vishal(), onTime.map(pay), '2026-10-04');
-    const b = loanState(vishal(), mixed.map(pay), '2026-10-04');
+  it('standard: a payment before its due date is all principal', () => {
+    // Paid on the 22nd, two days before Jan 24: no interest is owed yet.
+    const s = loanState(vishal(), [pay('2026-01-22')], '2026-01-23');
+    expect(s.splits[0]).toMatchObject({ interest: 0, principal: 750 });
+    // That month's interest then comes on the 24th, on the smaller balance.
+    const after = loanState(vishal(), [pay('2026-01-22')], '2026-01-24');
+    expect(after.interestDue).toBe(round((table(5).balance - 750) * 0.05 / 12));
+    // Early months leave a little less owed than the table.
+    const early = loanState(vishal(), ['2026-01-22', ...onTime.slice(1)].map(pay), '2026-10-04');
+    expect(early.principalLeft).toBeLessThan(7330.92);
+  });
+
+  it('standard: a payment after the next due date has passed costs that month\'s interest', () => {
+    const late = onTime.map(d => (d === '2026-03-24' ? '2026-04-25' : d));
+    const s = loanState(vishal(), late.map(pay), '2026-10-04');
+    expect(s.paymentsMade).toBe(14);
+    expect(s.principalLeft).toBeGreaterThan(7330.92);
+  });
+
+  it('penalty waiver: early or late changes nothing — every payment splits like its row', () => {
+    const a = loanState(waived(), onTime.map(pay), '2026-10-04');
+    const b = loanState(waived(), mixed.map(pay), '2026-10-04');
     expect(b.principalLeft).toBe(a.principalLeft);
     expect(b.interestPaid).toBe(a.interestPaid);
     expect(b.splits.map(x => [x.interest, x.principal])).toEqual(a.splits.map(x => [x.interest, x.principal]));
+    expect(b.splits[b.splits.length - 1]).toMatchObject({ n: 14, interest: 33.53, principal: 716.47 });
   });
 
-  it('payment #14 splits $33.53 interest / $716.47 principal, as in the table', () => {
-    const s = loanState(vishal(), mixed.map(pay), '2026-10-04');
-    expect(s.splits[s.splits.length - 1]).toMatchObject({ n: 14, interest: 33.53, principal: 716.47 });
-  });
-
-  it('the rest of the loan agrees with the table too', () => {
-    const o = loanOutlook(vishal(), mixed.map(pay), '2026-10-04');
-    expect(o.paymentsLeft).toBe(10);
-    expect(o.nextDue).toBe('2026-10-24');
-    const all = schedule(terms());
-    const tableInterest = all.reduce((sum, r) => sum + r.interest, 0);
-    expect(Math.abs(o.lifetimeInterest - tableInterest)).toBeLessThan(0.05);
-  });
-
-  it('a missed month still costs interest; catching up pays both installments', () => {
+  it('penalty waiver: a month paid late, alongside the next one, costs nothing extra', () => {
     const missed = onTime.filter(d => d !== '2026-03-24');
-    const behind = loanState(vishal(), missed.map(pay), '2026-04-30');
-    const fine = loanState(vishal(), onTime.map(pay), '2026-04-30');
-    // April's payment clears March's interest and April's first, so more principal is left.
-    expect(behind.principalLeft).toBeGreaterThan(fine.principalLeft);
-    // March's payment arrives late, alongside April's.
-    const caughtUp = loanState(vishal(), [...missed, '2026-04-28'].map(pay), '2026-10-04');
-    // A whole month late costs one month's interest on March's principal (~$3) —
-    // unlike a payment a few days off, which costs nothing.
-    expect(caughtUp.paymentsMade).toBe(14);
-    expect(caughtUp.principalLeft).toBeGreaterThan(7330.92);
-    expect(caughtUp.principalLeft - 7330.92).toBeLessThan(4);
+    const behind = loanState(waived(), missed.map(pay), '2026-04-30');
+    expect(behind.interestDue).toBe(0); // nothing builds up between payments
+    expect(behind.principalLeft).toBe(table(8).balance); // 5 on schedule + Jan, Feb, Apr
+    const caughtUp = loanState(waived(), [...missed, '2026-04-28'].map(pay), '2026-10-04');
+    expect(caughtUp.principalLeft).toBe(7330.92);
+    // Still flagged as late on the page — the waiver is about money, not dates.
+    // (April's payment covered March; April's own window closes May 4.)
+    expect(loanOutlook(waived(), missed.filter(d => d <= '2026-05-05').map(pay), '2026-05-05').behindBy).toBe(1);
   });
 
-  it('paying ahead counts as the next installment, charged once', () => {
-    const ahead = loanState(vishal(), [...onTime, '2026-09-30'].map(pay), '2026-10-04');
+  it('penalty waiver: paying ahead is the next row of the table', () => {
+    const ahead = loanState(waived(), [...onTime, '2026-09-30'].map(pay), '2026-10-04');
     expect(ahead.paymentsMade).toBe(15);
     expect(ahead.principalLeft).toBe(table(15).balance);
-    const o = loanOutlook(vishal(), [...onTime, '2026-09-30'].map(pay), '2026-10-04');
-    expect(o.nextDue).toBe('2026-11-24');
+    expect(loanOutlook(waived(), [...onTime, '2026-09-30'].map(pay), '2026-10-04').nextDue).toBe('2026-11-24');
+  });
+
+  it('penalty waiver: the rest of the loan agrees with the table too', () => {
+    const o = loanOutlook(waived(), mixed.map(pay), '2026-10-04');
+    expect(o.paymentsLeft).toBe(10);
+    expect(o.nextDue).toBe('2026-10-24');
+    const tableInterest = schedule(terms()).reduce((sum, r) => sum + r.interest, 0);
+    expect(Math.abs(o.lifetimeInterest - tableInterest)).toBeLessThan(0.05);
+    expect(o.upcoming[o.upcoming.length - 1].balance).toBe(0);
+  });
+});
+
+describe('lump sums', () => {
+  // The car loan, 3 payments made, then $3,000 extra on Oct 20 on top of October's payment.
+  const pay = (date: string, amount = 333.12) => tx({ date, amount });
+  const regular = () => ['2026-08-05', '2026-09-05', '2026-10-05'].map(d => pay(d));
+  const withLump = (mode: 'reduce-emi' | 'reduce-tenure', onTop = true) => {
+    const lump = pay('2026-10-20', 3000);
+    const l = loan({ paymentIds: [lump.id!], lumpSums: [{ txId: lump.id!, mode, onTop }] });
+    return { l, txs: [...regular(), lump], lump };
+  };
+
+  it('lower the payment: same end date, smaller payments', () => {
+    const { l, txs } = withLump('reduce-emi');
+    const s = loanState(l, txs, '2026-10-21');
+    const o = loanOutlook(l, txs, '2026-10-21');
+    const plain = loanOutlook(loan(), regular(), '2026-10-21');
+    expect(s.paymentsMade).toBe(3);   // on top: not one of the monthly payments
+    expect(s.termMonths).toBe(60);
+    // The 57 payments left clear what's left — the textbook EMI on it.
+    expect(s.payment).toBe(monthlyPayment(s.principalLeft, 4.2, 57, 'reducing'));
+    expect(s.payment).toBeLessThan(333.12);
+    expect(o.paymentsLeft).toBe(57);
+    expect(o.payoffDate).toBe(plain.payoffDate);
+    expect(o.upcoming[0].payment).toBe(s.payment);
+    expect(o.upcoming[o.upcoming.length - 1].balance).toBe(0);
+    expect(o.lifetimeInterest).toBeLessThan(plain.lifetimeInterest);
+  });
+
+  it('shorter loan: same payment, finished sooner', () => {
+    const { l, txs } = withLump('reduce-tenure');
+    const s = loanState(l, txs, '2026-10-21');
+    const o = loanOutlook(l, txs, '2026-10-21');
+    const plain = loanOutlook(loan(), regular(), '2026-10-21');
+    expect(s.payment).toBe(333.12);
+    expect(s.termMonths).toBeLessThan(60);
+    expect(3 + o.paymentsLeft).toBe(s.termMonths);
+    expect(o.payoffDate! < plain.payoffDate!).toBe(true);
+    expect(o.upcoming.slice(0, -1).every(r => r.payment === 333.12)).toBe(true);
+    // Fewer months of interest: cheaper than lowering the payment.
+    expect(o.lifetimeInterest).toBeLessThan(loanOutlook(withLump('reduce-emi').l, txs, '2026-10-21').lifetimeInterest);
+  });
+
+  it('either way, the lump sum itself goes to principal', () => {
+    const { l, txs, lump } = withLump('reduce-tenure');
+    const sp = loanState(l, txs, '2026-10-21').splits.find(x => x.tx.id === lump.id)!;
+    expect(sp).toMatchObject({ installment: false, interest: 0, principal: 3000, n: 3 });
+    expect(sp.lump).toMatchObject({ mode: 'reduce-tenure', payment: 333.12 });
+  });
+
+  it('one big payment instead of the monthly one still counts as that month\'s', () => {
+    const big = pay('2026-10-05', 3333.12);
+    const l = loan({ paymentIds: [big.id!], lumpSums: [{ txId: big.id!, mode: 'reduce-tenure' }] });
+    const txs = [pay('2026-08-05'), pay('2026-09-05'), big];
+    expect(loanState(l, txs, '2026-10-06').paymentsMade).toBe(3);
+    expect(loanOutlook(l, txs, '2026-10-06').behindBy).toBe(0);
+  });
+
+  it('after the payment drops, the new amount is recognised automatically', () => {
+    const { l, txs } = withLump('reduce-emi');
+    const emi = loanState(l, txs, '2026-10-21').payment;
+    const next = pay('2026-11-05', emi);
+    const found = loanPayments(l, [...txs, next]).map(p => p.tx.id);
+    expect(found).toContain(next.id);
+    expect(loanState(l, [...txs, next], '2026-11-05').paymentsMade).toBe(4);
+  });
+
+  it('works with the penalty waiver too', () => {
+    const { txs } = withLump('reduce-emi');
+    const lumpId = txs[3].id!;
+    const l = loan({ onSchedule: true, paymentIds: [lumpId], lumpSums: [{ txId: lumpId, mode: 'reduce-emi', onTop: true }] });
+    const o = loanOutlook(l, txs, '2026-10-21');
+    expect(o.paymentsLeft).toBe(57);
+    expect(o.upcoming[o.upcoming.length - 1].balance).toBe(0);
   });
 });

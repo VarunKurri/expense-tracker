@@ -1,4 +1,4 @@
-import { LoanMethod, LoanTerms, ManualAsset, ManualAssetType, Transaction } from '../models';
+import { LoanMethod, LoanTerms, LumpSum, ManualAsset, ManualAssetType, Transaction } from '../models';
 import { localDateString, parseLocalDate } from './date';
 
 /**
@@ -22,7 +22,16 @@ import { localDateString, parseLocalDate } from './date';
  * the schedule was followed. Interest builds up on each due date; a payment
  * clears that interest first and the rest reduces the principal. So a missed
  * month leaves interest owing, a double payment catches up, and an extra
- * payment goes straight to principal — whichever method the loan uses.
+ * payment goes straight to principal — whichever method the loan uses. A
+ * payment that arrives before its due date finds no interest owing yet, so all
+ * of it is principal (and that month's interest is then charged on less).
+ *
+ * Two choices change that:
+ *  - **Penalty waiver** (`onSchedule`): every payment counts as made on its due
+ *    date, so payment N splits exactly like row N of the EMI table — early or
+ *    late makes no difference, and nothing builds up between payments.
+ *  - **Lump sums**: a payment you mark pays down principal early, then either
+ *    lowers the monthly payment (same end date) or keeps it (ends sooner).
  *
  * Pure functions: the Net worth page, the loan page and the tests share them.
  */
@@ -175,19 +184,38 @@ export function matchTolerance(payment: number): number {
   return Math.max(5, payment * 0.05);
 }
 
+/** The regular payment from a date on. A lump sum that lowered it starts a new one. */
+interface RegularPayment { from: string; payment: number }
+
 /**
  * The loan's payments, oldest first: everything linked by hand, plus every
  * transaction the matching rule recognises — right direction, on or after the
- * start, merchant/notes containing the text, close to the payment amount, and
+ * start, merchant/notes containing the text, close to the regular payment, and
  * not one you un-linked.
  */
 export function loanPayments(asset: ManualAsset, txs: Transaction[]): LoanPayment[] {
   const terms = asset.loan;
   if (!terms) return [];
+  let regular: RegularPayment[] = [{ from: '', payment: terms.payment }];
+  let out = matchPayments(asset, txs, regular);
+  // After a lump sum lowers the monthly payment, later payments are the new
+  // amount — recognise those too. Each pass can only find more; it settles fast.
+  if ((terms.lumpSums ?? []).some(l => l.mode === 'reduce-emi')) {
+    for (let pass = 0; pass < 3; pass++) {
+      const next = regularPayments(loanState(asset, txs, '9999-12-31', out), terms.payment);
+      if (next.map(r => `${r.from}:${r.payment}`).join() === regular.map(r => `${r.from}:${r.payment}`).join()) break;
+      regular = next;
+      out = matchPayments(asset, txs, regular);
+    }
+  }
+  return out;
+}
+
+function matchPayments(asset: ManualAsset, txs: Transaction[], regular: RegularPayment[]): LoanPayment[] {
+  const terms = asset.loan!;
   const linked = new Set(terms.paymentIds ?? []);
   const ignored = new Set(terms.ignoredIds ?? []);
   const text = terms.match?.text?.trim().toLowerCase();
-  const tol = matchTolerance(terms.payment);
   const out: LoanPayment[] = [];
   for (const t of txs) {
     if (!t.id || t.refunded) continue;
@@ -197,21 +225,39 @@ export function loanPayments(asset: ManualAsset, txs: Transaction[]): LoanPaymen
     if (terms.match?.accountId && t.accountId !== terms.match.accountId) continue;
     const hay = `${t.merchant ?? ''} ${t.notes ?? ''}`.toLowerCase();
     if (!hay.includes(text)) continue;
-    if (Math.abs(t.amount - terms.payment) > tol) continue;
+    if (!closeToRegular(t, regular)) continue;
     out.push({ tx: t, kind: 'payment', how: 'matched' });
   }
   return out.sort((a, b) => a.tx.date.localeCompare(b.tx.date) || (a.tx.createdAt ?? 0) - (b.tx.createdAt ?? 0));
+}
+
+/** Close to the payment in force on its date — or to the original, if the payer never changed. */
+function closeToRegular(t: Transaction, regular: RegularPayment[], widen = 1): boolean {
+  const inForce = [...regular].reverse().find(r => r.from <= t.date) ?? regular[0];
+  return [inForce.payment, regular[0].payment].some(p => Math.abs(t.amount - p) <= matchTolerance(p) * widen);
+}
+
+/** The regular payment over time: the original, then each one a lump sum set. */
+function regularPayments(state: LoanState, original: number): RegularPayment[] {
+  const out: RegularPayment[] = [{ from: '', payment: original }];
+  for (const sp of state.splits) {
+    if (sp.lump && sp.lump.payment !== out[out.length - 1].payment) out.push({ from: sp.tx.date, payment: sp.lump.payment });
+  }
+  return out;
 }
 
 /** Unlinked transactions that look like they could be payments — for one-click linking. */
 export function candidatePayments(asset: ManualAsset, txs: Transaction[], limit = 20): Transaction[] {
   const terms = asset.loan;
   if (!terms) return [];
-  const taken = new Set(loanPayments(asset, txs).map(p => p.tx.id));
-  const tol = Math.max(matchTolerance(terms.payment), terms.payment * 0.25);
+  const pays = loanPayments(asset, txs);
+  const taken = new Set(pays.map(p => p.tx.id));
+  const regular = regularPayments(loanState(asset, txs, '9999-12-31', pays), terms.payment);
+  // Wider than automatic matching: a payer who rounds, or pays a little extra.
+  const widen = (p: number) => Math.max(1, (p * 0.25) / matchTolerance(p));
   return txs
     .filter(t => t.id && !taken.has(t.id) && !t.refunded && rightDirection(asset, t) && t.date >= terms.startDate)
-    .filter(t => Math.abs(t.amount - terms.payment) <= tol)
+    .filter(t => closeToRegular(t, regular, widen(terms.payment)))
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, limit);
 }
@@ -220,12 +266,17 @@ export function candidatePayments(asset: ManualAsset, txs: Transaction[], limit 
 
 export interface PaymentSplit {
   tx: Transaction;
-  n: number;            // 1-based count among real payments
+  /** 1-based count among monthly payments. A lump sum on top shares the count of the one before. */
+  n: number;
+  /** Counts as one of the monthly payments (false for a lump sum paid on top). */
+  installment: boolean;
   interest: number;
   principal: number;
   /** Paid beyond what was owed — nothing left to pay it against. */
   surplus: number;
   principalLeft: number;
+  /** Marked as a lump sum: what the regular payment and the term became after it. */
+  lump?: LumpSum & { payment: number; termMonths: number };
 }
 
 export interface LoanState {
@@ -244,8 +295,12 @@ export interface LoanState {
    * or a statement balance. What "4 of 60 payments" and missed months count against.
    */
   covered: number;
-  /** Installments whose interest has been charged (by due date or by an early payment). */
-  accruedThrough: number;
+  /** Due dates reached so far. In the standard model their interest is already charged. */
+  duesPassed: number;
+  /** The regular payment now — the original, or what a lump sum lowered it to. */
+  payment: number;
+  /** How many monthly payments the loan runs for now — fewer after a lump sum that shortened it. */
+  termMonths: number;
   principalPaid: number;
   interestPaid: number;
   totalPaid: number;
@@ -262,11 +317,17 @@ type Event =
  * The loan as it stands at the end of `asOf`. Interest is added on each due
  * date; payments clear interest first, then principal. A statement balance
  * you entered replaces the running figure on its date.
+ *
+ * With the penalty waiver on, interest isn't added by date at all: each
+ * monthly payment is charged its own installment's interest as it is applied,
+ * just as if it had arrived on its due date.
  */
 export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, payments = loanPayments(asset, txs)): LoanState {
   const terms = asset.loan!;
   const down = payments.find(p => p.kind === 'down' && p.tx.date <= asOf);
   const downPayment = down ? down.tx.amount : (terms.downPayment ?? 0);
+  const waived = !!terms.onSchedule;
+  const lumps = new Map((terms.lumpSums ?? []).map(l => [l.txId, l]));
 
   // Before tracking began, the loan followed its schedule: start from where the
   // schedule says it was, counting those payments as made.
@@ -309,19 +370,16 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
   // real payments count towards covering due dates.
   let settlePoint = startAt && assumed > 0 ? startAt : null;
   let paymentsSinceSettle = 0;
+  let duesPassed = assumed;
+  let installments = assumed;       // monthly payments counted so far
+  let payment = terms.payment;      // the regular payment, until a lump sum changes it
+  let term = terms.termMonths;      // how long the loan runs, until a lump sum shortens it
 
-  // Interest is charged per installment, once — when its due date arrives or
-  // when a payment is applied to it, whichever comes first. So a payment that
-  // lands a few days early splits exactly like it would on the day (as an EMI
-  // table has it), while a missed month still builds up interest on its date.
-  let accruedThrough = assumed;   // installments whose interest is already charged
-  let nextInstallment = assumed;  // the installment the next payment pays
-  const charge = (k: number) => {
-    if (k < accruedThrough) return;
-    if (principalLeft > 0 && (k < terms.termMonths || terms.method === 'reducing')) {
+  /** Installment k's interest, on what is owed now. Flat and no-interest loans stop charging at the end of the term. */
+  const accrue = (k: number) => {
+    if (principalLeft > 0 && (k < term || terms.method === 'reducing')) {
       interestDue = round2(interestDue + periodInterest(terms, principalLeft));
     }
-    accruedThrough = k + 1;
   };
   const duesUpTo = (date: string) => {
     let n = 0;
@@ -331,10 +389,13 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
 
   for (const e of events) {
     if (e.kind === 'due') {
-      charge(e.index);
+      duesPassed = e.index + 1;
+      if (!waived) accrue(e.index);
     } else if (e.kind === 'pay') {
-      charge(nextInstallment);
-      nextInstallment++;
+      const lump = lumps.get(e.tx.id!);
+      const installment = !lump?.onTop;
+      // Waived: as if it arrived on its due date — its own installment's interest, no more, no less.
+      if (waived && installment) accrue(installments);
       const amount = e.tx.amount;
       const toInterest = Math.min(amount, interestDue);
       const toPrincipal = Math.min(principalLeft, round2(amount - toInterest));
@@ -344,29 +405,54 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
       interestPaid = round2(interestPaid + toInterest);
       principalPaid = round2(principalPaid + toPrincipal);
       totalPaid = round2(totalPaid + amount);
-      paymentsSinceSettle++;
-      splits.push({ tx: e.tx, n: assumed + splits.length + 1, interest: round2(toInterest), principal: round2(toPrincipal), surplus, principalLeft });
+      if (installment) { installments++; paymentsSinceSettle++; }
+      if (lump && principalLeft > 0.004) {
+        if (lump.mode === 'reduce-emi') payment = reamortise(terms, principalLeft, Math.max(1, term - installments));
+        else term = installments + monthsToClear(terms, principalLeft, payment);
+      }
+      splits.push({
+        tx: e.tx, n: installments, installment, interest: round2(toInterest), principal: round2(toPrincipal), surplus, principalLeft,
+        ...(lump ? { lump: { ...lump, payment, termMonths: term } } : {}),
+      });
     } else {
       // A statement balance: the figure is known, and everything due before it is settled.
       principalLeft = round2(e.value);
       interestDue = 0;
       settlePoint = e.date;
       paymentsSinceSettle = 0;
-      const settled = duesUpTo(e.date);
-      accruedThrough = Math.max(accruedThrough, settled);
-      nextInstallment = Math.max(nextInstallment, settled);
+      installments = Math.max(installments, duesUpTo(e.date));
     }
   }
 
-  const paymentsMade = assumed + splits.length;
+  const paymentsMade = assumed + splits.filter(s => s.installment).length;
   let covered = paymentsMade;
   if (settlePoint) covered = Math.max(paymentsMade, duesUpTo(settlePoint) + paymentsSinceSettle);
 
   return {
     principalLeft, interestDue, owed: round2(principalLeft + interestDue),
-    paymentsMade, assumedPayments: assumed, covered, accruedThrough,
+    paymentsMade, assumedPayments: assumed, covered, duesPassed, payment, termMonths: term,
     principalPaid, interestPaid, totalPaid, downPayment, splits,
   };
+}
+
+/** The regular payment that clears `principal` in `months`, the loan's way. */
+function reamortise(terms: LoanTerms, principal: number, months: number): number {
+  // Flat: the same interest each month as before, on top of an even share of what's left.
+  if (terms.method === 'flat' && terms.rate > 0) return round2(principal / months + periodInterest(terms, principal));
+  return monthlyPayment(principal, terms.rate, months, terms.method);
+}
+
+/** How many regular payments it takes to clear `principal`. */
+function monthsToClear(terms: LoanTerms, principal: number, payment: number): number {
+  let left = principal, n = 0;
+  while (left > 0.004 && n < 1200) {
+    const step = round2(payment - periodInterest(terms, left));
+    if (step <= 0) return 1200; // the payment doesn't even cover the interest
+    // A few cents of rounding ride along with the last payment.
+    left = left - step < 1 ? 0 : round2(left - step);
+    n++;
+  }
+  return n;
 }
 
 /** What the loan is worth to net worth on a date: nothing before it started. */
@@ -410,7 +496,6 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
   let principalLeft = now.principalLeft;
   let interestDue = now.interestDue;
 
-
   // Due dates whose window has closed: a payment for them is now missed. Counted
   // against payments made, so a payment on the 2nd covers the 25th before it,
   // and two payments in one month cover two due dates.
@@ -432,15 +517,18 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
   let leftToPay = 0, futureInterest = 0, paymentsLeft = 0;
   let payoffDate: string | null = null;
   const upcoming: ScheduleRow[] = [];
-  const accrues = (i: number) => principalLeft > 0 && (i < terms.termMonths || terms.method === 'reducing');
+  const waived = !!terms.onSchedule;
+  const accrues = (k: number) => principalLeft > 0 && (k < now.termMonths || terms.method === 'reducing');
+  const charge = () => {
+    const i = periodInterest(terms, principalLeft);
+    interestDue = round2(interestDue + i);
+    futureInterest = round2(futureInterest + i);
+  };
 
-  // Installments already covered whose interest hasn't been charged yet.
-  for (let i = now.accruedThrough; i < nextIndex; i++) {
-    if (accrues(i)) {
-      const interest = periodInterest(terms, principalLeft);
-      interestDue = round2(interestDue + interest);
-      futureInterest = round2(futureInterest + interest);
-    }
+  // Paid ahead: due dates already covered still charge their interest when they
+  // come. (Waived: each payment already carried its own installment's interest.)
+  if (!waived) {
+    for (let i = now.duesPassed; i < nextIndex; i++) if (accrues(i)) charge();
   }
 
   // From the next payment expected — which may be one whose due date has passed
@@ -448,18 +536,16 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
   // Anything missed is folded into what's owed and paid off along the way.
   let due = nextIndex;
   while ((principalLeft > 0.004 || interestDue > 0.004) && due < terms.termMonths * 3) {
-    if (due >= now.accruedThrough && accrues(due)) {
-      const i = periodInterest(terms, principalLeft);
-      interestDue = round2(interestDue + i);
-      futureInterest = round2(futureInterest + i);
-    }
+    // Standard: interest comes with each due date not reached yet. Waived: with each payment, by installment.
+    const k = waived ? now.covered + paymentsLeft : due;
+    if ((waived || due >= now.duesPassed) && accrues(k)) charge();
     const owedNow = round2(principalLeft + interestDue);
     // Regular payments until it's cleared. On the last scheduled one, a few
     // cents of rounding are settled with it, as lenders do; anything more
     // (payments missed along the way) carries on at the regular amount, so the
     // loan honestly runs longer instead of ending in one huge payment.
-    const settlesRounding = due >= terms.termMonths - 1 && owedNow - terms.payment < 1;
-    const pay = settlesRounding ? owedNow : Math.min(owedNow, terms.payment);
+    const settlesRounding = k >= now.termMonths - 1 && owedNow - now.payment < 1;
+    const pay = settlesRounding ? owedNow : Math.min(owedNow, now.payment);
     const toInterest = Math.min(pay, interestDue);
     const toPrincipal = Math.min(principalLeft, round2(pay - toInterest));
     interestDue = round2(interestDue - toInterest);

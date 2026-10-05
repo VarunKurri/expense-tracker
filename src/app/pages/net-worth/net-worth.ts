@@ -129,7 +129,7 @@ export class NetWorth implements OnDestroy {
       .filter(m => m.loan && !m.archived && !countsInNetWorth(m))
       .map(m => {
         const s = loanState(m, txs, this.today);
-        return { id: m.id!, name: m.name, owed: s.owed, made: s.paymentsMade, of: m.loan!.termMonths };
+        return { id: m.id!, name: m.name, owed: s.owed, made: s.paymentsMade, of: s.termMonths };
       });
   });
 
@@ -139,7 +139,7 @@ export class NetWorth implements OnDestroy {
     const m = this.manual().find(x => x.id === h.id);
     if (!m?.loan) return null;
     const s = loanState(m, this.txs(), this.today);
-    return `${s.paymentsMade} of ${m.loan.termMonths} payments`;
+    return `${s.paymentsMade} of ${s.termMonths} payments`;
   }
 
   hasManual = computed(() => this.manual().some(m => !m.archived));

@@ -10,9 +10,10 @@ import { Confirm } from '../../../components/confirm/confirm';
 import { TransactionView } from '../../../components/transaction-view/transaction-view';
 import { TransactionForm } from '../../transactions/transaction-form/transaction-form';
 import { AssetForm, AssetFormSave } from '../asset-form/asset-form';
-import { Transaction } from '../../../models';
+import { LoanTerms, LumpSum, ManualAsset, Transaction } from '../../../models';
 import {
-  LoanPayment, candidatePayments, dueModeOf, schedule, countsInNetWorth, loanDirection, loanOutlook, loanPayments, loanState,
+  LoanPayment, PaymentSplit, candidatePayments, dueModeOf, schedule, countsInNetWorth, loanDirection, loanOutlook, loanPayments,
+  loanState, matchTolerance,
 } from '../../../utils/loans';
 import { entryValueOn, manualType, withValuation } from '../../../utils/net-worth';
 import { localDateString, parseLocalDate } from '../../../utils/date';
@@ -99,7 +100,7 @@ export class LoanDetail {
     const mode = dueModeOf(t);
     if (mode === 'none') {
       const pace = o.payoffDate ? ` At this pace, ${this.lent() ? 'repaid' : 'paid off'} around ${this.monthYear(o.payoffDate)}.` : '';
-      return `${s.paymentsMade} of ${t.termMonths} payments ${this.lent() ? 'in' : 'made'} so far, roughly monthly.${pace}`;
+      return `${s.paymentsMade} of ${s.termMonths} payments ${this.lent() ? 'in' : 'made'} so far, roughly monthly.${pace}`;
     }
     if (!o.nextDue) return 'On track.';
     // Due date passed but still inside its window: on its way, not missed.
@@ -110,7 +111,7 @@ export class LoanDetail {
       ? `expected around ${this.formatDate(o.nextDue)} (by ${this.formatDate(o.nextDueBy!)})`
       : `due ${this.formatDate(o.nextDue)}`;
     if (s.paymentsMade === 0) return `No payments yet. The first is ${when}.`;
-    return `On track. Next payment of ${this.money(t.payment)} is ${when}.`;
+    return `On track. Next payment of ${this.money(s.payment)} is ${when}.`;
   });
 
   /** What it bought, and what that's worth now — the other side of the loan. */
@@ -131,13 +132,32 @@ export class LoanDetail {
 
   downPayment = computed(() => this.payments().find(p => p.kind === 'down') ?? null);
 
-  /** Payments so far, newest first, with how each was split. */
+  /**
+   * Payments so far, newest first, with how each was split. `unusual` marks a
+   * payment far from the regular amount at the time — the ones worth asking
+   * "was this a lump sum?" about.
+   */
   made = computed(() => {
-    const s = this.state();
-    if (!s) return [];
+    const s = this.state(), t = this.terms();
+    if (!s || !t) return [];
     const how = new Map(this.payments().map(p => [p.tx.id, p.how]));
-    return [...s.splits].reverse().map(sp => ({ ...sp, how: how.get(sp.tx.id) ?? 'matched' }));
+    let inForce = t.payment;
+    const rows = s.splits.map(sp => {
+      const unusual = Math.abs(sp.tx.amount - inForce) > matchTolerance(inForce);
+      const row = { ...sp, how: how.get(sp.tx.id) ?? 'matched', unusual, lumpNote: this.lumpNote(sp) };
+      if (sp.lump) inForce = sp.lump.payment;
+      return row;
+    });
+    return rows.reverse();
   });
+
+  /** "Lump sum · payment lowered to $612.40" / "Lump sum · loan shortened to 20 payments". */
+  private lumpNote(sp: PaymentSplit): string {
+    if (!sp.lump) return '';
+    return sp.lump.mode === 'reduce-emi'
+      ? `Lump sum · payment lowered to ${this.money(sp.lump.payment)}`
+      : `Lump sum · loan shortened to ${sp.lump.termMonths} payments`;
+  }
 
   showAllMissed = signal(false);
   /** Three missing months is enough to make the point; the rest fold away. */
@@ -229,6 +249,9 @@ export class LoanDetail {
       await this.manualService.update(l.id, { loan: patch });
       this.toast.success(mode === 'down' ? 'Down payment linked.' : 'Payment linked.');
       this.closeLink();
+      // Well above the regular payment: ask what the extra should change.
+      const regular = this.state()?.payment ?? terms.payment;
+      if (mode === 'payment' && t.amount > regular + matchTolerance(regular)) this.openLump(t);
     } catch {
       this.toast.error('Could not link it. Please try again.');
     }
@@ -239,16 +262,89 @@ export class LoanDetail {
     const l = this.loan();
     if (!l?.id || !t.id) return;
     const terms = l.loan!;
+    const base = { ...terms, lumpSums: (terms.lumpSums ?? []).filter(x => x.txId !== t.id) };
     const patch = t.id === terms.downPaymentId
-      ? { ...terms, downPaymentId: undefined }
+      ? { ...base, downPaymentId: undefined }
       : terms.paymentIds?.includes(t.id)
-        ? { ...terms, paymentIds: terms.paymentIds.filter(x => x !== t.id) }
-        : { ...terms, ignoredIds: [...new Set([...(terms.ignoredIds ?? []), t.id])] };
+        ? { ...base, paymentIds: terms.paymentIds.filter(x => x !== t.id) }
+        : { ...base, ignoredIds: [...new Set([...(terms.ignoredIds ?? []), t.id])] };
     try {
       await this.manualService.update(l.id, { loan: patch });
       this.toast.success('Unlinked. It still counts as a normal transaction.');
     } catch {
       this.toast.error('Could not unlink it. Please try again.');
+    }
+  }
+
+  // ── Lump sums ──────────────────────────────────────────────
+  /** The payment being marked as a lump sum, and the choices for it. */
+  lumpTx = signal<Transaction | null>(null);
+  lumpMode = signal<LumpSum['mode']>('reduce-tenure');
+  lumpOnTop = signal(false);
+  isLump = computed(() => !!this.lumpTx() && !!this.terms()?.lumpSums?.some(x => x.txId === this.lumpTx()!.id));
+
+  openLump(tx: Transaction) {
+    const existing = this.terms()?.lumpSums?.find(x => x.txId === tx.id);
+    this.lumpMode.set(existing?.mode ?? 'reduce-tenure');
+    // Another payment in the same month means this one came on top of it.
+    this.lumpOnTop.set(existing ? !!existing.onTop : this.sharesMonth(tx));
+    this.lumpTx.set(tx);
+  }
+
+  private sharesMonth(tx: Transaction): boolean {
+    const month = tx.date.slice(0, 7);
+    return (this.state()?.splits ?? []).some(sp => sp.tx.id !== tx.id && !sp.lump && sp.tx.date.slice(0, 7) === month);
+  }
+
+  /** The loan with this lump sum set as chosen — what Save would make it. */
+  private withLump(l: ManualAsset, tx: Transaction, mode: LumpSum['mode'], onTop: boolean): LoanTerms {
+    const t = l.loan!;
+    const lump: LumpSum = { txId: tx.id!, mode, ...(onTop ? { onTop: true } : {}) };
+    return {
+      ...t,
+      // Linked by hand, so it stays a payment whatever its amount.
+      paymentIds: [...new Set([...(t.paymentIds ?? []), tx.id!])],
+      ignoredIds: (t.ignoredIds ?? []).filter(x => x !== tx.id),
+      lumpSums: [...(t.lumpSums ?? []).filter(x => x.txId !== tx.id), lump],
+    };
+  }
+
+  /** What each choice would do: the payment from now on, when it ends, how many payments are left. */
+  lumpPreview = computed(() => {
+    const l = this.loan(), tx = this.lumpTx();
+    if (!l?.loan || !tx?.id) return null;
+    const preview = (mode: LumpSum['mode']) => {
+      const asset = { ...l, loan: this.withLump(l, tx, mode, this.lumpOnTop()) };
+      const pays = loanPayments(asset, this.txs());
+      const s = loanState(asset, this.txs(), this.today, pays);
+      const o = loanOutlook(asset, this.txs(), this.today, pays);
+      return { payment: s.payment, payoff: o.payoffDate, left: o.paymentsLeft, interest: o.lifetimeInterest };
+    };
+    return { emi: preview('reduce-emi'), tenure: preview('reduce-tenure') };
+  });
+
+  async saveLump() {
+    const l = this.loan(), tx = this.lumpTx();
+    if (!l?.id || !l.loan || !tx?.id) return;
+    try {
+      await this.manualService.update(l.id, { loan: this.withLump(l, tx, this.lumpMode(), this.lumpOnTop()) });
+      this.toast.success(this.lumpMode() === 'reduce-emi' ? 'Lump sum saved. The monthly payment is lower.' : 'Lump sum saved. The loan ends sooner.');
+      this.lumpTx.set(null);
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
+
+  /** Back to an ordinary payment. */
+  async removeLump() {
+    const l = this.loan(), tx = this.lumpTx();
+    if (!l?.id || !l.loan || !tx?.id) return;
+    try {
+      await this.manualService.update(l.id, { loan: { ...l.loan, lumpSums: (l.loan.lumpSums ?? []).filter(x => x.txId !== tx.id) } });
+      this.toast.success('Counted as a regular payment again.');
+      this.lumpTx.set(null);
+    } catch {
+      this.toast.error('Could not save. Please try again.');
     }
   }
 
