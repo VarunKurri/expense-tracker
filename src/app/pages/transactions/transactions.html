@@ -115,18 +115,20 @@
               (change)="filterAccountId.set($any($event.target).value)">
         <option value="">All accounts</option>
         @for (a of activeAccounts(); track a.id) {
-          <option [value]="a.id">{{ a.icon }} {{ a.name }}</option>
+          <option [value]="a.id" [selected]="a.id === filterAccountId()">{{ a.icon }} {{ a.name }}</option>
         }
       </select>
     }
 
-    <!-- Category filter -->
+    <!-- Category filter. Each option marks itself selected: the select's own
+         [value] is set before the options exist (categories load async), so a
+         filter arriving from a link would show "All categories". -->
     <select class="filter-select"
             [value]="filterCategoryId()"
             (change)="filterCategoryId.set($any($event.target).value)">
       <option value="">All categories</option>
       @for (c of allCategories(); track c.id) {
-        <option [value]="c.id">{{ c.icon }} {{ c.name }}</option>
+        <option [value]="c.id" [selected]="c.id === filterCategoryId()">{{ c.icon }} {{ c.name }}</option>
       }
     </select>
 

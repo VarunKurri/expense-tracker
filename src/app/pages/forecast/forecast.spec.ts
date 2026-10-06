@@ -92,15 +92,23 @@ describe('Forecast page', () => {
     expect(el.querySelector('.month-row:not(.head)')!.textContent).toContain('(rest)');
   });
 
-  it('leaving out the one-off month changes the pace', async () => {
+  it('leaving out the one-off month changes the pace — on the same card as what it changes', async () => {
     await setup(history());
-    const rows = [...el.querySelectorAll('.base-row')];
-    expect(rows).toHaveLength(3);
-    const laptopMonth = rows[1];
-    (laptopMonth.querySelector('.toggle') as HTMLButtonElement).click();
+    const card = el.querySelector('.typical')!;
+    // The months, the choice of how many, and the figures they make are one card.
+    expect(card.querySelector('.spans')!.textContent).toContain('Last 3');
+    const tiles = [...card.querySelectorAll('.month-tile')];
+    expect(tiles).toHaveLength(3);
+    expect(card.querySelector('.typical-figures')!.textContent).toContain('$2,500');
+    const laptopMonth = tiles[1] as HTMLButtonElement;
+    laptopMonth.click();
     await settle();
     expect(laptopMonth.classList).toContain('off');
+    expect(laptopMonth.getAttribute('aria-pressed')).toBe('false');
+    expect(card.querySelector('.typical-figures')!.textContent).toContain('$2,000');
     expect(el.querySelector('.hero-sentence')!.textContent).toContain('put away about $1,000 a month');
+    // The explanation card below has no controls of its own any more.
+    expect(el.querySelector('.basis .chip')).toBeNull();
     // Remembered on this device.
     expect(JSON.parse(localStorage.getItem('trackr.forecast.excluded')!)).toHaveLength(1);
   });
@@ -143,7 +151,7 @@ describe('Forecast page', () => {
     const netflix: Bill = { id: 'nf', name: 'Netflix', amount: 20, frequency: 'monthly', nextDueDate: monthsAgo(-1, 5), autopayEnabled: true, active: true, createdAt: 0 };
     await setup(txs, [netflix]);
 
-    const card = el.querySelector('.everyday')!;
+    const card = el.querySelector('.typical')!;
     const rows = [...card.querySelectorAll('.cat-row')];
     // Groceries $2,000 a month; the laptop month adds $500 uncategorised; Netflix nets to nothing.
     expect(rows.map(r => r.querySelector('.cat-name')!.textContent!.trim())).toEqual(['Groceries', 'Uncategorised', 'Entertainment']);
@@ -162,7 +170,7 @@ describe('Forecast page', () => {
   it('a bill nobody filed is shown as its own line, not hidden in a category', async () => {
     const gym: Bill = { id: 'gym', name: 'Gym', amount: 40, frequency: 'monthly', nextDueDate: monthsAgo(-1, 2), autopayEnabled: true, active: true, createdAt: 0 };
     await setup(history(), [gym]);
-    const unfiled = el.querySelector('.everyday .unfiled')!;
+    const unfiled = el.querySelector('.typical .unfiled')!;
     expect(unfiled.textContent).toContain('Gym');
     expect(unfiled.textContent).toContain('−$40');
     expect(el.querySelector('.everyday-total')!.textContent).toContain('$2,460');

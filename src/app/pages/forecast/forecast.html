@@ -122,13 +122,46 @@
         </section>
       </div>
 
-      <!-- EVERYDAY, BY CATEGORY -->
-      @if (f.basis.categories.length) {
-        <section class="card everyday">
-          <div class="card-head">
-            <span class="card-label">Everyday, in a typical month</span>
-            <span class="muted">Average of the months below</span>
+      <!-- A TYPICAL MONTH: the months it's based on, and what they add up to.
+           The controls live on the card they change. -->
+      <section class="card typical">
+        <div class="card-head">
+          <span class="card-label">A typical month</span>
+          <div class="spans" role="group" aria-label="Months to average">
+            @for (s of spans; track s) {
+              <button class="chip" [class.active]="basedOn() === s" [attr.aria-pressed]="basedOn() === s"
+                      (click)="setBasedOn(s)">Last {{ s }}</button>
+            }
           </div>
+        </div>
+
+        <div class="based-on">
+          <span class="label-mono">Based on</span>
+          <div class="month-tiles">
+            @for (b of f.basis.months; track b.month) {
+              <button type="button" class="month-tile" [class.off]="!b.included" (click)="toggleMonth(b.month)"
+                      [attr.aria-pressed]="b.included"
+                      [attr.aria-label]="(b.included ? 'Leave out ' : 'Count ') + b.label">
+                <span class="t-name">{{ b.label }}</span>
+                <span class="t-figs">{{ money(b.income) }} in · {{ money(b.spending) }} out</span>
+              </button>
+            }
+          </div>
+          <p class="field-hint">Click a month to leave it out if it was a one-off — a laptop, a trip — so it doesn't set the pace.</p>
+        </div>
+
+        <div class="typical-figures">
+          <div>
+            <span class="label-mono">Money in</span>
+            <span class="t-value">{{ money(f.basis.income) }}</span>
+          </div>
+          <div>
+            <span class="label-mono">Everyday spending</span>
+            <span class="t-value">{{ money(f.basis.everyday) }}</span>
+          </div>
+        </div>
+
+        @if (f.basis.categories.length) {
           <p class="everyday-sentence">{{ everydaySentence() }}</p>
           @for (row of everydayRows(); track row.id) {
             <button type="button" class="cat-row" [class.zero]="row.amount === 0" (click)="openCategory(row.id)"
@@ -166,40 +199,24 @@
             <span>Everyday spending, a month</span>
             <span class="num">{{ money(f.basis.everyday) }}</span>
           </div>
-        </section>
-      }
+        } @else {
+          <p class="empty-note">No spending in the months counted.</p>
+        }
+      </section>
 
-      <!-- HOW IT'S WORKED OUT -->
+      <!-- HOW IT'S WORKED OUT: just the explanation; the controls are above. -->
       <section class="card basis">
         <div class="card-head">
           <span class="card-label">How this is worked out</span>
-          <div class="spans" role="group" aria-label="Months the averages use">
-            @for (s of spans; track s) {
-              <button class="chip" [class.active]="basedOn() === s" [attr.aria-pressed]="basedOn() === s"
-                      (click)="setBasedOn(s)">Last {{ s }}</button>
-            }
-          </div>
         </div>
         <div class="basis-body">
           <p class="basis-text">
             <strong>Known money comes in on its dates:</strong> bills and subscriptions when they're due,
-            loan payments on their schedule. <strong>The rest is typical:</strong> about
-            {{ money(f.basis.income) }} a month in, and {{ money(f.basis.everyday) }} of everyday spending —
-            your spending over the months below, less what bills cost a month ({{ money(f.basis.billsMonthly) }})
-            and loan payments. Investments are held flat; nothing assumes growth.
+            loan payments on their schedule. <strong>The rest is a typical month</strong>, averaged over the
+            months chosen above: {{ money(f.basis.income) }} in, and {{ money(f.basis.everyday) }} of everyday
+            spending — what you spent, less what bills cost a month ({{ money(f.basis.billsMonthly) }}) and loan
+            payments, category by category. Investments are held flat; nothing assumes growth.
           </p>
-          <p class="field-hint">Leave out a month that was a one-off — a laptop, a trip — so it doesn't set the pace.</p>
-          <div class="base-months">
-            @for (b of f.basis.months; track b.month) {
-              <div class="base-row" [class.off]="!b.included">
-                <span class="b-name">{{ b.label }}</span>
-                <span class="b-fig">{{ money(b.income) }} in</span>
-                <span class="b-fig">{{ money(b.spending) }} spent</span>
-                <button type="button" class="toggle" [class.on]="b.included" (click)="toggleMonth(b.month)"
-                        [attr.aria-pressed]="b.included" [attr.aria-label]="'Count ' + b.label"></button>
-              </div>
-            }
-          </div>
         </div>
       </section>
     }

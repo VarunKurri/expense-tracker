@@ -250,6 +250,67 @@
   color: var(--fg-3);
 }
 
+/* ── A typical month ─────────────────────────────────────── */
+.based-on {
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  .field-hint { margin: 0; }
+}
+
+.month-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+/* A month counted is a solid tile; one left out is dashed and struck — monochrome, like any selection. */
+.month-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--t), border-color var(--t);
+
+  .t-name { font-size: 13px; font-weight: 500; color: var(--fg); }
+  .t-figs { font-size: 11.5px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+
+  &:hover { background: var(--accent-bg); }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+  &.off {
+    border-style: dashed;
+    border-color: var(--line);
+    background: transparent;
+    .t-name, .t-figs { color: var(--fg-4); text-decoration: line-through; }
+  }
+}
+
+.typical-figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 20px;
+  }
+  > div + div { border-left: 1px solid var(--line); }
+
+  .t-value { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--fg); font-variant-numeric: tabular-nums; }
+}
+
 /* ── Everyday, by category ────────────────────────────────── */
 /* An average of real history, not a projection: a plain card. */
 .everyday-sentence {
@@ -397,32 +458,6 @@
   strong { color: var(--fg); font-weight: 600; }
 }
 
-.base-months {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  max-width: 620px;
-}
-
-.base-row {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr auto;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--line);
-  font-size: 13px;
-  color: var(--fg-2);
-  font-variant-numeric: tabular-nums;
-
-  &:last-child { border-bottom: 0; }
-  .b-name { color: var(--fg); font-weight: 500; }
-  .b-fig { text-align: right; }
-  &.off .b-name, &.off .b-fig { color: var(--fg-4); text-decoration: line-through; }
-}
-
 @media (max-width: 960px) {
   .columns { grid-template-columns: 1fr; }
 }
@@ -451,5 +486,4 @@
     }
   }
   .month-detail { padding-left: 20px; }
-  .base-row { grid-template-columns: 1fr auto; .b-fig { display: none; } }
 }

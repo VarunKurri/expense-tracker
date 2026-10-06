@@ -176,17 +176,17 @@ export class Forecast implements OnDestroy {
     return this.showAllCategories() ? rows : rows.slice(0, 8);
   });
 
-  /** "About $1,401 a month goes on everyday spending. Groceries ($420) is the biggest part." */
+  /** "Groceries is the biggest part, at $520 (37%)." — the total sits right above, so not repeated. */
   everydaySentence = computed(() => {
     const b = this.f().basis;
     const top = b.categories.find(c => c.everyday > 0);
-    const lead = `About ${this.money(b.everyday)} a month goes on everyday spending.`;
-    if (!top) return lead;
+    const hint = 'Click a category to see its transactions over these months.';
+    if (!top) return hint;
     const name = top.categoryId === '__none__'
       ? 'Uncategorised spending'
       : this.categoryService.categories().find(c => c.id === top.categoryId)?.name ?? 'Uncategorised spending';
     const pct = b.everyday > 0 ? Math.round((top.everyday / b.everyday) * 100) : 0;
-    return `${lead} ${name} is the biggest part, at ${this.money(top.everyday)} (${pct}%).`;
+    return `${name} is the biggest part, at ${this.money(top.everyday)} (${pct}%). ${hint}`;
   });
 
   /** The category's transactions over the months the average is based on. */
