@@ -83,8 +83,16 @@
 }
 
 @media (max-width: 640px) {
-  .backdrop { padding: 12px; }
-  .modal { max-height: calc(100vh - 24px); }
+  /* On an iPhone home-screen app the page runs under the status bar and the
+     home bar: keep the dialog's title and its Save row clear of both. */
+  .backdrop {
+    padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+  }
+  /* dvh: on iOS, 100vh reaches behind Safari's toolbar and hides the footer buttons. */
+  .modal {
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
   .modal-header, .modal-footer { padding-left: 16px; padding-right: 16px; }
   .modal-body { padding: 16px; }
 }

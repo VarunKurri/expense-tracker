@@ -249,6 +249,9 @@ input, select, textarea {
   letter-spacing: -0.01em;
 }
 
+/* iOS: don't enlarge text when the phone turns sideways. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
 /* ============================================
    TYPE PRIMITIVES
    ============================================ */
@@ -499,6 +502,14 @@ input, select, textarea {
 
 .input       { @include field-base; }
 .input-field { @include field-base; }
+
+/* iPhone: Safari zooms the whole page into any field set under 16px when you
+   tap it, and leaves it zoomed after the form closes. On touch screens every
+   field is 16px — including page-level filters that set their own smaller
+   size, hence !important. Desktop keeps 14px. */
+@media (pointer: coarse) {
+  input, select, textarea, .input, .input-field { font-size: 16px !important; }
+}
 
 /* Selects get our chevron, inset like the text on the left, in place of the
    browser's own arrow — which sits flush against the border whatever the
