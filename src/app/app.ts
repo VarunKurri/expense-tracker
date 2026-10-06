@@ -237,8 +237,11 @@ export class App {
       if (user) {
         // If sign-in happened while the router had no active route (its initial
         // navigation was cancelled by authGuard), land on the dashboard instead
-        // of a blank outlet.
-        if (this.router.url === '/' || this.router.url === '') {
+        // of a blank outlet. But not while a navigation is still on its way:
+        // on a reload or a link into the app the URL reads '/' until authGuard
+        // lets it through, and redirecting then threw away the page asked for.
+        const navigating = untracked(() => this.router.currentNavigation());
+        if (!navigating && (this.router.url === '/' || this.router.url === '')) {
           this.router.navigateByUrl('/dashboard');
         }
         this.encryption.booting.set(true);

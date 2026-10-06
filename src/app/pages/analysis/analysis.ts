@@ -14,7 +14,7 @@ import { TransactionView } from '../../components/transaction-view/transaction-v
 import { Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { filterForAnalysis } from '../../utils/analysis-filter';
-import { chartColors } from '../../utils/theme-colors';
+import { categoryPalette, chartColors } from '../../utils/theme-colors';
 import { ThemeService } from '../../services/theme.service';
 import {
   Chart, ChartData, ChartOptions,
@@ -291,7 +291,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
     return [...byCat.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
-      .map(([id, amount]) => {
+      .map(([id, amount], i) => {
         const cat = id === '__none__'
           ? { name: 'Uncategorized', icon: '📦', color: '#9ca3af' }
           : this.categoryService.categories().find(c => c.id === id);
@@ -299,7 +299,9 @@ export class Analysis implements AfterViewInit, OnDestroy {
           id,
           name: cat?.name || 'Unknown',
           icon: (cat as any)?.icon || '📦',
-          color: (cat as any)?.color || '#6366f1',
+          // A category without its own colour takes the next palette hue, so
+          // slices stay apart rather than all falling back to one purple.
+          color: (cat as any)?.color || categoryPalette()[i % 8],
           amount: Math.round(amount * 100) / 100,
           pct: total > 0 ? Math.round((amount / total) * 100) : 0
         };

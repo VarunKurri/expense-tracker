@@ -110,7 +110,7 @@
             <span class="acct-type">{{ account.type }}</span>
           </div>
           <div class="acct-name">{{ account.name }}</div>
-          <div class="acct-bal" [class.negative]="isNegative(balanceFor(account))">
+          <div class="acct-bal" [class.negative]="isOverdrawn(account)">
             {{ formatCurrency(balanceFor(account)) }}
           </div>
           @if (account.last4) {

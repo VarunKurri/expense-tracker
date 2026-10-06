@@ -12,7 +12,7 @@ import { BillForm } from '../bills/bill-form/bill-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { ToastService } from '../../services/toast.service';
 import { Account, Bill, Transaction } from '../../models';
-import { chartColors } from '../../utils/theme-colors';
+import { categoryPalette, chartColors } from '../../utils/theme-colors';
 import { ThemeService } from '../../services/theme.service';
 import { SpendCalendar } from '../../components/spend-calendar/spend-calendar';
 import { DayDetail } from '../../components/day-detail/day-detail';
@@ -399,14 +399,16 @@ export class Dashboard implements OnDestroy {
     const total = this.recentTotal();
     return [...byCat.entries()]
       .sort((a, b) => b[1] - a[1]).slice(0, 6)
-      .map(([id, amount]) => {
+      .map(([id, amount], i) => {
         const cat = id === '__none__'
           ? { name: 'Other', icon: '📦', color: '#9ca3af' }
           : this.categoryService.categories().find(c => c.id === id);
         return {
           name: cat?.name || 'Unknown',
           icon: (cat as any)?.icon || '📦',
-          color: (cat as any)?.color || '#6366f1',
+          // A category without its own colour takes the next palette hue, so
+          // slices stay apart rather than all falling back to one purple.
+          color: (cat as any)?.color || categoryPalette()[i % 8],
           amount: Math.round(amount * 100) / 100,
           pct: total > 0 ? Math.round((amount / total) * 100) : 0
         };
@@ -433,6 +435,14 @@ export class Dashboard implements OnDestroy {
     return '$' + Math.round(n);
   }
   isNegative(n: number): boolean { return n < 0; }
+  /**
+   * Red only for an account that has gone below zero. A card's balance is what
+   * you owe, so a negative one means you overpaid — money in your favour, not
+   * a warning (it used to show red, as if it were debt).
+   */
+  isOverdrawn(account: Account): boolean {
+    return !owesMoney(account.type) && this.balanceFor(account) < 0;
+  }
   navigate(path: string) { this.router.navigate([path]); }
   setRange(r: string) { this.activeRange.set(r as '7D' | '30D' | '90D' | 'YTD'); }
 

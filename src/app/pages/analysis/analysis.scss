@@ -320,8 +320,9 @@
   border-radius: 3px;
   flex-shrink: 0;
 
-  &.income-swatch  { background: rgba(128, 128, 128, 0.6); }
-  &.spending-swatch { background: var(--teal); }
+  /* Match the bars: income teal (positive), spending blue (the chart accent). */
+  &.income-swatch  { background: var(--teal); }
+  &.spending-swatch { background: var(--blue); }
 }
 
 .bar-chart-wrap {
