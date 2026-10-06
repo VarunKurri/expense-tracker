@@ -42,8 +42,10 @@ The app is what we copy. Do not "correct" this back to dark.
   - `var(--font-display)` Newsreader, weight 300 — **editorial moments only**
 - The serif is a garnish, not the number style. Use it for insight/promo cards,
   empty states and onboarding — the way Origin uses "See where your money goes."
-  Money always uses `.num-display` (sans semibold) or `.num` (mono tabular),
-  never `.display`.
+  Money always uses `.num-display` (sans semibold, hero figures) or `.fig`
+  (sans with tabular figures, amounts in lists and tables) — never `.display`,
+  and never the mono `.num`, which is the data voice for dates and counts. A
+  mono amount reads as a different app.
 - Signature headline pattern, for those editorial moments only:
   `<h2 class="display">See where <em>your money</em> goes.</h2>`
 - Nearly every card is headed by a mono uppercase eyebrow with a trailing
@@ -71,7 +73,7 @@ The app is what we copy. Do not "correct" this back to dark.
 - Cards use `var(--card-grad)`; inputs use `var(--input-grad)`.
 - Shared classes: `.card`, `.btn-primary`, `.btn-solid`, `.btn-ghost`,
   `.btn-danger`, `.input` / `.input-field`, `.chip`, `.card-label`,
-  `.label-mono`, `.num`, `.num-display`, `.display`.
+  `.label-mono`, `.num`, `.fig`, `.num-display`, `.display`.
 - `.glass` / `.glass-strong` are legacy aliases for flat surfaces, kept only so
   un-converted templates still render. Do not use them in new markup.
 - **Every form and dialog uses `<app-modal>`** (components/modal) — one shell:

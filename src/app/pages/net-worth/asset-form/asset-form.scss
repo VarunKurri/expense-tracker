@@ -17,7 +17,7 @@
     border-top: 1px solid var(--line);
 
     &:first-child { border-top: 0; }
-    .num { color: var(--fg); text-align: right; }
+    .fig { color: var(--fg); text-align: right; }
     .btn-ghost { justify-self: end; }
   }
 }

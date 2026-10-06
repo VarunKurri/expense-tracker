@@ -213,10 +213,7 @@
 }
 
 .stat-value {
-  /* Money is set in the UI sans everywhere else in the app (Home's hero,
-     Analysis' KPIs, the transaction rows). The global `.num` is mono, so it is
-     overridden here rather than dropped — the tabular figures still matter. */
-  font-family: var(--font-ui);
+  /* Paired with the global .fig (sans, tabular figures). */
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.03em;
@@ -254,9 +251,7 @@
   tbody tr:last-child td { border-bottom: none; }
 
   .right { text-align: right; }
-  .num {
-    font-family: var(--font-ui);
-    font-variant-numeric: tabular-nums;
+  .fig {
     color: var(--fg);
     font-weight: 500;
   }

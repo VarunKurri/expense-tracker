@@ -310,6 +310,15 @@ input, select, textarea {
   letter-spacing: -0.03em;
 }
 
+/* Amounts in lists and tables — the UI sans with even-width digits, so columns
+   line up. Money is never set in the mono `.num`: that is the data voice
+   (dates, counts), and a mono amount reads as a different app. */
+.fig {
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
 /* Large hero figure ($589, $962 in Origin's cards) — sans semibold with tight
    tracking. Deliberately NOT the serif: Origin's product sets every number
    this way. */

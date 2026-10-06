@@ -321,7 +321,7 @@
             @for (v of history; track v.date) {
               <li>
                 <span>{{ formatDate(v.date) }}</span>
-                <span class="num">{{ money(v.value) }}</span>
+                <span class="fig">{{ money(v.value) }}</span>
                 @if (history.length > 1 || (losesValue && purchasePrice)) {
                   <button type="button" class="btn-ghost sm" (click)="removeValuation(v)"
                           [attr.aria-label]="'Remove the ' + formatDate(v.date) + ' value'">Remove</button>

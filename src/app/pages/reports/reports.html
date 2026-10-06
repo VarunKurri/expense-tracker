@@ -104,21 +104,21 @@
     <div class="stat-strip">
       <div class="stat">
         <div class="stat-label">Total income</div>
-        <div class="stat-value num pos">{{ money(totalIn()) }}</div>
+        <div class="stat-value fig pos">{{ money(totalIn()) }}</div>
       </div>
       <div class="stat">
         <div class="stat-label">Total expenses</div>
-        <div class="stat-value num">{{ money(totalOut()) }}</div>
+        <div class="stat-value fig">{{ money(totalOut()) }}</div>
       </div>
       <div class="stat">
         <div class="stat-label">Net cash flow</div>
-        <div class="stat-value num" [class.pos]="netFlow() >= 0" [class.neg]="netFlow() < 0">
+        <div class="stat-value fig" [class.pos]="netFlow() >= 0" [class.neg]="netFlow() < 0">
           {{ signed(netFlow()) }}
         </div>
       </div>
       <div class="stat">
         <div class="stat-label">Avg / month</div>
-        <div class="stat-value num" [class.pos]="avgPerMonth() >= 0" [class.neg]="avgPerMonth() < 0">
+        <div class="stat-value fig" [class.pos]="avgPerMonth() >= 0" [class.neg]="avgPerMonth() < 0">
           {{ signed(avgPerMonth()) }}
         </div>
       </div>
@@ -149,10 +149,10 @@
         <tbody>
           @for (t of drillTransactions(); track t.id) {
             <tr>
-              <td class="num muted">{{ t.date }}</td>
+              <td class="fig muted">{{ t.date }}</td>
               <td>{{ t.merchant }}</td>
               <td class="muted">{{ t.category }}</td>
-              <td class="right num" [class.pos]="t.type === 'income'">
+              <td class="right fig" [class.pos]="t.type === 'income'">
                 {{ t.type === 'income' ? '+' : '−' }}{{ money(t.amount) }}
               </td>
             </tr>
@@ -186,8 +186,8 @@
               <td>
                 <span class="dot" [style.background]="r.color"></span>{{ r.name }}
               </td>
-              <td class="right num">{{ money(r.amount) }}</td>
-              <td class="right num muted">{{ r.pct }}%</td>
+              <td class="right fig">{{ money(r.amount) }}</td>
+              <td class="right fig muted">{{ r.pct }}%</td>
             </tr>
           } @empty {
             <tr><td colspan="3" class="empty-cell">Nothing in this period.</td></tr>
@@ -200,10 +200,10 @@
           <tr><th>Movement</th><th class="right">Amount</th></tr>
         </thead>
         <tbody>
-          <tr><td>Moved in</td><td class="right num pos">{{ money(transfers().movedIn) }}</td></tr>
-          <tr><td>Moved out</td><td class="right num">{{ money(transfers().movedOut) }}</td></tr>
+          <tr><td>Moved in</td><td class="right fig pos">{{ money(transfers().movedIn) }}</td></tr>
+          <tr><td>Moved out</td><td class="right fig">{{ money(transfers().movedOut) }}</td></tr>
           <tr><td class="muted">Transactions</td>
-              <td class="right num muted">{{ transfers().count }}</td></tr>
+              <td class="right fig muted">{{ transfers().count }}</td></tr>
         </tbody>
       </table>
       <p class="table-note">
@@ -225,9 +225,9 @@
             <tr class="clickable" (click)="openMonth(r.month, r.label)"
                 [attr.title]="'See ' + r.label + ' transactions'">
               <td>{{ r.label }} {{ r.month.slice(0, 4) }}</td>
-              <td class="right num pos">{{ money(r.income) }}</td>
-              <td class="right num">{{ money(r.expenses) }}</td>
-              <td class="right num" [class.pos]="r.net >= 0" [class.neg]="r.net < 0">
+              <td class="right fig pos">{{ money(r.income) }}</td>
+              <td class="right fig">{{ money(r.expenses) }}</td>
+              <td class="right fig" [class.pos]="r.net >= 0" [class.neg]="r.net < 0">
                 {{ signed(r.net) }}
               </td>
             </tr>
