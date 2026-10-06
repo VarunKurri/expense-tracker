@@ -27,11 +27,86 @@
 
 ## Design system
 
-- Read tally-design-system.md and the JSX files in expense_tracker_design/tally/ for visual reference
-- Glassmorphic style (blurred cards, gradients, subtle shadows)
-- CSS variables defined in `src/styles.scss`
-- Desktop-first, responsive down to mobile
-- Use classes like `.glass`, `.glass-strong`, `.btn`, `.input` from the shared styles
+Modelled on the Origin (useorigin.com) **product**, matched against screenshots
+of the real app. **Not glassmorphic** — that was two designs ago. Do not
+reintroduce blurred cards, coloured primary buttons, or green glow gradients.
+
+Important: Origin's *marketing site* is near-black, but their **app is light**.
+The app is what we copy. Do not "correct" this back to dark.
+
+- All tokens live in `src/styles.scss`. Fonts load from `src/index.html`.
+- **Light is the default.** Dark mode exists and must keep working.
+- Three type voices:
+  - `var(--font-ui)` Inter — all UI text, page titles, and **all figures**
+  - `var(--font-mono)` Roboto Mono, **11px/500 UPPERCASE** — card labels, eyebrows, data
+  - `var(--font-display)` Newsreader, weight 300 — **editorial moments only**
+- The serif is a garnish, not the number style. Use it for insight/promo cards,
+  empty states and onboarding — the way Origin uses "See where your money goes."
+  Money always uses `.num-display` (sans semibold, hero figures) or `.fig`
+  (sans with tabular figures, amounts in lists and tables) — never `.display`,
+  and never the mono `.num`, which is the data voice for dates and counts. A
+  mono amount reads as a different app.
+- Signature headline pattern, for those editorial moments only:
+  `<h2 class="display">See where <em>your money</em> goes.</h2>`
+- Nearly every card is headed by a mono uppercase eyebrow with a trailing
+  chevron — `.card-label` (`NET WORTH ›`, `SPENT IN SEPTEMBER ›`).
+- **Colour discipline:** surfaces are white on a near-white canvas with hairline
+  borders. Colour is a data signal only: `--blue` = the chart accent (spend
+  areas, calendar heat), `--teal` = positive/income, `--red` = negative,
+  `--forecast-grad` = projections (forecast cards, the projected area of a chart;
+  never a card that also shows actual history — a projected line is dashed), `--cat-1..7` = category icon chips.
+- **The UI accent is monochrome.** Selection, focus and "you are here" use
+  `--accent` (= `--fg`) / `--accent-on` / `--accent-bg` / `--focus-ring`, never
+  a palette colour: a selected pill is ink-filled, a focused field gets a
+  neutral ring. Teal had leaked into these states, which made "selected" and
+  "this is income" the same colour so neither meant anything on sight. If you
+  reach for `--teal` or `--green` for a hover, focus, active or checked state,
+  that is the bug.
+- `color-scheme` is set per theme on `:root`, so browser-drawn controls (the
+  date field's calendar button, native dropdowns, scrollbars) follow the app
+  rather than the OS. Don't `filter: invert()` them.
+- **Buttons are outlined, not filled.** `.btn-primary` is a white button with a
+  `--line-strong` border, matching "Add account" / "Create budget" / "Save".
+  `.btn-solid` (dark fill) exists for the rare high-emphasis CTA — use sparingly.
+- Radii: `--radius-xs` 4px · `--radius-sm` 8px (inputs, buttons) · `--radius`
+  14px (cards) · `--radius-pill` 999px (chips, tab pills).
+- Cards use `var(--card-grad)`; inputs use `var(--input-grad)`.
+- Shared classes: `.card`, `.btn-primary`, `.btn-solid`, `.btn-ghost`,
+  `.btn-danger`, `.input` / `.input-field`, `.chip`, `.card-label`,
+  `.label-mono`, `.num`, `.fig`, `.num-display`, `.display`.
+- `.glass` / `.glass-strong` are legacy aliases for flat surfaces, kept only so
+  un-converted templates still render. Do not use them in new markup.
+- **Every form and dialog uses `<app-modal>`** (components/modal) — one shell:
+  mono eyebrow title, scrolling body, pinned footer. Put the button row on an
+  element marked `modal-footer` that is a **direct child** of `<app-modal>`
+  (content projection only matches top-level nodes). Build the inside from the
+  shared pieces in `styles.scss → FORMS`: `.form`, `.field`, `.label-sm`,
+  `.label-optional`, `.field-hint`, `.field-error`, `.form-grid`,
+  `.form-section` / `.form-section-title`, `.form-note`, `.input-affix`
+  (`.input-affix.suffix` for a unit after the number), `.link-btn`,
+  `.seg` / `.type-seg` / `.mini-seg`, `.toggle` / `.toggle-row`,
+  `.icon-picks` / `.icon-opt`, `.swatches` / `.color-opt`, `.choice-grid` /
+  `.choice`, `.modal-actions` / `.actions-right`. A form's own stylesheet
+  should hold only what is genuinely unique to it. **Never redefine buttons,
+  inputs, labels or toggles in a page stylesheet** — every form used to, and
+  that is exactly how they drifted apart.
+- Shared components worth reaching for before writing new markup:
+  `app-spend-calendar` (month heat grid), `app-day-detail` (what one day cost),
+  `app-transaction-view` (read-only transaction sheet), `app-transaction-form`,
+  `app-month-picker` (`‹ Month ›` stepper with a jump-to-month grid — use it for
+  any month selection rather than a row of month pills),
+  `app-confirm`, `app-modal`, `app-toast`, `app-logo`, `app-icon`.
+  `app-transaction-view` is the **only** transaction view — Dashboard, Spending,
+  Analysis and Transactions all render it, including reimbursement linking.
+  Never fork a second copy: the three that existed before drifted, and only one
+  of them had reimbursements, so the same transaction read differently
+  depending on which screen you opened it from.
+- Desktop-first, responsive down to mobile.
+- Microcopy follows Origin: mono uppercase eyebrow → plain-English sentence
+  headline → a calm sentence explaining *why it matters*. Never just a number.
+- `tally-design-system.md` and `expense_tracker_design/tally/` describe the
+  **previous** (Tally) design and are kept for reference only — they are not the
+  current target.
 
 ## Secrets
 
@@ -51,6 +126,9 @@ src/app/
     bills/
     budgets/
     analysis/
+    forecast/       Analysis → Forecast tab: cash ahead (maths in utils/forecast.ts)
+    net-worth/      accounts + manual assets/debts (ManualAsset, dated valuations)
+      loan-detail/  one loan: payments made/missed/to come (maths in utils/loans.ts)
   app.ts            shell with sidebar
   app.html
   app.scss

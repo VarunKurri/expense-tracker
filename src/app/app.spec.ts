@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
+import { provideServiceWorker } from '@angular/service-worker';
 import { App } from './app';
 import { AuthService } from './services/auth.service';
 import { SeedService } from './services/seed.service';
@@ -32,11 +33,17 @@ describe('App', () => {
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [
-        provideRouter([]),
+        // A catch-all, so the shell's post-sign-in redirect has somewhere to land.
+        provideRouter([{ path: '**', children: [] }]),
+        // The shell's update banner needs SwUpdate; disabled, as in development.
+        provideServiceWorker('ngsw-worker.js', { enabled: false }),
         {
           provide: AuthService,
           useValue: {
             user: authUser,
+            resolved: signal(true),
+            isEmailVerified: signal(true),
+            hasPasswordProvider: signal(true),
             signInWithGoogle: vi.fn(),
             signInWithEmail: vi.fn(),
             signUpWithEmail: vi.fn(),
@@ -54,7 +61,7 @@ describe('App', () => {
             bills,
           },
         },
-        { provide: AccountService, useValue: { accounts } },
+        { provide: AccountService, useValue: { accounts, loaded: signal(true) } },
         { provide: CategoryService, useValue: { categories } },
         { provide: TransactionService, useValue: { transactions } },
         { provide: BudgetService, useValue: { budgets } },
@@ -71,9 +78,14 @@ describe('App', () => {
             unlocked,
             hasProfile,
             busy,
+            booting: signal(false),
+            deviceRemembered: signal(false),
+            hasRecoveryCode: signal(false),
             error: encryptionError,
             refreshProfileState: vi.fn(() => Promise.resolve()),
+            tryUnlockFromDevice: vi.fn(() => Promise.resolve(false)),
             migrateUserData: vi.fn(),
+            repairEnvelopeDocs: vi.fn(() => Promise.resolve()),
             unlock: vi.fn(),
             lock: vi.fn(),
           },
@@ -98,22 +110,30 @@ describe('App', () => {
   it('renders the email sign-in form for signed-out users', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
+    // Signed-out visitors land on the landing page; "Sign in" opens the form.
+    ([...compiled.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Sign in') as HTMLButtonElement).click();
+    fixture.detectChanges();
     expect(compiled.textContent).toContain('Welcome back');
     expect(compiled.textContent).toContain('Sign in');
     expect(compiled.querySelector('input[type="email"]')).toBeTruthy();
   });
 
-  it('shows the encryption unlock screen after authentication', () => {
+  it('shows the encryption unlock screen after authentication', async () => {
     authUser.set({ email: 'user@example.com' });
     hasProfile.set(true);
+    fixture.detectChanges();
+    // A brief boot screen while it checks for a remembered device.
+    await fixture.whenStable();
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Unlock encrypted data');
   });
 
-  it('shows create vault copy for first-time encrypted users', () => {
+  it('shows create vault copy for first-time encrypted users', async () => {
     authUser.set({ email: 'user@example.com' });
     hasProfile.set(false);
+    fixture.detectChanges();
+    await fixture.whenStable();
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Create encryption passphrase');

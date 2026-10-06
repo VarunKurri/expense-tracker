@@ -1,0 +1,165 @@
+<div class="page">
+
+  <div class="page-head">
+    <div>
+      <h1>Net worth</h1>
+      <p class="sub">Everything you own, minus everything you owe</p>
+    </div>
+    <button class="btn-primary" (click)="openNew()">+ Add asset or debt</button>
+  </div>
+
+  <app-error-banner [message]="manualService.error()" />
+
+  @if (isEmpty()) {
+
+    <section class="card empty">
+      <span class="card-label">Net worth</span>
+      <h2 class="display">See the whole picture, <em>not just the bank</em>.</h2>
+      <p>Connect or add an account, or add something you own or owe — a home, a car, a loan — and your net worth starts here.</p>
+      <button class="btn-primary" (click)="openNew()">+ Add asset or debt</button>
+    </section>
+
+  } @else {
+
+    <!-- HERO: the figure, how it moved, and the line -->
+    <section class="card hero">
+      <div class="hero-head">
+        <span class="card-label">{{ shown().projected ? 'Projected for ' + formatDate(shown().date) : shown().hovering ? formatDate(shown().date) : 'Net worth' }}</span>
+        <div class="ranges" role="group" aria-label="Time range">
+          @for (r of ranges; track r) {
+            <button class="chip" [class.active]="range() === r"
+                    [attr.aria-pressed]="range() === r" (click)="setRange(r)">{{ r === 'ALL' ? 'All' : r }}</button>
+          }
+          <span class="ranges-gap" aria-hidden="true"></span>
+          <button class="chip" [class.active]="projecting()" [attr.aria-pressed]="projecting()"
+                  title="Continue the line 6 months ahead, from your recent pace, bills and loan payments"
+                  (click)="toggleProjection()">+6M ahead</button>
+        </div>
+      </div>
+
+      <div class="hero-figure">
+        <span class="num-display" [class.negative]="shown().net < 0">
+          {{ shown().net < 0 ? '−' : '' }}{{ money(shown().net) }}
+        </span>
+      </div>
+
+      <p class="hero-change">
+        <span class="delta" [class.up]="shownChange().amount > 0" [class.down]="shownChange().amount < 0">
+          {{ signed(shownChange().amount) }}
+          @if (shownChange().pct !== null) { ({{ pct(shownChange().pct) }}) }
+        </span>
+        <span class="muted">{{ changeWords() }}</span>
+      </p>
+
+      <div class="chart-wrap" (mouseleave)="clearHover()">
+        <canvas #chartCanvas role="img"
+                [attr.aria-label]="'Net worth over ' + range() + ', from ' + money(series()[0]?.net ?? 0) + ' to ' + money(now().net)"></canvas>
+      </div>
+
+      @if (sentence()) {
+        <p class="hero-sentence">
+          {{ sentence() }}
+          @if (projecting()) {
+            @if (projection().length) {
+              <span class="projection-note">
+                The dashed line assumes the next months look like the last three — your usual income and spending,
+                bills on their dates, loan payments on schedule — with investments held flat.
+                <a routerLink="/analysis/forecast">See the forecast ›</a>
+              </span>
+            } @else {
+              <span class="projection-note">A projection needs a full month of history first.</span>
+            }
+          }
+        </p>
+      }
+    </section>
+
+    <!-- WHAT IT'S MADE OF -->
+    <div class="sides">
+      @for (side of sides(); track side.kind) {
+        <section class="card side">
+          <div class="side-head">
+            <span class="card-label">{{ side.label }}</span>
+            <span class="side-total num-display">{{ money(side.total) }}</span>
+          </div>
+
+          @for (g of side.groups; track g.key) {
+            <div class="group">
+              <div class="group-head">
+                <span class="group-name">{{ g.label }}</span>
+                <span class="group-total">{{ money(g.total) }}</span>
+              </div>
+              <div class="share" [class.liability]="side.kind === 'liability'"
+                   [attr.aria-label]="(g.share * 100 | number:'1.0-0') + '% of ' + side.label.toLowerCase()">
+                <div class="share-fill" [style.width]="(g.share * 100) + '%'"></div>
+              </div>
+              @for (h of g.items; track h.key) {
+                <button type="button" class="row" (click)="open(h)">
+                  <span class="row-icon">{{ h.icon }}</span>
+                  <span class="row-main">
+                    <span class="row-name">{{ h.name }}</span>
+                    <span class="row-sub">{{ loanProgress(h) ?? h.subtitle }}{{ h.kind === 'manual' && !loanProgress(h) ? ' · added by you' : '' }}</span>
+                  </span>
+                  <span class="row-amount">{{ money(h.amount) }}</span>
+                </button>
+              }
+            </div>
+          } @empty {
+            <p class="side-empty">
+              @if (side.kind === 'liability') {
+                Nothing owed. Card balances and loans you add will show here.
+              } @else {
+                Nothing here yet.
+              }
+            </p>
+          }
+        </section>
+      }
+    </div>
+
+    @if (tracked().length) {
+      <section class="card side tracked">
+        <div class="side-head">
+          <span class="card-label">Tracked, not counted</span>
+        </div>
+        <p class="tracked-note">Loans being repaid to you for someone else. The money is theirs, so it isn't in your net worth — the payments you receive still count as income.</p>
+        @for (t of tracked(); track t.id) {
+          <button type="button" class="row" (click)="openLoan(t.id)">
+            <span class="row-icon">🤲</span>
+            <span class="row-main">
+              <span class="row-name">{{ t.name }}</span>
+              <span class="row-sub">{{ t.made }} of {{ t.of }} payments</span>
+            </span>
+            <span class="row-amount">{{ money(t.owed) }} to go</span>
+          </button>
+        }
+      </section>
+    }
+
+    @if (!hasManual()) {
+      <section class="card promo">
+        <span class="card-label">Beyond your accounts</span>
+        <h2 class="display">Count <em>what you own</em>, not just what's in the bank.</h2>
+        <p>A home, a car, a retirement account Plaid can't reach, or a loan — add them once and update the value whenever it changes. Each update is kept, so the history above stays honest.</p>
+        <button class="btn-primary" (click)="openNew()">+ Add asset or debt</button>
+      </section>
+    }
+  }
+
+</div>
+
+<app-asset-form
+  [open]="formOpen()"
+  [asset]="editing()"
+  [linkedName]="linkedName()"
+  (closed)="closeForm()"
+  (saved)="handleSave($event)"
+  (deleteRequested)="askDelete()" />
+
+<app-confirm
+  [open]="confirmOpen()"
+  title="Delete this entry?"
+  [message]="(toDelete()?.name ?? 'It') + ' and its value history will be removed, and it will no longer count toward your net worth — past months included.'"
+  confirmText="Delete"
+  (confirmed)="confirmDelete()"
+  (cancelled)="cancelDelete()" />

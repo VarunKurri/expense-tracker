@@ -1,0 +1,223 @@
+<div class="page">
+
+  <div class="header-row">
+    <div>
+      <h1>Rules</h1>
+      <div class="hint">File transactions automatically</div>
+    </div>
+    <!-- Same header as Settings → Categories: a quiet way back, and the
+         page's one primary action beside it. -->
+    <div class="header-actions">
+      <a class="btn-ghost" routerLink="/settings">← Settings</a>
+      <button class="btn-primary" (click)="startNewRule()">+ New rule</button>
+    </div>
+  </div>
+
+
+  @if (loadError()) {
+    <div class="notice error">{{ loadError() }}</div>
+  }
+
+    <section class="card">
+      <div class="card-head">
+        <span class="card-label">Rules</span>
+      </div>
+
+      <p class="section-note">
+        Rules file transactions for you — "anything from Lyft goes to Rideshare".
+        They run in order, top to bottom, and the first rule to decide a field wins.
+        A new rule applies to transactions from now on; use <em>Apply to existing</em>
+        below to run it over what you already have.
+      </p>
+
+      <table class="rule-table">
+        <thead>
+          <tr><th>Order</th><th>Rule</th><th>Status</th><th class="right">Actions</th></tr>
+        </thead>
+        <tbody>
+          @for (r of rules(); track r.id; let i = $index) {
+            <tr [class.off]="!r.enabled">
+              <td class="order">
+                <button class="icon-btn" [disabled]="i === 0 || busy()"
+                        (click)="move(r, -1)" aria-label="Move up">↑</button>
+                <button class="icon-btn" [disabled]="i === rules().length - 1 || busy()"
+                        (click)="move(r, 1)" aria-label="Move down">↓</button>
+              </td>
+              <td>
+                <div class="rule-name">{{ r.name || describe(r) }}</div>
+                @if (r.name) { <div class="rule-desc">{{ describe(r) }}</div> }
+                @if (isBroken(r)) {
+                  <div class="rule-warn">
+                    The category this rule files into was deleted, so that part of the
+                    rule is paused. Edit the rule to pick a new category.
+                  </div>
+                }
+              </td>
+              <td>
+                <button class="chip" [class.active]="r.enabled" (click)="toggleRule(r)">
+                  {{ r.enabled ? 'On' : 'Off' }}
+                </button>
+              </td>
+              <td class="right nowrap">
+                <button class="btn-ghost sm" (click)="editRule(r)">Edit</button>
+                <button class="btn-danger sm" (click)="deleteRule(r)">Delete</button>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="4" class="empty-cell">
+              No rules yet. Create one to file transactions automatically.
+            </td></tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    @if (rules().length) {
+      <section class="card">
+        <div class="card-head"><span class="card-label">Apply to existing</span></div>
+        <p class="section-note">
+          Transactions synced from your bank are categorised here, on your device —
+          your rules are encrypted, so the sync itself cannot read them.
+        </p>
+        <div class="apply-row">
+          <div class="apply-stat">
+            <div class="apply-count">{{ pendingCount() }}</div>
+            <div class="apply-label">uncategorised would be filed</div>
+            <button class="btn-primary" [disabled]="busy() || !pendingCount()"
+                    (click)="applyRules(false)">Apply to uncategorised</button>
+          </div>
+          <div class="apply-stat">
+            <div class="apply-count">{{ recategoriseCount() }}</div>
+            <div class="apply-label">total would change, including re-filing</div>
+            <button class="btn-ghost" [disabled]="busy() || !recategoriseCount()"
+                    (click)="applyRules(true)">Re-file everything</button>
+          </div>
+        </div>
+        <p class="section-note warn">
+          <strong>Re-file everything</strong> overwrites categories you set by hand.
+          The safer option only touches transactions with no category.
+        </p>
+      </section>
+    }
+
+  <!-- ── Rule editor ─────────────────────────────────────── -->
+  <app-modal [open]="!!editing()" [title]="isNew() ? 'New rule' : 'Edit rule'"
+             size="md" (closed)="cancelEdit()">
+    @if (editing(); as r) {
+      <div class="form">
+        <label class="field">
+          <span class="label-sm">Name (optional)</span>
+          <input class="input-field" [value]="r.name || ''"
+                 placeholder="Rideshare"
+                 (input)="patchDraft({ name: $any($event.target).value })" />
+        </label>
+
+        <div class="form-section">
+          <div class="form-section-title">When</div>
+
+          <label class="field">
+            <span class="label-sm">Merchant or notes contain</span>
+            <input class="input-field" [value]="r.merchantContains || ''"
+                   placeholder="lyft"
+                   (input)="patchDraft({ merchantContains: $any($event.target).value })" />
+          </label>
+
+          <div class="form-grid">
+            <label class="field">
+              <span class="label-sm">Type</span>
+              <select class="input-field" [value]="r.type || ''"
+                      (change)="patchDraft({ type: $any($event.target).value || undefined })">
+                <option value="">Any</option>
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+                <option value="transfer">Transfer</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="label-sm">Account</span>
+              <select class="input-field" [value]="r.accountId || ''"
+                      (change)="patchDraft({ accountId: $any($event.target).value })">
+                <option value="">Any</option>
+                @for (a of accounts(); track a.id) {
+                  <option [value]="a.id">{{ a.name }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <div class="form-grid">
+            <label class="field">
+              <span class="label-sm">Amount at least</span>
+              <input class="input-field" type="number" step="0.01" min="0"
+                     [value]="r.amountMin ?? ''"
+                     (input)="patchDraft({ amountMin: $any($event.target).valueAsNumber })" />
+            </label>
+            <label class="field">
+              <span class="label-sm">Amount at most</span>
+              <input class="input-field" type="number" step="0.01" min="0"
+                     [value]="r.amountMax ?? ''"
+                     (input)="patchDraft({ amountMax: $any($event.target).valueAsNumber })" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span class="label-sm">Currently filed as</span>
+            <select class="input-field" [value]="r.categoryId || ''"
+                    (change)="patchDraft({ categoryId: $any($event.target).value })">
+              <option value="">Any category</option>
+              @for (c of pickable(r.categoryId); track c.id) {
+                <option [value]="c.id">{{ c.name }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Then</div>
+
+          <label class="field">
+            <span class="label-sm">File as</span>
+            <select class="input-field" [value]="r.setCategoryId || ''"
+                    (change)="patchDraft({ setCategoryId: $any($event.target).value })">
+              <option value="">Leave the category alone</option>
+              @for (c of pickable(r.setCategoryId); track c.id) {
+                <option [value]="c.id">{{ c.name }}</option>
+              }
+            </select>
+          </label>
+
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Mark as an internal transfer</div>
+              <div class="toggle-sub">Keeps it out of spending and income totals.</div>
+            </div>
+            <button type="button" class="toggle"
+                    [class.on]="r.setInternalTransfer === true"
+                    [attr.aria-pressed]="r.setInternalTransfer === true"
+                    aria-label="Mark as an internal transfer"
+                    (click)="patchDraft({ setInternalTransfer: r.setInternalTransfer === true ? undefined : true })">
+            </button>
+          </div>
+        </div>
+
+        <div class="summary" [class.invalid]="!draftValid()">
+          {{ draftSummary() }}
+          @if (draftImpact() !== null) {
+            <div class="impact">
+              Would change {{ draftImpact() }}
+              existing transaction{{ draftImpact() === 1 ? '' : 's' }}.
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <div class="modal-actions" modal-footer>
+      <div class="actions-right">
+        <button class="btn-ghost" (click)="cancelEdit()">Cancel</button>
+        <button class="btn-primary" [disabled]="!draftValid() || busy()"
+                (click)="saveRule()">Save rule</button>
+      </div>
+    </div>
+  </app-modal>
+</div>

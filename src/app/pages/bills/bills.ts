@@ -10,7 +10,9 @@ import { TransactionForm } from '../transactions/transaction-form/transaction-fo
 import { Confirm } from '../../components/confirm/confirm';
 import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Bill, Transaction } from '../../models';
+import { frequencyLabel, monthlyCost } from '../../utils/bill-schedule';
 import { ToastService } from '../../services/toast.service';
+import { localDateString } from '../../utils/date';
 
 type BillTab = 'active' | 'paused';
 
@@ -146,7 +148,7 @@ export class Bills {
   futureBills = computed(() => {
     const future = new Date();
     future.setDate(future.getDate() + 30);
-    const futureStr = future.toISOString().slice(0, 10);
+    const futureStr = localDateString(future);
     return this.billService.bills().filter(b =>
       b.active && b.nextDueDate > futureStr
     );
@@ -206,14 +208,7 @@ export class Bills {
   totalMonthly = computed(() => {
     return this.billService.bills()
       .filter(b => b.active)
-      .reduce((sum, b) => {
-        switch (b.frequency) {
-          case 'weekly':    return sum + (b.amount * 52 / 12);
-          case 'monthly':   return sum + b.amount;
-          case 'quarterly': return sum + (b.amount / 3);
-          case 'yearly':    return sum + (b.amount / 12);
-        }
-      }, 0);
+      .reduce((sum, b) => sum + monthlyCost(b.amount, b.frequency), 0);
   });
 
   totalYearly = computed(() => this.totalMonthly() * 12);
@@ -469,10 +464,7 @@ export class Bills {
 
 
   frequencyLabel(f: string): string {
-    const map: Record<string, string> = {
-      weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly'
-    };
-    return map[f] || f;
+    return frequencyLabel(f);
   }
 
   localDate(dateStr: string): Date {

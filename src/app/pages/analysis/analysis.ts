@@ -10,9 +10,12 @@ import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
+import { TransactionView } from '../../components/transaction-view/transaction-view';
 import { Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { filterForAnalysis } from '../../utils/analysis-filter';
+import { categoryPalette, chartColors } from '../../utils/theme-colors';
+import { ThemeService } from '../../services/theme.service';
 import {
   Chart, ChartData, ChartOptions,
   ArcElement, DoughnutController,
@@ -20,6 +23,7 @@ import {
   CategoryScale, LinearScale,
   Tooltip, Legend
 } from 'chart.js';
+import { localDateString } from '../../utils/date';
 
 Chart.register(
   ArcElement, DoughnutController,
@@ -33,12 +37,13 @@ type RangeKey = 'this-month' | 'last-month' | '3-months' | 'this-year' | 'all' |
 @Component({
   selector: 'app-analysis',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TransactionForm, Confirm],
+  imports: [CommonModule, FormsModule, RouterLink, TransactionForm, Confirm, TransactionView],
   templateUrl: './analysis.html',
   styleUrl: './analysis.scss'
 })
 export class Analysis implements AfterViewInit, OnDestroy {
   private toastService = inject(ToastService);
+  private themeService = inject(ThemeService);
   private txService = inject(TransactionService);
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
@@ -66,20 +71,18 @@ export class Analysis implements AfterViewInit, OnDestroy {
     );
   }
 
+  // The view panel owns its own body-scroll lock.
   openTxView(tx: Transaction) {
     this.viewingTx.set(tx);
-    document.body.style.overflow = 'hidden';
   }
 
   closeTxView() {
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
   }
 
   editFromTxView() {
     const tx = this.viewingTx();
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
     if (tx) {
       this.editingTx.set(tx);
       this.txFormOpen.set(true);
@@ -127,7 +130,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
   excludedCategories = signal<Set<string>>(new Set());
   customStart = signal('');
   customEnd = signal('');
-  todayStr = new Date().toISOString().slice(0, 10);
+  todayStr = localDateString(); // local, not UTC — UTC is already tomorrow on a US evening
 
   ranges: { value: RangeKey; label: string }[] = [
     { value: 'this-month',  label: 'This month' },
@@ -208,10 +211,20 @@ export class Analysis implements AfterViewInit, OnDestroy {
   });
 
   /** An expense's true cost after any linked reimbursements — unless netting is
-   *  off ("Include refunded"), in which case every expense counts as recorded. */
-  private eff(t: Transaction): number {
+   *  off ("Include refunded"), in which case every expense counts as recorded.
+   *
+   *  Public because the drill-down lists have to show the same figure this page
+   *  totals: a $173.27 charge that was $101.76 paid back counts as $71.51 here,
+   *  and a row printing $173.27 under a $117.28 header does not add up. */
+  eff(t: Transaction): number {
     if (!this.excludeRefunded()) return t.amount;
     return this.txService.effectiveExpenseAmount(t);
+  }
+
+  /** How much of an expense came back, for the "was $X, $Y back" note. */
+  reimbursedOn(t: Transaction): number {
+    if (!this.excludeRefunded()) return 0;
+    return this.txService.reimbursedAmountFor(t.id);
   }
 
   // ── KPIs ───────────────────────────────────────────────────
@@ -278,7 +291,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
     return [...byCat.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
-      .map(([id, amount]) => {
+      .map(([id, amount], i) => {
         const cat = id === '__none__'
           ? { name: 'Uncategorized', icon: '📦', color: '#9ca3af' }
           : this.categoryService.categories().find(c => c.id === id);
@@ -286,7 +299,9 @@ export class Analysis implements AfterViewInit, OnDestroy {
           id,
           name: cat?.name || 'Unknown',
           icon: (cat as any)?.icon || '📦',
-          color: (cat as any)?.color || '#6366f1',
+          // A category without its own colour takes the next palette hue, so
+          // slices stay apart rather than all falling back to one purple.
+          color: (cat as any)?.color || categoryPalette()[i % 8],
           amount: Math.round(amount * 100) / 100,
           pct: total > 0 ? Math.round((amount / total) * 100) : 0
         };
@@ -482,6 +497,16 @@ export class Analysis implements AfterViewInit, OnDestroy {
         this.updateBar(trendData);
       }
     });
+
+    // Chart.js resolves colours once, at construction, so a theme switch would
+    // leave these painted for the previous theme. Rebuild both on change.
+    effect(() => {
+      this.themeService.theme();
+      if (!this.chartsReady) return;
+      this.donutChart?.destroy(); this.donutChart = null;
+      this.barChart?.destroy();   this.barChart = null;
+      queueMicrotask(() => this.initCharts());
+    });
   }
 
   ngAfterViewInit() {
@@ -513,7 +538,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
           data: data.map(d => d.amount),
           backgroundColor: data.map(d => d.color),
           borderWidth: 3,
-          borderColor: 'transparent',
+          borderColor: chartColors().surface,
           hoverOffset: 6,
         }]
       },
@@ -544,6 +569,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
     const ctx = this.barCanvas?.nativeElement?.getContext('2d');
     if (!ctx) return;
     const data = this.monthlyTrend();
+    const c = chartColors();
     this.barChart = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -552,9 +578,8 @@ export class Analysis implements AfterViewInit, OnDestroy {
           {
             label: 'Income',
             data: data.map(d => d.income),
-            backgroundColor: 'rgba(128, 128, 128, 0.5)',
-            borderColor: 'rgba(128, 128, 128, 0.8)',
-            borderWidth: 1,
+            backgroundColor: c.positive,
+            borderWidth: 0,
             borderRadius: 4,
             barPercentage: 0.55,
             categoryPercentage: 0.7,
@@ -562,7 +587,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
           {
             label: 'Spending',
             data: data.map(d => d.expenses),
-            backgroundColor: '#00D64F',
+            backgroundColor: c.accent,
             borderRadius: 4,
             barPercentage: 0.55,
             categoryPercentage: 0.7,
@@ -581,11 +606,11 @@ export class Analysis implements AfterViewInit, OnDestroy {
           }
         },
         scales: {
-          x: { grid: { display: false }, border: { display: false }, ticks: { color: '#8A8A92', font: { size: 11 } } },
+          x: { grid: { display: false }, border: { display: false }, ticks: { color: c.tick, font: { size: 11 } } },
           y: {
-            grid: { color: 'rgba(128,128,128,0.1)' },
+            grid: { color: c.grid },
             border: { display: false },
-            ticks: { color: '#8A8A92', font: { size: 11 }, callback: (val) => this.formatCurrencyShort(val as number) }
+            ticks: { color: c.tick, font: { size: 11 }, callback: (val) => this.formatCurrencyShort(val as number) }
           }
         }
       }

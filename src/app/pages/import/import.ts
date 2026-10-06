@@ -6,6 +6,7 @@ import { CategoryService } from '../../services/category.service';
 import { TransactionService } from '../../services/transaction.service';
 import { Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
+import { localDateString } from '../../utils/date';
 
 interface ParsedRow {
   type: 'expense' | 'income' | 'transfer';
@@ -73,7 +74,9 @@ export class Import {
     // "February 21, 2026" → "2026-02-21"
     const d = new Date(cell.trim());
     if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10);
+    // `new Date("February 21, 2026")` is local midnight; format it in local time
+    // too — toISOString() is UTC and gave the day before east of UTC.
+    return localDateString(d);
   }
 
   // Notion name → Trackr name mappings

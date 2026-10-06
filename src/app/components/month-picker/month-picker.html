@@ -1,0 +1,36 @@
+<div class="picker">
+  <button type="button" class="step" (click)="step(-1)" [disabled]="!canPrev()"
+          aria-label="Previous month">‹</button>
+  <button type="button" class="label-btn" (click)="toggle()"
+          [attr.aria-expanded]="open()" aria-haspopup="dialog"
+          title="Choose a month">
+    {{ label() }}
+  </button>
+  <button type="button" class="step" (click)="step(1)" [disabled]="!canNext()"
+          aria-label="Next month">›</button>
+
+  @if (open()) {
+    <div class="pop" role="dialog" aria-label="Choose a month">
+      <div class="pop-head">
+        <button type="button" class="step sm" (click)="stepYear(-1)" [disabled]="!canPrevYear()"
+                aria-label="Previous year">‹</button>
+        <span class="year">{{ gridYear() }}</span>
+        <button type="button" class="step sm" (click)="stepYear(1)" [disabled]="!canNextYear()"
+                aria-label="Next year">›</button>
+      </div>
+      <div class="grid">
+        @for (c of cells(); track c.value) {
+          <button type="button" class="cell"
+                  [class.selected]="c.selected" [class.current]="c.current"
+                  [disabled]="c.disabled" (click)="pick(c.value)">
+            {{ c.name }}
+            @if (c.marked) { <span class="dot" aria-hidden="true"></span> }
+          </button>
+        }
+      </div>
+      @if (month() !== thisMonth) {
+        <button type="button" class="today" (click)="pick(thisMonth)">Go to this month</button>
+      }
+    </div>
+  }
+</div>

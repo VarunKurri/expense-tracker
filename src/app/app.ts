@@ -18,7 +18,9 @@ import { AccountService } from './services/account.service';
 import { CategoryService } from './services/category.service';
 import { TransactionService } from './services/transaction.service';
 import { BudgetService } from './services/budget.service';
+import { monthKeyOf } from './utils/calendar';
 import { Account } from './models';
+import { Logo } from './components/logo/logo';
 
 interface NavItem {
   path: string;
@@ -49,7 +51,7 @@ interface PaletteEntry {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, Icon, Toast, UpdateBanner, AuthAction],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, Icon, Logo, Toast, UpdateBanner, AuthAction],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -133,6 +135,7 @@ export class App {
   nav = computed((): NavItem[] => [
     { path: '/dashboard',    label: 'Home',         iconName: 'home' },
     { path: '/accounts',     label: 'Accounts',     iconName: 'accounts' },
+    { path: '/net-worth',    label: 'Net worth',    iconName: 'networth' },
     { path: '/transactions', label: 'Transactions', iconName: 'tx' },
     { path: '/bills',        label: 'Bills',        iconName: 'bills',
       // Overdue always counts; "upcoming" only counts a bill due today/tomorrow —
@@ -234,8 +237,11 @@ export class App {
       if (user) {
         // If sign-in happened while the router had no active route (its initial
         // navigation was cancelled by authGuard), land on the dashboard instead
-        // of a blank outlet.
-        if (this.router.url === '/' || this.router.url === '') {
+        // of a blank outlet. But not while a navigation is still on its way:
+        // on a reload or a link into the app the URL reads '/' until authGuard
+        // lets it through, and redirecting then threw away the page asked for.
+        const navigating = untracked(() => this.router.currentNavigation());
+        if (!navigating && (this.router.url === '/' || this.router.url === '')) {
           this.router.navigateByUrl('/dashboard');
         }
         this.encryption.booting.set(true);
@@ -294,6 +300,11 @@ export class App {
   switchAuthMode(mode: 'signin' | 'signup' | 'reset') {
     this.authMode.set(mode);
     this.password.set('');
+  }
+
+  /** The landing page IS home, so its wordmark returns to the top. */
+  scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   backToLanding() {
@@ -496,7 +507,7 @@ export class App {
   }
 
   private budgetSearchEntries(query: string): PaletteEntry[] {
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentMonth = monthKeyOf();
     return this.budgetService.budgets()
       .filter(budget => {
         const category = this.categoryService.categories().find(c => c.id === budget.categoryId);

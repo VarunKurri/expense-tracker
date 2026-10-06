@@ -4,54 +4,38 @@
   <div class="page-head">
     <div>
       <h1>Budgets</h1>
-      <p class="sub">{{ subtitle() }}</p>
+      <p class="sub">How each category is tracking against its limit</p>
     </div>
-    <button class="btn-primary" (click)="openNew()">+ New Budget</button>
+    <div class="head-actions">
+      <app-month-picker
+        [month]="selectedMonth()"
+        [min]="pickerMin()"
+        [max]="pickerMax"
+        [marks]="oneOffMonths()"
+        (monthChange)="setMonth($event)" />
+      <button class="btn-primary" (click)="openNew()">+ New budget</button>
+    </div>
   </div>
 
   <app-error-banner [message]="budgetService.error()" />
   <app-error-banner [message]="categoryService.error()" />
 
-  <!-- MONTH SELECTOR -->
-  <div class="month-nav">
-    @for (m of availableMonths(); track m.value) {
-      <button class="month-btn"
-              [class.active]="selectedMonth() === m.value"
-              [class.current]="isCurrentMonth(m.value)"
-              (click)="selectedMonth.set(m.value)">
-        {{ m.label }}
-      </button>
-    }
-  </div>
-
-  <!-- FILTER ROW -->
-  <div class="filter-row">
-    <button class="refunded-toggle"
-            [class.active]="excludeRefunded()"
-            (click)="excludeRefunded.set(!excludeRefunded())">
-      @if (excludeRefunded()) {
-        ✓ Excluding refunded
-      } @else {
-        Including refunded
-      }
-    </button>
-  </div>
-
   <!-- ORPHANED BUDGETS (category was merged/deleted) -->
   @if (orphanedBudgets().length > 0) {
-    <div class="orphan-panel">
-      <div class="orphan-head">
-        ⚠️ {{ orphanedBudgets().length }} budget(s) point to a category that no longer exists.
-        Reassign each to a current category (the amount is kept) or delete it.
-      </div>
+    <section class="card orphan-panel">
+      <span class="card-label">Needs a category</span>
+      <p class="orphan-head">
+        {{ orphanedBudgets().length === 1 ? 'This budget points' : 'These budgets point' }} to a
+        category that no longer exists. Move each to a current category — the amount is kept — or delete it.
+      </p>
       @for (b of orphanedBudgets(); track b.id) {
         <div class="orphan-row">
           <div class="orphan-info">
             <div class="orphan-top">
-              <span class="orphan-amount">{{ formatCurrencyFull(b.amount) }}/mo</span>
-              <span class="orphan-tag">{{ b.isDefault ? 'every month' : b.month }}</span>
+              <span class="orphan-amount">{{ formatCurrencyFull(b.amount) }}</span>
+              <span class="orphan-tag">{{ b.isDefault ? 'Every month' : b.month }}</span>
             </div>
-            <span class="orphan-sub">Original category was deleted — name unavailable · set on {{ formatShortDate(b.createdAt) }}</span>
+            <span class="orphan-sub">Set on {{ formatShortDate(b.createdAt) }}</span>
           </div>
           <div class="orphan-actions">
             <select class="input-field"
@@ -61,98 +45,128 @@
                 <option [value]="c.id">{{ c.name }}</option>
               }
             </select>
-            <button class="btn" (click)="reassignBudget(b)">Reassign</button>
-            <button class="btn danger" (click)="removeOrphan(b)">Delete</button>
+            <button class="btn-ghost sm" (click)="reassignBudget(b)">Move</button>
+            <button class="btn-danger sm" (click)="removeOrphan(b)">Delete</button>
           </div>
         </div>
       }
-    </div>
+    </section>
   }
 
-  <!-- PAST MONTH BANNER -->
-  @if (isPastMonth()) {
-    <div class="month-banner past">
-      📅 Viewing {{ subtitle().split(' · ')[0] }} — spending is final for this month
-    </div>
-  }
-
-  <!-- FUTURE MONTH BANNER -->
-  @if (isFutureMonth()) {
-    <div class="month-banner future">
-      🔮 Viewing a future month — no spending recorded yet
-    </div>
-  }
-
-  @if (budgetService.defaultBudgets().length === 0) {
+  @if (budgetService.budgets().length === 0) {
 
     <!-- EMPTY STATE -->
-    <div class="empty">
-      <div class="empty-icon">🎯</div>
-      <h3>No budgets set</h3>
-      <p>Add a monthly budget for each spending category to start tracking.</p>
-      <button class="btn-primary" (click)="openNew()">+ Add first budget</button>
-    </div>
+    <section class="card empty">
+      <span class="card-label">Budgets</span>
+      <h2 class="display">Give each category <em>a limit</em>.</h2>
+      <p>Set a monthly amount for the things you spend on most, and see at a glance which ones are running hot.</p>
+      <button class="btn-primary" (click)="openNew()">+ Add your first budget</button>
+    </section>
 
   } @else {
 
-    <!-- SUMMARY BAR -->
-    <div class="summary-bar">
-      <div class="summary-stat">
-        <div class="summary-label">Total budget</div>
-        <div class="summary-value">{{ formatCurrencyFull(totals().budget) }}</div>
+    @if (elsewhere().length > 0) {
+      <div class="elsewhere">
+        @for (e of elsewhere(); track e.categoryId) {
+          <p class="form-note">
+            {{ e.name }} has a limit only in
+            @for (m of e.months; track m; let i = $index; let last = $last) {
+              <button class="link-btn" (click)="goToMonth(m)">{{ e.labels[i] }}</button>{{ last ? '' : ', ' }}
+            }
+            and none every month. To make it every month, open it there and choose
+            <em>Every month</em>.
+          </p>
+        }
       </div>
-      <div class="summary-divider"></div>
-      <div class="summary-stat">
-        <div class="summary-label">Total spent</div>
-        <div class="summary-value" [class.over]="totals().spent > totals().budget">
-          {{ formatCurrencyFull(totals().spent) }}
+    }
+
+    @if (budgetRows().length === 0) {
+      <section class="card empty">
+        <span class="card-label">{{ monthName() }}</span>
+        <h2 class="display">No limits apply to <em>{{ monthName() }}</em>.</h2>
+        <p>Your budgets are all one-off limits for other months.</p>
+      </section>
+    } @else {
+
+    <!-- HERO: the month in one figure and one sentence -->
+    <section class="card hero">
+      <div class="hero-head">
+        <span class="card-label">{{ heroLabel() }}</span>
+        <button class="refunded-toggle"
+                [class.active]="excludeRefunded()"
+                [attr.aria-pressed]="excludeRefunded()"
+                [title]="excludeRefunded()
+                  ? 'Refunded purchases are left out and reimbursements are subtracted'
+                  : 'Every purchase counts at its full amount'"
+                (click)="toggleRefunded()">
+          {{ excludeRefunded() ? '✓ Excluding refunded' : 'Including refunded' }}
+        </button>
+      </div>
+
+      <div class="hero-figure">
+        <span class="num-display">{{ formatCurrencyFull(totals().spent) }}</span>
+        <span class="hero-of">of {{ formatCurrencyFull(totals().budget) }}</span>
+      </div>
+
+      <div class="bar" [class.warn]="totals().pct >= 75 && totals().pct < 100"
+           [class.over]="totals().pct >= 100">
+        <div class="bar-fill" [style.width]="Math.min(100, totals().pct) + '%'"></div>
+      </div>
+
+      <p class="hero-sentence">{{ heroSentence() }}</p>
+
+      <div class="hero-stats">
+        <div class="stat">
+          <span class="label-mono">{{ totals().left >= 0 ? 'Left' : 'Over by' }}</span>
+          <span class="stat-value" [class.over]="totals().left < 0">{{ formatCurrencyFull(totals().left) }}</span>
+        </div>
+        <div class="stat">
+          <span class="label-mono">Over budget</span>
+          <span class="stat-value" [class.over]="totals().over > 0">{{ totals().over }}</span>
+        </div>
+        <div class="stat">
+          <span class="label-mono">Close to limit</span>
+          <span class="stat-value">{{ totals().warn }}</span>
+        </div>
+        <div class="stat">
+          <span class="label-mono">{{ isPastMonth() ? 'Closed' : 'Resets' }}</span>
+          <span class="stat-value">{{ resetDate() }}</span>
         </div>
       </div>
-      <div class="summary-divider"></div>
-      <div class="summary-stat">
-        <div class="summary-label">Remaining</div>
-        <div class="summary-value"
-             [class.over]="totals().budget - totals().spent < 0">
-          {{ formatCurrencyFull(totals().budget - totals().spent) }}
-        </div>
-      </div>
-      <div class="summary-divider"></div>
-      <div class="summary-stat">
-        <div class="summary-label">Over budget</div>
-        <div class="summary-value" [class.over]="totals().over > 0">
-          {{ totals().over }} categor{{ totals().over === 1 ? 'y' : 'ies' }}
-        </div>
-      </div>
-    </div>
+    </section>
 
     <!-- BUDGET GRID -->
     <div class="budget-grid">
       @for (row of budgetRows(); track row.budget.id) {
-        <div class="budget-card"
+        <div class="card budget-card"
              [class.over]="row.status === 'over'"
              [class.warn]="row.status === 'warn'"
-             (click)="openDetail(row.budget.categoryId)">
+             role="link" tabindex="0"
+             (click)="openDetail(row.categoryId)"
+             (keydown.enter)="openDetail(row.categoryId)">
 
-          <!-- Card top: icon + name + override chip -->
           <div class="card-top">
-            <div class="card-icon"
-                 [class.icon-ok]="row.status === 'ok' && row.pct > 0"
-                 [class.icon-warn]="row.status === 'warn'"
-                 [class.icon-over]="row.status === 'over'">
-              {{ row.categoryIcon }}
-            </div>
+            <div class="card-icon">{{ row.categoryIcon }}</div>
             <div class="card-title-wrap">
               <div class="card-name">{{ row.categoryName }}</div>
-              <div class="card-freq">Monthly</div>
+              <div class="card-freq" [class.override]="row.isOverride">{{ freqLabel(row) }}</div>
             </div>
-            <button class="override-chip"
-                    (click)="$event.stopPropagation(); openOverride(row.budget.categoryId)"
-                    title="Set a one-off limit for this month">
-              Override
-            </button>
+            <div class="card-actions">
+              <button class="override-chip"
+                      (click)="$event.stopPropagation(); openEdit(row)"
+                      [title]="row.isOverride ? 'Change this month\'s limit' : 'Change the every-month limit'">
+                Edit
+              </button>
+              @if (!row.isOverride) {
+                <button class="override-chip"
+                        (click)="$event.stopPropagation(); openOverride(row)"
+                        title="Set a different limit for this month only">
+                  Override
+                </button>
+              }
+            </div>
           </div>
 
-          <!-- Spent amount + budget limit -->
           <div class="card-amounts">
             <span class="card-spent"
                   [class.over]="row.status === 'over'"
@@ -162,31 +176,26 @@
             <span class="card-of">of {{ formatCurrencyFull(row.budget.amount) }}</span>
           </div>
 
-          <!-- Progress bar -->
-          <div class="card-bar-wrap">
-            <div class="card-bar-fill"
-                 [class.warn]="row.status === 'warn'"
-                 [class.over]="row.status === 'over'"
-                 [style.width]="(row.pct > 100 ? 100 : row.pct) + '%'">
-            </div>
+          <div class="bar" [class.warn]="row.status === 'warn'" [class.over]="row.status === 'over'">
+            <div class="bar-fill" [style.width]="Math.min(100, row.pct) + '%'"></div>
           </div>
 
-          <!-- Bottom row: remaining + resets date + pct -->
           <div class="card-meta">
             @if (row.remaining < 0) {
-              <span class="over-badge">{{ formatCurrency(Math.abs(row.remaining)) }} over</span>
+              <span class="over-text">{{ formatCurrencyFull(-row.remaining) }} over</span>
             } @else if (row.spent > 0) {
-              <span class="remaining-text">{{ formatCurrencyFull(row.remaining) }} left</span>
+              <span>{{ formatCurrencyFull(row.remaining) }} left</span>
             } @else {
-              <span class="no-activity">No activity</span>
+              <span class="muted">No spending yet</span>
             }
-            <span class="resets-text">Resets {{ resetDate() }}</span>
+            <span class="muted">{{ row.pct }}%</span>
           </div>
 
         </div>
       }
     </div>
 
+    }
   }
 
 </div>
@@ -194,17 +203,17 @@
 <!-- MODALS -->
 <app-budget-form
   [open]="formOpen()"
-  [budget]="editing()"
-  [preselectedCategoryId]="preselectedCategoryId()"
-  [preselectedMonth]="preselectedMonth()"
+  [categoryId]="formCategoryId()"
+  [viewMonth]="selectedMonth()"
+  [initialScope]="formScope()"
   (closed)="closeForm()"
   (saved)="handleSave($event)"
-  (deleteRequested)="askDelete()" />
+  (deleteRequested)="askDelete($event)" />
 
 <app-confirm
   [open]="confirmOpen()"
-  title="Delete budget?"
-  message="This will remove the budget limit for this category."
-  confirmText="Delete"
+  [title]="toDelete()?.isDefault === false ? 'Remove this month\'s limit?' : 'Delete budget?'"
+  [message]="deleteMessage()"
+  [confirmText]="toDelete()?.isDefault === false ? 'Remove' : 'Delete'"
   (confirmed)="confirmDelete()"
-  (cancelled)="confirmOpen.set(false)" />
+  (cancelled)="cancelDelete()" />

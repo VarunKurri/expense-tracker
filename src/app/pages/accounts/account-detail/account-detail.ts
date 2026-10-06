@@ -9,6 +9,7 @@ import { TransactionForm } from '../../transactions/transaction-form/transaction
 import { Confirm } from '../../../components/confirm/confirm';
 import { Account, Transaction } from '../../../models';
 import { ToastService } from '../../../services/toast.service';
+import { owesMoney } from '../../../utils/finance';
 
 @Component({
   selector: 'app-account-detail',
@@ -44,7 +45,7 @@ export class AccountDetail {
     const a = this.account();
     if (!a) return 0;
     const txDelta = this.txService.balanceForAccount(a.id!);
-    if (a.type === 'credit') return a.openingBalance - txDelta;
+    if (owesMoney(a.type)) return a.openingBalance - txDelta;
     return (a.openingBalance || 0) + txDelta;
   });
 
@@ -82,7 +83,7 @@ export class AccountDetail {
     const pct = this.utilizationPct();
     if (pct >= 80) return 'var(--red)';
     if (pct >= 60) return 'var(--amber)';
-    return 'var(--green)';
+    return 'var(--teal)';
   });
 
   // Last 8 transactions for this account, sorted newest first

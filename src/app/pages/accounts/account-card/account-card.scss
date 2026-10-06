@@ -5,8 +5,8 @@
 
 .card {
   padding: 20px;
-  border-radius: 18px;
-  background: var(--surface);
+  border-radius: var(--radius);
+  background: var(--card-grad);
   border: 1px solid var(--line);
   cursor: pointer;
   min-height: 170px;
@@ -16,27 +16,11 @@
   gap: 6px;
   position: relative;
   overflow: hidden;
-  transition: all 0.18s ease;
+  transition: border-color 0.18s ease;
   box-sizing: border-box;
 
-  &:hover {
-    background: var(--surface-hi);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  }
-
-  // Subtle green glow in top-right corner
-  &::after {
-    content: '';
-    position: absolute;
-    top: -40px;
-    right: -40px;
-    width: 120px;
-    height: 120px;
-    background: radial-gradient(circle, var(--green-bg), transparent 70%);
-    pointer-events: none;
-    border-radius: 50%;
-  }
+  // Origin's cards don't lift or glow — the border does the work.
+  &:hover { border-color: var(--line-strong); }
 }
 
 .card-head {
@@ -59,10 +43,11 @@
 }
 
 .card-type {
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.04em;
   color: var(--fg-4);
 }
 
@@ -99,11 +84,12 @@
 }
 
 .card-label {
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-4);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-weight: 500;
 }
 
 .card-credit-row {
@@ -124,10 +110,11 @@
 }
 
 .chip-label {
+  font-family: var(--font-mono);
   font-size: 9.5px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--fg-4);
   margin-bottom: 2px;
 }
@@ -138,6 +125,6 @@
   color: var(--fg);
   font-variant-numeric: tabular-nums;
 
-  &.positive { color: var(--color-income); }
-  &.negative { color: var(--color-expense); }
+  &.positive { color: var(--teal); }
+  &.negative { color: var(--red); }
 }

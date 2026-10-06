@@ -106,6 +106,19 @@ export class TransactionTemplateService {
     }) as any);
   }
 
+  /** Used when a category is deleted, to re-point templates that filed into it. */
+  async update(id: string, patch: Partial<TransactionTemplate>) {
+    const user = this.auth.user();
+    if (!user) throw new Error('Not signed in');
+    const ref = doc(this.db, `users/${user.uid}/transactionTemplates/${id}`);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error('Template not found');
+    const current = await this.encryption.decryptDoc<TransactionTemplate>(snap.data());
+    await updateDoc(ref, await this.encryption.encryptForWrite({
+      ...current, ...patch, updatedAt: Date.now(),
+    }) as any);
+  }
+
   async remove(id: string) {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');

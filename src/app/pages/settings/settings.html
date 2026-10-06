@@ -35,6 +35,26 @@
     </div>
 
     <div class="settings-section">
+      <div class="settings-section-title">Spending</div>
+      <div class="settings-row" (click)="navigate('/settings/categories')">
+        <div class="settings-icon">🏷️</div>
+        <div class="settings-info">
+          <div class="settings-label">Categories</div>
+          <div class="settings-sub">Add, rename, archive or delete categories</div>
+        </div>
+        <div class="settings-arrow">›</div>
+      </div>
+      <div class="settings-row" (click)="navigate('/settings/rules')">
+        <div class="settings-icon">🗂️</div>
+        <div class="settings-info">
+          <div class="settings-label">Rules</div>
+          <div class="settings-sub">File transactions into categories automatically</div>
+        </div>
+        <div class="settings-arrow">›</div>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-section-title">Data</div>
       <div class="settings-row" (click)="navigate('/import')">
         <div class="settings-icon">📥</div>
@@ -155,9 +175,9 @@
     only way to unlock your data if you forget your passphrase. We can't recover it for you.
   </p>
   <div class="recovery-code">{{ generatedCode() }}</div>
-  <div class="recovery-actions">
-    <button class="btn" (click)="copyRecoveryCode()">Copy</button>
-    <button class="btn primary" (click)="closeRecoveryModal()">I've saved it</button>
+  <div class="recovery-actions" modal-footer>
+    <button class="btn-ghost" (click)="copyRecoveryCode()">Copy</button>
+    <button class="btn-primary" (click)="closeRecoveryModal()">I've saved it</button>
   </div>
 </app-modal>
 
@@ -175,9 +195,9 @@
     <input class="input-field" type="password" autocomplete="new-password"
            [ngModel]="exportPassword()" (ngModelChange)="exportPassword.set($event)" />
   </label>
-  <div class="recovery-actions">
-    <button class="btn" (click)="exportModalOpen.set(false)">Cancel</button>
-    <button class="btn primary" [disabled]="busy() || exportPassword().length < 8" (click)="exportBackup()">
+  <div class="recovery-actions" modal-footer>
+    <button class="btn-ghost" (click)="exportModalOpen.set(false)">Cancel</button>
+    <button class="btn-primary" [disabled]="busy() || exportPassword().length < 8" (click)="exportBackup()">
       {{ busy() ? 'Exporting…' : 'Download backup' }}
     </button>
   </div>
@@ -202,9 +222,9 @@
     <input class="input-field" type="email" autocomplete="email"
            [ngModel]="changeEmailNew()" (ngModelChange)="changeEmailNew.set($event)" />
   </label>
-  <div class="recovery-actions">
-    <button class="btn" (click)="closeChangeEmail()">Cancel</button>
-    <button class="btn primary"
+  <div class="recovery-actions" modal-footer>
+    <button class="btn-ghost" (click)="closeChangeEmail()">Cancel</button>
+    <button class="btn-primary"
             [disabled]="busy() || !changeEmailPassword() || !changeEmailNew()"
             (click)="submitChangeEmail()">
       {{ busy() ? 'Sending…' : 'Send confirmation link' }}
@@ -237,9 +257,9 @@
     <input class="input-field" type="password" autocomplete="off"
            [ngModel]="importPassword()" (ngModelChange)="importPassword.set($event)" />
   </label>
-  <div class="recovery-actions">
-    <button class="btn" (click)="importModalOpen.set(false)">Cancel</button>
-    <button class="btn primary" [disabled]="busy() || !importFileText() || !importPassword()" (click)="restoreBackup()">
+  <div class="recovery-actions" modal-footer>
+    <button class="btn-ghost" (click)="importModalOpen.set(false)">Cancel</button>
+    <button class="btn-primary" [disabled]="busy() || !importFileText() || !importPassword()" (click)="restoreBackup()">
       {{ busy() ? 'Restoring…' : 'Restore' }}
     </button>
   </div>

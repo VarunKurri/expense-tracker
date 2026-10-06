@@ -32,6 +32,16 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/accounts/account-detail/account-detail').then(m => m.AccountDetail)
   },
   {
+    path: 'net-worth',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/net-worth/net-worth').then(m => m.NetWorth)
+  },
+  {
+    path: 'net-worth/loans/:id',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/net-worth/loan-detail/loan-detail').then(m => m.LoanDetail)
+  },
+  {
     path: 'transactions',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/transactions/transactions').then(m => m.Transactions)
@@ -57,6 +67,21 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/analysis/analysis').then(m => m.Analysis)
   },
   {
+    path: 'analysis/spending',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/spending/spending').then(m => m.Spending)
+  },
+  {
+    path: 'analysis/reports',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/reports/reports').then(m => m.Reports)
+  },
+  {
+    path: 'analysis/forecast',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/forecast/forecast').then(m => m.Forecast)
+  },
+  {
     path: 'analysis/categories',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/analysis/category-breakdown/category-breakdown').then(m => m.CategoryBreakdown)
@@ -65,6 +90,16 @@ export const routes: Routes = [
     path: 'import',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/import/import').then(m => m.Import)
+  },
+  {
+    path: 'settings/categories',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/categories/categories').then(m => m.Categories)
+  },
+  {
+    path: 'settings/rules',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/rules/rules').then(m => m.Rules)
   },
   {
     path: 'settings',

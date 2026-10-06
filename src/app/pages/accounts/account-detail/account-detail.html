@@ -133,7 +133,7 @@
                 @if (categoryFor(tx.categoryId); as cat) {
                   <span class="recent-icon">{{ cat.icon }}</span>
                 } @else if (tx.type === 'income') {
-                  <span class="recent-icon" style="color: var(--green)">↓</span>
+                  <span class="recent-icon" style="color: var(--teal)">↓</span>
                 } @else if (tx.type === 'transfer') {
                   <span class="recent-icon">↔</span>
                 } @else {

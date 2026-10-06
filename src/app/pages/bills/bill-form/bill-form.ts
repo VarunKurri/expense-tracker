@@ -8,7 +8,9 @@ import { Modal } from '../../../components/modal/modal';
 import { AccountService } from '../../../services/account.service';
 import { CategoryService } from '../../../services/category.service';
 import { Bill, BillAmountMode, BillDueDateMode, BillFrequency } from '../../../models';
+import { BILL_FREQUENCIES } from '../../../utils/bill-schedule';
 import { ToastService } from '../../../services/toast.service';
+import { localDateString } from '../../../utils/date';
 
 @Component({
   selector: 'app-bill-form',
@@ -43,12 +45,7 @@ export class BillForm implements OnChanges {
 
   submitting = signal(false);
 
-  frequencies: { value: BillFrequency; label: string }[] = [
-    { value: 'weekly',    label: 'Weekly' },
-    { value: 'monthly',   label: 'Monthly' },
-    { value: 'quarterly', label: 'Quarterly' },
-    { value: 'yearly',    label: 'Yearly' },
-  ];
+  frequencies = BILL_FREQUENCIES;
 
   iconOptions = ['📄', '📺', '🎵', '🎮', '☁️', '📱', '🛒', '💪', '📰', '🎬', '🏠', '🚗', '💊', '✈️', '🍔'];
 
@@ -83,7 +80,7 @@ export class BillForm implements OnChanges {
       this.amount = 0;
       this.amountMode = 'fixed';
       this.frequency = 'monthly';
-      this.nextDueDate = new Date().toISOString().slice(0, 10);
+      this.nextDueDate = localDateString();
       this.dueDateMode = 'exact';
       this.accountId = this.activeAccounts()[0]?.id || '';
       // Default to Subscriptions category

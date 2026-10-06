@@ -9,7 +9,19 @@ import { CategoryService } from '../../../services/category.service';
 import { BudgetService } from '../../../services/budget.service';
 import { Budget } from '../../../models';
 import { ToastService } from '../../../services/toast.service';
+import {
+  BudgetDraft, BudgetScope, defaultFor, findBudget, monthOptions, overrideFor, prefillAmount,
+} from '../../../utils/budgets';
+import { monthKeyOf, monthLabel } from '../../../utils/calendar';
 
+/**
+ * Add or edit a budget.
+ *
+ * The form says *what* to save — category, "every month" or "one month", and
+ * the amount — and the page works out which document that is. It no longer
+ * edits whichever budget happened to be on screen: that is how overriding one
+ * month used to wipe the every-month budget.
+ */
 @Component({
   selector: 'app-budget-form',
   standalone: true,
@@ -23,33 +35,76 @@ export class BudgetForm implements OnChanges {
   budgetService = inject(BudgetService);
 
   @Input() open = false;
-  @Input() budget: Budget | null = null;
-  @Input() preselectedCategoryId = '';
-  @Input() preselectedMonth = '';
+  /** Preselected category. Empty for "+ New budget". */
+  @Input() categoryId = '';
+  /** The month the Budgets page is showing. */
+  @Input() viewMonth = monthKeyOf();
+  @Input() initialScope: BudgetScope = 'default';
   @Output() closed = new EventEmitter<void>();
-  @Output() saved = new EventEmitter<Omit<Budget, 'id' | 'createdAt'>>();
-  @Output() deleteRequested = new EventEmitter<void>();
+  @Output() saved = new EventEmitter<BudgetDraft>();
+  @Output() deleteRequested = new EventEmitter<Budget>();
 
-  categoryId = '';
+  // Signals, so the notes and title follow every change.
+  category = signal('');
+  scope = signal<BudgetScope>('default');
+  month = signal(monthKeyOf());
   amount = 0;
-  isDefault = true;
-  month = '';
+  /** Once you type an amount, switching scope stops replacing it. */
+  private amountTouched = false;
+  /** Category is fixed when opened from a budget card. */
+  lockCategory = false;
 
-  submitting = signal(false);
+  expenseCategories = computed(() => {
+    const all = this.categories.categories();
+    const list = all.filter(c => c.kind === 'expense' && !c.archived);
+    // An archived category's budget is still editable, so keep it selectable.
+    const current = all.find(c => c.id === this.category());
+    return current && !list.includes(current) ? [current, ...list] : list;
+  });
 
-  expenseCategories = computed(() =>
-    this.categories.categories().filter(c => c.kind === 'expense' && !c.archived)
-  );
+  months = computed(() => monthOptions(monthKeyOf(), 6, 12, [this.viewMonth, this.month()]));
 
-  currentMonth = new Date().toISOString().slice(0, 7);
+  /** The existing budget this form will change, if any. */
+  target = computed(() =>
+    findBudget(this.budgetService.budgets(), this.category(), this.scope(), this.month()) ?? null);
 
-  months = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 3 + i);
-    return {
-      value: d.toISOString().slice(0, 7),
-      label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    };
+  /** Saving "every month" will turn this month's one-off into the every-month budget. */
+  promotes = computed(() => {
+    const budgets = this.budgetService.budgets();
+    return this.scope() === 'default' && !defaultFor(budgets, this.category())
+      && !!overrideFor(budgets, this.category(), this.month());
+  });
+
+  /** Whether saving changes a budget that already exists. */
+  editingExisting = computed(() => !!this.target() || this.promotes());
+
+  categoryName = computed(() =>
+    this.categories.categories().find(c => c.id === this.category())?.name ?? 'This category');
+
+  monthName = computed(() => monthLabel(this.month()));
+
+  /** One calm sentence on what saving does to the other months. */
+  note = computed(() => {
+    const budgets = this.budgetService.budgets();
+    const cat = this.category();
+    if (!cat) return '';
+    const name = this.categoryName();
+    const def = defaultFor(budgets, cat);
+    if (this.scope() === 'month') {
+      return def
+        ? `Only ${this.monthName()} changes. Every other month stays at ${this.money(def.amount)}.`
+        : `Only ${this.monthName()} gets a limit. ${name} has no every-month budget.`;
+    }
+    const oneOff = overrideFor(budgets, cat, this.month());
+    if (!def && oneOff) {
+      return `${this.monthName()}'s one-off limit becomes the limit for every month.`;
+    }
+    if (def && oneOff) {
+      return `${this.monthName()} keeps its own limit of ${this.money(oneOff.amount)}. Remove it there to use this amount in ${this.monthName()} too.`;
+    }
+    return def && !this.lockCategory
+      ? `${name} already has an every-month budget of ${this.money(def.amount)}. Saving replaces it.`
+      : '';
   });
 
   ngOnChanges(changes: SimpleChanges) {
@@ -57,31 +112,37 @@ export class BudgetForm implements OnChanges {
   }
 
   private load() {
-    if (this.budget) {
-      this.categoryId = this.budget.categoryId;
-      this.amount = this.budget.amount;
-      this.isDefault = this.budget.isDefault;
-      this.month = this.budget.month || this.currentMonth;
-    } else {
-      this.categoryId = this.preselectedCategoryId || '';
-      this.amount = 0;
-      this.isDefault = !this.preselectedMonth;
-      this.month = this.preselectedMonth || this.currentMonth;
-    }
+    this.lockCategory = !!this.categoryId;
+    this.category.set(this.categoryId);
+    this.scope.set(this.initialScope);
+    this.month.set(this.viewMonth || monthKeyOf());
+    this.amountTouched = false;
+    this.refill();
   }
 
+  private refill() {
+    if (this.amountTouched) return;
+    this.amount = prefillAmount(this.budgetService.budgets(), this.category(), this.scope(), this.month());
+  }
+
+  setCategory(id: string) { this.category.set(id); this.refill(); }
+  setScope(s: BudgetScope) { this.scope.set(s); this.refill(); }
+  setMonth(m: string) { this.month.set(m); this.refill(); }
+  setAmount(v: number) { this.amount = v; this.amountTouched = true; }
+
   save() {
-    if (!this.categoryId) { this.toastService.error('Please select a category'); return; }
-    if (!this.amount || this.amount <= 0) { this.toastService.error('Amount must be greater than zero'); return; }
+    if (!this.category()) { this.toastService.error('Please select a category'); return; }
+    const amount = Number(this.amount);
+    if (!amount || amount <= 0) { this.toastService.error('Amount must be greater than zero'); return; }
+    this.saved.emit({ categoryId: this.category(), amount, scope: this.scope(), month: this.month() });
+  }
 
-    const data: Omit<Budget, 'id' | 'createdAt'> = {
-      categoryId: this.categoryId,
-      amount: Number(this.amount),
-      isDefault: this.isDefault,
-    };
+  requestDelete() {
+    const t = this.target();
+    if (t) this.deleteRequested.emit(t);
+  }
 
-    if (!this.isDefault) data.month = this.month;
-
-    this.saved.emit(data);
+  private money(n: number) {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
   }
 }

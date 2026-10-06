@@ -9,28 +9,13 @@
 
 /* ── HERO ─────────────────────────────────────────────────── */
 .hero {
-  padding: 32px;
-  border-radius: 24px;
-  background:
-    radial-gradient(ellipse 80% 100% at 100% 0%,
-      rgba(0, 214, 79, 0.28) 0%,
-      rgba(0, 214, 79, 0) 60%),
-    var(--bg-2);
+  padding: 24px;
+  border-radius: var(--radius);
+  background: var(--card-grad);
   border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: 0;
-  position: relative;
-  overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: -60px; right: -60px;
-    width: 240px; height: 240px;
-    background: radial-gradient(circle, rgba(0, 214, 79, 0.15), transparent 70%);
-    pointer-events: none;
-  }
 }
 
 .hero-top {
@@ -41,33 +26,39 @@
 }
 
 .hero-label {
+  font-family: var(--font-mono);
   color: var(--fg-3);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   display: flex;
   align-items: center;
   gap: 8px;
 
-  .dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 0 3px var(--green-bg);
-  }
+  .dot { display: none; }
+}
+
+/* "NET WORTH ›" opens the Net worth page — a link that still reads as the eyebrow. */
+.hero-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+
+  &:hover { color: var(--fg); }
+  &:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 3px var(--focus-ring); }
 }
 
 .range-seg {
   display: flex;
-  background: var(--bg-3);
-  padding: 3px;
-  border-radius: 10px;
-  gap: 2px;
+  gap: 4px;
 }
 
 .range-btn {
-  padding: 5px 12px;
-  border-radius: 7px;
-  font-size: 12.5px;
+  padding: 5px 13px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
   font-weight: 500;
   color: var(--fg-3);
   background: transparent;
@@ -76,8 +67,8 @@
   font-family: inherit;
   transition: all 0.18s ease;
 
-  &:hover { color: var(--fg); }
-  &.active { background: var(--surface-hi); color: var(--fg); }
+  &:hover { color: var(--fg); background: var(--bg-3); }
+  &.active { background: var(--surface-hi); color: var(--fg); font-weight: 600; }
 }
 
 .hero-number {
@@ -88,16 +79,18 @@
   font-variant-numeric: tabular-nums;
 
   .cur {
-    font-size: 30px; font-weight: 500;
-    color: var(--fg-3); margin-top: 10px; margin-right: 2px;
+    font-size: 26px; font-weight: 600;
+    color: var(--fg); margin-top: 6px; margin-right: 1px;
+    letter-spacing: -0.03em;
   }
   .whole {
-    font-size: 72px; font-weight: 700;
-    letter-spacing: -0.055em; color: var(--fg);
+    font-size: 44px; font-weight: 600;
+    letter-spacing: -0.035em; color: var(--fg);
   }
   .cents {
-    font-size: 30px; color: var(--fg-3);
-    font-weight: 500; margin-top: 10px; margin-left: 2px;
+    font-size: 26px; color: var(--fg);
+    font-weight: 600; margin-top: 6px; margin-left: 1px;
+    letter-spacing: -0.03em;
   }
 }
 
@@ -109,19 +102,18 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 999px;
-  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0;
+  margin-bottom: 18px;
   font-variant-numeric: tabular-nums;
   align-self: flex-start;
 
-  &.pos { background: var(--green-bg); color: var(--green); }
-  &.neg { background: var(--red-bg); color: var(--red); }
+  &.pos { color: var(--teal); }
+  &.neg { color: var(--red); }
 }
 
-.hero-change-label { font-weight: 400; opacity: 0.8; }
+.hero-change-label { font-weight: 400; color: var(--fg-3); }
 
 .hero-actions {
   display: flex;
@@ -131,43 +123,6 @@
 }
 
 /* ── BUTTONS ──────────────────────────────────────────────── */
-.btn-primary {
-  padding: 11px 18px;
-  border-radius: 12px;
-  background: var(--green);
-  color: #000;
-  font-weight: 600;
-  font-size: 13.5px;
-  font-family: inherit;
-  border: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: background 0.18s ease;
-
-  &:hover { background: var(--green-hi); }
-  &:disabled { opacity: 0.6; cursor: not-allowed; }
-}
-
-.btn-ghost {
-  padding: 11px 18px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  color: var(--fg);
-  font-weight: 500;
-  font-size: 13.5px;
-  font-family: inherit;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.18s ease;
-
-  &:hover { background: var(--surface-hi); }
-}
-
 /* ── KPI TILES ────────────────────────────────────────────── */
 .kpi-grid {
   display: grid;
@@ -177,8 +132,8 @@
 
 .kpi {
   padding: 18px 20px;
-  border-radius: 16px;
-  background: var(--surface);
+  border-radius: var(--radius);
+  background: var(--card-grad);
   border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -186,20 +141,27 @@
 }
 
 .kpi-top { display: flex; justify-content: space-between; align-items: center; }
-.kpi-label { color: var(--fg-3); font-size: 12.5px; font-weight: 500; }
+.kpi-label {
+  font-family: var(--font-mono);
+  color: var(--fg-3);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .kpi-dot {
   width: 8px; height: 8px; border-radius: 50%;
-  &.income  { background: var(--green); }
+  &.income  { background: var(--teal); }
   &.expense { background: var(--red); }
   &.neutral { background: var(--fg-4); }
 }
 .kpi-value {
-  font-size: 28px; font-weight: 700;
-  letter-spacing: -0.035em;
+  font-size: 26px; font-weight: 600;
+  letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
   color: var(--fg);
-  &.income  { color: var(--green); }
-  &.expense { color: var(--red); }
+  &.income  { color: var(--teal); }
+  &.expense { color: var(--fg); }
   &.muted   { color: var(--fg-4); }
 }
 .kpi-sub { font-size: 12px; color: var(--fg-4); }
@@ -212,17 +174,18 @@
   margin-bottom: -8px;
 }
 .section-title {
-  font-size: 13px; font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 11px; font-weight: 500;
   color: var(--fg-3);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
 }
 .section-link {
   font-size: 13px; font-weight: 500;
-  color: var(--green);
+  color: var(--fg-3);
   background: transparent; border: none;
   cursor: pointer; font-family: inherit;
-  &:hover { opacity: 0.75; }
+  &:hover { color: var(--fg); }
 }
 
 /* ── ACCOUNTS STRIP ───────────────────────────────────────── */
@@ -234,8 +197,8 @@
 
 .acct-card {
   padding: 16px;
-  border-radius: 16px;
-  background: var(--surface);
+  border-radius: var(--radius);
+  background: var(--card-grad);
   border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -243,7 +206,7 @@
   cursor: pointer;
   transition: all 0.18s ease;
 
-  &:hover { background: var(--surface-hi); transform: translateY(-1px); }
+  &:hover { border-color: var(--line-strong); }
 }
 
 .acct-head {
@@ -262,7 +225,7 @@
   transition: background 0.18s ease;
 }
 
-.acct-type { font-size: 10px; color: var(--fg-4); text-transform: uppercase; font-weight: 600; letter-spacing: 0.08em; }
+.acct-type { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em; }
 .acct-name { font-size: 13px; font-weight: 500; color: var(--fg-2); }
 .acct-bal {
   font-size: 20px; font-weight: 700;
@@ -271,18 +234,34 @@
   color: var(--fg);
   &.negative { color: var(--red); }
 }
-.acct-sub { font-size: 11px; color: var(--fg-4); font-family: monospace; letter-spacing: 0.1em; }
+.acct-sub { font-size: 11px; color: var(--fg-4); font-family: var(--font-mono); letter-spacing: 0.04em; }
 
 /* ── MAIN GRID ─────────────────────────────────────────────── */
+/* Three cards on one baseline.
+ *
+ * These used to size to their own content, so the row ended in a ragged step —
+ * the donut card runs a good deal taller than a two-bill list, and how far
+ * apart they land changes with the data, which is what made it look accidental.
+ *
+ * Stretching them to a shared height fixes that without inventing content: the
+ * cards share a bottom edge, and each one's own content still starts at the
+ * top. A sidebar arrangement was the other candidate and was worse — stacking
+ * two short cards beside the tall one simply moved the overhang to the other
+ * column. */
 .main-grid {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
-.left-col { display: flex; flex-direction: column; gap: 16px; }
-.right-col { display: flex; flex-direction: column; gap: 16px; }
+/* Content tops out; the stretch shows as quiet space at the foot of the
+   shorter cards rather than as stretched rows. */
+.main-grid > .panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
 
 /* ── PANEL ─────────────────────────────────────────────────── */
 .panel {
@@ -300,66 +279,103 @@
   border-bottom: 1px solid var(--line);
 }
 
-.panel-title { font-size: 14.5px; font-weight: 600; color: var(--fg); letter-spacing: -0.01em; }
+.panel-title {
+  font-family: var(--font-mono);
+  font-size: 11px; font-weight: 500;
+  color: var(--fg-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .panel-sub-text { font-size: 12px; color: var(--fg-3); margin-top: 2px; }
 .panel-link {
   font-size: 12.5px; font-weight: 500;
-  color: var(--green);
+  color: var(--fg-3);
   background: transparent; border: none;
   cursor: pointer; font-family: inherit;
   white-space: nowrap;
-  &:hover { opacity: 0.75; }
+  &:hover { color: var(--fg); }
 }
 .panel-empty { padding: 24px; text-align: center; color: var(--fg-4); font-size: 13px; }
 
-/* ── FLOW CHART ────────────────────────────────────────────── */
-.flow-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 16px 18px 0;
+/* ── SPEND CALENDAR CARD ───────────────────────────────────── */
+.spend-card { margin-bottom: 16px; }
+
+.spend-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
 }
-.flow-header-left { display: flex; flex-direction: column; gap: 6px; }
-.flow-stats { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-.flow-stat {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 13px; color: var(--fg-3);
-  font-variant-numeric: tabular-nums;
-  strong { color: var(--fg); font-weight: 600; }
+
+.spend-main { padding: 20px 22px 22px; min-width: 0; }
+
+/* The eyebrow is the link into the Spending page, the way Origin's
+   "SPENT IN SEPTEMBER ›" is. It is a button, so it gets a pointer and a focus
+   ring — but no fill or border, so it still reads as a label. */
+.spend-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--fg-3);
+
+  &:hover { color: var(--fg); }
+  &:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: var(--radius-xs); }
+
+  .card-label { cursor: pointer; }
 }
-.flow-dot {
-  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-  &.income-dot   { background: rgba(128, 128, 128, 0.6); }
-  &.spending-dot { background: var(--green); }
+
+.spend-chev {
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.14s ease;
 }
-.flow-net-block { text-align: right; }
-.flow-net-label {
-  font-size: 11px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--fg-4); margin-bottom: 4px;
-}
-.flow-net-value {
-  font-size: 28px; font-weight: 700;
+.spend-link:hover .spend-chev { transform: translateX(2px); }
+
+.spend-total {
+  font-size: 40px;
   letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-  &.pos { color: var(--green); }
-  &.neg { color: var(--red); }
+  margin: 10px 0 20px;
+  color: var(--fg);
 }
-.flow-chart-wrap { height: 160px; padding: 8px 16px 16px; }
+
+.spend-rail {
+  border-left: 1px solid var(--line);
+  align-self: stretch;
+  min-width: 0;
+}
+
+.spend-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 20px 18px 12px;
+}
 
 /* ── ACTIVITY ──────────────────────────────────────────────── */
+/* A real <button>, so these rows are keyboard-reachable — they open the
+   transaction view, which was previously only clickable with a mouse. */
 .activity-row {
   display: grid;
   grid-template-columns: 38px 1fr auto;
   gap: 12px;
   align-items: center;
+  width: 100%;
   padding: 11px 18px;
   cursor: pointer;
+  border: none;
   border-bottom: 1px solid var(--line);
+  background: transparent;
+  font-family: var(--font-ui);
+  text-align: left;
   transition: background 0.18s ease;
 
   &:last-child { border-bottom: none; }
   &:hover { background: var(--bg-3); }
+  &:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 }
 
 .activity-icon {
@@ -370,12 +386,13 @@
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; flex-shrink: 0; color: var(--fg-3);
 
-  &.income { background: var(--green-bg); border-color: transparent; color: var(--green); }
+  &.income { background: var(--teal-bg); border-color: transparent; color: var(--teal); }
   &.transfer { color: var(--fg-3); }
 }
 
-.activity-main { min-width: 0; }
+.activity-main { min-width: 0; display: block; }
 .activity-title {
+  display: block;
   font-size: 13.5px; font-weight: 600; color: var(--fg);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -389,7 +406,7 @@
   font-size: 13.5px; font-weight: 700;
   font-variant-numeric: tabular-nums; white-space: nowrap;
   color: var(--fg);
-  &.pos { color: var(--green); }
+  &.pos { color: var(--teal); }
   &.neg { color: var(--fg); }
   &.neu { color: var(--fg-3); }
 }
@@ -476,125 +493,28 @@
 .budget-mini-bar { height: 5px; background: var(--bg-3); border-radius: 999px; overflow: hidden; }
 .budget-mini-fill {
   height: 100%; border-radius: 999px;
-  background: var(--green); transition: width 0.3s ease;
+  background: var(--blue); transition: width 0.3s ease;
   &.warn { background: var(--amber); }
   &.over { background: var(--red); }
 }
 
 /* ── TRANSACTION VIEW PANEL ────────────────────────────────── */
-.view-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(4px);
-  z-index: 50;
-  animation: fadeIn 0.2s ease;
-}
-
-.view-panel {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: var(--surface-hi);
-  border-radius: 24px 24px 0 0;
-  border: 1px solid var(--line);
-  border-bottom: none;
-  z-index: 51;
-  padding: 0 0 calc(40px + env(safe-area-inset-bottom));
-  animation: slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-@media (min-width: 640px) {
-  .view-panel {
-    bottom: auto; left: 50%; top: 50%;
-    transform: translate(-50%, -50%);
-    width: 480px; max-height: 85vh; overflow-y: auto;
-    border-radius: 20px; border: 1px solid var(--line);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 24px 64px rgba(0,0,0,0.1);
-    animation: popIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-  .view-handle { display: none; }
-}
-
-.view-handle { width: 36px; height: 4px; border-radius: 999px; background: var(--line); margin: 12px auto 0; }
-
-.view-header {
-  display: flex; justify-content: space-between;
-  align-items: center; padding: 16px 20px 0;
-}
-
-.view-close {
-  width: 32px; height: 32px; border-radius: 50%;
-  background: var(--bg-3); border: none;
-  color: var(--fg-3); font-size: 13px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.18s ease;
-  &:hover { color: var(--fg); }
-}
-
-.view-edit-btn {
-  padding: 7px 16px; border-radius: 8px;
-  background: var(--green); color: #000;
-  font-size: 13px; font-weight: 600;
-  font-family: inherit; border: none; cursor: pointer;
-  transition: background 0.18s ease;
-  &:hover { background: var(--green-hi); }
-}
-
-.view-amount-wrap { padding: 20px 24px 8px; text-align: center; }
-
-.view-amount {
-  font-size: 42px; font-weight: 700;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums; color: var(--fg);
-  &.pos { color: var(--green); }
-  &.neg { color: var(--fg); }
-}
-
-.view-refunded-badge {
-  display: inline-block; margin-top: 8px;
-  padding: 4px 12px; border-radius: 999px;
-  background: var(--green-bg); color: var(--green);
-  font-size: 12px; font-weight: 600;
-}
-
-.view-details {
-  margin: 16px 20px 0;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 16px; overflow: hidden;
-}
-
-.view-row {
-  display: flex; justify-content: space-between;
-  align-items: flex-start;
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--line);
-  gap: 16px;
-  &:last-child { border-bottom: none; }
-}
-
-.view-row-label { font-size: 13px; color: var(--fg-3); font-weight: 500; flex-shrink: 0; }
-.view-row-value { font-size: 13px; font-weight: 600; color: var(--fg); text-align: right; }
-
-.notes-text {
-  color: var(--fg-2); font-weight: 400;
-  line-height: 1.5; white-space: pre-wrap;
-  word-break: break-word; text-align: left;
-}
-
-.view-type-badge {
-  font-size: 12px; padding: 3px 10px;
-  border-radius: 999px; font-weight: 600;
-  &.income   { background: var(--green-bg); color: var(--green); }
-  &.expense  { background: var(--red-bg); color: var(--red); }
-  &.transfer { background: var(--bg-3); color: var(--fg-3); }
-}
+/* The transaction view panel now lives in
+   components/transaction-view/ — its styles moved with it. */
 
 /* ── RESPONSIVE ────────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .accts-strip { grid-template-columns: repeat(3, 1fr); }
 }
+/* Below this the rail can no longer sit beside a seven-column calendar without
+   squeezing both, so it drops underneath and becomes a normal list. */
 @media (max-width: 1100px) {
-  .main-grid { grid-template-columns: 1fr; }
-  .right-col { display: grid; grid-template-columns: repeat(2, 1fr); }
+  .spend-layout { grid-template-columns: 1fr; }
+  .spend-rail {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+  .spend-rail-head { padding-top: 14px; }
 }
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
@@ -603,17 +523,8 @@
   .kpi-grid { grid-template-columns: 1fr; }
   .accts-strip { grid-template-columns: repeat(2, 1fr); }
   .hero-top { flex-wrap: wrap; gap: 12px; }
-  .right-col { grid-template-columns: 1fr; }
-  .flow-header { flex-direction: column; gap: 10px; }
-  .flow-net-block { text-align: left; display: flex; align-items: center; gap: 10px; }
-  .flow-net-label { margin-bottom: 0; font-size: 10px; }
-  .flow-net-value { font-size: 22px; }
-}
-
-/* ── ANIMATIONS ────────────────────────────────────────────── */
-@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes popIn   {
-  from { transform: translate(-50%, -48%) scale(0.97); opacity: 0; }
-  to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  .spend-main { padding: 16px 14px 18px; }
+  .spend-total { font-size: 32px; margin: 8px 0 16px; }
+  .spend-rail-head { padding-left: 14px; padding-right: 14px; }
+  .activity-row { padding-left: 14px; padding-right: 14px; }
 }

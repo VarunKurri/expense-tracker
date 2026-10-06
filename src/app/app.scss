@@ -24,8 +24,8 @@
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(circle at 70% 20%, rgba(0, 214, 79, 0.18) 0%, transparent 50%),
-    radial-gradient(circle at 20% 80%, rgba(0, 214, 79, 0.08) 0%, transparent 40%);
+    radial-gradient(ellipse 75% 55% at 78% 12%, rgba(59, 142, 255, 0.32) 0%, transparent 62%),
+    radial-gradient(ellipse 65% 50% at 10% 78%, rgba(14, 159, 110, 0.24) 0%, transparent 58%);
   pointer-events: none;
 
   &::after {
@@ -51,29 +51,35 @@
   display: flex;
   align-items: center;
   gap: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .login-wordmark {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.04em;
+  font-family: var(--font-display);
+  font-size: 46px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.01em;
   color: #fff;
+  transform: translateY(var(--wordmark-nudge));
 }
 
 .login-hero-text {
   h1 {
-    font-size: clamp(36px, 4vw, 52px);
-    font-weight: 800;
-    letter-spacing: -0.05em;
-    line-height: 1.08;
+    font-family: var(--font-display);
+    font-size: clamp(36px, 4vw, 54px);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    line-height: 1.18;
     color: #fff;
     margin-bottom: 20px;
-
-    /* Green accent on last word via gradient trick */
-    background: linear-gradient(135deg, #ffffff 60%, var(--green) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
   }
 
   p {
@@ -103,9 +109,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--green);
+  background: linear-gradient(135deg, var(--blue), var(--teal));
   flex-shrink: 0;
-  box-shadow: 0 0 8px rgba(0, 214, 79, 0.6);
 }
 
 /* ── RIGHT PANEL ────────────────────────────── */
@@ -128,6 +133,15 @@
 
 .login-card-logo {
   /* Just the icon, no text — wordmark is in the left panel */
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .login-card-heading {
@@ -153,10 +167,10 @@
   gap: 10px;
   width: 100%;
   padding: 14px 20px;
-  border-radius: 14px;
-  background: var(--green);
-  color: #000;
-  font-weight: 700;
+  border-radius: var(--radius-sm);
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 500;
   font-size: 15px;
   font-family: inherit;
   border: none;
@@ -176,9 +190,7 @@
   }
 
   &:hover {
-    background: var(--green-hi);
-    transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0, 214, 79, 0.35);
+    opacity: 0.88;
     &::before { opacity: 1; }
   }
 
@@ -195,8 +207,8 @@
 .btn-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(0,0,0,0.3);
-  border-top-color: #000;
+  border: 2px solid rgba(127,127,127,0.35);
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   flex-shrink: 0;
@@ -239,10 +251,10 @@
   gap: 10px;
   width: 100%;
   padding: 14px 20px;
-  border-radius: 14px;
-  background: var(--green);
-  color: #000;
-  font-weight: 700;
+  border-radius: var(--radius-sm);
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 500;
   font-size: 15px;
   margin-top: 4px;
   cursor: pointer;
@@ -250,11 +262,7 @@
 
   span { color: inherit; font-size: inherit; font-weight: inherit; }
 
-  &:hover:not(:disabled) {
-    background: var(--green-hi);
-    transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0, 214, 79, 0.25);
-  }
+  &:hover:not(:disabled) { opacity: 0.88; }
 
   &:disabled {
     opacity: 0.45;
@@ -452,7 +460,7 @@
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--line);
-  background: var(--bg-2);
+  background: var(--surface);
   position: sticky;
   top: 0;
   height: 100vh;
@@ -470,28 +478,64 @@
   gap: 10px;
   padding: 6px 10px;
   margin-bottom: 20px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--t);
+
+  // The lockup behaves as one object: you click it, you don't select it.
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  background: var(--green);
-  color: #000;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--fg);
+  color: var(--bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-weight: 500;
   font-size: 16px;
-  letter-spacing: -0.04em;
   flex-shrink: 0;
 }
 
+/* The wordmark is set in the display serif, the way Origin sets theirs. */
+/* ── BRAND LOCKUP ───────────────────────────────
+   The wordmark is optically centred against the mark, not box-centred.
+   Flex centres the text's line box, but "Trackr" has no descenders, so the
+   ink sits in the top of that box with empty space beneath it, and the
+   lockup reads high. --wordmark-nudge pushes the text back down. It is in
+   em, so it holds at every size.
+
+   The value was found by measuring painted pixels rather than font metrics:
+   screenshot the lockup against a fixed page region, find the ink rows of
+   the mark and of the text, and solve for the offset that puts their centres
+   together. 0.115em lands the two centres within a quarter of a pixel, and
+   the measurement repeats exactly.
+
+   Sizes put cap height at ~0.63 of the mark's height, matching how Origin
+   sizes theirs (cap height is 0.74em in Newsreader, so font-size is roughly
+   0.88 × mark height).
+
+   These are logos, not buttons — no hover or active state. */
+/* --wordmark-nudge is defined in src/styles.scss — a `:root` rule inside a
+   component stylesheet gets scoped to `[_ngcontent-…]:root`, which matches
+   nothing, so the token would never be defined. */
+
 .brand-name {
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: -0.03em;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 25px;
+  line-height: 1;
+  letter-spacing: -0.01em;
   color: var(--fg);
+  transform: translateY(var(--wordmark-nudge));
 }
 
 /* ============================================
@@ -505,12 +549,13 @@
 }
 
 .nav-section {
-  color: var(--fg-4);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-family: var(--font-mono);
+  color: var(--fg-3);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 14px 12px 6px;
+  padding: 16px 12px 6px;
 }
 
 .nav-item {
@@ -531,11 +576,12 @@
   background: transparent;
   text-align: left;
 
-  &:hover { background: var(--surface); color: var(--fg); }
+  &:hover { background: var(--bg-3); color: var(--fg-2); }
 
   &.active {
-    background: var(--surface-hi);
+    background: var(--bg-3);
     color: var(--fg);
+    font-weight: 600;
     svg { stroke: var(--fg); }
   }
 
@@ -564,11 +610,12 @@
 .nav-badge {
   margin-left: auto;
   padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--green);
-  color: #000;
-  font-size: 10.5px;
-  font-weight: 700;
+  border-radius: var(--radius-pill);
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
 }
 
 /* ============================================
@@ -615,12 +662,13 @@
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--green), #00A03E);
-    color: #000;
+    background: var(--bg-3);
+    border: 1px solid var(--line);
+    color: var(--fg-2);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 14px;
     flex-shrink: 0;
   }
@@ -729,35 +777,39 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  pointer-events: none;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 
   .brand-name {
-    font-weight: 700;
-    font-size: 15px;
-    letter-spacing: -0.02em;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 23px;
+    line-height: 1;
+    letter-spacing: -0.01em;
     color: var(--fg);
+    transform: translateY(var(--wordmark-nudge));
   }
 }
 
 .topbar-add {
   width: 42px;
   height: 42px;
-  border-radius: 12px;
-  background: var(--green);
+  border-radius: var(--radius-sm);
+  background: var(--fg);
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #000;
+  color: var(--bg);
   cursor: pointer;
-  transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  transition: opacity 0.18s ease;
   flex-shrink: 0;
-  box-shadow: 0 8px 18px rgba(0, 214, 79, 0.22);
 
-  &:hover {
-    background: var(--green-hi);
-    transform: translateY(-1px);
-  }
+  &:hover { opacity: 0.85; }
 }
 
 .topbar-search {
@@ -828,7 +880,7 @@
   align-items: center;
   gap: 12px;
   padding: 20px 24px;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--line);
   color: var(--fg-3);
   flex-shrink: 0;
 }
@@ -922,24 +974,24 @@
 
   &.more {
     margin-top: 2px;
-    color: var(--green);
+    color: var(--teal);
 
     .command-icon {
-      color: var(--green);
-      background: var(--green-bg);
+      color: var(--teal);
+      background: var(--teal-bg);
       border-color: transparent;
     }
 
     .command-label {
-      color: var(--green);
+      color: var(--teal);
     }
 
     &.active {
       background: var(--surface);
 
       .command-icon {
-        color: var(--green);
-        background: var(--green-bg);
+        color: var(--teal);
+        background: var(--teal-bg);
         border-color: transparent;
       }
     }
@@ -997,6 +1049,7 @@
     position: fixed;
     top: 0; left: 0;
     height: 100vh;
+    height: 100dvh;
     width: 280px;
     transform: translateX(-100%);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
@@ -1070,7 +1123,7 @@
     width: 15px;
     height: 15px;
     margin: 2px 0 0;
-    accent-color: var(--green);
+    accent-color: var(--accent);
     flex-shrink: 0;
     cursor: pointer;
   }
@@ -1114,7 +1167,7 @@
   height: 22px;
   border-radius: 50%;
   border: 2.5px solid var(--line);
-  border-top-color: var(--green);
+  border-top-color: var(--teal);
   animation: boot-spin 0.7s linear infinite;
 }
 
@@ -1138,7 +1191,7 @@
     color: var(--fg-3);
     transition: color 0.15s ease;
 
-    &.met { color: var(--green); }
+    &.met { color: var(--teal); }
   }
 
   .pw-dot {
@@ -1151,14 +1204,15 @@
     justify-content: center;
     font-size: 9px;
     font-weight: 700;
-    color: #000;
+    color: var(--fg-4);
     flex-shrink: 0;
     transition: all 0.15s ease;
   }
 
   li.met .pw-dot {
-    background: var(--green);
-    border-color: var(--green);
+    background: var(--teal);
+    border-color: var(--teal);
+    color: #fff;
   }
 }
 
@@ -1177,8 +1231,9 @@
   position: fixed;
   inset: 0;
   background-image:
-    radial-gradient(circle at 70% 10%, rgba(0, 214, 79, 0.16) 0%, transparent 45%),
-    radial-gradient(circle at 15% 70%, rgba(0, 214, 79, 0.08) 0%, transparent 40%);
+    radial-gradient(ellipse 70% 55% at 72% 8%, rgba(59, 142, 255, 0.30) 0%, transparent 62%),
+    radial-gradient(ellipse 60% 50% at 12% 68%, rgba(14, 159, 110, 0.22) 0%, transparent 58%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, rgba(124, 92, 196, 0.16) 0%, transparent 60%);
   pointer-events: none;
 }
 
@@ -1196,12 +1251,23 @@
   display: flex;
   align-items: center;
   gap: 11px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .landing-wordmark {
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-size: 33px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  transform: translateY(var(--wordmark-nudge));
 }
 
 .landing-nav-actions {
@@ -1213,20 +1279,16 @@
 .landing-cta {
   padding: 13px 26px;
   border-radius: 13px;
-  background: var(--green);
+  background: #fff;
   color: #000;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 15px;
   cursor: pointer;
   border: none;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease;
   white-space: nowrap;
 
-  &:hover {
-    background: var(--green-hi, #2ee06a);
-    transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0, 214, 79, 0.3);
-  }
+  &:hover { opacity: 0.86; }
 
   &.sm { padding: 9px 18px; font-size: 13.5px; border-radius: 11px; }
 }
@@ -1258,11 +1320,21 @@
   gap: 22px;
 
   h1 {
-    font-size: clamp(38px, 6vw, 64px);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    line-height: 1.06;
+    font-size: clamp(38px, 6vw, 66px);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    line-height: 1.16;
     margin: 0;
+
+    em {
+      font-style: italic;
+      // A gradient-filled accent phrase — the one place the brand colours
+      // appear in type.
+      background: linear-gradient(100deg, var(--blue) 0%, var(--teal) 70%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
   }
 
   p {
@@ -1280,11 +1352,14 @@
   gap: 7px;
   padding: 7px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 214, 79, 0.35);
-  background: rgba(0, 214, 79, 0.1);
-  color: #7deda5;
-  font-size: 12.5px;
-  font-weight: 600;
+  border: 1px solid rgba(14, 159, 110, 0.38);
+  background: rgba(14, 159, 110, 0.12);
+  color: #4FD8A8;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .landing-hero-actions {
@@ -1322,12 +1397,27 @@
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: rgba(0, 214, 79, 0.35);
-    background: rgba(0, 214, 79, 0.05);
-    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.05);
   }
 
-  .landing-feature-icon { font-size: 26px; margin-bottom: 12px; }
+  .landing-feature-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 21px;
+    margin-bottom: 14px;
+
+    &.c1 { background: rgba(59, 142, 255, 0.18);  box-shadow: inset 0 0 0 1px rgba(59, 142, 255, 0.30); }
+    &.c2 { background: rgba(14, 159, 110, 0.18);  box-shadow: inset 0 0 0 1px rgba(14, 159, 110, 0.30); }
+    &.c3 { background: rgba(240, 168, 48, 0.18);  box-shadow: inset 0 0 0 1px rgba(240, 168, 48, 0.30); }
+    &.c4 { background: rgba(232, 115, 74, 0.18);  box-shadow: inset 0 0 0 1px rgba(232, 115, 74, 0.30); }
+    &.c5 { background: rgba(124, 92, 196, 0.18);  box-shadow: inset 0 0 0 1px rgba(124, 92, 196, 0.30); }
+    &.c6 { background: rgba(74, 171, 232, 0.18);  box-shadow: inset 0 0 0 1px rgba(74, 171, 232, 0.30); }
+  }
 
   h3 {
     font-size: 15.5px;

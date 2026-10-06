@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, AfterViewInit, ViewChild, ElementRef, OnDestroy, effect } from '@angular/core';
+import { Component, inject, signal, computed, ViewChild, ElementRef, OnDestroy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AccountService } from '../../services/account.service';
@@ -12,29 +12,37 @@ import { BillForm } from '../bills/bill-form/bill-form';
 import { Confirm } from '../../components/confirm/confirm';
 import { ToastService } from '../../services/toast.service';
 import { Account, Bill, Transaction } from '../../models';
+import { categoryPalette, chartColors } from '../../utils/theme-colors';
+import { ThemeService } from '../../services/theme.service';
+import { SpendCalendar } from '../../components/spend-calendar/spend-calendar';
+import { DayDetail } from '../../components/day-detail/day-detail';
+import { TransactionView } from '../../components/transaction-view/transaction-view';
+import { DayCell, monthKeyOf, monthLabel } from '../../utils/calendar';
+import { MoneyRules, spendingTransactions } from '../../utils/reporting';
+import { budgetProgress, budgetSpent, effectiveBudgets } from '../../utils/budgets';
+import { netWorthSeries } from '../../utils/net-worth';
+import { ManualAssetService } from '../../services/manual-asset.service';
 import {
   Chart, ArcElement, DoughnutController,
-  CategoryScale, LinearScale, BarElement, BarController,
-  LineController, LineElement, PointElement, Filler,
   Tooltip, Legend
 } from 'chart.js';
+import { owesMoney } from '../../utils/finance';
 
-Chart.register(
-  ArcElement, DoughnutController,
-  CategoryScale, LinearScale, BarElement, BarController,
-  LineController, LineElement, PointElement, Filler,
-  Tooltip, Legend
-);
+Chart.register(ArcElement, DoughnutController, Tooltip, Legend);
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, TransactionForm, BillForm, Confirm],
+  imports: [
+    CommonModule, TransactionForm, BillForm, Confirm,
+    SpendCalendar, DayDetail, TransactionView,
+  ],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
-export class Dashboard implements AfterViewInit, OnDestroy {
+export class Dashboard implements OnDestroy {
   private accountService = inject(AccountService);
+  private manualAssets = inject(ManualAssetService);
   private txService = inject(TransactionService);
   private categoryService = inject(CategoryService);
   private billService = inject(BillService);
@@ -42,13 +50,32 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   private quickAddService = inject(QuickAddService);
   private router = inject(Router);
   private toastService = inject(ToastService);
+  private themeService = inject(ThemeService);
   Math = Math
 
-  @ViewChild('miniDonutCanvas') miniDonutCanvas!: ElementRef<HTMLCanvasElement>;
+  /**
+   * The donut's canvas only exists while there is spending to show, so it
+   * appears some time after the page does — on a cold start, only once every
+   * transaction has been decrypted, which takes longer the more there are.
+   *
+   * Angular calls this setter the moment the canvas enters or leaves the page,
+   * so the chart is built exactly then. The previous version polled on a
+   * timer, checked once at first render, and gave up immediately if no
+   * spending had loaded yet — so on a fresh load or hard refresh the donut
+   * never appeared, and only showed after navigating away and back, when the
+   * data was already there.
+   */
+  @ViewChild('miniDonutCanvas') set miniDonutCanvasRef(ref: ElementRef<HTMLCanvasElement> | undefined) {
+    this.miniDonutCanvas = ref;
+    if (!ref) {
+      this.miniDonut?.destroy();
+      this.miniDonut = null;
+    } else if (!this.miniDonut) {
+      this.initMiniDonut();
+    }
+  }
+  private miniDonutCanvas?: ElementRef<HTMLCanvasElement>;
   private miniDonut: Chart | null = null;
-
-  @ViewChild('cashFlowCanvas') cashFlowCanvas!: ElementRef<HTMLCanvasElement>;
-  private cashFlowChart: Chart | null = null;
 
   activeRange = signal<'7D' | '30D' | '90D' | 'YTD'>('30D');
 
@@ -65,21 +92,23 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   txConfirmOpen = signal(false);
   txToDelete = signal<Transaction | null>(null);
 
-  openTxView(tx: Transaction) {
-    this.viewingTx.set(tx);
-    document.body.style.overflow = 'hidden';
-  }
+  // The overlays own their own body-scroll locks, so these only move state.
+  openTxView(tx: Transaction) { this.viewingTx.set(tx); }
 
+  /** Steps back to the day popup when that is where this was opened from. */
   closeTxView() {
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
+    const back = this.returnToDay();
+    if (back) { this.returnToDay.set(null); this.selectedDay.set(back); }
   }
 
-  editFromTxView() {
-    const tx = this.viewingTx();
+  editFromTxView(tx: Transaction) {
+    // Editing leaves the day popup behind — the form is a new destination, not
+    // a step deeper into it.
+    this.returnToDay.set(null);
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
-    if (tx) { this.editingTx.set(tx); this.txFormOpen.set(true); }
+    this.editingTx.set(tx);
+    this.txFormOpen.set(true);
   }
 
   closeTxForm() { this.txFormOpen.set(false); this.editingTx.set(null); }
@@ -154,66 +183,91 @@ export class Dashboard implements AfterViewInit, OnDestroy {
 
   balanceFor(account: Account): number {
     const txDelta = this.txService.balanceForAccount(account.id!);
-    const balance = account.type === 'credit'
+    const balance = owesMoney(account.type)
       ? account.openingBalance - txDelta
       : (account.openingBalance || 0) + txDelta;
     return Math.round(balance * 100) / 100;
   }
 
-  netWorth = computed(() => {
-    let assets = 0, liabilities = 0;
-    for (const a of this.activeAccounts()) {
-      const bal = this.balanceFor(a);
-      if (a.type === 'credit') { if (bal > 0) liabilities += bal; else assets += Math.abs(bal); }
-      else { if (bal >= 0) assets += bal; else liabilities += Math.abs(bal); }
-    }
-    return Math.round((assets - liabilities) * 100) / 100;
-  });
+  /**
+   * Net worth, counted exactly as the Net worth page counts it — accounts plus
+   * any homes, cars or loans you added there — so the two never disagree.
+   */
+  private netWorthPoints = computed(() =>
+    netWorthSeries(
+      this.accountService.accounts(), this.manualAssets.items(), this.txService.transactions(),
+      [this.rangeStart(), this.localDateString()],
+    ));
 
-  netWorthChange = computed(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    const cutoff = this.localDateString(d);
-    return Math.round(
-      this.txService.transactions()
-        .filter(t => t.date >= cutoff && !t.isInternalTransfer)
-        .reduce((s, t) => {
-          if (t.type === 'income') return s + t.amount;
-          if (t.type === 'expense') return s - t.amount;
-          return s;
-        }, 0) * 100
-    ) / 100;
-  });
+  netWorth = computed(() => this.netWorthPoints()[1].net);
 
-  cashFlowData = computed(() => {
-    const days: { date: string; label: string; income: number; expenses: number }[] = [];
-    const now = new Date();
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const date = this.localDateString(d);
-      const label = i % 7 === 0 || i === 0
-        ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-      days.push({ date, label, income: 0, expenses: 0 });
-    }
-    for (const t of this.txService.transactions()) {
-      if (t.isInternalTransfer) continue;
-      const entry = days.find(d => d.date === t.date);
-      if (!entry) continue;
-      if (t.type === 'income') entry.income += t.amount;
-      if (t.type === 'expense') entry.expenses += t.amount;
-    }
-    return days;
-  });
+  /** How net worth moved over the selected range (it used to be income minus spending). */
+  netWorthChange = computed(() =>
+    Math.round((this.netWorthPoints()[1].net - this.netWorthPoints()[0].net) * 100) / 100);
 
-  cashFlowNet = computed(() =>
-    Math.round(this.cashFlowData().reduce((s, d) => s + d.income - d.expenses, 0) * 100) / 100
+  netWorthChangeLabel = computed(() => ({
+    '7D': 'in the last 7 days', '30D': 'in the last 30 days',
+    '90D': 'in the last 90 days', 'YTD': 'this year',
+  } as Record<string, string>)[this.activeRange()]);
+
+  // ── Spending calendar ─────────────────────────────────────
+  /**
+   * The month the calendar card shows. The dashboard is always "now" — stepping
+   * through months is what the Spending page is for.
+   */
+  calendarMonth = monthKeyOf();
+  calendarLabel = monthLabel(this.calendarMonth, false);
+
+  /**
+   * What the calendar counts as spending. Deliberately the same rules the
+   * Analysis and Reports pages use by default — expenses only, no internal
+   * transfers, refunded transactions dropped, and partial reimbursements netted
+   * off — so the figure on this card matches what those pages show for the same
+   * month rather than being a fourth, slightly different number.
+   */
+  monthSpending = computed(() =>
+    spendingTransactions(this.txService.transactions())
+      .filter(t => !t.refunded && t.date.startsWith(this.calendarMonth))
   );
-  cashFlowIncome = computed(() =>
-    Math.round(this.cashFlowData().reduce((s, d) => s + d.income, 0) * 100) / 100
+
+  /** Bound into the calendar and day popup so both net reimbursements the same way. */
+  spendAmount = (t: Transaction) => this.txService.effectiveExpenseAmount(t);
+
+  monthTotal = computed(() =>
+    Math.round(this.monthSpending().reduce((s, t) => s + this.spendAmount(t), 0) * 100) / 100
   );
-  cashFlowExpenses = computed(() =>
-    Math.round(this.cashFlowData().reduce((s, d) => s + d.expenses, 0) * 100) / 100
-  );
+
+  /** The day popup's open state — null when closed. */
+  selectedDay = signal<string | null>(null);
+
+  /**
+   * The day to come back to when the transaction view closes.
+   *
+   * Without this, closing a transaction opened from a day popup dumps you on
+   * the dashboard — you lose your place and have to find the day again. Closing
+   * an overlay should undo the step that opened it, not the whole stack.
+   */
+  private returnToDay = signal<string | null>(null);
+
+  openDay(cell: DayCell) { this.selectedDay.set(cell.date); }
+
+  closeDay() {
+    this.selectedDay.set(null);
+    this.returnToDay.set(null);
+  }
+
+  /** Day popup → the full transaction view, so one tap gets to the detail. */
+  openTxFromDay(tx: Transaction) {
+    this.returnToDay.set(this.selectedDay());
+    this.selectedDay.set(null);
+    this.openTxView(tx);
+  }
+
+  openSpending() {
+    this.router.navigate(['/analysis/spending'], {
+      queryParams: { month: this.calendarMonth },
+    });
+  }
 
   private rangeStart = computed((): string => {
     const now = new Date();
@@ -256,10 +310,15 @@ export class Dashboard implements AfterViewInit, OnDestroy {
 
   timeAgo(date: string): string {
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const d = new Date(date + 'T00:00:00');
-    const diff = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+    // Whole calendar days, so 11pm yesterday is still "Yesterday".
+    const diff = Math.round((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
     if (diff === 0) return 'Today';
     if (diff === 1) return 'Yesterday';
+    // Banks sometimes date a transaction ahead (a scheduled or pending payment).
+    if (diff === -1) return 'Tomorrow';
+    if (diff < 0) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     return `${diff}d ago`;
   }
 
@@ -297,26 +356,21 @@ export class Dashboard implements AfterViewInit, OnDestroy {
 
   budgetSummary = computed(() => {
     const month = this.currentMonth;
-    return this.budgetService.defaultBudgets()
-      .map(budget => {
-        const effective = this.budgetService.getBudgetForCategory(budget.categoryId, month);
-        if (!effective) return null;
-        const cat = this.categoryService.categories().find(c => c.id === budget.categoryId);
-        const spent = this.txService.transactions()
-          .filter(t =>
-            t.type === 'expense' &&
-            !t.isInternalTransfer &&
-            t.categoryId === budget.categoryId &&
-            t.date.startsWith(month) &&
-            !t.refunded
-          )
-          .reduce((s, t) => s + t.amount, 0);
-        const pct = effective.amount > 0 ? Math.round((spent / effective.amount) * 100) : 0;
+    const rules: MoneyRules = {
+      netting: true,
+      effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
+      reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
+    };
+    const txs = this.txService.transactions();
+    return effectiveBudgets(this.budgetService.budgets(), month)
+      .map(e => {
+        const cat = this.categoryService.categories().find(c => c.id === e.categoryId);
+        if (!cat) return null;
+        const spent = budgetSpent(txs, e.categoryId, month, rules);
+        const { pct, status } = budgetProgress(spent, e.budget.amount);
         return {
-          name: cat?.name || 'Unknown', icon: cat?.icon || '📦',
-          spent: Math.round(spent * 100) / 100,
-          budget: effective.amount, pct,
-          status: pct >= 100 ? 'over' : pct >= 75 ? 'warn' : 'ok'
+          name: cat.name, icon: cat.icon || '📦',
+          spent, budget: e.budget.amount, pct, status,
         };
       })
       .filter(Boolean)
@@ -329,9 +383,9 @@ export class Dashboard implements AfterViewInit, OnDestroy {
   recentExpenses = computed(() => {
     const now = new Date();
     const cutoff = this.localDateString(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
-    const today = this.localDateString(now);
+    // No end cap: a transaction the bank dated a day ahead is still recent (matches Transactions).
     return this.txService.transactions()
-      .filter(t => t.type === 'expense' && !t.refunded && !t.isInternalTransfer && t.date >= cutoff && t.date <= today);
+      .filter(t => t.type === 'expense' && !t.refunded && !t.isInternalTransfer && t.date >= cutoff);
   });
   recentTotal = computed(() =>
     Math.round(this.recentExpenses().reduce((s, t) => s + t.amount, 0) * 100) / 100
@@ -345,14 +399,16 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     const total = this.recentTotal();
     return [...byCat.entries()]
       .sort((a, b) => b[1] - a[1]).slice(0, 6)
-      .map(([id, amount]) => {
+      .map(([id, amount], i) => {
         const cat = id === '__none__'
           ? { name: 'Other', icon: '📦', color: '#9ca3af' }
           : this.categoryService.categories().find(c => c.id === id);
         return {
           name: cat?.name || 'Unknown',
           icon: (cat as any)?.icon || '📦',
-          color: (cat as any)?.color || '#6366f1',
+          // A category without its own colour takes the next palette hue, so
+          // slices stay apart rather than all falling back to one purple.
+          color: (cat as any)?.color || categoryPalette()[i % 8],
           amount: Math.round(amount * 100) / 100,
           pct: total > 0 ? Math.round((amount / total) * 100) : 0
         };
@@ -378,13 +434,15 @@ export class Dashboard implements AfterViewInit, OnDestroy {
     if (n >= 1000) return '$' + (n / 1000).toFixed(1) + 'k';
     return '$' + Math.round(n);
   }
-  formatFullDate(date: string): string {
-    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-    });
-  }
-
   isNegative(n: number): boolean { return n < 0; }
+  /**
+   * Red only for an account that has gone below zero. A card's balance is what
+   * you owe, so a negative one means you overpaid — money in your favour, not
+   * a warning (it used to show red, as if it were debt).
+   */
+  isOverdrawn(account: Account): boolean {
+    return !owesMoney(account.type) && this.balanceFor(account) < 0;
+  }
   navigate(path: string) { this.router.navigate([path]); }
   setRange(r: string) { this.activeRange.set(r as '7D' | '30D' | '90D' | 'YTD'); }
 
@@ -406,86 +464,29 @@ export class Dashboard implements AfterViewInit, OnDestroy {
 
   // ── Charts ────────────────────────────────────────────────
   constructor() {
+    // Creating and removing the chart is the canvas setter's job; this only
+    // keeps an existing chart's numbers current.
     effect(() => {
       const donutData = this.categoryBreakdown();
-      const flowData = this.cashFlowData();
-      // Init/update each chart independently — the donut canvas only exists when there
-      // is current-month spending, and the cash-flow chart must not depend on it.
-      this.ensureCashFlow();
-      if (this.cashFlowChart) this.updateCashFlow(flowData);
-      this.ensureDonut();
       if (this.miniDonut) this.updateMiniDonut(donutData);
     });
-  }
 
-  ngAfterViewInit() {
-    this.initChartsWhenReady();
-  }
-
-  // The cash-flow canvas is always rendered; retry until it (and, if present, the donut
-  // canvas) exist. Each chart is created independently so a hidden donut can't block it.
-  private initChartsWhenReady(attempt = 0) {
-    this.ensureCashFlow();
-    this.ensureDonut();
-    if (!this.cashFlowChart && attempt < 20) {
-      setTimeout(() => this.initChartsWhenReady(attempt + 1), 100);
-    }
-  }
-
-  private ensureCashFlow() {
-    if (!this.cashFlowChart && this.cashFlowCanvas?.nativeElement) this.initCashFlow();
-  }
-
-  private ensureDonut() {
-    const el = this.miniDonutCanvas?.nativeElement;
-    // The donut canvas is added/removed with current-month data; keep the chart in sync.
-    if (this.miniDonut && !el) { this.miniDonut.destroy(); this.miniDonut = null; }
-    if (!this.miniDonut && el) this.initMiniDonut();
+    // Chart.js bakes colours in at construction time, so a theme switch would
+    // otherwise leave the chart painted for the old theme. Rebuild on change,
+    // if the canvas is on the page.
+    effect(() => {
+      this.themeService.theme();
+      this.miniDonut?.destroy();
+      this.miniDonut = null;
+      if (this.miniDonutCanvas) this.initMiniDonut();
+    });
   }
 
   ngOnDestroy() {
     this.miniDonut?.destroy();
-    this.cashFlowChart?.destroy();
-  }
-
-  private initCashFlow() {
-    const ctx = this.cashFlowCanvas?.nativeElement?.getContext('2d');
-    if (!ctx) return;
-    const data = this.cashFlowData();
-    this.cashFlowChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: data.map(d => d.label),
-        datasets: [
-          { label: 'Income', data: data.map(d => d.income), backgroundColor: 'rgba(128,128,128,0.5)', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 },
-          { label: 'Spending', data: data.map(d => d.expenses), backgroundColor: '#00D64F', borderRadius: 3, barPercentage: 0.6, categoryPercentage: 0.6 }
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title: (items) => data[items[0].dataIndex].date,
-              label: (ctx) => ` ${ctx.dataset.label}: ${this.formatCurrency(ctx.raw as number)}`
-            }
-          }
-        },
-        scales: {
-          x: { grid: { display: false }, border: { display: false }, ticks: { color: '#8A8A92', font: { size: 10 }, maxRotation: 0 } },
-          y: { grid: { color: 'rgba(128,128,128,0.1)' }, border: { display: false }, ticks: { color: '#8A8A92', font: { size: 10 }, callback: (val) => this.formatCurrencyShort(val as number) } }
-        }
-      }
-    });
-  }
-
-  private updateCashFlow(data: any[]) {
-    if (!this.cashFlowChart) return;
-    this.cashFlowChart.data.labels = data.map(d => d.label);
-    this.cashFlowChart.data.datasets[0].data = data.map(d => d.income);
-    this.cashFlowChart.data.datasets[1].data = data.map(d => d.expenses);
-    this.cashFlowChart.update('none');
+    // Scroll locks are released by the overlay components themselves, via
+    // ScrollLockService — writing to body.overflow here would bypass its
+    // counter and could release a lock another overlay still holds.
   }
 
   private initMiniDonut() {
@@ -496,7 +497,7 @@ export class Dashboard implements AfterViewInit, OnDestroy {
       type: 'doughnut',
       data: {
         labels: data.map(d => d.name),
-        datasets: [{ data: data.map(d => d.amount), backgroundColor: data.map(d => d.color), borderWidth: 2, borderColor: 'transparent', hoverOffset: 4 }]
+        datasets: [{ data: data.map(d => d.amount), backgroundColor: data.map(d => d.color), borderWidth: 2, borderColor: chartColors().surface, hoverOffset: 4 }]
       },
       options: {
         responsive: true, maintainAspectRatio: false, cutout: '70%',

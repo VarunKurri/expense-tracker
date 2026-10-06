@@ -1,0 +1,48 @@
+@if (date(); as d) {
+  <div class="dd-backdrop" (click)="close()"></div>
+
+  <div class="dd" role="dialog" aria-modal="true" [attr.aria-label]="'Spending on ' + fullDate()">
+    <div class="dd-head">
+      <span class="card-label">Details</span>
+      <button class="dd-close" (click)="close()" aria-label="Close">
+        <svg width="15" height="15" viewBox="0 0 20 20" fill="none"
+             stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 4l12 12M16 4L4 16" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="dd-body">
+      <div class="dd-summary">
+        <div class="dd-date">{{ heading() }}</div>
+        <div class="dd-total num-display">{{ formatCurrency(total()) }}</div>
+      </div>
+
+      @if (rows().length) {
+        <div class="dd-rows">
+          @for (tx of rows(); track tx.id) {
+            <button type="button" class="dd-row" (click)="txPicked.emit(tx)">
+              <span class="dd-icon">
+                @if (categoryFor(tx.categoryId); as cat) { {{ cat.icon }} }
+                @else { ↑ }
+              </span>
+              <span class="dd-main">
+                <span class="dd-name">{{ tx.merchant || 'Untitled' }}</span>
+                <span class="dd-meta">
+                  @if (categoryFor(tx.categoryId); as cat) {
+                    <span>{{ cat.name }}</span>
+                    <span class="dd-dot">·</span>
+                  }
+                  <span>{{ accountName(tx.accountId) || 'No account' }}</span>
+                </span>
+              </span>
+              <span class="dd-amt">{{ formatCurrency(amountOf()(tx)) }}</span>
+            </button>
+          }
+        </div>
+      } @else {
+        <p class="dd-empty">Nothing spent on this day.</p>
+      }
+    </div>
+  </div>
+}

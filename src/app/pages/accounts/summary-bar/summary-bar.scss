@@ -15,11 +15,12 @@
   gap: 4px;
 
   .stat-label {
+    font-family: var(--font-mono);
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.04em;
     color: var(--fg-4);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .stat-value {
@@ -30,7 +31,7 @@
     color: var(--fg);
     white-space: nowrap;
 
-    &.asset     { color: var(--green); }
+    &.asset     { color: var(--teal); }
     &.liability { color: var(--red); }
     // Net worth is always neutral — carrying a credit card balance
     // is normal, not an error state. Never show net worth in red.

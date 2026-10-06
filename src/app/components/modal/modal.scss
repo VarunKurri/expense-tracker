@@ -1,29 +1,39 @@
+/* The one dialog shell every form in the app sits in.
+ *
+ * Matches the Categories and Rules sheets: a flat surface with a hairline
+ * border, a mono eyebrow for the title, a scrolling body and a pinned footer.
+ * The form pieces inside (fields, toggles, pickers, segmented controls) are
+ * global, in styles.scss → FORMS, so a form only styles what is unique to it.
+ */
+
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  z-index: 100;
-  animation: fadeIn 0.18s ease;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: fadeIn 0.16s ease;
 }
 
 .modal {
   width: 100%;
-  max-width: 520px;
-  max-height: 90vh;
-  background: var(--surface-hi);
+  max-width: 540px;
+  max-height: min(88vh, 900px);
   display: flex;
   flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
-  animation: slideUp 0.22s ease;
+  animation: rise 0.18s ease;
 
-  &.sm { max-width: 380px; }
+  &.sm { max-width: 440px; }
   &.lg { max-width: 800px; }
 }
 
@@ -31,135 +41,68 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--glass-border);
-
-  h2 {
-    font-size: 17px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-  }
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
 }
 
 .close-btn {
-  background: transparent;
-  border: none;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
   padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
 
-  &:hover {
-    background: var(--glass-bg);
-    color: var(--text-primary);
-  }
+  &:hover { color: var(--fg); border-color: var(--line); }
+  &:focus-visible { outline: 2px solid var(--fg-3); outline-offset: 2px; }
 }
 
 .modal-body {
-  padding: 24px;
-  overflow-y: auto;
   flex: 1;
   min-height: 0;
+  padding: 18px 20px;
+  overflow-y: auto;
 }
 
-@media (max-width: 768px) {
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+
+  /* A dialog with nothing marked `modal-footer` shows no empty footer bar. */
+  &:empty { display: none; }
+}
+
+@media (max-width: 640px) {
+  /* On an iPhone home-screen app the page runs under the status bar and the
+     home bar: keep the dialog's title and its Save row clear of both. */
   .backdrop {
-    padding: 16px;
-    align-items: center;
-    justify-content: center;
+    padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
   }
-
+  /* dvh: on iOS, 100vh reaches behind Safari's toolbar and hides the footer buttons. */
   .modal {
-    width: calc(100% - 16px);
-    max-width: 440px;
-    max-height: 85vh;
-    border-radius: 20px;
-
-    &::before {
-      display: none;
-    }
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
-
-  .modal-header {
-    padding: 16px 20px;
-  }
-
-  .modal-body {
-    padding: 16px 20px;
-
-    ::ng-deep {
-      .input-field, .input {
-        padding: 9px 12px !important;
-        font-size: 13.5px !important;
-      }
-      .field {
-        gap: 5px !important;
-      }
-      .label-sm {
-        font-size: 11px !important;
-      }
-      .amount-field {
-        padding: 6px 4px 4px !important;
-      }
-      .amount-input {
-        font-size: 32px !important;
-      }
-      .amount-curr {
-        font-size: 22px !important;
-      }
-      .type-seg {
-        padding: 3px !important;
-      }
-      .type-btn {
-        padding: 8px 10px !important;
-        font-size: 13px !important;
-      }
-      .notes-textarea {
-        min-height: 36px !important;
-      }
-      .actions, .modal-actions {
-        padding-top: 12px !important;
-        margin-top: 4px !important;
-      }
-      .btn-primary, .btn-ghost, .btn-danger {
-        padding: 8px 14px !important;
-        font-size: 13px !important;
-      }
-      .icon-opt {
-        width: 36px !important;
-        height: 36px !important;
-        font-size: 16px !important;
-      }
-      .color-opt {
-        width: 28px !important;
-        height: 28px !important;
-      }
-      .preview-card {
-        padding: 10px 12px !important;
-        gap: 10px !important;
-      }
-      .preview-emoji {
-        width: 32px !important;
-        height: 32px !important;
-        font-size: 16px !important;
-      }
-      .preview-bal {
-        font-size: 15px !important;
-      }
-    }
-  }
+  .modal-header, .modal-footer { padding-left: 16px; padding-right: 16px; }
+  .modal-body { padding: 16px; }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .backdrop, .modal { animation: none; }
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }

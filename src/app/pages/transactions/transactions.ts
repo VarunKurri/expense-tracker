@@ -7,16 +7,16 @@ import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
 import { TransactionForm } from './transaction-form/transaction-form';
 import { Confirm } from '../../components/confirm/confirm';
-import { Modal } from '../../components/modal/modal';
 import { ReconcileReview } from '../../components/reconcile-review/reconcile-review';
 import { ErrorBanner } from '../../components/error-banner/error-banner';
+import { TransactionView } from '../../components/transaction-view/transaction-view';
 import { Transaction } from '../../models';
 import { QuickAddService } from '../../services/quick-add.service';
 import { ToastService } from '../../services/toast.service';
 import { ReconciliationService } from '../../services/reconciliation.service';
+import { DateRange, transactionRange } from '../../utils/date-ranges';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
-type DateRange = 'last-30' | 'this-month' | 'last-month' | 'this-year' | 'custom' | 'all';
 type SpecialFilter = 'all' | 'uncategorized' | 'refunded' | 'not-refunded' | 'internal-transfer';
 type QuickEditDraft = {
   amount: number;
@@ -30,7 +30,10 @@ type QuickEditDraft = {
 @Component({
   selector: 'app-transactions',
   standalone: true,
-  imports: [CommonModule, FormsModule, TransactionForm, Confirm, Modal, ReconcileReview, ErrorBanner],
+  imports: [
+    CommonModule, FormsModule, TransactionForm, Confirm,
+    ReconcileReview, ErrorBanner, TransactionView,
+  ],
   templateUrl: './transactions.html',
   styleUrl: './transactions.scss',
 })
@@ -106,46 +109,11 @@ export class Transactions {
       && this.txService.reimbursedAmountFor(tx.id) > 0;
   }
 
-  // Date range bounds
-  private dateRange = computed(() => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
-
-    const localDate = (year: number, month: number, day: number) => {
-      const mm = String(month + 1).padStart(2, '0');
-      const dd = String(day).padStart(2, '0');
-      return `${year}-${mm}-${dd}`;
-    };
-
-    const lastDay = (year: number, month: number) =>
-      new Date(year, month + 1, 0).getDate();
-
-    const todayStr = localDate(y, m, now.getDate());
-
-    switch (this.filterDateRange()) {
-      case 'last-30': {
-        const d30 = new Date(now);
-        d30.setDate(d30.getDate() - 29);
-        const s = localDate(d30.getFullYear(), d30.getMonth(), d30.getDate());
-        return { start: s, end: todayStr };
-      }
-      case 'this-month':
-        return { start: localDate(y, m, 1), end: localDate(y, m, lastDay(y, m)) };
-      case 'last-month': {
-        // Use Date constructor to handle January rollback correctly
-        const prev = new Date(y, m - 1, 1);
-        const py = prev.getFullYear(), pm = prev.getMonth();
-        return { start: localDate(py, pm, 1), end: localDate(py, pm, lastDay(py, pm)) };
-      }
-      case 'this-year':
-        return { start: `${y}-01-01`, end: `${y}-12-31` };
-      case 'custom':
-        return { start: this.customStartDate(), end: this.customEndDate() };
-      default:
-        return { start: '', end: '' };
-    }
-  });
+  // Date range bounds — see utils/date-ranges.ts ("Last 30 days" has no end,
+  // so transactions the bank dated a day ahead still show)
+  private dateRange = computed(() =>
+    transactionRange(this.filterDateRange(), new Date(), { start: this.customStartDate(), end: this.customEndDate() })
+  );
 
   // Filtered transactions
   filtered = computed(() => {
@@ -519,111 +487,25 @@ export class Transactions {
       this.toggleSelectedTx(tx);
       return;
     }
+    // The view panel owns its own body-scroll lock.
     this.viewing.set(tx);
-    document.body.style.overflow = 'hidden';
   }
 
   closeView() {
     this.viewing.set(null);
-    document.body.style.overflow = '';
   }
 
   editFromView() {
     const tx = this.viewing();
     this.viewing.set(null);
-    document.body.style.overflow = '';
     if (tx) {
       this.editing.set(tx);
       this.formOpen.set(true);
     }
   }
 
-  // ── Reimbursement linking ─────────────────────────────────
-  linkingFrom = signal<Transaction | null>(null);
-  linkSearch = signal('');
-
-  // Live copy of the viewed transaction (the `viewing()` snapshot is frozen at open;
-  // these read through the service so the panel updates right after a link/unlink).
-  private viewingId = computed(() => this.viewing()?.id ?? null);
-  viewingLive = computed<Transaction | null>(() => {
-    const id = this.viewingId();
-    return id ? (this.txService.transactions().find(t => t.id === id) ?? null) : null;
-  });
-  viewingReimbursements = computed(() => {
-    const id = this.viewingId();
-    return id ? this.txService.reimbursementsFor(id) : [];
-  });
-  viewingReimbursedTotal = computed(() => this.txService.reimbursedAmountFor(this.viewingId() ?? undefined));
-  // How much of viewingReimbursedTotal() is genuine surplus (reimbursed beyond what the
-  // expense cost) rather than reducing its cost — distinguishes "still a net expense"
-  // from "came out ahead" in the detail panel.
-  viewingReimbursementSurplus = computed(() => {
-    const tx = this.viewing();
-    return tx ? this.txService.reimbursementSurplus(tx) : 0;
-  });
-  viewingReimbursesExpense = computed<Transaction | null>(() => {
-    const live = this.viewingLive();
-    if (live?.type !== 'income' || !live.reimbursesId) return null;
-    return this.txService.transactions().find(t => t.id === live.reimbursesId) ?? null;
-  });
-  // The reimbursed expense's own covered/surplus breakdown — shown on the income side
-  // of the link so a surplus is visible from either transaction, not just the expense's.
-  viewingReimbursesSurplus = computed(() => {
-    const exp = this.viewingReimbursesExpense();
-    return exp ? this.txService.reimbursementSurplus(exp) : 0;
-  });
-  viewingReimbursesCovered = computed(() => {
-    const exp = this.viewingReimbursesExpense();
-    if (!exp) return 0;
-    return Math.min(exp.amount, this.txService.reimbursedAmountFor(exp.id));
-  });
-
-  // Opposite-type transactions to link (an expense picks an income, and vice versa).
-  linkCandidates = computed<Transaction[]>(() => {
-    const from = this.linkingFrom();
-    if (!from) return [];
-    const wantType = from.type === 'income' ? 'expense' : 'income';
-    const q = this.linkSearch().trim().toLowerCase();
-    return this.txService.transactions().filter(t =>
-      t.type === wantType && t.id !== from.id &&
-      !(t.type === 'income' && !!t.reimbursesId) &&   // an income can reimburse only one expense
-      (!q || (t.merchant || '').toLowerCase().includes(q) || String(t.amount).includes(q))
-    ).slice(0, 50);
-  });
-
-  openLinkPicker(tx: Transaction) {
-    this.linkSearch.set('');
-    this.linkingFrom.set(tx);
-  }
-  closeLinkPicker() {
-    this.linkingFrom.set(null);
-    this.linkSearch.set('');
-  }
-
-  async confirmLink(candidate: Transaction) {
-    const from = this.linkingFrom();
-    if (!from) return;
-    const income = from.type === 'income' ? from : candidate;
-    const expense = from.type === 'expense' ? from : candidate;
-    if (!income.id || !expense.id) return;
-    try {
-      await this.txService.update(income.id, { reimbursesId: expense.id });
-      this.toastService.success('Reimbursement linked.');
-      this.closeLinkPicker();
-    } catch {
-      this.toastService.error('Could not link. Please try again.');
-    }
-  }
-
-  async unlinkReimbursement(income: Transaction) {
-    if (!income.id) return;
-    try {
-      await this.txService.update(income.id, { reimbursesId: undefined });
-      this.toastService.success('Reimbursement unlinked.');
-    } catch {
-      this.toastService.error('Could not unlink. Please try again.');
-    }
-  }
+  // Reimbursement linking moved into components/transaction-view/ along with
+  // the panel it belongs to, so every entry point into a transaction gets it.
 
   // ── CRUD ──────────────────────────────────────────────────
   openNew() {
