@@ -2,7 +2,7 @@ import {
   Component, ElementRef, OnDestroy, ViewChild, computed, effect, inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   CategoryScale, Chart, Filler, LineController, LineElement, LinearScale, PointElement, Tooltip,
 } from 'chart.js';
@@ -11,11 +11,12 @@ import { TransactionService } from '../../services/transaction.service';
 import { BillService } from '../../services/bill.service';
 import { ManualAssetService } from '../../services/manual-asset.service';
 import { ThemeService } from '../../services/theme.service';
+import { CategoryService } from '../../services/category.service';
 import { ForecastItem, ForecastMonth, cashOn, forecast, pastMonths, projectNetWorth } from '../../utils/forecast';
 import { composition, holdingsOn } from '../../utils/net-worth';
 import { MoneyRules } from '../../utils/reporting';
 import { localDateString, parseLocalDate } from '../../utils/date';
-import { chartColors } from '../../utils/theme-colors';
+import { categoryPalette, chartColors, otherColor } from '../../utils/theme-colors';
 
 Chart.register(LineController, LineElement, PointElement, Filler, CategoryScale, LinearScale, Tooltip);
 
@@ -43,6 +44,8 @@ export class Forecast implements OnDestroy {
   private billService = inject(BillService);
   private manualService = inject(ManualAssetService);
   private themeService = inject(ThemeService);
+  private categoryService = inject(CategoryService);
+  private router = inject(Router);
 
   readonly today = localDateString();
   readonly spans: Span[] = [3, 6, 12];
@@ -137,6 +140,67 @@ export class Forecast implements OnDestroy {
     const until = this.plusDays(this.today, 30);
     return this.f().months.flatMap(m => m.items).filter(it => it.date <= until);
   });
+
+  // ── Everyday spending, by category ─────────────────────────
+  showAllCategories = signal(false);
+
+  /**
+   * What the everyday figure is made of: each category's monthly average,
+   * less the bills that file under it. Eight hues is all the palette has, so
+   * the colours stop at eight and the rest share the neutral.
+   */
+  everydayRows = computed(() => {
+    const b = this.f().basis;
+    const palette = categoryPalette();
+    const total = b.categories.reduce((s, c) => s + c.everyday, 0);
+    const rows = b.categories.map((c, i) => {
+      const cat = c.categoryId === '__none__' ? null : this.categoryService.categories().find(x => x.id === c.categoryId);
+      // Only worth a line when bills were taken out; otherwise it would repeat the figure.
+      let sub = '';
+      if (c.bills > 0) {
+        const names = c.billNames.length > 2 ? `${c.billNames.slice(0, 2).join(', ')} +${c.billNames.length - 2}` : c.billNames.join(', ');
+        sub = c.everyday > 0
+          ? `${this.money(c.spent)} spent, less ${this.money(c.bills)} in bills (${names})`
+          : `All bills (${names}) — forecast on their dates`;
+      }
+      return {
+        id: c.categoryId,
+        name: cat?.name ?? 'Uncategorised',
+        icon: cat?.icon ?? '📦',
+        color: i < palette.length ? palette[i] : otherColor(),
+        amount: c.everyday,
+        share: total > 0 ? c.everyday / total : 0,
+        sub,
+      };
+    });
+    return this.showAllCategories() ? rows : rows.slice(0, 8);
+  });
+
+  /** "About $1,401 a month goes on everyday spending. Groceries ($420) is the biggest part." */
+  everydaySentence = computed(() => {
+    const b = this.f().basis;
+    const top = b.categories.find(c => c.everyday > 0);
+    const lead = `About ${this.money(b.everyday)} a month goes on everyday spending.`;
+    if (!top) return lead;
+    const name = top.categoryId === '__none__'
+      ? 'Uncategorised spending'
+      : this.categoryService.categories().find(c => c.id === top.categoryId)?.name ?? 'Uncategorised spending';
+    const pct = b.everyday > 0 ? Math.round((top.everyday / b.everyday) * 100) : 0;
+    return `${lead} ${name} is the biggest part, at ${this.money(top.everyday)} (${pct}%).`;
+  });
+
+  /** The category's transactions over the months the average is based on. */
+  openCategory(categoryId: string) {
+    const used = this.f().basis.months.filter(m => m.included);
+    if (!used.length) return;
+    const [y, m] = used[used.length - 1].month.split('-').map(Number);
+    this.router.navigate(['/transactions'], {
+      queryParams: {
+        view: 'analysis', start: `${used[0].month}-01`, end: localDateString(new Date(y, m, 0)), excludeRefunded: true,
+        ...(categoryId !== '__none__' ? { categoryId } : {}),
+      },
+    });
+  }
 
   // ── Basis ──────────────────────────────────────────────────
   setAhead(s: Span) { this.hoverIndex.set(null); this.ahead.set(s); }

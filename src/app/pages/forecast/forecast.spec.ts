@@ -1,11 +1,13 @@
+import { vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { Forecast } from './forecast';
 import { AccountService } from '../../services/account.service';
 import { TransactionService } from '../../services/transaction.service';
 import { BillService } from '../../services/bill.service';
 import { ManualAssetService } from '../../services/manual-asset.service';
+import { CategoryService } from '../../services/category.service';
 import { Account, Bill, ManualAsset, Transaction } from '../../models';
 import { localDateString } from '../../utils/date';
 
@@ -58,6 +60,13 @@ describe('Forecast page', () => {
         },
         { provide: BillService, useValue: { bills: signal(bills) } },
         { provide: ManualAssetService, useValue: { items: signal(manual), error: signal(null) } },
+        {
+          provide: CategoryService,
+          useValue: { categories: signal([
+            { id: 'groceries', name: 'Groceries', icon: '🛒', kind: 'expense', createdAt: 0 },
+            { id: 'fun', name: 'Entertainment', icon: '🎬', kind: 'expense', createdAt: 0 },
+          ]) },
+        },
       ],
     });
     fixture = TestBed.createComponent(Forecast);
@@ -123,5 +132,39 @@ describe('Forecast page', () => {
     button('12 months').click();
     await settle();
     expect(el.querySelectorAll('.month-row:not(.head)')).toHaveLength(13);
+  });
+
+  it('breaks everyday spending into categories that add up, and opens their transactions', async () => {
+    const txs = history().map(t => (t.type === 'expense' && t.id !== 'laptop' ? { ...t, categoryId: 'groceries' } : t));
+    // Netflix: a bill whose payments are filed under Entertainment, so it comes off there.
+    for (const n of [1, 2, 3]) {
+      txs.push({ id: `nf${n}`, type: 'expense', accountId: 'chk', amount: 20, date: monthsAgo(n, 5), merchant: 'NETFLIX.COM', categoryId: 'fun', createdAt: 0, updatedAt: 0 } as Transaction);
+    }
+    const netflix: Bill = { id: 'nf', name: 'Netflix', amount: 20, frequency: 'monthly', nextDueDate: monthsAgo(-1, 5), autopayEnabled: true, active: true, createdAt: 0 };
+    await setup(txs, [netflix]);
+
+    const card = el.querySelector('.everyday')!;
+    const rows = [...card.querySelectorAll('.cat-row')];
+    // Groceries $2,000 a month; the laptop month adds $500 uncategorised; Netflix nets to nothing.
+    expect(rows.map(r => r.querySelector('.cat-name')!.textContent!.trim())).toEqual(['Groceries', 'Uncategorised', 'Entertainment']);
+    expect(rows[0].querySelector('.cat-amount')!.textContent).toContain('$2,000');
+    expect(rows[2].textContent).toContain('All bills (Netflix)');
+    expect(card.querySelector('.everyday-total')!.textContent).toContain('$2,500');
+    expect(card.querySelector('.everyday-sentence')!.textContent).toContain('Groceries is the biggest part, at $2,000 (80%)');
+
+    const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    (rows[0] as HTMLButtonElement).click();
+    expect(nav).toHaveBeenCalledWith(['/transactions'], {
+      queryParams: expect.objectContaining({ view: 'analysis', categoryId: 'groceries', start: `${monthsAgo(3, 1).slice(0, 7)}-01` }),
+    });
+  });
+
+  it('a bill nobody filed is shown as its own line, not hidden in a category', async () => {
+    const gym: Bill = { id: 'gym', name: 'Gym', amount: 40, frequency: 'monthly', nextDueDate: monthsAgo(-1, 2), autopayEnabled: true, active: true, createdAt: 0 };
+    await setup(history(), [gym]);
+    const unfiled = el.querySelector('.everyday .unfiled')!;
+    expect(unfiled.textContent).toContain('Gym');
+    expect(unfiled.textContent).toContain('−$40');
+    expect(el.querySelector('.everyday-total')!.textContent).toContain('$2,460');
   });
 });

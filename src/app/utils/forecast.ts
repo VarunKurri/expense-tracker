@@ -3,7 +3,7 @@ import { advanceDueDate, monthlyCost } from './bill-schedule';
 import { localDateString, parseLocalDate } from './date';
 import { countsInNetWorth, loanDirection, loanOutlook, loanPayments, matchTolerance } from './loans';
 import { balanceOn, entryValueOn, manualType } from './net-worth';
-import { MoneyRules, monthlySeries } from './reporting';
+import { MoneyRules, expenseAmount, monthlySeries, spendingTransactions } from './reporting';
 
 /**
  * The forecast: where your cash and net worth are heading if the next months
@@ -162,18 +162,62 @@ export interface BaseMonth {
   included: boolean;
 }
 
+/** One category's share of everyday spending in a typical month. */
+export interface EverydayCategory {
+  /** `__none__` for uncategorised spending. */
+  categoryId: string;
+  /** Average a month spent in it, over the months counted. */
+  spent: number;
+  /** Bills filed under it, per month — they're forecast on their dates instead. */
+  bills: number;
+  /** Their names, so "less $100 in bills" can say which. */
+  billNames: string[];
+  /** spent − bills, never below zero: what the forecast assumes each month. */
+  everyday: number;
+}
+
 export interface ForecastBasis {
   months: BaseMonth[];
   income: number;
+  /** Everyday spending per month: the categories, less any bills no category could be found for. */
   everyday: number;
   /** What the bills cost per month, on average — taken out of spending to leave "everyday". */
   billsMonthly: number;
+  /** Everyday spending by category, largest first. Adds up to `everyday` with `unfiledBills`. */
+  categories: EverydayCategory[];
+  /** Bills (per month) with no category of their own and no past payment to take one from. */
+  unfiledBills: number;
+  unfiledBillNames: string[];
+}
+
+/**
+ * Where a bill's payments land: its own category, or failing that, the
+ * category of the latest transaction named like it (a "Netflix" bill pays
+ * the "NETFLIX.COM" charge filed under Entertainment). Null if neither.
+ */
+export function billCategory(bill: Bill, txs: Transaction[]): string | null {
+  if (bill.categoryId) return bill.categoryId;
+  const name = bill.name.trim().toLowerCase();
+  if (name.length < 3) return null;
+  let best: Transaction | null = null;
+  for (const t of txs) {
+    if (t.type !== 'expense' || !t.categoryId) continue;
+    const hay = `${t.merchant ?? ''} ${t.notes ?? ''}`.toLowerCase();
+    if (!hay.includes(name)) continue;
+    if (!best || t.date > best.date) best = t;
+  }
+  return best?.categoryId ?? null;
 }
 
 /**
  * Average income and everyday spending over `months`, leaving out any in
  * `excluded`. Loan payments in either direction are taken out first, and so
  * are refunded expenses (as Analysis does with "Excluding refunded").
+ *
+ * Everyday spending is worked out per category: the category's average
+ * spending, less the bills that file under it (their monthly cost), never
+ * below zero. A quarterly insurance bill that lands in one month out of three
+ * then nets out to nothing, rather than leaving "everyday" insurance behind.
  */
 export function forecastBasis(
   txs: Transaction[], loans: ManualAsset[], bills: Bill[], rules: MoneyRules, months: string[], excluded: string[] = [],
@@ -184,9 +228,8 @@ export function forecastBasis(
     for (const p of loanPayments(l, txs)) if (p.kind === 'payment' && p.tx.id) loanTx.add(p.tx.id);
   }
   const counted = txs.filter(t => !(t.id && loanTx.has(t.id)) && !(rules.netting && t.refunded));
-  const billsMonthly = round2(bills
-    .filter(b => b.active && b.amount > 0 && !billIsLoanPayment(b, loans))
-    .reduce((s, b) => s + monthlyCost(b.amount, b.frequency), 0));
+  const liveBills = bills.filter(b => b.active && b.amount > 0 && !billIsLoanPayment(b, loans));
+  const billsMonthly = round2(liveBills.reduce((s, b) => s + monthlyCost(b.amount, b.frequency), 0));
 
   const skip = new Set(excluded);
   const rows: BaseMonth[] = monthlySeries(counted, rules, months).map(r => ({
@@ -199,7 +242,45 @@ export function forecastBasis(
   }));
   const used = rows.filter(r => r.included);
   const avg = (f: (r: BaseMonth) => number) => used.length ? round2(used.reduce((s, r) => s + f(r), 0) / used.length) : 0;
-  return { months: rows, income: avg(r => r.income), everyday: avg(r => r.everyday), billsMonthly };
+
+  // Spending per category over the months counted, then a monthly average.
+  const usedMonths = new Set(used.map(r => r.month));
+  const spentBy = new Map<string, number>();
+  for (const t of spendingTransactions(counted)) {
+    if (!usedMonths.has(t.date.slice(0, 7))) continue;
+    const key = t.categoryId || '__none__';
+    spentBy.set(key, (spentBy.get(key) ?? 0) + expenseAmount(t, rules));
+  }
+  // Bills, per month, by the category they file under.
+  const billsBy = new Map<string, { amount: number; names: string[] }>();
+  let unfiledBills = 0;
+  const unfiledBillNames: string[] = [];
+  for (const b of liveBills) {
+    const monthly = monthlyCost(b.amount, b.frequency);
+    const cat = billCategory(b, counted);
+    if (!cat) { unfiledBills += monthly; unfiledBillNames.push(b.name); continue; }
+    const e = billsBy.get(cat) ?? { amount: 0, names: [] };
+    e.amount += monthly;
+    e.names.push(b.name);
+    billsBy.set(cat, e);
+  }
+
+  const n = used.length;
+  const categories: EverydayCategory[] = [...new Set([...spentBy.keys(), ...billsBy.keys()])]
+    .map(categoryId => {
+      const spent = n ? round2((spentBy.get(categoryId) ?? 0) / n) : 0;
+      const b = billsBy.get(categoryId);
+      const billsAmt = round2(b?.amount ?? 0);
+      return { categoryId, spent, bills: billsAmt, billNames: b?.names ?? [], everyday: round2(Math.max(0, spent - billsAmt)) };
+    })
+    .filter(c => c.spent > 0)
+    .sort((a, b) => b.everyday - a.everyday || b.spent - a.spent);
+
+  const everyday = round2(Math.max(0, categories.reduce((s, c) => s + c.everyday, 0) - unfiledBills));
+  return {
+    months: rows, income: avg(r => r.income), everyday, billsMonthly,
+    categories, unfiledBills: round2(unfiledBills), unfiledBillNames,
+  };
 }
 
 // ── The forecast ─────────────────────────────────────────────

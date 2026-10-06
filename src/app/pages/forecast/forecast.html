@@ -122,6 +122,53 @@
         </section>
       </div>
 
+      <!-- EVERYDAY, BY CATEGORY -->
+      @if (f.basis.categories.length) {
+        <section class="card everyday">
+          <div class="card-head">
+            <span class="card-label">Everyday, in a typical month</span>
+            <span class="muted">Average of the months below</span>
+          </div>
+          <p class="everyday-sentence">{{ everydaySentence() }}</p>
+          @for (row of everydayRows(); track row.id) {
+            <button type="button" class="cat-row" [class.zero]="row.amount === 0" (click)="openCategory(row.id)"
+                    [attr.aria-label]="row.name + ', ' + money(row.amount) + ' a month — see its transactions'">
+              <span class="cat-icon" [style.background]="row.color + '22'" [style.border-color]="row.color + '44'">{{ row.icon }}</span>
+              <span class="cat-main">
+                <span class="cat-name">{{ row.name }}</span>
+                @if (row.sub) { <span class="cat-sub">{{ row.sub }}</span> }
+                <span class="cat-bar"><span class="cat-fill" [style.width]="(row.share * 100) + '%'" [style.background]="row.color"></span></span>
+              </span>
+              <span class="cat-figures">
+                <span class="cat-amount">{{ money(row.amount) }}</span>
+                <span class="cat-pct">{{ row.share * 100 | number:'1.0-0' }}%</span>
+              </span>
+            </button>
+          }
+          @if (f.basis.categories.length > 8) {
+            <button class="show-all" (click)="showAllCategories.set(!showAllCategories())">
+              {{ showAllCategories() ? 'Show fewer' : 'Show all ' + f.basis.categories.length + ' categories' }}
+            </button>
+          }
+          @if (f.basis.unfiledBills > 0) {
+            <div class="unfiled">
+              <span>
+                <strong>Bills with no category</strong>
+                <span class="muted">
+                  · {{ f.basis.unfiledBillNames.join(', ') }}. They're forecast on their dates, so they come off the total.
+                  Give them a category on Bills to see which part of your spending they come out of.
+                </span>
+              </span>
+              <span class="num">−{{ money(f.basis.unfiledBills) }}</span>
+            </div>
+          }
+          <div class="everyday-total">
+            <span>Everyday spending, a month</span>
+            <span class="num">{{ money(f.basis.everyday) }}</span>
+          </div>
+        </section>
+      }
+
       <!-- HOW IT'S WORKED OUT -->
       <section class="card basis">
         <div class="card-head">

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Account, Bill, ManualAsset, Transaction } from '../models';
 import {
-  billIsLoanPayment, billItems, cashOn, forecast, forecastBasis, pastMonths, projectNetWorth,
+  billCategory, billIsLoanPayment, billItems, cashOn, forecast, forecastBasis, pastMonths, projectNetWorth,
 } from './forecast';
 import { MoneyRules } from './reporting';
 import { estimatedValue, monthlyPayment } from './loans';
@@ -69,6 +69,60 @@ describe('the months it is based on', () => {
     const b = forecastBasis([...history(), ...pays], [loan], [bill({ amount: 120, frequency: 'quarterly' })], rules, pastMonths(today, 3));
     expect(b.billsMonthly).toBe(40);
     expect(b.everyday).toBe(2460);  // 2500 − 40; the loan payments aren't in it at all
+  });
+});
+
+describe('everyday spending, by category', () => {
+  const months = pastMonths(today, 3);
+  const spend = (cat: string | undefined, amount: number, m: string, merchant = 'Shop') =>
+    tx({ amount, date: `2026-${m}-10`, categoryId: cat, merchant });
+
+  /** Groceries $400–$500 a month, dining $150, and $90 nobody filed. */
+  function life(): Transaction[] {
+    return [
+      spend('groceries', 400, '07'), spend('groceries', 500, '08'), spend('groceries', 450, '09'),
+      spend('dining', 150, '07'), spend('dining', 150, '08'), spend('dining', 150, '09'),
+      spend(undefined, 90, '07'), spend(undefined, 90, '08'), spend(undefined, 90, '09'),
+    ];
+  }
+
+  it('averages each category, largest first, and they add up to the everyday figure', () => {
+    const b = forecastBasis(life(), [], [], rules, months);
+    expect(b.categories.map(c => [c.categoryId, c.everyday])).toEqual([['groceries', 450], ['dining', 150], ['__none__', 90]]);
+    expect(b.everyday).toBe(690);
+    expect(b.categories.reduce((s, c) => s + c.everyday, 0) - b.unfiledBills).toBe(b.everyday);
+  });
+
+  it('a bill comes out of its own category — a quarterly one nets to nothing, not a third', () => {
+    const txs = [...life(), spend('insurance', 360, '08', 'GEICO')];   // paid once a quarter
+    const geico = bill({ name: 'Geico', amount: 360, frequency: 'quarterly', categoryId: 'insurance' });
+    const b = forecastBasis(txs, [], [geico], rules, months);
+    const ins = b.categories.find(c => c.categoryId === 'insurance')!;
+    expect(ins).toMatchObject({ spent: 120, bills: 120, everyday: 0, billNames: ['Geico'] });
+    expect(b.everyday).toBe(690);  // insurance adds nothing: it's in the Bills column on its date
+  });
+
+  it('a bill with no category takes the one its payments are filed under', () => {
+    const txs = [...life(), ...['07', '08', '09'].map(m => spend('entertainment', 20, m, 'NETFLIX.COM'))];
+    const netflix = bill({ name: 'Netflix', amount: 20 });
+    expect(billCategory(netflix, txs)).toBe('entertainment');
+    const b = forecastBasis(txs, [], [netflix], rules, months);
+    expect(b.categories.find(c => c.categoryId === 'entertainment')).toMatchObject({ spent: 20, bills: 20, everyday: 0 });
+    expect(b.unfiledBills).toBe(0);
+    expect(b.everyday).toBe(690);
+  });
+
+  it('a bill with no category and no payments to go by is shown on its own line', () => {
+    const gym = bill({ name: 'Gym', amount: 40 });
+    const b = forecastBasis(life(), [], [gym], rules, months);
+    expect(b.unfiledBills).toBe(40);
+    expect(b.unfiledBillNames).toEqual(['Gym']);
+    expect(b.everyday).toBe(650);
+  });
+
+  it('leaving a month out changes the categories too', () => {
+    const b = forecastBasis(life(), [], [], rules, months, ['2026-08']);
+    expect(b.categories.find(c => c.categoryId === 'groceries')!.everyday).toBe(425);
   });
 });
 
