@@ -24,12 +24,16 @@
     <!-- HERO: the figure, how it moved, and the line -->
     <section class="card hero">
       <div class="hero-head">
-        <span class="card-label">{{ shown().hovering ? formatDate(shown().date) : 'Net worth' }}</span>
+        <span class="card-label">{{ shown().projected ? 'Projected for ' + formatDate(shown().date) : shown().hovering ? formatDate(shown().date) : 'Net worth' }}</span>
         <div class="ranges" role="group" aria-label="Time range">
           @for (r of ranges; track r) {
             <button class="chip" [class.active]="range() === r"
                     [attr.aria-pressed]="range() === r" (click)="setRange(r)">{{ r === 'ALL' ? 'All' : r }}</button>
           }
+          <span class="ranges-gap" aria-hidden="true"></span>
+          <button class="chip" [class.active]="projecting()" [attr.aria-pressed]="projecting()"
+                  title="Continue the line 6 months ahead, from your recent pace, bills and loan payments"
+                  (click)="toggleProjection()">+6M ahead</button>
         </div>
       </div>
 
@@ -53,7 +57,20 @@
       </div>
 
       @if (sentence()) {
-        <p class="hero-sentence">{{ sentence() }}</p>
+        <p class="hero-sentence">
+          {{ sentence() }}
+          @if (projecting()) {
+            @if (projection().length) {
+              <span class="projection-note">
+                The dashed line assumes the next months look like the last three — your usual income and spending,
+                bills on their dates, loan payments on schedule — with investments held flat.
+                <a routerLink="/analysis/forecast">See the forecast ›</a>
+              </span>
+            } @else {
+              <span class="projection-note">A projection needs a full month of history first.</span>
+            }
+          }
+        </p>
       }
     </section>
 

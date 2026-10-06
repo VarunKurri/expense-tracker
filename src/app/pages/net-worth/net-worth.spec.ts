@@ -5,6 +5,7 @@ import { NetWorth } from './net-worth';
 import { AccountService } from '../../services/account.service';
 import { TransactionService } from '../../services/transaction.service';
 import { ManualAssetService } from '../../services/manual-asset.service';
+import { BillService } from '../../services/bill.service';
 import { Account, ManualAsset, Transaction } from '../../models';
 import { localDateString } from '../../utils/date';
 
@@ -57,8 +58,12 @@ describe('Net worth page', () => {
       providers: [
         provideRouter([]),
         { provide: AccountService, useValue: { accounts: signal([checking, card]) } },
-        { provide: TransactionService, useValue: { transactions: signal(txs) } },
+        {
+          provide: TransactionService,
+          useValue: { transactions: signal(txs), effectiveExpenseAmount: (t: Transaction) => t.amount, reimbursementSurplus: () => 0 },
+        },
         { provide: ManualAssetService, useValue: manual },
+        { provide: BillService, useValue: { bills: signal([]) } },
       ],
     });
     fixture = TestBed.createComponent(NetWorth);
@@ -149,5 +154,34 @@ describe('Net worth page', () => {
     button('1Y').click();
     await settle();
     expect(el.querySelector('.hero-change')!.textContent).toContain('over the past year');
+  });
+
+  it('"+6M ahead" carries the line on, dashed, from the forecast', async () => {
+    // Three months of $3,000 pay and $2,000 spending: about $1,000 a month saved.
+    const month = (n: number, day: number) => {
+      const d = new Date(); return localDateString(new Date(d.getFullYear(), d.getMonth() - n, day));
+    };
+    const txs: Transaction[] = [];
+    for (const n of [1, 2, 3]) {
+      txs.push({ type: 'income', accountId: 'chk', amount: 3000, date: month(n, 1), createdAt: 0, updatedAt: 0 } as Transaction);
+      txs.push({ type: 'expense', accountId: 'chk', amount: 2000, date: month(n, 15), createdAt: 0, updatedAt: 0 } as Transaction);
+    }
+    await setup([], txs);
+    const nw = fixture.componentInstance;
+    expect(nw.projection()).toEqual([]);
+    expect(el.querySelector('.projection-note')).toBeNull();
+
+    button('+6M ahead').click();
+    await settle();
+    const ahead = nw.projection();
+    expect(ahead).toHaveLength(7);   // the rest of this month, then six month-ends
+    expect(ahead[6].net - ahead[0].net).toBeCloseTo(6000, -1);
+    expect(nw.chartPoints().filter(p => p.projected)).toHaveLength(7);
+    expect(el.querySelector('.projection-note')!.textContent).toContain('See the forecast');
+
+    // Scrubbing into the future says so.
+    nw.hoverIndex.set(nw.chartPoints().length - 1);
+    await settle();
+    expect(el.querySelector('.hero .card-label')!.textContent).toContain('Projected for');
   });
 });

@@ -51,7 +51,8 @@ The app is what we copy. Do not "correct" this back to dark.
 - **Colour discipline:** surfaces are white on a near-white canvas with hairline
   borders. Colour is a data signal only: `--blue` = the chart accent (spend
   areas, calendar heat), `--teal` = positive/income, `--red` = negative,
-  `--forecast-grad` = projections, `--cat-1..7` = category icon chips.
+  `--forecast-grad` = projections (forecast cards, the projected area of a chart;
+  never a card that also shows actual history — a projected line is dashed), `--cat-1..7` = category icon chips.
 - **The UI accent is monochrome.** Selection, focus and "you are here" use
   `--accent` (= `--fg`) / `--accent-on` / `--accent-bg` / `--focus-ring`, never
   a palette colour: a selected pill is ink-filled, a focused field gets a
@@ -123,6 +124,7 @@ src/app/
     bills/
     budgets/
     analysis/
+    forecast/       Analysis → Forecast tab: cash ahead (maths in utils/forecast.ts)
     net-worth/      accounts + manual assets/debts (ManualAsset, dated valuations)
       loan-detail/  one loan: payments made/missed/to come (maths in utils/loans.ts)
   app.ts            shell with sidebar

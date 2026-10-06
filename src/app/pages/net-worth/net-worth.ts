@@ -2,13 +2,14 @@ import {
   Component, ElementRef, OnDestroy, ViewChild, computed, effect, inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   CategoryScale, Chart, Filler, LineController, LineElement, LinearScale, PointElement, Tooltip,
 } from 'chart.js';
 import { AccountService } from '../../services/account.service';
 import { TransactionService } from '../../services/transaction.service';
 import { ManualAssetService } from '../../services/manual-asset.service';
+import { BillService } from '../../services/bill.service';
 import { ThemeService } from '../../services/theme.service';
 import { ToastService } from '../../services/toast.service';
 import { ErrorBanner } from '../../components/error-banner/error-banner';
@@ -16,6 +17,7 @@ import { Confirm } from '../../components/confirm/confirm';
 import { AssetForm, AssetFormSave } from './asset-form/asset-form';
 import { countsInNetWorth, loanState } from '../../utils/loans';
 import { Holding, RANGES, Range, changeOver, composition, earliestDate, holdingsOn, netWorthSeries, rangeDates } from '../../utils/net-worth';
+import { forecast, projectNetWorth } from '../../utils/forecast';
 import { localDateString, parseLocalDate } from '../../utils/date';
 import { chartColors } from '../../utils/theme-colors';
 import { ManualAsset } from '../../models';
@@ -39,7 +41,7 @@ const RANGE_WORDS: Record<Range, string> = {
 @Component({
   selector: 'app-net-worth',
   standalone: true,
-  imports: [CommonModule, ErrorBanner, Confirm, AssetForm],
+  imports: [CommonModule, RouterLink, ErrorBanner, Confirm, AssetForm],
   templateUrl: './net-worth.html',
   styleUrl: './net-worth.scss',
 })
@@ -50,6 +52,7 @@ export class NetWorth implements OnDestroy {
   private themeService = inject(ThemeService);
   private toast = inject(ToastService);
   private router = inject(Router);
+  private billService = inject(BillService);
 
   readonly ranges = RANGES;
   readonly today = localDateString();
@@ -73,12 +76,43 @@ export class NetWorth implements OnDestroy {
 
   change = computed(() => changeOver(this.series()));
 
+  // ── Projection ─────────────────────────────────────────────
+  /** Continue the line six months ahead, on the forecast's numbers. */
+  projecting = signal(false);
+
+  /** Net worth at each of the next six month-ends — see utils/forecast.ts for what it assumes. */
+  projection = computed(() => {
+    if (!this.projecting()) return [];
+    const f = forecast({
+      accounts: this.accounts(), manual: this.manual(), bills: this.billService.bills(), txs: this.txs(),
+      rules: {
+        netting: true,
+        effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
+        reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
+      },
+      today: this.today, horizon: 7, baseMonths: 3,
+    });
+    if (f.thin) return [];
+    return projectNetWorth(f, this.now().net, this.manual(), this.txs(), this.today);
+  });
+
+  /** What the chart draws: the history, then (if shown) the projection. */
+  chartPoints = computed(() => [
+    ...this.series().map(p => ({ date: p.date, net: p.net, projected: false })),
+    ...this.projection().map(p => ({ date: p.date, net: p.net, projected: true })),
+  ]);
+
+  toggleProjection() {
+    this.hoverIndex.set(null);
+    this.projecting.set(!this.projecting());
+  }
+
   /** The figure in the hero: today, or the hovered point while scrubbing the chart. */
   shown = computed(() => {
     const i = this.hoverIndex();
-    const s = this.series();
-    if (i !== null && s[i]) return { net: s[i].net, date: s[i].date, hovering: true };
-    return { net: this.now().net, date: this.today, hovering: false };
+    const p = this.chartPoints();
+    if (i !== null && p[i]) return { net: p[i].net, date: p[i].date, hovering: true, projected: p[i].projected };
+    return { net: this.now().net, date: this.today, hovering: false, projected: false };
   });
 
   /** Change from the start of the range to the shown point. */
@@ -92,6 +126,7 @@ export class NetWorth implements OnDestroy {
 
   changeWords = computed(() => {
     const shown = this.shown();
+    if (shown.projected) return `since ${this.formatDate(this.series()[0]?.date ?? this.today)}, projected for ${this.formatDate(shown.date)}`;
     return shown.hovering
       ? `since ${this.formatDate(this.series()[0]?.date ?? this.today)}, as of ${this.formatDate(shown.date)}`
       : `over ${RANGE_WORDS[this.range()]}`;
@@ -159,10 +194,11 @@ export class NetWorth implements OnDestroy {
   constructor() {
     // New data or a new range: update in place.
     effect(() => {
-      const s = this.series();
+      const p = this.chartPoints();
       if (!this.chart) return;
-      this.chart.data.labels = s.map(p => p.date);
-      this.chart.data.datasets[0].data = s.map(p => p.net);
+      this.chart.data.labels = p.map(x => x.date);
+      this.chart.data.datasets[0].data = this.actualData(p);
+      this.chart.data.datasets[1].data = this.projectedData(p);
       this.chart.update('none');
     });
     // Chart.js bakes colours in, so a theme flip rebuilds.
@@ -177,16 +213,27 @@ export class NetWorth implements OnDestroy {
 
   ngOnDestroy() { this.chart?.destroy(); }
 
+  private actualData(p: { net: number; projected: boolean }[]) { return p.map(x => (x.projected ? null : x.net)); }
+  /** Starts at the last actual point so the dashed line carries straight on from it. */
+  private projectedData(p: { net: number; projected: boolean }[]) {
+    if (!p.some(x => x.projected)) return p.map(() => null);
+    const lastActual = p.findIndex(x => x.projected) - 1;
+    return p.map((x, i) => (x.projected || i === lastActual ? x.net : null));
+  }
+
   private buildChart() {
     const canvas = this.canvas?.nativeElement;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx || this.chart) return;
     const c = chartColors();
-    const s = this.series();
+    const s = this.chartPoints();
 
     const fill = ctx.createLinearGradient(0, 0, 0, canvas.clientHeight || 260);
     fill.addColorStop(0, c.accent + '33');
     fill.addColorStop(1, c.accent + '00');
+    const ahead = ctx.createLinearGradient(0, 0, 0, canvas.clientHeight || 260);
+    ahead.addColorStop(0, c.accent + '38');
+    ahead.addColorStop(1, c.accent + '00');
 
     // A thin vertical rule under the cursor, so you can see which day you are reading.
     const crosshair = {
@@ -215,12 +262,27 @@ export class NetWorth implements OnDestroy {
         labels: s.map(p => p.date),
         datasets: [{
           label: 'Net worth',
-          data: s.map(p => p.net),
+          data: this.actualData(s),
           borderColor: c.accent,
           backgroundColor: fill,
           borderWidth: 2,
           fill: true,
           // Monotone never overshoots, so a payday jump can't draw a dip that didn't happen.
+          cubicInterpolationMode: 'monotone',
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: c.accent,
+          pointHoverBorderColor: c.surface,
+          pointHoverBorderWidth: 2,
+        }, {
+          // The projection: dashed, on the forecast wash, so it never reads as actual.
+          label: 'Projected',
+          data: this.projectedData(s),
+          borderColor: c.accent,
+          backgroundColor: ahead,
+          borderWidth: 2,
+          borderDash: [5, 4],
+          fill: true,
           cubicInterpolationMode: 'monotone',
           pointRadius: 0,
           pointHoverRadius: 4,
@@ -240,9 +302,11 @@ export class NetWorth implements OnDestroy {
           legend: { display: false },
           tooltip: {
             displayColors: false,
+            // Where the two lines meet both carry the point; show it once.
+            filter: (item, i, all) => item.raw !== null && all.findIndex(x => x.raw !== null) === i,
             callbacks: {
               title: items => this.formatDate(String(items[0].label)),
-              label: item => this.money(item.raw as number),
+              label: item => `${this.chartPoints()[item.dataIndex]?.projected ? 'Projected ' : ''}${this.money(item.raw as number)}`,
             },
           },
         },
@@ -252,7 +316,7 @@ export class NetWorth implements OnDestroy {
             border: { display: false },
             ticks: {
               color: c.tick, font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6,
-              callback: (_v, i) => this.formatTick(String(this.series()[i]?.date ?? '')),
+              callback: (_v, i) => this.formatTick(String(this.chartPoints()[i]?.date ?? '')),
             },
           },
           y: {
@@ -373,7 +437,7 @@ export class NetWorth implements OnDestroy {
 
   private formatTick(d: string): string {
     if (!d) return '';
-    const long = this.range() === '1Y' || this.range() === 'ALL';
+    const long = this.range() === '1Y' || this.range() === 'ALL' || this.projecting();
     return parseLocalDate(d).toLocaleDateString('en-US', long ? { month: 'short', year: '2-digit' } : { month: 'short', day: 'numeric' });
   }
 

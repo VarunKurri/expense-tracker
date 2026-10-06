@@ -9,6 +9,7 @@ import { TransactionForm } from '../transactions/transaction-form/transaction-fo
 import { AccountService } from '../../services/account.service';
 import { TransactionService } from '../../services/transaction.service';
 import { ManualAssetService } from '../../services/manual-asset.service';
+import { BillService } from '../../services/bill.service';
 import { CategoryService } from '../../services/category.service';
 import { Account, ManualAsset, Transaction } from '../../models';
 import { localDateString } from '../../utils/date';
@@ -111,6 +112,7 @@ describe('Loans', () => {
         { provide: AccountService, useValue: { accounts: signal([checking]) } },
         { provide: TransactionService, useValue: txs },
         { provide: ManualAssetService, useValue: manual },
+        { provide: BillService, useValue: { bills: signal([]) } },
         { provide: CategoryService, useValue: { categories: signal([]), error: signal(null) } },
       ],
     });

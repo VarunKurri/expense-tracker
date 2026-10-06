@@ -845,6 +845,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 }
 
+/* Four tabs on one line on a phone. */
+@media (max-width: 480px) {
+  .subnav { gap: 2px; }
+  .subnav-tab { padding: 8px 12px; font-size: 13.5px; }
+}
+
 /* ============================================
    CHIPS
    ============================================ */

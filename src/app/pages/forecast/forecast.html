@@ -1,0 +1,160 @@
+<div class="page">
+
+  <div class="header-row">
+    <div>
+      <h1>Forecast</h1>
+      <div class="hint">Where your cash is heading if the next months look like the last few</div>
+    </div>
+    <div class="spans" role="group" aria-label="How far ahead">
+      @for (s of spans; track s) {
+        <button class="chip" [class.active]="ahead() === s" [attr.aria-pressed]="ahead() === s"
+                (click)="setAhead(s)">{{ s }} months</button>
+      }
+    </div>
+  </div>
+
+  <nav class="subnav">
+    <a class="subnav-tab" routerLink="/analysis">Overview</a>
+    <a class="subnav-tab" routerLink="/analysis/spending">Spending</a>
+    <a class="subnav-tab" routerLink="/analysis/reports">Reports</a>
+    <span class="subnav-tab active" aria-current="page">Forecast</span>
+  </nav>
+
+  @if (f(); as f) {
+    @if (f.thin) {
+      <section class="card empty">
+        <span class="card-label">Forecast</span>
+        <h2 class="display">A forecast needs <em>a month of history</em>.</h2>
+        <p>
+          Once a full month of income and spending is in, Trackr can say where your cash is heading —
+          with your bills on their dates and your loan payments on schedule.
+        </p>
+      </section>
+    } @else {
+
+      <!-- HERO -->
+      <section class="card hero">
+        <span class="card-label">{{ eyebrow() }}</span>
+        <div class="hero-figure">
+          <span class="num-display" [class.negative]="shown().cash < 0">{{ signedMoney(shown().cash) }}</span>
+          @if (shown().projected) { <span class="tag">Projected</span> }
+        </div>
+        <p class="hero-change">
+          <span class="delta" [class.up]="shown().cash - f.startCash > 0" [class.down]="shown().cash - f.startCash < 0">
+            {{ signed(shown().cash - f.startCash) }}
+          </span>
+          <span class="muted">from {{ signedMoney(f.startCash) }} today</span>
+        </p>
+
+        <div class="chart-wrap" (mouseleave)="hoverIndex.set(null)">
+          <canvas #chartCanvas role="img"
+                  [attr.aria-label]="'Cash from ' + signedMoney(points()[0]?.cash ?? 0) + ' six months ago to ' + signedMoney(f.startCash) + ' today, projected ' + signedMoney(f.endCash) + ' by ' + formatDate(f.months[f.months.length - 1].end)"></canvas>
+        </div>
+        <div class="legend">
+          <span class="key actual">Actual</span>
+          <span class="key projected">Projected</span>
+        </div>
+
+        <p class="hero-sentence">{{ sentence() }}</p>
+        @if (netWorthAhead(); as nw) {
+          <a class="nw-link" routerLink="/net-worth">
+            Net worth heading to <strong>{{ signedMoney(nw.then) }}</strong> by {{ formatDate(nw.date) }}
+            ({{ signed(nw.then - nw.now) }}) ›
+          </a>
+        }
+      </section>
+
+      <div class="columns">
+        <!-- MONTH BY MONTH -->
+        <section class="card months">
+          <div class="card-head">
+            <span class="card-label">Month by month</span>
+            <span class="muted">Projected</span>
+          </div>
+          <div class="month-row head" aria-hidden="true">
+            <span>Month</span><span>In</span><span>Bills</span><span>Loans</span><span>Everyday</span><span>Net</span><span>Cash</span>
+          </div>
+          @for (m of f.months; track m.month) {
+            <button type="button" class="month-row" [class.open]="openMonth() === m.month"
+                    [attr.aria-expanded]="openMonth() === m.month" (click)="toggleOpen(m)">
+              <span class="m-name">{{ m.label }}{{ m.partial ? ' (rest)' : '' }}</span>
+              <span class="num" data-label="In">{{ money(m.income + m.repayments) }}</span>
+              <span class="num" data-label="Bills">{{ m.bills ? '−' + money(m.bills) : '—' }}</span>
+              <span class="num" data-label="Loans">{{ m.loans ? '−' + money(m.loans) : '—' }}</span>
+              <span class="num" data-label="Everyday">−{{ money(m.everyday) }}</span>
+              <span class="num net" data-label="Net" [class.up]="m.net > 0" [class.down]="m.net < 0">{{ signed(m.net) }}</span>
+              <span class="num cash" data-label="Cash" [class.negative]="m.cash < 0">{{ signedMoney(m.cash) }}</span>
+            </button>
+            @if (openMonth() === m.month) {
+              <div class="month-detail">
+                @if (m.income) {
+                  <div class="d-row"><span>Usual income{{ m.partial ? ', rest of month' : '' }}</span><span class="num">{{ money(m.income) }}</span></div>
+                }
+                @for (it of m.items; track $index) {
+                  <div class="d-row">
+                    <span>{{ it.name }} <span class="muted">· {{ formatShortDate(it.date) }}{{ it.overdue ? ' · overdue' : '' }}</span></span>
+                    <span class="num">{{ it.kind === 'loan-in' ? '' : '−' }}{{ money(it.amount) }}</span>
+                  </div>
+                }
+                <div class="d-row"><span>Everyday spending{{ m.partial ? ', rest of month' : '' }}</span><span class="num">−{{ money(m.everyday) }}</span></div>
+              </div>
+            }
+          }
+        </section>
+
+        <!-- COMING UP -->
+        <section class="card soon">
+          <div class="card-head">
+            <span class="card-label">Next 30 days</span>
+          </div>
+          @for (it of comingUp(); track $index) {
+            <div class="soon-row">
+              <span class="soon-date">{{ formatShortDate(it.date) }}</span>
+              <span class="soon-main">
+                <span class="soon-name">{{ it.name }}</span>
+                <span class="soon-sub">{{ itemSub(it) }}</span>
+              </span>
+              <span class="soon-amount" [class.up]="it.kind === 'loan-in'">{{ it.kind === 'loan-in' ? '+' : '−' }}{{ money(it.amount) }}</span>
+            </div>
+          } @empty {
+            <p class="empty-note">No bills or loan payments in the next 30 days.</p>
+          }
+        </section>
+      </div>
+
+      <!-- HOW IT'S WORKED OUT -->
+      <section class="card basis">
+        <div class="card-head">
+          <span class="card-label">How this is worked out</span>
+          <div class="spans" role="group" aria-label="Months the averages use">
+            @for (s of spans; track s) {
+              <button class="chip" [class.active]="basedOn() === s" [attr.aria-pressed]="basedOn() === s"
+                      (click)="setBasedOn(s)">Last {{ s }}</button>
+            }
+          </div>
+        </div>
+        <div class="basis-body">
+          <p class="basis-text">
+            <strong>Known money comes in on its dates:</strong> bills and subscriptions when they're due,
+            loan payments on their schedule. <strong>The rest is typical:</strong> about
+            {{ money(f.basis.income) }} a month in, and {{ money(f.basis.everyday) }} of everyday spending —
+            your spending over the months below, less what bills cost a month ({{ money(f.basis.billsMonthly) }})
+            and loan payments. Investments are held flat; nothing assumes growth.
+          </p>
+          <p class="field-hint">Leave out a month that was a one-off — a laptop, a trip — so it doesn't set the pace.</p>
+          <div class="base-months">
+            @for (b of f.basis.months; track b.month) {
+              <div class="base-row" [class.off]="!b.included">
+                <span class="b-name">{{ b.label }}</span>
+                <span class="b-fig">{{ money(b.income) }} in</span>
+                <span class="b-fig">{{ money(b.spending) }} spent</span>
+                <button type="button" class="toggle" [class.on]="b.included" (click)="toggleMonth(b.month)"
+                        [attr.aria-pressed]="b.included" [attr.aria-label]="'Count ' + b.label"></button>
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+    }
+  }
+</div>
