@@ -78,25 +78,25 @@
             <button type="button" class="month-row" [class.open]="openMonth() === m.month"
                     [attr.aria-expanded]="openMonth() === m.month" (click)="toggleOpen(m)">
               <span class="m-name">{{ m.label }}{{ m.partial ? ' (rest)' : '' }}</span>
-              <span class="num" data-label="In">{{ money(m.income + m.repayments) }}</span>
-              <span class="num" data-label="Bills">{{ m.bills ? '−' + money(m.bills) : '—' }}</span>
-              <span class="num" data-label="Loans">{{ m.loans ? '−' + money(m.loans) : '—' }}</span>
-              <span class="num" data-label="Everyday">−{{ money(m.everyday) }}</span>
-              <span class="num net" data-label="Net" [class.up]="m.net > 0" [class.down]="m.net < 0">{{ signed(m.net) }}</span>
-              <span class="num cash" data-label="Cash" [class.negative]="m.cash < 0">{{ signedMoney(m.cash) }}</span>
+              <span class="fig" data-label="In">{{ money(m.income + m.repayments) }}</span>
+              <span class="fig" data-label="Bills">{{ m.bills ? '−' + money(m.bills) : '—' }}</span>
+              <span class="fig" data-label="Loans">{{ m.loans ? '−' + money(m.loans) : '—' }}</span>
+              <span class="fig" data-label="Everyday">−{{ money(m.everyday) }}</span>
+              <span class="fig net" data-label="Net" [class.up]="m.net > 0" [class.down]="m.net < 0">{{ signed(m.net) }}</span>
+              <span class="fig cash" data-label="Cash" [class.negative]="m.cash < 0">{{ signedMoney(m.cash) }}</span>
             </button>
             @if (openMonth() === m.month) {
               <div class="month-detail">
                 @if (m.income) {
-                  <div class="d-row"><span>Usual income{{ m.partial ? ', rest of month' : '' }}</span><span class="num">{{ money(m.income) }}</span></div>
+                  <div class="d-row"><span>Usual income{{ m.partial ? ', rest of month' : '' }}</span><span class="fig">{{ money(m.income) }}</span></div>
                 }
                 @for (it of m.items; track $index) {
                   <div class="d-row">
                     <span>{{ it.name }} <span class="muted">· {{ formatShortDate(it.date) }}{{ it.overdue ? ' · overdue' : '' }}</span></span>
-                    <span class="num">{{ it.kind === 'loan-in' ? '' : '−' }}{{ money(it.amount) }}</span>
+                    <span class="fig">{{ it.kind === 'loan-in' ? '' : '−' }}{{ money(it.amount) }}</span>
                   </div>
                 }
-                <div class="d-row"><span>Everyday spending{{ m.partial ? ', rest of month' : '' }}</span><span class="num">−{{ money(m.everyday) }}</span></div>
+                <div class="d-row"><span>Everyday spending{{ m.partial ? ', rest of month' : '' }}</span><span class="fig">−{{ money(m.everyday) }}</span></div>
               </div>
             }
           }
@@ -192,12 +192,12 @@
                   Give them a category on Bills to see which part of your spending they come out of.
                 </span>
               </span>
-              <span class="num">−{{ money(f.basis.unfiledBills) }}</span>
+              <span class="fig">−{{ money(f.basis.unfiledBills) }}</span>
             </div>
           }
           <div class="everyday-total">
             <span>Everyday spending, a month</span>
-            <span class="num">{{ money(f.basis.everyday) }}</span>
+            <span class="fig">{{ money(f.basis.everyday) }}</span>
           </div>
         } @else {
           <p class="empty-note">No spending in the months counted.</p>
