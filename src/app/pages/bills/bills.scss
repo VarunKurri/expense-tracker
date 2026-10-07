@@ -584,6 +584,12 @@
   border-bottom: none;
   z-index: 51;
   padding: 0 0 calc(40px + env(safe-area-inset-bottom));
+  /* Never taller than the screen below the status bar: long content (notes,
+     reimbursements, a loan) scrolls inside instead of pushing the close
+     button up under the notch. Desktop sets its own height below. */
+  max-height: calc(100dvh - env(safe-area-inset-top) - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   animation: slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -620,6 +626,15 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px 0;
+}
+
+/* Pinned while a long sheet scrolls, so closing is always one tap away. */
+.view-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-bottom: 8px;
+  background: var(--surface-hi);
 }
 
 .view-edit-btn {

@@ -633,8 +633,17 @@
 
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
-  .page-head { flex-direction: column; }
-  .range-pills { flex-wrap: wrap; }
+  .page-head { flex-direction: column; align-items: stretch; }
+  .head-actions { width: 100%; }
+  /* Six ranges don't fit one row on a phone, and wrapping left them ragged:
+     a full-width 3 × 2 grid of equal cells instead, like a segmented control. */
+  .range-pills {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+  }
+  .range-pill { padding: 8px 4px; text-align: center; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .cat-row { grid-template-columns: 110px 1fr 70px 30px; }
 }
