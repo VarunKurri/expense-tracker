@@ -1,3 +1,5 @@
+import type { TransactionSplit } from './split.model';
+
 export type TransactionType = 'income' | 'expense' | 'transfer';
 
 export interface Transaction {
@@ -46,6 +48,10 @@ export interface Transaction {
   // counts as spending/income until the user marks it. (Auto-detection from Plaid's
   // transfer category is a possible future improvement.)
   isInternalTransfer?: boolean;
+
+  // Bill splitting (expenses only): who shared this bill and who paid what.
+  // See models/split.model.ts; the maths is utils/splits.ts.
+  split?: TransactionSplit;
 
   // Plaid sync metadata (set for bank-synced transactions)
   plaidTransactionId?: string;            // Plaid transaction_id; also the Firestore doc id — used for dedup
