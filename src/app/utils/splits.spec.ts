@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ME, MoneyBackEntry, TransactionSplit } from '../models';
 import { outOfPocketCents, surplusCents } from './money-back';
 import {
-  ItemizedSplitState, QuickSplitState, assignUnclaimedTo, itemQuantity, itemUnitPriceCents, setItemQuantity, setItemUnitPrice, buildItemizedSplit, buildQuickSplit, emptyItemizedState,
+  ItemizedSplitState, QuickSplitState, assignUnclaimedTo, outstandingFor, setClosed, itemQuantity, itemUnitPriceCents, setItemQuantity, setItemUnitPrice, buildItemizedSplit, buildQuickSplit, emptyItemizedState,
   emptyQuickState, itemizedBillCents, itemizedStateFrom, myPaymentToCoverCents, newItem, owedToMeByPerson,
   quickAssignedCents, quickBillCents, quickSplit, quickStateFrom, removeFromItemized, restateWeights, setItemMode, setItemWeight,
   splitProblems, splitStatus, toggleAssignee,
@@ -484,5 +484,27 @@ describe('item quantity', () => {
     const s = splitStatus(split);
     expect(s.myShareCents + s.people.reduce((t, p) => t + p.shareCents, 0)).toBe(5198);
     expect(split.items[0]).toMatchObject({ quantity: 2, unitPriceCents: 2599, priceCents: 5198 });
+  });
+});
+
+describe('repaying from the transaction view', () => {
+  const split = quickSplit(24000, [ME, 'alex', 'ben', 'cara']);
+
+  it('what clears the people a repayment covers', () => {
+    const s = splitStatus(split, [repay(2000, 'ben')]);
+    expect(outstandingFor(s, ['alex'])).toBe(6000);
+    expect(outstandingFor(s, ['alex', 'ben', 'cara'])).toBe(6000 + 4000 + 6000);
+  });
+
+  it('a closed balance is not suggested', () => {
+    const s = splitStatus(setClosed(split, 'cara', true));
+    expect(outstandingFor(s, ['alex', 'cara'])).toBe(6000);
+  });
+
+  it('closing and reopening', () => {
+    const closed = setClosed(split, 'cara', true);
+    expect(closed.closedPersonIds).toEqual(['cara']);
+    expect(setClosed(closed, 'cara', true).closedPersonIds).toEqual(['cara']);
+    expect(setClosed(closed, 'cara', false).closedPersonIds).toEqual([]);
   });
 });

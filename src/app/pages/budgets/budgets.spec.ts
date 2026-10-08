@@ -14,6 +14,8 @@ import { AccountService } from '../../services/account.service';
 import { ManualAssetService } from '../../services/manual-asset.service';
 import { Budget, Category, Transaction } from '../../models';
 import { MoneyBackLedger } from '../../utils/money-back';
+import { PersonService } from '../../services/person.service';
+import { personName } from '../../utils/splits';
 import { addMonths, monthKeyOf } from '../../utils/calendar';
 
 /**
@@ -108,6 +110,7 @@ describe('Budgets', () => {
         { provide: BudgetService, useValue: budgets },
         { provide: CategoryService, useValue: { categories: signal([subs, dining]), error: signal(null) } },
         { provide: TransactionService, useValue: txs },
+        { provide: PersonService, useValue: { people: signal([]), nameOf: (id: string) => personName([], id) } },
         { provide: AccountService, useValue: { accounts: signal([]) } },
         { provide: ManualAssetService, useValue: { items: signal([]), error: signal(null) } },
       ],

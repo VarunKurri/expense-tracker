@@ -11,7 +11,9 @@ import { Router } from '@angular/router';
 import { loanDirection, loanPayments, loanState } from '../../utils/loans';
 import { localDateString } from '../../utils/date';
 import { Modal } from '../modal/modal';
-import { ManualAsset, MoneyBackSource, Transaction, UntrackedReturn } from '../../models';
+import { ManualAsset, ME, MoneyBackSource, Transaction, UntrackedReturn } from '../../models';
+import { PersonService } from '../../services/person.service';
+import { PersonSplitStatus, outstandingFor, setClosed, splitStatus } from '../../utils/splits';
 import { RefundState, newReturnId } from '../../utils/money-back';
 import { fromCents, toCents } from '../../utils/money';
 
@@ -156,6 +158,59 @@ export class TransactionView {
 
   saving = signal(false);
 
+  // ── Split: who owes what, after money back ─────────────────
+  people = inject(PersonService);
+  readonly ME = ME;
+
+  /** For a split expense: everyone's share, what they owed you, and what's come back. */
+  split = computed(() => {
+    const t = this.tx();
+    return t?.type === 'expense' && t.split ? splitStatus(t.split, this.txService.moneyBackEntriesFor(t)) : null;
+  });
+
+  /** Everyone on the bill but you. */
+  splitOthers = computed(() => (this.tx()?.split?.participantIds ?? []).filter(id => id !== ME));
+
+  stateLabel(p: PersonSplitStatus): string {
+    switch (p.state) {
+      case 'owed': return 'Owed';
+      case 'partial': return 'Partly repaid';
+      case 'repaid': return 'Repaid';
+      case 'closed': return "Won't be repaid";
+      default: return p.paidCents > 0 ? 'Paid their way' : 'Nothing owed';
+    }
+  }
+
+  /** What a person's row says, beside their state. */
+  personDetail(p: PersonSplitStatus): string {
+    if (p.dueToMeCents === 0) return `Share ${this.formatCents(p.shareCents)}`;
+    if (p.state === 'repaid') return `${this.formatCents(p.repaidCents)} back`;
+    if (p.repaidCents > 0) return `${this.formatCents(p.repaidCents)} back · owes ${this.formatCents(p.outstandingCents)}`;
+    return `Owes ${this.formatCents(p.outstandingCents)}`;
+  }
+
+  /** "Won't be repaid" / reopen. Their share stays in your spending either way. */
+  async setPersonClosed(personId: string, closed: boolean) {
+    const t = this.tx();
+    if (!t?.id || !t.split) return;
+    try {
+      await this.txService.update(t.id, { split: setClosed(t.split, personId, closed) });
+      this.toast.success(closed ? `${this.people.nameOf(personId)} won't be repaying this.` : 'Reopened.');
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
+
+  /** "Repayment from Mrunaal for Mrunaal and Priya" — who and whose share, when known. */
+  fromLabel(e: { fromPersonId?: string; coversPersonIds?: string[] }): string {
+    if (!e.fromPersonId) return '';
+    const from = this.people.nameOf(e.fromPersonId);
+    const covers = (e.coversPersonIds ?? []).filter(id => id !== e.fromPersonId);
+    return covers.length
+      ? ` from ${from} for ${[e.fromPersonId, ...covers].map(id => id === e.fromPersonId ? from : this.people.nameOf(id)).join(', ')}`
+      : ` from ${from}`;
+  }
+
   // The "Add money back" dialog: money that never reached a tracked account
   // (cash, store credit). It asks refund or repayment because on a split bill
   // they differ — a refund lowers everyone's share, a repayment settles one
@@ -167,6 +222,17 @@ export class TransactionView {
   draftAmount = signal<number | null>(null);
   draftDate = signal('');
   draftNote = signal('');
+  /** On a split bill, a repayment says who it's from and whose shares it covers. */
+  draftFrom = signal('');
+  draftCovers = signal<string[]>([]);
+  /** Once the amount is typed, choosing people stops re-filling it. */
+  private draftAmountTyped = false;
+
+  /** Asking "from whom" only makes sense on a split bill, for a repayment. */
+  askWho = computed(() => !!this.split() && this.draftSource() === 'repayment');
+  /** The same question in the link picker, when linking from a split expense. */
+  askLinkWho = computed(() =>
+    !!this.split() && this.linkSource() === 'repayment' && this.linkingFrom()?.type === 'expense');
 
   /** What hasn't come back yet — what "The full amount / The rest" records. */
   remainingCents = computed(() => {
@@ -175,13 +241,55 @@ export class TransactionView {
     return Math.max(0, toCents(t.amount) - toCents(this.moneyBackTotal()));
   });
 
-  openDraft() {
+  /** Opened from a person's row, it's a repayment from them, filled in with what they owe. */
+  openDraft(fromPersonId?: string) {
     this.draftOpen.set(true);
-    this.draftSource.set('refund');
+    this.draftSource.set(fromPersonId ? 'repayment' : 'refund');
     this.draftFull.set(false);
     this.draftAmount.set(null);
     this.draftDate.set(localDateString());
     this.draftNote.set('');
+    this.draftAmountTyped = false;
+    const from = fromPersonId ?? this.firstOwing();
+    this.draftFrom.set(from);
+    this.draftCovers.set(from ? [from] : []);
+    if (fromPersonId) this.prefillRepayment();
+  }
+
+  setDraftSource(source: MoneyBackSource) {
+    this.draftSource.set(source);
+    if (this.askWho()) this.prefillRepayment();
+  }
+
+  setDraftAmount(value: number | null) {
+    this.draftAmountTyped = true;
+    this.draftAmount.set(value);
+  }
+
+  /** Changing who it's from: by default it covers just them. */
+  setDraftFrom(personId: string) {
+    this.draftFrom.set(personId);
+    this.draftCovers.set([personId]);
+    this.prefillRepayment();
+  }
+
+  toggleCover(personId: string) {
+    this.draftCovers.update(ids => ids.includes(personId) ? ids.filter(id => id !== personId) : [...ids, personId]);
+    this.prefillRepayment();
+  }
+
+  /** Whoever still owes, first — the likeliest person to be paying you back. */
+  private firstOwing(): string {
+    const s = this.split();
+    return s?.people.find(p => p.outstandingCents > 0 && p.state !== 'closed')?.personId ?? this.splitOthers()[0] ?? '';
+  }
+
+  /** Fill the amount with what the covered people still owe, until it's typed by hand. */
+  private prefillRepayment() {
+    const s = this.split();
+    if (!s || this.draftAmountTyped) return;
+    const owed = outstandingFor(s, this.draftCovers());
+    this.draftAmount.set(owed > 0 ? fromCents(owed) : null);
   }
 
   closeDraft() {
@@ -198,8 +306,9 @@ export class TransactionView {
     if (!date) { this.toast.error('Pick the date it came back.'); return; }
     const note = this.draftNote().trim();
     const source = this.draftSource();
+    if (this.askWho() && !this.draftFrom()) { this.toast.error('Choose who paid you back.'); return; }
     const entry: UntrackedReturn = {
-      id: newReturnId(), source, amountCents, date, ...(note ? { note } : {}),
+      id: newReturnId(), source, amountCents, date, ...(note ? { note } : {}), ...this.whoFields(source),
     };
     const ok = await this.saveMoneyBack(t, [...(t.moneyBack ?? []), entry],
       source === 'refund' ? (full ? 'Marked as refunded.' : 'Refund added.') : (full ? 'Marked as paid back.' : 'Repayment added.'));
@@ -237,6 +346,13 @@ export class TransactionView {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  /** From / covers, for a repayment on a split bill; nothing otherwise. */
+  private whoFields(source: MoneyBackSource): { fromPersonId?: string; coversPersonIds?: string[] } {
+    if (!this.split() || source !== 'repayment' || !this.draftFrom()) return {};
+    const covers = this.draftCovers().length ? this.draftCovers() : [this.draftFrom()];
+    return { fromPersonId: this.draftFrom(), coversPersonIds: covers };
   }
 
   formatCents(cents: number): string {
@@ -363,6 +479,10 @@ export class TransactionView {
   openLinkPicker(tx: Transaction) {
     this.linkSearch.set('');
     this.linkSource.set('repayment');
+    // Linking from a split expense asks who it was from, as "Add money back" does.
+    const from = this.firstOwing();
+    this.draftFrom.set(from);
+    this.draftCovers.set(from ? [from] : []);
     this.linkingFrom.set(tx);
   }
 
@@ -378,9 +498,10 @@ export class TransactionView {
     const expense = from.type === 'expense' ? from : candidate;
     if (!income.id || !expense.id) return;
     try {
+      const who = from.type === 'expense' ? this.whoFields(this.linkSource()) : {};
       await this.txService.update(income.id, {
         reimbursesId: expense.id,
-        moneyBackInfo: { ...income.moneyBackInfo, source: this.linkSource() },
+        moneyBackInfo: { ...income.moneyBackInfo, source: this.linkSource(), ...who },
       });
       this.toast.success(this.linkSource() === 'refund' ? 'Refund linked.' : 'Repayment linked.');
       this.closeLinkPicker();

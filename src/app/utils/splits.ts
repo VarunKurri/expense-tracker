@@ -228,6 +228,21 @@ export function splitStatus(split: TransactionSplit, moneyBack: MoneyBackEntry[]
 }
 
 /**
+ * What a repayment from these people would need to be to clear them: the sum
+ * of what they still owe you. What "Add money back" fills in for a repayment.
+ */
+export function outstandingFor(status: SplitStatus, personIds: string[]): number {
+  const ids = new Set(personIds);
+  return sum(status.people.filter(p => ids.has(p.personId) && p.state !== 'closed').map(p => p.outstandingCents));
+}
+
+/** Mark someone "won't be repaid", or reopen them. */
+export function setClosed(split: TransactionSplit, personId: string, closed: boolean): TransactionSplit {
+  const rest = (split.closedPersonIds ?? []).filter(id => id !== personId);
+  return { ...split, closedPersonIds: closed ? [...rest, personId] : rest };
+}
+
+/**
  * What everyone owes you across many split bills, by person. People whose
  * balance is closed on a bill ("won't be repaid") don't count for that bill.
  */

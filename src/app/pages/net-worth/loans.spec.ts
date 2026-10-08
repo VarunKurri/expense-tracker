@@ -13,6 +13,8 @@ import { BillService } from '../../services/bill.service';
 import { CategoryService } from '../../services/category.service';
 import { Account, ManualAsset, Transaction } from '../../models';
 import { MoneyBackLedger } from '../../utils/money-back';
+import { PersonService } from '../../services/person.service';
+import { personName } from '../../utils/splits';
 import { localDateString } from '../../utils/date';
 import { schedule } from '../../utils/loans';
 
@@ -108,6 +110,7 @@ describe('Loans', () => {
         provideLocationMocks(),
         { provide: AccountService, useValue: { accounts: signal([checking]) } },
         { provide: TransactionService, useValue: txs },
+        { provide: PersonService, useValue: { people: signal([]), nameOf: (id: string) => personName([], id) } },
         { provide: ManualAssetService, useValue: manual },
         { provide: BillService, useValue: { bills: signal([]) } },
         { provide: CategoryService, useValue: { categories: signal([]), error: signal(null) } },

@@ -76,6 +76,38 @@
     @if (tx.type === 'expense') {
       <div class="view-reimburse">
         <div class="view-reimburse-head">Money back</div>
+        @if (split(); as s) {
+          <!-- SPLIT — one row per person; tap to record what they paid back -->
+          <div class="split-people">
+            @for (p of s.people; track p.personId) {
+              <div class="split-person" [class.settled]="p.state === 'repaid' || p.state === 'none'">
+                <button type="button" class="split-person-main" (click)="openDraft(p.personId)"
+                        [disabled]="p.outstandingCents === 0 || p.state === 'closed'"
+                        [attr.aria-label]="'Record a repayment from ' + people.nameOf(p.personId)">
+                  <span class="split-person-name">{{ people.nameOf(p.personId) }}</span>
+                  <span class="split-person-detail fig">{{ personDetail(p) }}</span>
+                </button>
+                <span class="chip split-state" [class.active]="p.state === 'repaid'">{{ stateLabel(p) }}</span>
+                @if (p.state === 'owed' || p.state === 'partial') {
+                  <button type="button" class="link-btn split-close" (click)="setPersonClosed(p.personId, true)">Won't be repaid</button>
+                } @else if (p.state === 'closed') {
+                  <button type="button" class="link-btn split-close" (click)="setPersonClosed(p.personId, false)">Reopen</button>
+                }
+              </div>
+            }
+          </div>
+          <p class="reimburse-hint split-hint">
+            Your share is <span class="fig">{{ formatCents(s.myShareCents) }}</span>.
+            @if (s.owedToMeCents > 0) {
+              <span class="fig">{{ formatCents(s.owedToMeCents) }}</span> is still owed to you — tap someone to record what they paid back.
+            } @else {
+              Nobody owes you anything on this.
+            }
+            @if (s.unappliedRepaymentCents > 0) {
+              <span class="fig">{{ formatCents(s.unappliedRepaymentCents) }}</span> came back beyond what anyone owed, so it covers your share too.
+            }
+          </p>
+        }
         @if (moneyBackTotal() > 0) {
           <div class="reimburse-summary">
             @if (refundState() === 'full' && reimbursementSurplus() <= 0.005) {
@@ -99,7 +131,7 @@
           @for (e of untracked(); track e.id) {
             <div class="reimburse-row">
               <span class="reimburse-row-text">
-                ↩ {{ sourceLabel(e.source) }} · +{{ formatCents(e.amountCents) }} · {{ formatDate(e.date) }}{{ e.note ? ' · ' + e.note : '' }}
+                ↩ {{ sourceLabel(e.source) }}{{ fromLabel(e) }} · +{{ formatCents(e.amountCents) }} · {{ formatDate(e.date) }}{{ e.note ? ' · ' + e.note : '' }}
               </span>
               <button class="reimburse-unlink" (click)="removeUntracked(e)" title="Remove" aria-label="Remove money back">✕</button>
             </div>
@@ -107,7 +139,7 @@
           @for (r of linkedIncomes(); track r.id) {
             <div class="reimburse-row">
               <span class="reimburse-row-text">
-                ↩ {{ sourceLabel(incomeSource(r)) }} · {{ r.merchant || 'Income' }} · +{{ formatCurrency(r.amount) }} · {{ formatDate(r.date) }}
+                ↩ {{ sourceLabel(incomeSource(r)) }}{{ fromLabel(r.moneyBackInfo ?? {}) }} · {{ r.merchant || 'Income' }} · +{{ formatCurrency(r.amount) }} · {{ formatDate(r.date) }}
               </span>
               <button class="reimburse-unlink" (click)="unlinkReimbursement(r)" title="Unlink" aria-label="Unlink income">✕</button>
             </div>
@@ -215,6 +247,9 @@
         : 'From a person paying you back. On a split bill, it settles what they owe.' }}
     </p>
   </div>
+  @if (askLinkWho()) {
+    <div class="form link-who"><ng-container [ngTemplateOutlet]="who" /></div>
+  }
   <input class="link-search input-field"
          [ngModel]="linkSearch()"
          (ngModelChange)="linkSearch.set($event)"
@@ -239,8 +274,8 @@
   <div class="form">
     <div class="field">
       <div class="mini-seg" role="radiogroup" aria-label="Kind of money back">
-        <button type="button" role="radio" [class.active]="draftSource() === 'refund'" [attr.aria-checked]="draftSource() === 'refund'" (click)="draftSource.set('refund')">Refund</button>
-        <button type="button" role="radio" [class.active]="draftSource() === 'repayment'" [attr.aria-checked]="draftSource() === 'repayment'" (click)="draftSource.set('repayment')">Repayment</button>
+        <button type="button" role="radio" [class.active]="draftSource() === 'refund'" [attr.aria-checked]="draftSource() === 'refund'" (click)="setDraftSource('refund')">Refund</button>
+        <button type="button" role="radio" [class.active]="draftSource() === 'repayment'" [attr.aria-checked]="draftSource() === 'repayment'" (click)="setDraftSource('repayment')">Repayment</button>
       </div>
       <p class="field-hint">
         {{ draftSource() === 'refund'
@@ -248,7 +283,10 @@
           : 'From a person paying you back. On a split bill, it settles what they owe.' }}
       </p>
     </div>
-    @if (remainingCents() > 0) {
+    @if (askWho()) {
+      <ng-container [ngTemplateOutlet]="who" />
+    }
+    @if (remainingCents() > 0 && !askWho()) {
       <div class="toggle-row">
         <div>
           <div class="toggle-label">
@@ -270,7 +308,7 @@
         <label class="label-sm" for="mb-amount">Amount</label>
         <div class="input-affix"><span class="affix">$</span>
           <input id="mb-amount" class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
-                 [ngModel]="draftAmount()" (ngModelChange)="draftAmount.set($event)" name="mbAmount" placeholder="0.00" />
+                 [ngModel]="draftAmount()" (ngModelChange)="setDraftAmount($event)" name="mbAmount" placeholder="0.00" />
         </div>
       </div>
       <div class="field">
@@ -286,7 +324,7 @@
              placeholder="Store credit, Venmo from Alex…" />
     </div>
     <p class="form-note">
-      For money that never reached an account Trackr tracks. If it did, use “Link an income”
+      For money that never reached an account Trackr tracks. If it did, use “Link income”
       instead, so it isn't counted twice.
     </p>
   </div>
@@ -297,3 +335,25 @@
     </div>
   </div>
 </app-modal>
+
+<!-- WHO — on a split bill, a repayment says who it's from and whose shares it covers -->
+<ng-template #who>
+  <div class="field">
+    <label class="label-sm" for="mb-from">From</label>
+    <select id="mb-from" class="input-field" [ngModel]="draftFrom()" (ngModelChange)="setDraftFrom($event)" name="mbFrom">
+      @for (id of splitOthers(); track id) { <option [value]="id">{{ people.nameOf(id) }}</option> }
+    </select>
+  </div>
+  <div class="field">
+    <span class="label-sm">Covers</span>
+    <div class="cover-chips">
+      @for (id of splitOthers(); track id) {
+        <button type="button" class="chip name" [class.active]="draftCovers().includes(id)"
+                [attr.aria-pressed]="draftCovers().includes(id)" (click)="toggleCover(id)">{{ people.nameOf(id) }}</button>
+      }
+      <button type="button" class="chip name" [class.active]="draftCovers().includes(ME)"
+              [attr.aria-pressed]="draftCovers().includes(ME)" (click)="toggleCover(ME)">You</button>
+    </div>
+    <p class="field-hint">Whose share this pays off. One friend can pay for several — even for you.</p>
+  </div>
+</ng-template>

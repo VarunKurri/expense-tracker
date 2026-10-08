@@ -10,6 +10,10 @@ import { ManualAssetService } from '../../services/manual-asset.service';
 import { ToastService } from '../../services/toast.service';
 import { Transaction } from '../../models';
 import { MoneyBackLedger } from '../../utils/money-back';
+import { ME } from '../../models';
+import { quickSplit, splitStatus } from '../../utils/splits';
+import { PersonService } from '../../services/person.service';
+import { personName } from '../../utils/splits';
 
 /** The real money-back logic; updates are applied the way Firestore would (undefined dropped). */
 class FakeTransactions extends MoneyBackLedger {
@@ -18,6 +22,12 @@ class FakeTransactions extends MoneyBackLedger {
     this.transactions.update(all => all.map(t => t.id === id ? JSON.parse(JSON.stringify({ ...t, ...patch })) : t));
   }
 }
+
+const friends = signal([
+  { id: 'alex', name: 'Alex', createdAt: 0, updatedAt: 0 },
+  { id: 'ben', name: 'Ben', createdAt: 0, updatedAt: 0 },
+  { id: 'cara', name: 'Cara', createdAt: 0, updatedAt: 0 },
+]);
 
 const haircut: Transaction = {
   id: 'cut', type: 'expense', amount: 46, date: '2026-10-04', merchant: 'In 2 Cuts',
@@ -61,6 +71,7 @@ describe('TransactionView — money back', () => {
       providers: [
         provideRouter([]),
         { provide: TransactionService, useValue: txs },
+        { provide: PersonService, useValue: { people: friends, nameOf: (id: string) => personName(friends(), id) } },
         { provide: CategoryService, useValue: { categories: signal([]) } },
         { provide: AccountService, useValue: { accounts: signal([]) } },
         { provide: ManualAssetService, useValue: { items: signal([]) } },
@@ -155,5 +166,97 @@ describe('TransactionView — money back', () => {
     expect(linked.reimbursesId).toBe('cut');
     expect(linked.moneyBackInfo?.source).toBe('refund');
     expect(txs.isFullyRefunded(txs.transactions()[0])).toBe(true);
+  });
+
+  describe('on a split bill', () => {
+    // $240 dinner, four ways: you, Alex, Ben, Cara — $60 each.
+    const dinner: Transaction = { ...haircut, id: 'dinner', amount: 240, merchant: 'Ramen Bar', split: quickSplit(24000, [ME, 'alex', 'ben', 'cara']) };
+    const rows = () => [...view().querySelectorAll('.split-person')].map(r =>
+      [...r.querySelectorAll('.split-person-name, .split-person-detail, .split-state, .split-close')]
+        .map(e => e.textContent!.trim()).join(' '));
+    const saved = () => txs.transactions().find(t => t.id === 'dinner')!;
+    const status = () => splitStatus(saved().split!, txs.moneyBackEntriesFor(saved()));
+
+    it('shows each person: what they owe, and their state', async () => {
+      await open(dinner);
+      expect(rows()).toEqual([
+        "Alex Owes $60.00 Owed Won't be repaid",
+        "Ben Owes $60.00 Owed Won't be repaid",
+        "Cara Owes $60.00 Owed Won't be repaid",
+      ]);
+      expect(view().textContent).toContain('Your share is $60.00.');
+      expect(view().textContent).toContain('$180.00 is still owed to you');
+    });
+
+    it('tapping someone records a repayment from them, filled in with what they owe', async () => {
+      await open(dinner);
+      (view().querySelector('[aria-label="Record a repayment from Alex"]') as HTMLElement).click();
+      await settle();
+      expect(button('Repayment').getAttribute('aria-checked')).toBe('true');
+      expect((document.getElementById('mb-from') as HTMLSelectElement).value).toBe('alex');
+      expect((document.getElementById('mb-amount') as HTMLInputElement).value).toBe('60');
+      button('Save').click();
+      await settle();
+
+      expect(saved().moneyBack).toEqual([expect.objectContaining({ source: 'repayment', amountCents: 6000, fromPersonId: 'alex', coversPersonIds: ['alex'] })]);
+      expect(rows()[0]).toContain('Repaid');
+      expect(txs.effectiveExpenseAmount(saved())).toBe(180);
+      expect(view().textContent).toContain('↩ Repayment from Alex');
+    });
+
+    it('one friend paying for several clears them all', async () => {
+      await open(dinner);
+      (view().querySelector('[aria-label="Record a repayment from Alex"]') as HTMLElement).click();
+      await settle();
+      const cover = (name: string) => [...document.querySelectorAll('.cover-chips button')].find(b => b.textContent!.trim() === name) as HTMLElement;
+      cover('Ben').click(); await settle();
+      cover('Cara').click(); await settle();
+      expect((document.getElementById('mb-amount') as HTMLInputElement).value).toBe('180');
+      button('Save').click();
+      await settle();
+
+      expect(status().people.map(p => p.state)).toEqual(['repaid', 'repaid', 'repaid']);
+      expect(view().textContent).toContain('Nobody owes you anything on this.');
+      expect(view().textContent).toContain('↩ Repayment from Alex for Alex, Ben, Cara');
+      expect(txs.effectiveExpenseAmount(saved())).toBe(60); // your share is what's left
+    });
+
+    it('a refund on the bill lowers everyone\'s share', async () => {
+      await open(dinner);
+      button('+ Add money back').click();
+      await settle();
+      expect(document.getElementById('mb-from')).toBeNull(); // a refund isn't from a person
+      await typeAmount('40');
+      button('Save').click();
+      await settle();
+      expect(rows()[0]).toContain('Owes $50.00');
+      expect(view().textContent).toContain('Your share is $50.00.');
+    });
+
+    it("\"won't be repaid\" closes a balance but keeps it in your spending", async () => {
+      await open(dinner);
+      const close = [...view().querySelectorAll('.split-close')][2] as HTMLElement; // Cara
+      close.click();
+      await settle();
+      expect(saved().split!.closedPersonIds).toEqual(['cara']);
+      expect(rows()[2]).toContain("Won't be repaid");
+      expect(rows()[2]).toContain('Reopen');
+      expect(view().textContent).toContain('$120.00 is still owed to you');
+      expect(txs.effectiveExpenseAmount(saved())).toBe(240);
+    });
+
+    it('linking a bank income as a repayment asks who it was from', async () => {
+      const venmo: Transaction = { id: 'v', type: 'income', amount: 60, date: '2026-10-05', merchant: 'Venmo', createdAt: 0, updatedAt: 0 };
+      await open(dinner, [venmo]);
+      button('+ Link income').click();
+      await settle();
+      (document.getElementById('mb-from') as HTMLSelectElement).value = 'ben';
+      document.getElementById('mb-from')!.dispatchEvent(new Event('change'));
+      await settle();
+      (document.querySelector('.link-item') as HTMLElement).click();
+      await settle();
+      expect(txs.transactions().find(t => t.id === 'v')!.moneyBackInfo).toEqual({ source: 'repayment', fromPersonId: 'ben', coversPersonIds: ['ben'] });
+      expect(status().people.find(p => p.personId === 'ben')!.state).toBe('repaid');
+    });
   });
 });
