@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ME, MoneyBackEntry, TransactionSplit } from '../models';
 import { outOfPocketCents, surplusCents } from './money-back';
 import {
-  ItemizedSplitState, QuickSplitState, assignUnclaimedTo, buildItemizedSplit, buildQuickSplit, emptyItemizedState,
+  ItemizedSplitState, QuickSplitState, assignUnclaimedTo, itemQuantity, itemUnitPriceCents, setItemQuantity, setItemUnitPrice, buildItemizedSplit, buildQuickSplit, emptyItemizedState,
   emptyQuickState, itemizedBillCents, itemizedStateFrom, myPaymentToCoverCents, newItem, owedToMeByPerson,
   quickAssignedCents, quickBillCents, quickSplit, quickStateFrom, removeFromItemized, restateWeights, setItemMode, setItemWeight,
   splitProblems, splitStatus, toggleAssignee,
@@ -442,5 +442,47 @@ describe('quickAssignedCents: the "left to assign" line', () => {
   it('amounts are what is typed; percentages are that share of the bill', () => {
     expect(quickAssignedCents({ ...base, mode: 'amount', weights: { [ME]: 500, alex: 300 } }, 1292)).toBe(800);
     expect(quickAssignedCents({ ...base, mode: 'percent', weights: { [ME]: 50, alex: 30 } }, 1000)).toBe(800);
+  });
+});
+
+describe('item quantity', () => {
+  it('a new item can be several of the same thing: the line total is price × quantity', () => {
+    const mandi = newItem([ME], 'Mandi', 2599, 2);
+    expect(mandi.priceCents).toBe(5198);
+    expect(itemQuantity(mandi)).toBe(2);
+    expect(itemUnitPriceCents(mandi)).toBe(2599);
+  });
+
+  it('a single item stores no quantity at all, so old splits read the same', () => {
+    const one = newItem([ME], 'Lassi', 450);
+    expect(one).not.toHaveProperty('quantity');
+    expect(itemQuantity(one)).toBe(1);
+  });
+
+  it('changing the quantity keeps the price each; the total follows', () => {
+    const mandi = setItemQuantity(newItem([ME], 'Mandi', 2599), 3);
+    expect(mandi.priceCents).toBe(7797);
+    expect(setItemQuantity(mandi, 1)).not.toHaveProperty('quantity');
+    expect(setItemQuantity(mandi, 1).priceCents).toBe(2599);
+  });
+
+  it('changing the price each keeps the quantity', () => {
+    expect(setItemUnitPrice(newItem([ME], 'Mandi', 2599, 2), 2400).priceCents).toBe(4800);
+  });
+
+  it('nonsense quantities become 1', () => {
+    const item = newItem([ME], 'Naan', 300);
+    expect(itemQuantity(setItemQuantity(item, 0))).toBe(1);
+    expect(itemQuantity(setItemQuantity(item, NaN))).toBe(1);
+    expect(itemQuantity(setItemQuantity(item, 2.7))).toBe(2);
+  });
+
+  it('the engine shares the line total; three people, two mandis', () => {
+    const state: ItemizedSplitState = { ...emptyItemizedState(), participantIds: [ME, 'm', 'p'], items: [newItem([ME, 'm', 'p'], 'Mandi', 2599, 2)] };
+    const split = buildItemizedSplit(state, 5198);
+    expect(splitProblems(split, 5198)).toEqual([]);
+    const s = splitStatus(split);
+    expect(s.myShareCents + s.people.reduce((t, p) => t + p.shareCents, 0)).toBe(5198);
+    expect(split.items[0]).toMatchObject({ quantity: 2, unitPriceCents: 2599, priceCents: 5198 });
   });
 });

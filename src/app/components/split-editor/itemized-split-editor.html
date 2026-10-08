@@ -12,10 +12,15 @@
         <div class="item-grid">
           <input class="input-field item-name" [ngModel]="item.name" (ngModelChange)="setName(i, $event)" [name]="'item-' + item.id"
                  placeholder="What was it?" aria-label="Item name" />
+          <span class="input-affix item-qty"><span class="affix">×</span>
+            <input class="input-field" type="number" step="1" min="1" inputmode="numeric"
+                   [ngModel]="quantityOf(item)" (ngModelChange)="setQuantity(i, $event)" [name]="'qty-' + item.id"
+                   aria-label="Quantity" />
+          </span>
           <span class="input-affix item-price"><span class="affix">$</span>
             <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
                    [ngModel]="priceValue(item)" (ngModelChange)="setPrice(i, $event)" [name]="'price-' + item.id"
-                   placeholder="0.00" aria-label="Price" />
+                   placeholder="0.00" [attr.aria-label]="quantityOf(item) > 1 ? 'Price each' : 'Price'" />
           </span>
           <button type="button" class="item-remove" (click)="removeItem(i)" aria-label="Remove item">✕</button>
           @if (item.splitMode === 'equal') {
@@ -31,6 +36,12 @@
             @for (m of modes; track m.value) { <option [value]="m.value">{{ m.label }}</option> }
           </select>
         </div>
+        @if (quantityOf(item) > 1) {
+          <p class="field-hint item-total">
+            {{ quantityOf(item) }} × <span class="fig">{{ money(item.unitPriceCents ?? 0) }}</span>
+            = <span class="fig">{{ money(item.priceCents) }}</span>
+          </p>
+        }
 
         @if (item.splitMode !== 'equal') {
           <div class="item-weights">

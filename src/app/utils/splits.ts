@@ -1,4 +1,4 @@
-import { ME, MoneyBackEntry, SplitPerson, TransactionSplit } from '../models';
+import { ME, MoneyBackEntry, SplitItem, SplitPerson, TransactionSplit } from '../models';
 import { wholeShareWeights } from './split/shareWeights';
 import { allocate, sum } from './split/money';
 import { settle } from './split/settle';
@@ -397,7 +397,7 @@ export function restateWeights(state: QuickSplitState, mode: SplitMode, billCent
  */
 export interface ItemizedSplitState {
   participantIds: string[];
-  items: Item[];
+  items: SplitItem[];
   charges: Charges;
   otherPayments: Payment[];
 }
@@ -409,11 +409,37 @@ export function newItemId(): string {
 }
 
 /** A blank line, shared equally by `assigneeIds` (or nobody yet). */
-export function newItem(assigneeIds: string[] = [], name = '', priceCents = 0): Item {
-  return {
-    id: newItemId(), name, priceCents, splitMode: 'equal',
+export function newItem(assigneeIds: string[] = [], name = '', priceCents = 0, quantity = 1): SplitItem {
+  const item: SplitItem = {
+    id: newItemId(), name, priceCents: priceCents * quantity, splitMode: 'equal',
     assignments: assigneeIds.map(personId => ({ personId, weight: 1 })),
   };
+  return quantity > 1 ? { ...item, quantity, unitPriceCents: priceCents } : item;
+}
+
+/** How many of an item — 1 unless said otherwise. */
+export function itemQuantity(item: SplitItem): number {
+  return item.quantity && item.quantity > 1 ? item.quantity : 1;
+}
+
+/** The price of one. Exact when set; otherwise the line total over the quantity. */
+export function itemUnitPriceCents(item: SplitItem): number {
+  return item.unitPriceCents ?? Math.round(item.priceCents / itemQuantity(item));
+}
+
+/** Change how many; the line total follows (price each × quantity, in whole cents). */
+export function setItemQuantity<T extends SplitItem>(item: T, quantity: number): T {
+  const q = Number.isFinite(quantity) && quantity >= 1 ? Math.floor(quantity) : 1;
+  const unit = itemUnitPriceCents(item);
+  const { quantity: _q, unitPriceCents: _u, ...rest } = item;
+  return (q > 1 ? { ...rest, quantity: q, unitPriceCents: unit, priceCents: unit * q } : { ...rest, priceCents: unit }) as T;
+}
+
+/** Change the price of one; the line total follows. */
+export function setItemUnitPrice<T extends SplitItem>(item: T, unitPriceCents: number): T {
+  const unit = Math.max(0, Math.round(unitPriceCents));
+  const q = itemQuantity(item);
+  return (q > 1 ? { ...item, unitPriceCents: unit, priceCents: unit * q } : { ...item, priceCents: unit }) as T;
 }
 
 /** Start itemizing, keeping who's on the bill and who paid from the quick split. */
@@ -492,7 +518,7 @@ export function removeFromItemized(state: ItemizedSplitState, personId: string):
 }
 
 /** Equal mode: tap someone on or off an item. */
-export function toggleAssignee(item: Item, personId: string): Item {
+export function toggleAssignee<T extends Item>(item: T, personId: string): T {
   const has = item.assignments.some(a => a.personId === personId && a.weight > 0);
   return {
     ...item,
@@ -507,7 +533,7 @@ export function toggleAssignee(item: Item, personId: string): Item {
  * reset. Whoever had it keeps their part ("Alex had two thirds" stays two
  * thirds whether written as 2:1, 66.67% or $20).
  */
-export function setItemMode(item: Item, mode: SplitMode, participantIds: string[]): Item {
+export function setItemMode<T extends Item>(item: T, mode: SplitMode, participantIds: string[]): T {
   if (item.splitMode === mode) return item;
   const current: Record<string, number> = {};
   for (const a of item.assignments) current[a.personId] = item.splitMode === 'equal' ? (a.weight > 0 ? 1 : 0) : a.weight;
@@ -521,7 +547,7 @@ export function setItemMode(item: Item, mode: SplitMode, participantIds: string[
 }
 
 /** Uneven modes: set one person's shares, percent or amount (cents) on an item. */
-export function setItemWeight(item: Item, personId: string, weight: number): Item {
+export function setItemWeight<T extends Item>(item: T, personId: string, weight: number): T {
   const w = Math.max(0, weight);
   // Keep the order: the engine breaks cent ties by position, so moving someone
   // to the end could shift a cent between people just because a number was edited.

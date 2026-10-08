@@ -21,6 +21,19 @@ export interface SplitPerson {
 }
 
 /**
+ * A line on the bill. Split's `Item` (whose `priceCents` is the line total,
+ * which is all the engine divides) plus how many there were — "2 × Mandi" is
+ * one line, not two. When a quantity is set, `priceCents` is always
+ * `unitPriceCents × quantity`, so the two can't disagree.
+ */
+export interface SplitItem extends Item {
+  /** How many; absent means 1. */
+  quantity?: number;
+  /** The price of one, in cents. */
+  unitPriceCents?: number;
+}
+
+/**
  * How a bill is shared, attached to the expense transaction that paid for it.
  *
  * Money is integer cents throughout, as in Split. The transaction's own
@@ -39,7 +52,7 @@ export interface TransactionSplit {
   mode: 'quick' | 'itemized';
   /** Who shares the cost. Leave `ME` out when you paid for others entirely. */
   participantIds: string[];
-  items: Item[];
+  items: SplitItem[];
   charges: Charges;
   /** Who paid the merchant. Yours equals the transaction amount. */
   payments: Payment[];

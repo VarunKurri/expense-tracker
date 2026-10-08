@@ -1,13 +1,14 @@
 import { Component, computed, inject, input, model, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Item, ME, Payment } from '../../models';
+import { ME, Payment, SplitItem } from '../../models';
 import { PersonService } from '../../services/person.service';
 import { formatCurrency } from '../../utils/format';
 import { fromCents, toCents } from '../../utils/money';
 import { amountGapCents, calculateSplit, splitIsBalanced } from '../../utils/split/split';
 import type { ChargeMode, SplitMode, TipBasis } from '../../utils/split/types';
 import {
-  ItemizedSplitState, assignUnclaimedTo, buildItemizedSplit, myPaymentToCoverCents, newItem, paidTowardsBillCents, removeFromItemized,
+  ItemizedSplitState, assignUnclaimedTo, buildItemizedSplit, itemQuantity, itemUnitPriceCents, myPaymentToCoverCents, newItem,
+  paidTowardsBillCents, removeFromItemized, setItemQuantity, setItemUnitPrice,
   setItemMode, setItemWeight, splitProblems, toBill, toggleAssignee,
 } from '../../utils/splits';
 import { SplitPayers } from './parts/split-payers';
@@ -57,7 +58,7 @@ export class ItemizedSplitEditor {
   mismatch = computed(() => this.result().subtotalCents > 0 && this.coverCents() !== this.myPaidCents());
 
   private unclaimed = computed(() => new Set(this.result().unassignedItemIds));
-  isUnclaimed(item: Item): boolean {
+  isUnclaimed(item: SplitItem): boolean {
     return item.priceCents > 0 && this.unclaimed().has(item.id);
   }
   anyUnclaimed = computed(() => this.state().items.some(i => this.isUnclaimed(i)));
@@ -81,7 +82,7 @@ export class ItemizedSplitEditor {
   }
 
   // ── Items ──────────────────────────────────────────────────
-  private updateItem(index: number, change: (item: Item) => Item) {
+  private updateItem(index: number, change: (item: SplitItem) => SplitItem) {
     this.state.update(s => ({ ...s, items: s.items.map((it, i) => i === index ? change(it) : it) }));
   }
 
@@ -97,16 +98,24 @@ export class ItemizedSplitEditor {
     this.updateItem(index, it => ({ ...it, name }));
   }
 
-  priceValue(item: Item): number | null {
-    return item.priceCents ? fromCents(item.priceCents) : null;
+  readonly quantityOf = itemQuantity;
+
+  /** The price field is the price of one; with a quantity, the line total follows. */
+  priceValue(item: SplitItem): number | null {
+    const unit = itemUnitPriceCents(item);
+    return unit ? fromCents(unit) : null;
   }
 
   setPrice(index: number, raw: number | string | null) {
     const n = Number(raw);
-    this.updateItem(index, it => ({ ...it, priceCents: Number.isFinite(n) && n > 0 ? toCents(n) : 0 }));
+    this.updateItem(index, it => setItemUnitPrice(it, Number.isFinite(n) && n > 0 ? toCents(n) : 0));
   }
 
-  hasPart(item: Item, personId: string): boolean {
+  setQuantity(index: number, raw: number | string | null) {
+    this.updateItem(index, it => setItemQuantity(it, Number(raw)));
+  }
+
+  hasPart(item: SplitItem, personId: string): boolean {
     return item.assignments.some(a => a.personId === personId && a.weight > 0);
   }
 
@@ -118,7 +127,7 @@ export class ItemizedSplitEditor {
     this.updateItem(index, it => setItemMode(it, mode, this.state().participantIds));
   }
 
-  weightValue(item: Item, personId: string): number | null {
+  weightValue(item: SplitItem, personId: string): number | null {
     const w = item.assignments.find(a => a.personId === personId)?.weight;
     if (w === undefined || w === 0) return null;
     return item.splitMode === 'amount' ? fromCents(w) : w;
@@ -128,7 +137,7 @@ export class ItemizedSplitEditor {
     this.updateItem(index, it => setItemWeight(it, personId, parseWeight(it.splitMode, raw)));
   }
 
-  itemNote(item: Item): string {
+  itemNote(item: SplitItem): string {
     return splitIsBalanced(item) ? '' : balanceNote(item.splitMode, item.assignments, amountGapCents(item), 'this item');
   }
 

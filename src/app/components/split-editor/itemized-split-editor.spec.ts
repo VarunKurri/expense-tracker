@@ -44,7 +44,7 @@ describe('ItemizedSplitEditor', () => {
     await settle();
   }
   const names = () => [...el.querySelectorAll('input[aria-label="Item name"]')];
-  const prices = () => [...el.querySelectorAll('input[aria-label="Price"]')];
+  const prices = () => [...el.querySelectorAll('.item-price input')];
   const items = () => [...el.querySelectorAll('.item')] as HTMLElement[];
   const chipIn = (item: HTMLElement, text: string) =>
     [...item.querySelectorAll('button.chip')].find(b => b.textContent!.trim() === text) as HTMLButtonElement;
@@ -162,5 +162,15 @@ describe('ItemizedSplitEditor', () => {
     expect(el.textContent).toContain('$12.00 left');
     await type(el.querySelector('input[aria-label="Tip"]')!, '20');
     expect(el.textContent).toContain('✓ Adds up');
+  });
+
+  it('a quantity makes one line of several: 2 × $25.99', async () => {
+    await type(names()[0], 'Nalli Gosht Mutton Mandi');
+    await type(el.querySelector('input[aria-label="Quantity"]')!, '2');
+    await type(prices()[0], '25.99');
+    expect(el.querySelector('input[aria-label="Price each"]')).not.toBeNull();
+    expect(el.textContent).toContain('2 × $25.99 = $51.98');
+    expect(el.textContent).toContain('Items $51.98');
+    expect(host.state().items[0]).toMatchObject({ quantity: 2, unitPriceCents: 2599, priceCents: 5198 });
   });
 });
