@@ -1,5 +1,5 @@
 import { Budget, Transaction } from '../models';
-import { MoneyRules, totalExpenses } from './reporting';
+import { MoneyRules, refundedOut, totalExpenses } from './reporting';
 import { addMonths, monthLabel } from './calendar';
 
 /**
@@ -193,7 +193,7 @@ export function budgetSpent(
 ): number {
   return totalExpenses(
     txs.filter(t =>
-      t.categoryId === categoryId && t.date.startsWith(month) && !(rules.netting && t.refunded)),
+      t.categoryId === categoryId && t.date.startsWith(month) && !refundedOut(t, rules)),
     rules,
   );
 }

@@ -56,8 +56,11 @@
 
     <button class="filter-btn"
             [class.active]="excludeRefunded()"
+            [title]="excludeRefunded()
+              ? 'Refunds and repayments are subtracted; fully refunded purchases are left out'
+              : 'Every purchase counts at its full amount'"
             (click)="excludeRefunded.set(!excludeRefunded())">
-      {{ excludeRefunded() ? '✓ Excluding refunded' : 'Include refunded' }}
+      {{ excludeRefunded() ? '✓ Count money back' : 'Count money back' }}
     </button>
 
     <!-- No emoji — clean text button -->

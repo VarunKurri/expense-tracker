@@ -443,20 +443,20 @@
                         @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
                         @else { {{ formatCurrency(tx.amount) }} }
                       </div>
-                      @if (tx.refunded) {
+                      @if (txService.isFullyRefunded(tx)) {
                         <span class="refunded-badge">↩ Refunded</span>
                       }
                       @if (tx.type === 'income' && tx.reimbursesId) {
-                        <span class="refunded-badge">↩ Reimbursement{{ txService.reimbursementSurplusForIncome(tx) > 0 ? ' + surplus' : '' }}</span>
+                        <span class="refunded-badge">↩ {{ tx.moneyBackInfo?.source === 'refund' ? 'Refund' : 'Reimbursement' }}{{ txService.reimbursementSurplusForIncome(tx) > 0 ? ' + surplus' : '' }}</span>
                       }
-                      @if (tx.type === 'expense' && txService.reimbursedAmountFor(tx.id) > 0) {
+                      @if (tx.type === 'expense' && !txService.isFullyRefunded(tx) && txService.moneyBackFor(tx) > 0) {
                         <!-- A reimbursement is money coming back — always green, always the
                              full amount, same convention as an income row. In analysis view
                              (with netting active) it's struck through with the net effect
                              shown alongside, rather than recolored to imply "still owed." -->
                         <span class="reimburse-net-row">
                           <span class="refunded-badge" [class.struck]="showNetAnalysis(tx)">
-                            ↩ +{{ formatCurrency(txService.reimbursedAmountFor(tx.id)) }}
+                            ↩ +{{ formatCurrency(txService.moneyBackFor(tx)) }}
                           </span>
                           @if (showNetAnalysis(tx)) {
                             <!-- Exactly-reimbursed ($0 either way) stays neutral — it's

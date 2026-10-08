@@ -110,7 +110,7 @@
   &.transfer { background: var(--bg-3); color: var(--fg-3); }
 }
 
-/* ── Reimbursements ────────────────────────────────────────── */
+/* ── Money back (and the loan card, which shares its look) ─── */
 .view-reimburse {
   margin: 14px 20px 0;
   padding: 14px 16px;
@@ -187,11 +187,23 @@
     font-weight: 600;
     cursor: pointer;
     &:hover { background: var(--bg-3); color: var(--fg); }
+    &:disabled { opacity: 0.5; cursor: default; }
   }
+
+  /* Four actions: two to a row, so they still fit at phone width. */
+  .money-back-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 8px;
+    .reimburse-add { flex: 1 1 calc(50% - 4px); }
+  }
+
+  .mini-seg { margin-bottom: 4px; }
 }
 
 /* ── Link picker ───────────────────────────────────────────── */
 .link-search { width: 100%; margin-bottom: 12px; }
+.link-source { margin-bottom: 12px; }
 
 .link-list {
   display: flex;

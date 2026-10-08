@@ -96,10 +96,10 @@
                 [class.active]="excludeRefunded()"
                 [attr.aria-pressed]="excludeRefunded()"
                 [title]="excludeRefunded()
-                  ? 'Refunded purchases are left out and reimbursements are subtracted'
+                  ? 'Refunds and repayments are subtracted; fully refunded purchases are left out'
                   : 'Every purchase counts at its full amount'"
                 (click)="toggleRefunded()">
-          {{ excludeRefunded() ? '✓ Excluding refunded' : 'Including refunded' }}
+          {{ excludeRefunded() ? '✓ Count money back' : 'Count money back' }}
         </button>
       </div>
 

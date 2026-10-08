@@ -17,9 +17,10 @@ import { plaidCategoryName } from '../utils/plaid-category-map';
 import { resolvePlaidCategory } from '../utils/categories';
 import { TransactionRuleService } from './transaction-rule.service';
 import { applyRulesToDraft } from '../utils/rules';
+import { MoneyBackLedger } from '../utils/money-back';
 
 @Injectable({ providedIn: 'root' })
-export class TransactionService {
+export class TransactionService extends MoneyBackLedger {
   private db = inject(Firestore);
   private auth = inject(AuthService);
   private encryption = inject(EncryptionService);
@@ -128,54 +129,9 @@ export class TransactionService {
     return transactionDeltaForAccount(this.transactions(), accountId);
   }
 
-  // ── Partial reimbursements ─────────────────────────────────
-  // Total reimbursed per expense: sum of every income's amount that points at it via
-  // `reimbursesId`. One source of truth (the income), so an expense never gets stale.
-  reimbursedByExpense = computed<Map<string, number>>(() => {
-    const map = new Map<string, number>();
-    for (const t of this.transactions()) {
-      if (t.type === 'income' && t.reimbursesId) {
-        map.set(t.reimbursesId, (map.get(t.reimbursesId) ?? 0) + t.amount);
-      }
-    }
-    return map;
-  });
-
-  /** How much of an expense has been reimbursed by linked income. */
-  reimbursedAmountFor(expenseId?: string): number {
-    if (!expenseId) return 0;
-    return Math.round((this.reimbursedByExpense().get(expenseId) ?? 0) * 100) / 100;
-  }
-
-  /** An expense's true cost after reimbursements (floored at 0). Non-expenses pass through. */
-  effectiveExpenseAmount(t: Transaction): number {
-    if (t.type !== 'expense' || !t.id) return t.amount;
-    return Math.max(0, Math.round((t.amount - this.reimbursedAmountFor(t.id)) * 100) / 100);
-  }
-
-  /** When linked reimbursements exceed the original expense (e.g. split evenly but one
-   *  side rounded up), the excess is real profit, not spending — it belongs in income,
-   *  not silently floored away by `effectiveExpenseAmount`. Zero for non-expenses. */
-  reimbursementSurplus(t: Transaction): number {
-    if (t.type !== 'expense' || !t.id) return 0;
-    return Math.max(0, Math.round((this.reimbursedAmountFor(t.id) - t.amount) * 100) / 100);
-  }
-
-  /** The income transactions that reimburse a given expense. */
-  reimbursementsFor(expenseId?: string): Transaction[] {
-    if (!expenseId) return [];
-    return this.transactions().filter(t => t.type === 'income' && t.reimbursesId === expenseId);
-  }
-
-  /** For an income that reimburses an expense: that expense's surplus, if any. Surplus
-   *  belongs to the expense as a whole (it can come from one or several linked
-   *  incomes together), not to any single payment — this just lets a reimbursing
-   *  income's own row indicate "this is part of a package that came out ahead." */
-  reimbursementSurplusForIncome(income: Transaction): number {
-    if (income.type !== 'income' || !income.reimbursesId) return 0;
-    const expense = this.transactions().find(t => t.id === income.reimbursesId);
-    return expense ? this.reimbursementSurplus(expense) : 0;
-  }
+  // Money back (refunds and repayments): moneyBackFor, effectiveExpenseAmount,
+  // reimbursementSurplus, refundState, isFullyRefunded, moneyRules… are inherited
+  // from MoneyBackLedger (utils/money-back.ts), where they're tested on their own.
 
   // For credit cards: currentBalance = openingBalance + txBalance
   // openingBalance is positive debt, expenses add to it, payments reduce it

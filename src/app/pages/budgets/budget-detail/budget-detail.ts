@@ -65,11 +65,7 @@ export class BudgetDetail {
 
   monthLabel = monthLabel(this.month);
 
-  private rules: MoneyRules = {
-    netting: this.excludeRefunded,
-    effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
-    reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
-  };
+  private rules: MoneyRules = this.txService.moneyRules(this.excludeRefunded);
 
   /** Every expense in this category and month, newest first — refunded ones included, shown dimmed. */
   transactions = computed(() =>
@@ -94,11 +90,15 @@ export class BudgetDetail {
   }
 
   reimbursedOf(t: Transaction): number {
-    return t.id ? this.txService.reimbursedAmountFor(t.id) : 0;
+    return this.txService.moneyBackFor(t);
+  }
+
+  isRefunded(t: Transaction): boolean {
+    return this.txService.isFullyRefunded(t);
   }
 
   isExcluded(t: Transaction): boolean {
-    return this.excludeRefunded && !!t.refunded;
+    return this.excludeRefunded && this.txService.isFullyRefunded(t);
   }
 
   spent = computed(() =>

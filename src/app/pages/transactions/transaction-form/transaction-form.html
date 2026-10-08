@@ -245,21 +245,15 @@
       }
     }
 
-    <!-- REFUNDED TOGGLE -->
+    <!-- MONEY BACK — refunds and repayments live on the transaction view now, so
+         partial refunds and who-paid-what have one home. -->
     @if (transaction && type === 'expense') {
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">Mark as refunded</div>
-          <div class="toggle-sub">
-            Excludes from analysis. For partial refunds, log the payback as income instead.
-          </div>
-        </div>
-        <button type="button"
-                class="toggle"
-                [class.on]="refunded"
-                (click)="refunded = !refunded">
-        </button>
-      </div>
+      <p class="form-note">
+        @if (moneyBack() > 0) {
+          {{ formatCurrency(moneyBack()) }} has come back on this so far.
+        }
+        Refunds and repayments are recorded under <strong>Money back</strong> on the transaction's details.
+      </p>
     }
 
     <!-- INTERNAL TRANSFER TOGGLE -->

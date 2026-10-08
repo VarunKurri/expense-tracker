@@ -61,6 +61,8 @@ Chart.register(
 })
 export class Spending implements AfterViewInit, OnDestroy {
   private txService = inject(TransactionService);
+  /** Fully refunded, counting refund incomes linked from the bank. */
+  private isRefunded = (t: Transaction) => this.txService.isFullyRefunded(t);
   private categoryService = inject(CategoryService);
   private budgetService = inject(BudgetService);
   private themeService = inject(ThemeService);
@@ -115,11 +117,7 @@ export class Spending implements AfterViewInit, OnDestroy {
   }
 
   // ── Money ──────────────────────────────────────────────────
-  private rules = computed<MoneyRules>(() => ({
-    netting: true,
-    effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
-    reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
-  }));
+  private rules = computed<MoneyRules>(() => this.txService.moneyRules(true));
 
   /** Bound into the calendar, day popup and trend line alike. */
   spendAmount = (t: Transaction) => this.txService.effectiveExpenseAmount(t);
@@ -127,7 +125,7 @@ export class Spending implements AfterViewInit, OnDestroy {
   /** The month's transactions, refunds already excluded. */
   monthTx = computed(() => {
     const { start, end } = monthRange(this.month());
-    return filterForAnalysis(this.txService.transactions(), { start, end, excludeRefunded: true });
+    return filterForAnalysis(this.txService.transactions(), { start, end, excludeRefunded: true, isRefunded: this.isRefunded });
   });
 
   /** Only what counts as spending — what the calendar and popup are given. */
@@ -137,7 +135,7 @@ export class Spending implements AfterViewInit, OnDestroy {
 
   private prevMonthTx = computed(() => {
     const { start, end } = monthRange(addMonths(this.month(), -1));
-    return filterForAnalysis(this.txService.transactions(), { start, end, excludeRefunded: true });
+    return filterForAnalysis(this.txService.transactions(), { start, end, excludeRefunded: true, isRefunded: this.isRefunded });
   });
 
   prevTotal = computed(() => totalExpenses(this.prevMonthTx(), this.rules()));

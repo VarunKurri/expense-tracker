@@ -15,6 +15,7 @@ import { QuickAddService } from '../../services/quick-add.service';
 import { ToastService } from '../../services/toast.service';
 import { ReconciliationService } from '../../services/reconciliation.service';
 import { DateRange, transactionRange } from '../../utils/date-ranges';
+import { refundedPatch } from '../../utils/money-back';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
 type SpecialFilter = 'all' | 'uncategorized' | 'refunded' | 'not-refunded' | 'internal-transfer';
@@ -93,7 +94,7 @@ export class Transactions {
     // "Include refunded" also turns off reimbursement netting/exclusion, same as it
     // does for refunded rows — one toggle for "count things as originally recorded."
     if (!this.analysisExcludeRefunded()) return false;
-    if (t.refunded) return true;
+    if (this.txService.isFullyRefunded(t)) return true;
     // A reimbursement (income linked to an expense) isn't real income — it's folded
     // into the expense's true cost — so it's greyed out and left out of the totals.
     if (t.type === 'income' && t.reimbursesId) return true;
@@ -106,7 +107,7 @@ export class Transactions {
   showNetAnalysis(tx: Transaction): boolean {
     return tx.type === 'expense'
       && this.analysisView() && this.analysisExcludeRefunded()
-      && this.txService.reimbursedAmountFor(tx.id) > 0;
+      && this.txService.moneyBackFor(tx) > 0;
   }
 
   // Date range bounds — see utils/date-ranges.ts ("Last 30 days" has no end,
@@ -138,8 +139,8 @@ export class Transactions {
       }
       if (this.filterCategoryId() && t.categoryId !== this.filterCategoryId()) return false;
       if (this.specialFilter() === 'uncategorized' && (t.type === 'transfer' || !!t.categoryId)) return false;
-      if (this.specialFilter() === 'refunded' && !t.refunded) return false;
-      if (this.specialFilter() === 'not-refunded' && t.refunded) return false;
+      if (this.specialFilter() === 'refunded' && !this.txService.isFullyRefunded(t)) return false;
+      if (this.specialFilter() === 'not-refunded' && this.txService.isFullyRefunded(t)) return false;
       if (this.specialFilter() === 'internal-transfer' && !t.isInternalTransfer) return false;
       if (merchantQuery && !(t.merchant || '').toLowerCase().includes(merchantQuery)) return false;
       if (q) {
@@ -442,7 +443,14 @@ export class Transactions {
 
     this.bulkSaving.set(true);
     try {
-      await this.txService.updateMany(ids, { refunded });
+      // Each purchase is refunded for its own amount, so this is one patch per row
+      // (a full-refund money-back entry), not one shared patch.
+      const byId = new Map(this.txService.transactions().map(t => [t.id, t]));
+      const patches = ids
+        .map(id => byId.get(id))
+        .filter((t): t is Transaction => !!t?.id && t.type === 'expense')
+        .map(t => ({ id: t.id!, patch: refundedPatch(t, refunded) }));
+      await this.txService.applyPatches(patches);
       this.toastService.success(`Updated ${ids.length} transactions.`);
       this.clearSelection();
     } catch (err) {

@@ -227,7 +227,7 @@ export class Dashboard implements OnDestroy {
    */
   monthSpending = computed(() =>
     spendingTransactions(this.txService.transactions())
-      .filter(t => !t.refunded && t.date.startsWith(this.calendarMonth))
+      .filter(t => !this.txService.isFullyRefunded(t) && t.date.startsWith(this.calendarMonth))
   );
 
   /** Bound into the calendar and day popup so both net reimbursements the same way. */
@@ -356,11 +356,7 @@ export class Dashboard implements OnDestroy {
 
   budgetSummary = computed(() => {
     const month = this.currentMonth;
-    const rules: MoneyRules = {
-      netting: true,
-      effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
-      reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
-    };
+    const rules: MoneyRules = this.txService.moneyRules(true);
     const txs = this.txService.transactions();
     return effectiveBudgets(this.budgetService.budgets(), month)
       .map(e => {
@@ -385,7 +381,7 @@ export class Dashboard implements OnDestroy {
     const cutoff = this.localDateString(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
     // No end cap: a transaction the bank dated a day ahead is still recent (matches Transactions).
     return this.txService.transactions()
-      .filter(t => t.type === 'expense' && !t.refunded && !t.isInternalTransfer && t.date >= cutoff);
+      .filter(t => t.type === 'expense' && !this.txService.isFullyRefunded(t) && !t.isInternalTransfer && t.date >= cutoff);
   });
   recentTotal = computed(() =>
     Math.round(this.recentExpenses().reduce((s, t) => s + t.amount, 0) * 100) / 100

@@ -7,6 +7,7 @@ import { TransactionService } from '../../services/transaction.service';
 import { Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { localDateString } from '../../utils/date';
+import { fullRefundEntry } from '../../utils/money-back';
 
 interface ParsedRow {
   type: 'expense' | 'income' | 'transfer';
@@ -446,7 +447,8 @@ export class Import {
           tx.accountId = row.accountId;
           if (row.categoryId) tx.categoryId = row.categoryId;
           if (row.notes) tx.notes = row.notes;
-          if (row.refunded) tx.refunded = true;
+          // A "Refunded: yes" row is a full refund, recorded as money back.
+          if (row.refunded && row.type === 'expense') tx.moneyBack = [fullRefundEntry(tx as Transaction)];
         }
 
         const key = `${tx.type}|${tx.date}|${tx.amount}|${(tx.merchant || '').toLowerCase()}|${tx.accountId || ''}|${tx.fromAccountId || ''}|${tx.toAccountId || ''}`;

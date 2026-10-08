@@ -3,7 +3,7 @@ import { advanceDueDate, monthlyCost } from './bill-schedule';
 import { localDateString, parseLocalDate } from './date';
 import { countsInNetWorth, loanDirection, loanOutlook, loanPayments, matchTolerance } from './loans';
 import { balanceOn, entryValueOn, manualType } from './net-worth';
-import { MoneyRules, expenseAmount, monthlySeries, spendingTransactions } from './reporting';
+import { MoneyRules, expenseAmount, monthlySeries, refundedOut, spendingTransactions } from './reporting';
 
 /**
  * The forecast: where your cash and net worth are heading if the next months
@@ -212,7 +212,7 @@ export function billCategory(bill: Bill, txs: Transaction[]): string | null {
 /**
  * Average income and everyday spending over `months`, leaving out any in
  * `excluded`. Loan payments in either direction are taken out first, and so
- * are refunded expenses (as Analysis does with "Excluding refunded").
+ * are fully refunded expenses (as Analysis does while counting money back).
  *
  * Everyday spending is worked out per category: the category's average
  * spending, less the bills that file under it (their monthly cost), never
@@ -227,7 +227,7 @@ export function forecastBasis(
     if (!l.loan) continue;
     for (const p of loanPayments(l, txs)) if (p.kind === 'payment' && p.tx.id) loanTx.add(p.tx.id);
   }
-  const counted = txs.filter(t => !(t.id && loanTx.has(t.id)) && !(rules.netting && t.refunded));
+  const counted = txs.filter(t => !(t.id && loanTx.has(t.id)) && !refundedOut(t, rules));
   const liveBills = bills.filter(b => b.active && b.amount > 0 && !billIsLoanPayment(b, loans));
   const billsMonthly = round2(liveBills.reduce((s, b) => s + monthlyCost(b.amount, b.frequency), 0));
 

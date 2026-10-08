@@ -13,6 +13,7 @@ import { TransactionService } from '../../services/transaction.service';
 import { AccountService } from '../../services/account.service';
 import { ManualAssetService } from '../../services/manual-asset.service';
 import { Budget, Category, Transaction } from '../../models';
+import { MoneyBackLedger } from '../../utils/money-back';
 import { addMonths, monthKeyOf } from '../../utils/calendar';
 
 /**
@@ -40,22 +41,10 @@ class FakeBudgets {
   }
 }
 
-/** Just enough of TransactionService, reimbursement links included. */
-class FakeTransactions {
+/** Just enough of TransactionService. Money back (refunds, reimbursements) is the
+ *  real logic, inherited — not a copy that could drift from what the app does. */
+class FakeTransactions extends MoneyBackLedger {
   transactions = signal<Transaction[]>([]);
-  reimbursementsFor(id?: string) {
-    return this.transactions().filter(t => t.type === 'income' && t.reimbursesId === id);
-  }
-  reimbursedAmountFor(id?: string) {
-    return this.reimbursementsFor(id).reduce((s, t) => s + t.amount, 0);
-  }
-  effectiveExpenseAmount(t: Transaction) {
-    if (t.type !== 'expense' || !t.id) return t.amount;
-    return Math.max(0, Math.round((t.amount - this.reimbursedAmountFor(t.id)) * 100) / 100);
-  }
-  reimbursementSurplus(t: Transaction) {
-    return t.type === 'expense' && t.id ? Math.max(0, this.reimbursedAmountFor(t.id) - t.amount) : 0;
-  }
   async update() {}
   async remove() {}
 }
@@ -291,7 +280,7 @@ describe('Budgets', () => {
     expect(el.querySelector('.hero-figure')!.textContent).toContain('$40.00');
     const row = [...el.querySelectorAll('.tx-row')].find(r => r.textContent!.includes('Ramen Bar'))!;
     expect(row.querySelector('.tx-amount')!.textContent).toContain('$40.00');
-    expect(row.textContent).toContain('$80.00 paid back');
+    expect(row.textContent).toContain('$80.00 back');
     expect(el.querySelector('.hero-note')!.textContent).toContain('$80.00 was paid back');
     // Refunded: listed but not counted.
     const tent = [...el.querySelectorAll('.tx-row')].find(r => r.textContent!.includes('Walmart'))!;
@@ -314,9 +303,10 @@ describe('Budgets', () => {
     await settle();
     const view = el.querySelector('app-transaction-view')!;
     expect(view.textContent).toContain('Ramen Bar');
-    expect(view.textContent).toContain('Reimbursed');
+    expect(view.textContent).toContain('Money back');
+    expect(view.textContent).toContain('Out of pocket $40.00');
     expect(view.textContent).toContain('$80.00');
-    expect(view.textContent).toContain('Link a reimbursement');
+    expect(view.textContent).toContain('Link an income');
     // The old hand-built panel is gone: the only view is the shared one.
     expect([...el.querySelectorAll('.view-panel')].every(p => p.closest('app-transaction-view'))).toBe(true);
   });

@@ -45,6 +45,8 @@ export class Analysis implements AfterViewInit, OnDestroy {
   private toastService = inject(ToastService);
   private themeService = inject(ThemeService);
   private txService = inject(TransactionService);
+  /** Fully refunded, counting refund incomes linked from the bank. */
+  private isRefunded = (t: Transaction) => this.txService.isFullyRefunded(t);
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
 
@@ -192,6 +194,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
       start, end,
       accountId: this.filterAccountId(),
       excludeRefunded: this.excludeRefunded(),
+      isRefunded: this.isRefunded,
       excludedCategoryIds: this.excludedCategories(),
     });
   });
@@ -224,7 +227,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
   /** How much of an expense came back, for the "was $X, $Y back" note. */
   reimbursedOn(t: Transaction): number {
     if (!this.excludeRefunded()) return 0;
-    return this.txService.reimbursedAmountFor(t.id);
+    return this.txService.moneyBackFor(t);
   }
 
   // ── KPIs ───────────────────────────────────────────────────
@@ -364,7 +367,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
       if (!months.has(key)) continue;
       const entry = months.get(key)!;
       if (t.type === 'income' && (!netting || !t.reimbursesId)) entry.income += t.amount;
-      if (t.type === 'expense' && !t.refunded) {
+      if (t.type === 'expense' && !this.txService.isFullyRefunded(t)) {
         entry.expenses += this.eff(t);
         if (netting) entry.income += this.txService.reimbursementSurplus(t);
       }

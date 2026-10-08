@@ -11,6 +11,7 @@ import { CategoryService } from '../../../services/category.service';
 import { BillService } from '../../../services/bill.service';
 import { TransactionTemplateService } from '../../../services/transaction-template.service';
 import { TransactionService } from '../../../services/transaction.service';
+import { formatCurrency } from '../../../utils/format';
 import { BillAmountMode, BillDueDateMode, BillFrequency, Transaction, TransactionType } from '../../../models';
 import { BILL_FREQUENCIES } from '../../../utils/bill-schedule';
 import { TransactionTemplate } from '../../../models';
@@ -50,10 +51,16 @@ export class TransactionForm implements OnChanges {
   categoryId = signal('');
   fromAccountId: string = '';
   toAccountId: string = '';
-  refunded = false;
   isInternalTransfer = false;
   saveAsTemplate = signal(false);
   templateName = signal('');
+
+  formatCurrency = formatCurrency;
+
+  /** Money back already recorded on the expense being edited, for the note in place of the old refund toggle. */
+  moneyBack(): number {
+    return this.transaction?.type === 'expense' ? this.transactionService.moneyBackFor(this.transaction) : 0;
+  }
 
   // Returns today's date as YYYY-MM-DD in LOCAL time — never UTC
   private localDateString(d: Date = new Date()): string {
@@ -118,7 +125,6 @@ export class TransactionForm implements OnChanges {
       this.categoryId.set(this.transaction.categoryId || '');
       this.fromAccountId = this.transaction.fromAccountId || '';
       this.toAccountId = this.transaction.toAccountId || '';
-      this.refunded = this.transaction.refunded || false;
       this.isInternalTransfer = this.transaction.isInternalTransfer || false;
       this.saveAsTemplate.set(false);
       this.templateName.set('');
@@ -394,7 +400,6 @@ export class TransactionForm implements OnChanges {
       const merchant = this.merchant().trim();
       const accountId = this.accountId;
       const categoryId = this.categoryId();
-      const refunded = this.refunded;
       const isInternalTransfer = this.isInternalTransfer;
       // Same reasoning as the snapshot above: read before the await, not after,
       // so a form reset in flight can't swap in stale bill settings.
@@ -427,7 +432,6 @@ export class TransactionForm implements OnChanges {
         accountId,
         ...(categoryId ? { categoryId } : {}),
         ...(notes ? { notes } : {}),
-        refunded,
         isInternalTransfer,
       });
 

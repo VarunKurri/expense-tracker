@@ -85,11 +85,7 @@ export class NetWorth implements OnDestroy {
     if (!this.projecting()) return [];
     const f = forecast({
       accounts: this.accounts(), manual: this.manual(), bills: this.billService.bills(), txs: this.txs(),
-      rules: {
-        netting: true,
-        effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
-        reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
-      },
+      rules: this.txService.moneyRules(true),
       today: this.today, horizon: 7, baseMonths: 3,
     });
     if (f.thin) return [];

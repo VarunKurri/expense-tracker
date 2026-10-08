@@ -60,11 +60,7 @@ export class Forecast implements OnDestroy {
   openMonth = signal<string | null>(null);
   hoverIndex = signal<number | null>(null);
 
-  private rules: MoneyRules = {
-    netting: true,
-    effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
-    reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
-  };
+  private rules: MoneyRules = this.txService.moneyRules(true);
 
   private txs = computed(() => this.txService.transactions());
 

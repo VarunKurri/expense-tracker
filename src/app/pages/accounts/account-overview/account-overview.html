@@ -181,7 +181,7 @@
           @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
           @else { {{ formatCurrency(tx.amount) }} }
         </div>
-        @if (tx.refunded) {
+        @if (txService.isFullyRefunded(tx)) {
           <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
         }
       </div>

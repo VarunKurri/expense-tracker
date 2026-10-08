@@ -22,7 +22,7 @@ export class AccountOverview {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private accountService = inject(AccountService);
-  private txService = inject(TransactionService);
+  txService = inject(TransactionService);
   private categoryService = inject(CategoryService);
 
   formOpen = signal(false);

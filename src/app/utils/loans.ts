@@ -1,5 +1,6 @@
 import { LoanMethod, LoanTerms, LumpSum, ManualAsset, ManualAssetType, Transaction } from '../models';
 import { localDateString, parseLocalDate } from './date';
+import { isFullyRefunded } from './money-back';
 
 /**
  * Loans: what a payment is, how much is still owed, and what is left to pay.
@@ -228,7 +229,9 @@ function matchPayments(asset: ManualAsset, txs: Transaction[], regular: RegularP
   const text = terms.match?.text?.trim().toLowerCase();
   const out: LoanPayment[] = [];
   for (const t of txs) {
-    if (!t.id || t.refunded) continue;
+    // A refunded payment isn't a payment. (Pure check: a refund *income* linked
+    // from the bank isn't visible here — rare enough for a loan payment.)
+    if (!t.id || isFullyRefunded(t)) continue;
     if (t.id === terms.downPaymentId) { out.push({ tx: t, kind: 'down', how: 'linked' }); continue; }
     if (linked.has(t.id)) { out.push({ tx: t, kind: 'payment', how: 'linked' }); continue; }
     if (!text || ignored.has(t.id) || !rightDirection(asset, t) || t.date < terms.startDate) continue;
@@ -266,7 +269,7 @@ export function candidatePayments(asset: ManualAsset, txs: Transaction[], limit 
   // Wider than automatic matching: a payer who rounds, or pays a little extra.
   const widen = (p: number) => Math.max(1, (p * 0.25) / matchTolerance(p));
   return txs
-    .filter(t => t.id && !taken.has(t.id) && !t.refunded && rightDirection(asset, t) && t.date >= terms.startDate)
+    .filter(t => t.id && !taken.has(t.id) && !isFullyRefunded(t) && rightDirection(asset, t) && t.date >= terms.startDate)
     .filter(t => closeToRegular(t, regular, widen(terms.payment)))
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, limit);

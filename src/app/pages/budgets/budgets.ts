@@ -169,11 +169,7 @@ export class Budgets {
     }
   }
 
-  private rules = computed<MoneyRules>(() => ({
-    netting: this.excludeRefunded(),
-    effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
-    reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
-  }));
+  private rules = computed<MoneyRules>(() => this.txService.moneyRules(this.excludeRefunded()));
 
   budgetRows = computed((): BudgetRow[] => {
     const month = this.selectedMonth();

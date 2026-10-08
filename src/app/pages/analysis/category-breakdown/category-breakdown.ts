@@ -15,6 +15,8 @@ import { Transaction } from '../../../models';
 })
 export class CategoryBreakdown {
   private txService = inject(TransactionService);
+  /** Fully refunded, counting refund incomes linked from the bank. */
+  private isRefunded = (t: Transaction) => this.txService.isFullyRefunded(t);
   private categoryService = inject(CategoryService);
   private route = inject(ActivatedRoute);
 
@@ -39,6 +41,7 @@ export class CategoryBreakdown {
     end: this.end(),
     accountId: this.accountId(),
     excludeRefunded: this.excludeRefunded(),
+    isRefunded: this.isRefunded,
     excludedCategoryIds: this.excludedCategoryIds(),
   }));
 

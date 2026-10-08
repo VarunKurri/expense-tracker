@@ -11,6 +11,7 @@ import {
 } from 'chart.js';
 import { SankeyController, Flow } from 'chartjs-chart-sankey';
 
+import { Transaction } from '../../models';
 import { TransactionService } from '../../services/transaction.service';
 import { CategoryService } from '../../services/category.service';
 import { ThemeService } from '../../services/theme.service';
@@ -56,6 +57,8 @@ const VIEWS: Record<ReportKey, { id: string; label: string }[]> = {
 })
 export class Reports implements AfterViewInit, OnDestroy {
   private txService = inject(TransactionService);
+  /** Fully refunded, counting refund incomes linked from the bank. */
+  private isRefunded = (t: Transaction) => this.txService.isFullyRefunded(t);
   private categoryService = inject(CategoryService);
   private themeService = inject(ThemeService);
   private router = inject(Router);
@@ -143,16 +146,12 @@ export class Reports implements AfterViewInit, OnDestroy {
   private filtered = computed(() => {
     const { start, end } = this.dateRange();
     return filterForAnalysis(this.txService.transactions(), {
-      start, end, excludeRefunded: this.netting(),
+      start, end, excludeRefunded: this.netting(), isRefunded: this.isRefunded,
     });
   });
 
   /** Injected so the reporting helpers stay pure and testable. */
-  private rules = computed<MoneyRules>(() => ({
-    netting: this.netting(),
-    effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
-    reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
-  }));
+  private rules = computed<MoneyRules>(() => this.txService.moneyRules(this.netting()));
 
   private months = computed(() => {
     const { start, end } = this.dateRange();

@@ -79,15 +79,15 @@
               <span class="tx-tag">Refunded</span>
             } @else {
               <span class="tx-amount">−{{ formatCurrency(amountOf(tx)) }}</span>
-              @if (excludeRefunded && reimbursedOf(tx) > 0) {
+              @if (isRefunded(tx)) {
+                <span class="tx-tag">Refunded</span>
+              } @else if (excludeRefunded && reimbursedOf(tx) > 0) {
                 <span class="tx-tag">
                   <span class="struck">{{ formatCurrency(tx.amount) }}</span>
-                  · {{ formatCurrency(reimbursedOf(tx) > tx.amount ? tx.amount : reimbursedOf(tx)) }} paid back
+                  · {{ formatCurrency(reimbursedOf(tx) > tx.amount ? tx.amount : reimbursedOf(tx)) }} back
                 </span>
-              } @else if (tx.refunded) {
-                <span class="tx-tag">Refunded</span>
               } @else if (!excludeRefunded && reimbursedOf(tx) > 0) {
-                <span class="tx-tag">{{ formatCurrency(reimbursedOf(tx)) }} paid back</span>
+                <span class="tx-tag">{{ formatCurrency(reimbursedOf(tx)) }} back</span>
               }
             }
           </span>

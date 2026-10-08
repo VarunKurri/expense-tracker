@@ -11,7 +11,9 @@ import { Router } from '@angular/router';
 import { loanDirection, loanPayments, loanState } from '../../utils/loans';
 import { localDateString } from '../../utils/date';
 import { Modal } from '../modal/modal';
-import { ManualAsset, Transaction } from '../../models';
+import { ManualAsset, MoneyBackSource, Transaction, UntrackedReturn } from '../../models';
+import { RefundState, newReturnId } from '../../utils/money-back';
+import { fromCents, toCents } from '../../utils/money';
 
 let nextLockId = 0;
 
@@ -73,17 +75,35 @@ export class TransactionView {
     return this.txService.transactions().find(t => t.id === snapshot.id) ?? snapshot;
   });
 
-  // ── Reimbursements ─────────────────────────────────────────
-  reimbursements = computed(() => {
-    const id = this.tx()?.id;
-    return id ? this.txService.reimbursementsFor(id) : [];
+  // ── Money back: refunds and repayments ─────────────────────
+  // One section for everything that came back on a purchase — see
+  // utils/money-back.ts. Tracked money back is an income linked to the expense;
+  // untracked (cash, store credit) is recorded on the expense itself.
+
+  /** Incomes linked to this expense. */
+  linkedIncomes = computed(() => this.txService.linkedIncomesFor(this.tx()));
+
+  /** Money back recorded by hand on this expense. */
+  untracked = computed<UntrackedReturn[]>(() => this.tx()?.moneyBack ?? []);
+
+  /** The old "Mark as refunded" flag, shown as a full refund until removed. */
+  legacyRefund = computed(() => {
+    const t = this.tx();
+    return !!t?.refunded && !(t.moneyBack ?? []).some(e => e.source === 'refund');
   });
 
-  reimbursedTotal = computed(() =>
-    this.txService.reimbursedAmountFor(this.tx()?.id ?? undefined));
+  moneyBackTotal = computed(() => {
+    const t = this.tx();
+    return t ? this.txService.moneyBackFor(t) : 0;
+  });
+
+  refundState = computed<RefundState>(() => {
+    const t = this.tx();
+    return t ? this.txService.refundState(t) : 'none';
+  });
 
   /**
-   * The part of the reimbursed total that exceeds the expense — the difference
+   * The part of the money back that exceeds the expense — the difference
    * between "you still spent something" and "you came out ahead".
    */
   reimbursementSurplus = computed(() => {
@@ -112,8 +132,111 @@ export class TransactionView {
   reimbursesCovered = computed(() => {
     const exp = this.reimbursesExpense();
     if (!exp) return 0;
-    return Math.min(exp.amount, this.txService.reimbursedAmountFor(exp.id));
+    return Math.min(exp.amount, this.txService.moneyBackFor(exp));
   });
+
+  sourceLabel(source: MoneyBackSource): string {
+    return source === 'refund' ? 'Refund' : 'Repayment';
+  }
+
+  /** A linked income's kind. Links from before refunds existed were repayments. */
+  incomeSource(income: Transaction): MoneyBackSource {
+    return income.moneyBackInfo?.source ?? 'repayment';
+  }
+
+  saving = signal(false);
+
+  /** Mark the whole purchase refunded: records whatever hasn't been refunded yet. */
+  async markFullyRefunded() {
+    const t = this.tx();
+    if (!t?.id) return;
+    const refundedSoFar = this.txService.moneyBackEntriesFor(t)
+      .filter(e => e.source === 'refund')
+      .reduce((total, e) => total + e.amountCents, 0);
+    const left = toCents(t.amount) - refundedSoFar;
+    if (left <= 0) return;
+    const entry: UntrackedReturn = { id: newReturnId(), source: 'refund', amountCents: left, date: localDateString() };
+    await this.saveMoneyBack(t, [...(t.moneyBack ?? []), entry], 'Marked as refunded.');
+  }
+
+  // The "Add refund" / "Record repayment" dialog.
+  draftSource = signal<MoneyBackSource | null>(null);
+  draftAmount = signal<number | null>(null);
+  draftDate = signal('');
+  draftNote = signal('');
+
+  openDraft(source: MoneyBackSource) {
+    this.draftSource.set(source);
+    this.draftAmount.set(null);
+    this.draftDate.set(localDateString());
+    this.draftNote.set('');
+  }
+
+  closeDraft() {
+    this.draftSource.set(null);
+  }
+
+  async saveDraft() {
+    const t = this.tx();
+    const source = this.draftSource();
+    if (!t?.id || !source) return;
+    const amountCents = toCents(Number(this.draftAmount()));
+    if (amountCents <= 0) { this.toast.error('Enter how much came back.'); return; }
+    if (!this.draftDate()) { this.toast.error('Pick the date it came back.'); return; }
+    const note = this.draftNote().trim();
+    const entry: UntrackedReturn = {
+      id: newReturnId(), source, amountCents, date: this.draftDate(), ...(note ? { note } : {}),
+    };
+    const ok = await this.saveMoneyBack(t, [...(t.moneyBack ?? []), entry],
+      source === 'refund' ? 'Refund added.' : 'Repayment recorded.');
+    if (ok) this.closeDraft();
+  }
+
+  async removeUntracked(entry: UntrackedReturn) {
+    const t = this.tx();
+    if (!t?.id) return;
+    await this.saveMoneyBack(t, (t.moneyBack ?? []).filter(e => e.id !== entry.id), 'Removed.');
+  }
+
+  /** Clear the old flag. Nothing else used it, so the purchase simply counts again. */
+  async removeLegacyRefund() {
+    const t = this.tx();
+    if (!t?.id) return;
+    try {
+      await this.txService.update(t.id, { refunded: undefined });
+      this.toast.success('No longer marked as refunded.');
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
+
+  private async saveMoneyBack(t: Transaction, moneyBack: UntrackedReturn[], message: string): Promise<boolean> {
+    if (!t.id || this.saving()) return false;
+    this.saving.set(true);
+    try {
+      await this.txService.update(t.id, { moneyBack });
+      this.toast.success(message);
+      return true;
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+      return false;
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async setIncomeSource(income: Transaction, source: MoneyBackSource) {
+    if (!income.id || this.incomeSource(income) === source) return;
+    try {
+      await this.txService.update(income.id, { moneyBackInfo: { ...income.moneyBackInfo, source } });
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
+
+  formatCents(cents: number): string {
+    return this.formatCurrency(fromCents(cents));
+  }
 
   // ── Loans ──────────────────────────────────────────────────
   private manualAssets = inject(ManualAssetService);
@@ -215,6 +338,8 @@ export class TransactionView {
   // ── Link picker ────────────────────────────────────────────
   linkingFrom = signal<Transaction | null>(null);
   linkSearch = signal('');
+  /** What the linked income is: a refund from the store, or a person paying you back. */
+  linkSource = signal<MoneyBackSource>('repayment');
 
   /** Opposite-type transactions: an expense picks an income, and vice versa. */
   linkCandidates = computed<Transaction[]>(() => {
@@ -232,6 +357,7 @@ export class TransactionView {
 
   openLinkPicker(tx: Transaction) {
     this.linkSearch.set('');
+    this.linkSource.set('repayment');
     this.linkingFrom.set(tx);
   }
 
@@ -247,8 +373,11 @@ export class TransactionView {
     const expense = from.type === 'expense' ? from : candidate;
     if (!income.id || !expense.id) return;
     try {
-      await this.txService.update(income.id, { reimbursesId: expense.id });
-      this.toast.success('Reimbursement linked.');
+      await this.txService.update(income.id, {
+        reimbursesId: expense.id,
+        moneyBackInfo: { ...income.moneyBackInfo, source: this.linkSource() },
+      });
+      this.toast.success(this.linkSource() === 'refund' ? 'Refund linked.' : 'Repayment linked.');
       this.closeLinkPicker();
     } catch {
       this.toast.error('Could not link. Please try again.');
@@ -258,8 +387,8 @@ export class TransactionView {
   async unlinkReimbursement(income: Transaction) {
     if (!income.id) return;
     try {
-      await this.txService.update(income.id, { reimbursesId: undefined });
-      this.toast.success('Reimbursement unlinked.');
+      await this.txService.update(income.id, { reimbursesId: undefined, moneyBackInfo: undefined });
+      this.toast.success('Unlinked.');
     } catch {
       this.toast.error('Could not unlink. Please try again.');
     }
@@ -292,12 +421,14 @@ export class TransactionView {
 
   @HostListener('document:keydown.escape')
   onEscape() {
-    // The picker sits on top of the panel, so Escape closes that first.
+    // The dialogs sit on top of the panel, so Escape closes those first.
+    if (this.draftSource()) { this.closeDraft(); return; }
     if (this.linkingFrom()) { this.closeLinkPicker(); return; }
     if (this.transaction()) this.close();
   }
 
   close() {
+    this.closeDraft();
     this.closeLinkPicker();
     this.closed.emit();
   }

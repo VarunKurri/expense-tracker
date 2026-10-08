@@ -22,7 +22,7 @@ export class AccountDetail {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private accountService = inject(AccountService);
-  private txService = inject(TransactionService);
+  txService = inject(TransactionService);
   private categoryService = inject(CategoryService);
   private toastService = inject(ToastService);
 

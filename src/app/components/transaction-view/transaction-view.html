@@ -16,7 +16,7 @@
         @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
         @else { {{ formatCurrency(tx.amount) }} }
       </div>
-      @if (tx.refunded) {
+      @if (txService.isFullyRefunded(tx)) {
         <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
       }
       @if (tx.isInternalTransfer) {
@@ -70,60 +70,90 @@
       </div>
     </div>
 
-    <!-- REIMBURSEMENTS — on every expense, whether or not any are linked yet, so
-         the same transaction reads the same way opened from anywhere. -->
+    <!-- MONEY BACK — refunds and repayments in one place, on every expense
+         whether or not anything has come back yet, so the same transaction reads
+         the same way opened from anywhere. -->
     @if (tx.type === 'expense') {
       <div class="view-reimburse">
-        <div class="view-reimburse-head">Reimbursements</div>
-        @if (reimbursedTotal() > 0) {
+        <div class="view-reimburse-head">Money back</div>
+        @if (moneyBackTotal() > 0) {
           <div class="reimburse-summary">
-            Reimbursed <strong>{{ formatCurrency(reimbursedTotal()) }}</strong>
-            of {{ formatCurrency(tx.amount) }}
-            @if (reimbursementSurplus() > 0.005) {
-              · Surplus <strong class="amt-surplus">{{ formatCurrency(reimbursementSurplus()) }}</strong>
+            @if (refundState() === 'full' && reimbursementSurplus() <= 0.005) {
+              Refunded in full, so it's left out of analysis while money back is counted.
             } @else {
-              · Net expense <strong [class.amt-expense]="netExpense() > 0.005">{{ formatCurrency(netExpense()) }}</strong>
+              <strong class="fig">{{ formatCurrency(moneyBackTotal()) }}</strong> back
+              of <span class="fig">{{ formatCurrency(tx.amount) }}</span>
+              @if (reimbursementSurplus() > 0.005) {
+                · Surplus <strong class="amt-surplus fig">{{ formatCurrency(reimbursementSurplus()) }}</strong>
+              } @else {
+                · Out of pocket <strong class="fig" [class.amt-expense]="netExpense() > 0.005">{{ formatCurrency(netExpense()) }}</strong>
+              }
             }
           </div>
-          @for (r of reimbursements(); track r.id) {
+          @if (legacyRefund()) {
+            <div class="reimburse-row">
+              <span class="reimburse-row-text">↩ Refund · +{{ formatCurrency(tx.amount) }} · marked refunded</span>
+              <button class="reimburse-unlink" (click)="removeLegacyRefund()" title="Remove" aria-label="Remove refund">✕</button>
+            </div>
+          }
+          @for (e of untracked(); track e.id) {
             <div class="reimburse-row">
               <span class="reimburse-row-text">
-                ↩ {{ r.merchant || 'Income' }} · +{{ formatCurrency(r.amount) }} · {{ formatDate(r.date) }}
+                ↩ {{ sourceLabel(e.source) }} · +{{ formatCents(e.amountCents) }} · {{ formatDate(e.date) }}{{ e.note ? ' · ' + e.note : '' }}
               </span>
-              <button class="reimburse-unlink" (click)="unlinkReimbursement(r)" title="Unlink">✕</button>
+              <button class="reimburse-unlink" (click)="removeUntracked(e)" title="Remove"
+                      [attr.aria-label]="'Remove ' + sourceLabel(e.source).toLowerCase()">✕</button>
+            </div>
+          }
+          @for (r of linkedIncomes(); track r.id) {
+            <div class="reimburse-row">
+              <span class="reimburse-row-text">
+                ↩ {{ sourceLabel(incomeSource(r)) }} · {{ r.merchant || 'Income' }} · +{{ formatCurrency(r.amount) }} · {{ formatDate(r.date) }}
+              </span>
+              <button class="reimburse-unlink" (click)="unlinkReimbursement(r)" title="Unlink" aria-label="Unlink income">✕</button>
             </div>
           }
         } @else {
           <p class="reimburse-hint">
-            Link money a friend paid you back so analysis counts only what you truly spent.
+            Got money back on this? Record a refund from the store or a repayment from a friend,
+            and analysis counts only what it really cost you.
           </p>
         }
-        <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Link a reimbursement</button>
+        <div class="money-back-actions">
+          @if (refundState() !== 'full') {
+            <button class="reimburse-add" [disabled]="saving()" (click)="markFullyRefunded()">Fully refunded</button>
+          }
+          <button class="reimburse-add" (click)="openDraft('refund')">+ Add refund</button>
+          <button class="reimburse-add" (click)="openDraft('repayment')">+ Record repayment</button>
+          <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Link an income</button>
+        </div>
       </div>
     }
 
     @if (tx.type === 'income') {
       <div class="view-reimburse">
-        <div class="view-reimburse-head">Reimbursement</div>
+        <div class="view-reimburse-head">Money back</div>
         @if (reimbursesExpense(); as exp) {
-          @if (reimbursesSurplus() > 0) {
-            <div class="reimburse-summary">
-              ↩ Reimburses <strong>{{ exp.merchant || 'an expense' }}</strong> ·
+          <div class="reimburse-summary">
+            ↩ {{ sourceLabel(incomeSource(tx)) }} for <strong>{{ exp.merchant || 'an expense' }}</strong> ·
+            @if (reimbursesSurplus() > 0) {
               {{ formatCurrency(reimbursesCovered()) }} covered +
               <strong class="amt-surplus">{{ formatCurrency(reimbursesSurplus()) }} surplus</strong>
-            </div>
-          } @else {
-            <div class="reimburse-summary">
-              ↩ Reimburses <strong>{{ exp.merchant || 'an expense' }}</strong> ·
+            } @else {
               {{ formatCurrency(exp.amount) }} on {{ formatDate(exp.date) }}
-            </div>
-          }
-          <button class="reimburse-add" (click)="unlinkReimbursement(tx)">Unlink reimbursement</button>
+            }
+          </div>
+          <div class="mini-seg" role="group" aria-label="Kind of money back">
+            <button type="button" [class.active]="incomeSource(tx) === 'refund'" (click)="setIncomeSource(tx, 'refund')">Refund</button>
+            <button type="button" [class.active]="incomeSource(tx) === 'repayment'" (click)="setIncomeSource(tx, 'repayment')">Repayment</button>
+          </div>
+          <button class="reimburse-add" (click)="unlinkReimbursement(tx)">Unlink</button>
         } @else {
           <p class="reimburse-hint">
-            Did this pay you back for an expense? Link it so it doesn't count as income.
+            Is this money back on a purchase — a refund, or a friend paying you back?
+            Link it so it isn't counted as income.
           </p>
-          <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Mark as reimbursement</button>
+          <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Link to a purchase</button>
         }
       </div>
     }
@@ -173,12 +203,16 @@
   </div>
 }
 
-<!-- REIMBURSEMENT LINK PICKER -->
+<!-- MONEY BACK LINK PICKER -->
 <app-modal
   [open]="!!linkingFrom()"
-  [title]="linkingFrom()?.type === 'income' ? 'Reimburses which expense?' : 'Which income paid this back?'"
+  [title]="linkingFrom()?.type === 'income' ? 'Money back on which purchase?' : 'Which income was the money back?'"
   size="sm"
   (closed)="closeLinkPicker()">
+  <div class="mini-seg link-source" role="group" aria-label="Kind of money back">
+    <button type="button" [class.active]="linkSource() === 'refund'" (click)="linkSource.set('refund')">Refund</button>
+    <button type="button" [class.active]="linkSource() === 'repayment'" (click)="linkSource.set('repayment')">Repayment</button>
+  </div>
   <input class="link-search input-field"
          [ngModel]="linkSearch()"
          (ngModelChange)="linkSearch.set($event)"
@@ -194,5 +228,43 @@
     } @empty {
       <div class="link-empty">No matching transactions.</div>
     }
+  </div>
+</app-modal>
+
+<!-- ADD REFUND / RECORD REPAYMENT — money back that never reached a tracked account -->
+<app-modal
+  [open]="!!draftSource()"
+  [title]="draftSource() === 'refund' ? 'Add refund' : 'Record repayment'"
+  size="sm"
+  (closed)="closeDraft()">
+  <div class="form">
+    <div class="field">
+      <label class="label-sm" for="mb-amount">Amount</label>
+      <div class="input-affix"><span class="affix">$</span>
+        <input id="mb-amount" class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
+               [ngModel]="draftAmount()" (ngModelChange)="draftAmount.set($event)" name="mbAmount" placeholder="0.00" />
+      </div>
+    </div>
+    <div class="field">
+      <label class="label-sm" for="mb-date">Date</label>
+      <input id="mb-date" class="input-field" type="date"
+             [ngModel]="draftDate()" (ngModelChange)="draftDate.set($event)" name="mbDate" />
+    </div>
+    <div class="field">
+      <label class="label-sm" for="mb-note">Note <span class="label-optional">(optional)</span></label>
+      <input id="mb-note" class="input-field"
+             [ngModel]="draftNote()" (ngModelChange)="draftNote.set($event)" name="mbNote"
+             [placeholder]="draftSource() === 'refund' ? 'Store credit, returned item…' : 'Who paid you, and how'" />
+    </div>
+    <p class="form-note">
+      For money that never reached an account Trackr tracks — cash, store credit, a card you
+      don't sync. If it did, use “Link an income” instead, so it isn't counted twice.
+    </p>
+  </div>
+  <div class="modal-actions" modal-footer>
+    <div class="actions-right">
+      <button class="btn-ghost" (click)="closeDraft()">Cancel</button>
+      <button class="btn-primary" [disabled]="saving()" (click)="saveDraft()">Save</button>
+    </div>
   </div>
 </app-modal>

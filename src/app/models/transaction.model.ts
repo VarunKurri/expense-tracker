@@ -1,3 +1,4 @@
+import type { MoneyBackInfo, UntrackedReturn } from './money-back.model';
 import type { TransactionSplit } from './split.model';
 
 export type TransactionType = 'income' | 'expense' | 'transfer';
@@ -27,9 +28,17 @@ export interface Transaction {
   aiConfidence?: number;
   receiptUrl?: string;
 
-  // Refund tracking
+  // Money back (refunds and repayments) — see models/money-back.model.ts and
+  // utils/money-back.ts. An expense's money back is every income linked to it
+  // via `reimbursesId` (tracked) plus the `moneyBack` entries below (untracked).
+  moneyBack?: UntrackedReturn[]; // on an expense: cash/store-credit money back
+  moneyBackInfo?: MoneyBackInfo;  // on a linked income: refund or repayment, and from whom
+
+  // LEGACY — the old all-or-nothing "Mark as refunded" toggle. Still read (as one
+  // untracked full refund) so old data keeps its totals; never written any more —
+  // editing such a transaction rewrites it as a `moneyBack` entry.
   refunded?: boolean;
-  refundedBy?: string; // transaction ID of the refunding income
+  refundedBy?: string; // never used
 
   // Partial-reimbursement linking (e.g. a friend pays you back ~half of a shared
   // meal). Set on an INCOME to point at the EXPENSE it reimburses. The expense's

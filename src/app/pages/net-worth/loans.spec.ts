@@ -12,6 +12,7 @@ import { ManualAssetService } from '../../services/manual-asset.service';
 import { BillService } from '../../services/bill.service';
 import { CategoryService } from '../../services/category.service';
 import { Account, ManualAsset, Transaction } from '../../models';
+import { MoneyBackLedger } from '../../utils/money-back';
 import { localDateString } from '../../utils/date';
 import { schedule } from '../../utils/loans';
 
@@ -31,12 +32,8 @@ class FakeManual {
   async remove(id: string) { this.items.update(all => all.filter(m => m.id !== id)); }
 }
 
-class FakeTransactions {
+class FakeTransactions extends MoneyBackLedger {
   transactions = signal<Transaction[]>([]);
-  reimbursementsFor() { return []; }
-  reimbursedAmountFor() { return 0; }
-  effectiveExpenseAmount(t: Transaction) { return t.amount; }
-  reimbursementSurplus() { return 0; }
   async update() {}
 }
 

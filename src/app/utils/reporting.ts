@@ -1,4 +1,5 @@
 import { Transaction } from '../models';
+import { isFullyRefunded } from './money-back';
 
 /**
  * Shared money aggregation for the Analysis and Reports pages.
@@ -24,12 +25,23 @@ import { Transaction } from '../models';
  * so these stay pure and unit-testable without a Firestore-backed service.
  */
 export interface MoneyRules {
-  /** The "exclude refunded" toggle, which also governs reimbursement netting. */
+  /** The "Count money back" toggle: on, refunds and repayments are netted off. */
   netting: boolean;
   /** An expense's cost after linked reimbursements. */
   effectiveExpense: (t: Transaction) => number;
   /** Reimbursements beyond the expense's own amount. */
   reimbursementSurplus: (t: Transaction) => number;
+  /**
+   * Whether a purchase was refunded in full (left out entirely while netting).
+   * Defaults to the pure check, which can't see refund incomes linked from the
+   * bank — pages pass `TransactionService.isFullyRefunded`, which can.
+   */
+  fullyRefunded?: (t: Transaction) => boolean;
+}
+
+/** A fully refunded purchase, left out while money back is being counted. */
+export function refundedOut(t: Transaction, rules: MoneyRules): boolean {
+  return rules.netting && (rules.fullyRefunded ?? isFullyRefunded)(t);
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;

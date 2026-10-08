@@ -29,3 +29,23 @@ export interface MoneyBackEntry {
    */
   coversPersonIds?: string[];
 }
+
+/**
+ * Money back recorded by hand — cash, store credit, anything that never hit an
+ * account Trackr tracks. Stored on the expense itself (`Transaction.moneyBack`).
+ */
+export interface UntrackedReturn extends MoneyBackEntry {
+  id: string;
+  note?: string;
+}
+
+/**
+ * On an income linked to an expense (`reimbursesId`): what kind of money back
+ * it is. Absent on links made before refunds and repayments were merged —
+ * those were always repayments ("a friend paid me back").
+ */
+export interface MoneyBackInfo {
+  source: MoneyBackSource;
+  fromPersonId?: string;
+  coversPersonIds?: string[];
+}
