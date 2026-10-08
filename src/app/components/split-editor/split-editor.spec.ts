@@ -5,11 +5,12 @@ import { SplitEditor } from './split-editor';
 import { PersonService } from '../../services/person.service';
 import { ToastService } from '../../services/toast.service';
 import { ME, SplitPerson } from '../../models';
-import { QuickSplitState, buildQuickSplit, emptyQuickState, splitStatus } from '../../utils/splits';
+import { QuickSplitState, buildQuickSplit, emptyQuickState, personName, splitStatus } from '../../utils/splits';
 
 class FakePeople {
   people = signal<SplitPerson[]>([{ id: 'alex', name: 'Alex', createdAt: 0, updatedAt: 0 }]);
   added: string[] = [];
+  nameOf(id: string) { return personName(this.people(), id); }
   async add(p: { name: string }) {
     const id = p.name.toLowerCase();
     this.added.push(p.name);

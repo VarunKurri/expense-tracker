@@ -1,0 +1,93 @@
+// The itemized editor's own layout. Shared pieces style themselves (parts/split-parts.scss).
+:host { display: contents; }
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* One receipt line: a hairline card, so lines read as separate rows. */
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card-grad);
+
+  &.unclaimed { border-style: dashed; border-color: var(--line-strong); }
+}
+
+.item-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 120px) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.item-remove {
+  border: none;
+  background: transparent;
+  color: var(--fg-3);
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  &:hover { color: var(--red); background: var(--bg-3); }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+}
+
+.item-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.item-mode {
+  width: auto;
+  margin-left: auto;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 12.5px;
+}
+
+.item-weights {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.item-weight {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fg-3);
+}
+
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.mismatch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.mini-seg { margin-bottom: 6px; }

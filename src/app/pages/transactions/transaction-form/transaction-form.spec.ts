@@ -12,7 +12,7 @@ import { ToastService } from '../../../services/toast.service';
 import { PersonService } from '../../../services/person.service';
 import { ME, Transaction } from '../../../models';
 import { MoneyBackLedger } from '../../../utils/money-back';
-import { quickSplit, splitStatus } from '../../../utils/splits';
+import { buildItemizedSplit, emptyItemizedState, newItem, personName, quickSplit, splitStatus } from '../../../utils/splits';
 
 class FakeTransactions extends MoneyBackLedger {
   transactions = signal<Transaction[]>([]);
@@ -57,6 +57,7 @@ describe('TransactionForm — splitting a bill', () => {
 
   beforeEach(async () => {
     errors = [];
+    const people = signal([{ id: 'alex', name: 'Alex', createdAt: 0, updatedAt: 0 }]);
     TestBed.configureTestingModule({
       imports: [Host],
       providers: [
@@ -67,7 +68,7 @@ describe('TransactionForm — splitting a bill', () => {
         { provide: TransactionService, useValue: new FakeTransactions() },
         { provide: QuickAddService, useValue: { defaultType: () => 'expense' } },
         { provide: ToastService, useValue: { success() {}, error: (m: string) => errors.push(m) } },
-        { provide: PersonService, useValue: { people: signal([{ id: 'alex', name: 'Alex', createdAt: 0, updatedAt: 0 }]) } },
+        { provide: PersonService, useValue: { people, nameOf: (id: string) => personName(people(), id) } },
       ],
     });
     fixture = TestBed.createComponent(Host);
@@ -119,5 +120,43 @@ describe('TransactionForm — splitting a bill', () => {
     await openWith(dinner);
     await host.form().save();
     expect('split' in host.saved[0]).toBe(false);
+  });
+
+  it('switching to "Item by item" keeps who is on the bill', async () => {
+    await openWith({ ...dinner, split: quickSplit(18000, [ME, 'alex']) });
+    button('Item by item').click();
+    await settle();
+    expect(host.form().itemizedState().participantIds).toEqual([ME, 'alex']);
+    expect(el.textContent).toContain('Tip on');
+  });
+
+  it("won't save a receipt that doesn't match what you paid, and says what it should be", async () => {
+    await openWith(dinner);
+    (el.querySelector('[aria-label="Split this bill"]') as HTMLElement).click();
+    await settle();
+    host.form().setSplitKind('itemized');
+    host.form().itemizedState.set({
+      ...emptyItemizedState(), participantIds: [ME, 'alex'],
+      items: [newItem([ME], 'Steak', 3000), newItem(['alex'], 'Salad', 1000)],
+    });
+    await host.form().save(); // the transaction says $180
+    expect(errors).toEqual(['The receipt says you paid $40.00. Fix the items or the amount before saving.']);
+
+    host.form().useSplitAmount(4000);
+    await host.form().save();
+    const split = host.saved[0].split!;
+    expect(split.mode).toBe('itemized');
+    expect(host.saved[0].amount).toBe(40);
+    expect(splitStatus(split).owedToMeCents).toBe(1000);
+  });
+
+  it('a saved itemized split opens item by item, as it was', async () => {
+    const state = { ...emptyItemizedState(), participantIds: [ME, 'alex'], items: [newItem(['alex'], 'Salad', 1000), newItem([ME], 'Steak', 3000)] };
+    await openWith({ ...dinner, amount: 40, split: buildItemizedSplit(state, 4000) });
+    expect(host.form().splitKind()).toBe('itemized');
+    expect(host.form().itemizedState().items.map(i => i.name)).toEqual(['Salad', 'Steak']);
+    await host.form().save();
+    expect(errors).toEqual([]);
+    expect(host.saved[0].split!.items.map(i => i.name)).toEqual(['Salad', 'Steak']);
   });
 });

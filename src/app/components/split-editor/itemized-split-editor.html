@@ -1,0 +1,126 @@
+<app-split-people [participantIds]="state().participantIds"
+                  (added)="add($event)" (removed)="remove($event)" (meToggled)="toggleMe()" />
+
+<!-- ITEMS -->
+<div class="field">
+  <span class="label-sm">Items</span>
+  <div class="items">
+    @for (item of state().items; track item.id; let i = $index) {
+      <div class="item" [class.unclaimed]="isUnclaimed(item)">
+        <div class="item-line">
+          <input class="input-field" [ngModel]="item.name" (ngModelChange)="setName(i, $event)" [name]="'item-' + item.id"
+                 placeholder="What was it?" aria-label="Item name" />
+          <span class="input-affix"><span class="affix">$</span>
+            <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
+                   [ngModel]="priceValue(item)" (ngModelChange)="setPrice(i, $event)" [name]="'price-' + item.id"
+                   placeholder="0.00" aria-label="Price" />
+          </span>
+          <button type="button" class="item-remove" (click)="removeItem(i)" aria-label="Remove item">✕</button>
+        </div>
+
+        <div class="item-who">
+          @if (item.splitMode === 'equal') {
+            <div class="people">
+              @for (id of state().participantIds; track id) {
+                <button type="button" class="chip" [class.active]="hasPart(item, id)" [attr.aria-pressed]="hasPart(item, id)"
+                        (click)="toggle(i, id)">{{ people.nameOf(id) }}</button>
+              }
+            </div>
+          }
+          <select class="input-field item-mode" [ngModel]="item.splitMode" (ngModelChange)="setMode(i, $event)"
+                  [name]="'mode-' + item.id" aria-label="How this item is divided">
+            @for (m of modes; track m.value) { <option [value]="m.value">{{ m.label }}</option> }
+          </select>
+        </div>
+
+        @if (item.splitMode !== 'equal') {
+          <div class="item-weights">
+            @for (id of state().participantIds; track id) {
+              <label class="item-weight">
+                <span>{{ people.nameOf(id) }}</span>
+                <input class="input-field" type="number" min="0" inputmode="decimal"
+                       [attr.step]="item.splitMode === 'shares' ? 1 : 0.01"
+                       [ngModel]="weightValue(item, id)" (ngModelChange)="setWeight(i, id, $event)"
+                       [name]="'iw-' + item.id + '-' + id"
+                       [placeholder]="item.splitMode === 'amount' ? '$0.00' : item.splitMode === 'percent' ? '0%' : '0'" />
+              </label>
+            }
+          </div>
+          @if (itemNote(item)) { <p class="field-error">{{ itemNote(item) }}</p> }
+        }
+        @if (isUnclaimed(item)) { <p class="field-hint">Nobody yet — tap who had it.</p> }
+      </div>
+    }
+  </div>
+  <div class="item-actions">
+    <button type="button" class="link-btn" (click)="addItem()">+ Add item</button>
+    @if (anyUnclaimed() && includesMe()) {
+      <button type="button" class="link-btn" (click)="claimTheRest()">Give unclaimed items to me</button>
+    }
+  </div>
+</div>
+
+<!-- TAX AND TIP -->
+<div class="form-grid">
+  <div class="field">
+    <span class="label-sm">Tax</span>
+    <div class="mini-seg" role="radiogroup" aria-label="Tax as">
+      <button type="button" role="radio" [class.active]="state().charges.taxMode === 'percent'"
+              [attr.aria-checked]="state().charges.taxMode === 'percent'" (click)="setTaxMode('percent')">%</button>
+      <button type="button" role="radio" [class.active]="state().charges.taxMode === 'amount'"
+              [attr.aria-checked]="state().charges.taxMode === 'amount'" (click)="setTaxMode('amount')">$</button>
+    </div>
+    <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal" name="tax" aria-label="Tax"
+           [ngModel]="chargeValue('tax')" (ngModelChange)="setCharge('tax', $event)"
+           [placeholder]="state().charges.taxMode === 'percent' ? '8.875' : '0.00'" />
+  </div>
+  <div class="field">
+    <span class="label-sm">Tip</span>
+    <div class="mini-seg" role="radiogroup" aria-label="Tip as">
+      <button type="button" role="radio" [class.active]="state().charges.tipMode === 'percent'"
+              [attr.aria-checked]="state().charges.tipMode === 'percent'" (click)="setTipMode('percent')">%</button>
+      <button type="button" role="radio" [class.active]="state().charges.tipMode === 'amount'"
+              [attr.aria-checked]="state().charges.tipMode === 'amount'" (click)="setTipMode('amount')">$</button>
+    </div>
+    <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal" name="tip" aria-label="Tip"
+           [ngModel]="chargeValue('tip')" (ngModelChange)="setCharge('tip', $event)"
+           [placeholder]="state().charges.tipMode === 'percent' ? '20' : '0.00'" />
+  </div>
+</div>
+@if (state().charges.tipMode === 'percent') {
+  <div class="field">
+    <span class="label-sm">Tip on</span>
+    <div class="mini-seg" role="radiogroup" aria-label="Tip on">
+      <button type="button" role="radio" [class.active]="state().charges.tipBasis === 'preTax'"
+              [attr.aria-checked]="state().charges.tipBasis === 'preTax'" (click)="setTipBasis('preTax')">The items</button>
+      <button type="button" role="radio" [class.active]="state().charges.tipBasis === 'postTax'"
+              [attr.aria-checked]="state().charges.tipBasis === 'postTax'" (click)="setTipBasis('postTax')">Items + tax</button>
+    </div>
+  </div>
+}
+<p class="field-hint">
+  Items <span class="fig">{{ money(result().subtotalCents) }}</span>
+  · tax <span class="fig">{{ money(result().taxCents) }}</span>
+  · tip <span class="fig">{{ money(result().tipCents) }}</span>.
+  Tax and tip are shared in proportion to what each person had.
+</p>
+
+@if (mismatch()) {
+  <div class="form-note mismatch">
+    The receipt comes to <span class="fig">{{ money(result().totalCents) }}</span>, so you'd have paid
+    <span class="fig">{{ money(coverCents()) }}</span>, but this transaction is
+    <span class="fig">{{ money(myPaidCents()) }}</span>.
+    <button type="button" class="link-btn" (click)="useAmount.emit(coverCents())">Use {{ money(coverCents()) }} as the amount</button>
+  </div>
+}
+
+<app-split-payers [payments]="state().otherPayments" (paymentsChange)="setPayments($event)" [candidates]="others()"
+                  hint="They paid the restaurant directly, alongside you." />
+
+<app-split-summary [split]="split()" [myPaidCents]="myPaidCents()" />
+
+@if (problems().includes('no-one-else')) {
+  <p class="field-error">Add someone to split with.</p>
+} @else if (problems().includes('unassigned')) {
+  <p class="field-error">Some items aren't anyone's yet.</p>
+}

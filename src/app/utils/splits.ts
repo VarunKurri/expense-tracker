@@ -1,9 +1,9 @@
-import { ME, MoneyBackEntry, TransactionSplit } from '../models';
+import { ME, MoneyBackEntry, SplitPerson, TransactionSplit } from '../models';
 import { wholeShareWeights } from './split/shareWeights';
 import { allocate, sum } from './split/money';
 import { settle } from './split/settle';
-import { calculateSplit } from './split/split';
-import type { Bill, BillSummary, Charges, Payment, SplitMode, Transfer } from './split/types';
+import { activeAssignments, calculateSplit } from './split/split';
+import type { Assignment, Bill, BillSummary, Charges, Item, Payment, SplitMode, Transfer } from './split/types';
 
 /**
  * Who owes you what on a split bill, after refunds and repayments.
@@ -29,6 +29,12 @@ import type { Bill, BillSummary, Charges, Payment, SplitMode, Transfer } from '.
  *
  * Integer cents throughout.
  */
+
+/** A display name for anyone on a bill — "You" for you. */
+export function personName(people: SplitPerson[], id: string): string {
+  if (id === ME) return 'You';
+  return people.find(p => p.id === id)?.name ?? 'Someone';
+}
 
 /** No tax, no tip — the quick "$180, three ways" split. */
 export const NO_CHARGES: Charges = {
@@ -359,4 +365,149 @@ export function restateWeights(state: QuickSplitState, mode: SplitMode, billCent
     ids.forEach((id, i) => out[id] = shareCents[i]);
   }
   return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* Itemized split editing                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What the itemized editor holds: the receipt's lines, tax and tip, and who
+ * had what. As with the quick split, the arithmetic is the engine's — the
+ * bill total here is whatever `calculateSplit` says items + tax + tip come to.
+ */
+export interface ItemizedSplitState {
+  participantIds: string[];
+  items: Item[];
+  charges: Charges;
+  otherPayments: Payment[];
+}
+
+let nextItem = 0;
+/** An id for a new line; only needs to be unique within one bill. */
+export function newItemId(): string {
+  return `i${Date.now().toString(36)}${(nextItem++).toString(36)}`;
+}
+
+/** A blank line, shared equally by `assigneeIds` (or nobody yet). */
+export function newItem(assigneeIds: string[] = [], name = '', priceCents = 0): Item {
+  return {
+    id: newItemId(), name, priceCents, splitMode: 'equal',
+    assignments: assigneeIds.map(personId => ({ personId, weight: 1 })),
+  };
+}
+
+/** Start itemizing, keeping who's on the bill and who paid from the quick split. */
+export function emptyItemizedState(from?: Pick<QuickSplitState, 'participantIds' | 'otherPayments'>): ItemizedSplitState {
+  return {
+    participantIds: [...(from?.participantIds ?? [ME])],
+    items: [newItem()],
+    charges: { ...NO_CHARGES, taxMode: 'percent', tipMode: 'percent' },
+    otherPayments: (from?.otherPayments ?? []).map(p => ({ ...p })),
+  };
+}
+
+export function buildItemizedSplit(
+  state: ItemizedSplitState, myPaidCents: number, existing?: TransactionSplit | null,
+): TransactionSplit {
+  const split: TransactionSplit = {
+    mode: 'itemized',
+    participantIds: [...state.participantIds],
+    // A line with no name and no price is an empty row, not part of the bill.
+    items: state.items.filter(i => i.name.trim() || i.priceCents > 0).map(i => ({ ...i, name: i.name.trim() || 'Item' })),
+    charges: { ...state.charges },
+    payments: [
+      { personId: ME, amountCents: myPaidCents },
+      ...state.otherPayments.filter(p => p.personId !== ME && p.amountCents > 0),
+    ],
+    source: existing?.source ?? 'manual',
+  };
+  if (existing?.closedPersonIds?.length) split.closedPersonIds = [...existing.closedPersonIds];
+  return split;
+}
+
+export function itemizedStateFrom(split: TransactionSplit): ItemizedSplitState {
+  return {
+    participantIds: [...split.participantIds],
+    items: split.items.map(i => ({ ...i, assignments: i.assignments.map(a => ({ ...a })) })),
+    charges: { ...split.charges },
+    otherPayments: split.payments.filter(p => p.personId !== ME).map(p => ({ ...p })),
+  };
+}
+
+/** Items + tax + tip, as the engine adds them up. */
+export function itemizedBillCents(state: ItemizedSplitState): number {
+  return calculateSplit(toBill(buildItemizedSplit(state, 0))).totalCents;
+}
+
+/**
+ * The amount you paid if everyone else's payments stand: the bill less what
+ * they put in. What "Use this as the amount" fills in when the receipt and
+ * the transaction disagree.
+ */
+export function myPaymentToCoverCents(state: ItemizedSplitState): number {
+  const others = sum(state.otherPayments.filter(p => p.personId !== ME).map(p => p.amountCents));
+  return Math.max(0, itemizedBillCents(state) - others);
+}
+
+/** Give every item nobody has claimed to one person — "the rest is mine". */
+export function assignUnclaimedTo(state: ItemizedSplitState, personId: string): ItemizedSplitState {
+  const people = state.participantIds.map(id => ({ id }));
+  return {
+    ...state,
+    items: state.items.map(item =>
+      item.priceCents > 0 && activeAssignments(item, people).length === 0
+        ? { ...item, splitMode: 'equal' as const, assignments: [{ personId, weight: 1 }] }
+        : item),
+  };
+}
+
+/** Someone left the bill: drop their claims and their payment, so nothing points at them. */
+export function removeFromItemized(state: ItemizedSplitState, personId: string): ItemizedSplitState {
+  return {
+    ...state,
+    participantIds: state.participantIds.filter(id => id !== personId),
+    items: state.items.map(i => ({ ...i, assignments: i.assignments.filter(a => a.personId !== personId) })),
+    otherPayments: state.otherPayments.filter(p => p.personId !== personId),
+  };
+}
+
+/** Equal mode: tap someone on or off an item. */
+export function toggleAssignee(item: Item, personId: string): Item {
+  const has = item.assignments.some(a => a.personId === personId && a.weight > 0);
+  return {
+    ...item,
+    assignments: has
+      ? item.assignments.filter(a => a.personId !== personId)
+      : [...item.assignments.filter(a => a.personId !== personId), { personId, weight: 1 }],
+  };
+}
+
+/**
+ * An item's split mode changes the way the whole split's does: restated, not
+ * reset. Whoever had it keeps their part ("Alex had two thirds" stays two
+ * thirds whether written as 2:1, 66.67% or $20).
+ */
+export function setItemMode(item: Item, mode: SplitMode, participantIds: string[]): Item {
+  if (item.splitMode === mode) return item;
+  const current: Record<string, number> = {};
+  for (const a of item.assignments) current[a.personId] = item.splitMode === 'equal' ? (a.weight > 0 ? 1 : 0) : a.weight;
+  const asShares: QuickSplitState = { participantIds, mode: 'shares', weights: current, otherPayments: [] };
+  const hasClaims = participantIds.some(id => (current[id] ?? 0) > 0);
+  const weights = mode === 'equal' || !hasClaims ? {} : restateWeights(asShares, mode, item.priceCents);
+  const assignments: Assignment[] = mode === 'equal'
+    ? participantIds.filter(id => (current[id] ?? 0) > 0).map(personId => ({ personId, weight: 1 }))
+    : participantIds.map(personId => ({ personId, weight: weights[personId] ?? 0 }));
+  return { ...item, splitMode: mode, assignments };
+}
+
+/** Uneven modes: set one person's shares, percent or amount (cents) on an item. */
+export function setItemWeight(item: Item, personId: string, weight: number): Item {
+  const w = Math.max(0, weight);
+  // Keep the order: the engine breaks cent ties by position, so moving someone
+  // to the end could shift a cent between people just because a number was edited.
+  const assignments = item.assignments.some(a => a.personId === personId)
+    ? item.assignments.map(a => a.personId === personId ? { ...a, weight: w } : a)
+    : [...item.assignments, { personId, weight: w }];
+  return { ...item, assignments };
 }

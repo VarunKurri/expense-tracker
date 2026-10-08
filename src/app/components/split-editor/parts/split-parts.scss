@@ -1,0 +1,95 @@
+// Pieces shared by both split editors. Only what's unique to them: chips,
+// segs, inputs, toggles and labels all come from styles.scss.
+:host { display: contents; }
+
+.people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  &.suggestions { margin-top: 8px; }
+}
+
+/* A person on the bill: an ink chip with its own remove button. */
+.chip.person {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 6px;
+}
+
+.person-remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  &:hover { opacity: 1; }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+}
+
+.add-person {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  .input-field { flex: 1; min-width: 0; }
+}
+
+.weights {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.weight-row.payer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 130px) auto;
+  align-items: center;
+  gap: 10px;
+  .person-remove { color: var(--fg-3); }
+}
+
+.add-payer { align-self: flex-start; font-size: 13px; }
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 600;
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 2px 10px;
+  align-items: baseline;
+  font-size: 13px;
+}
+
+.summary-name { color: var(--fg); font-weight: 500; }
+.summary-detail { color: var(--fg-3); }
+.summary-owes { color: var(--fg); font-weight: 600; text-align: right; min-width: 0; }
+.summary-items { grid-column: 1 / -1; font-size: 12px; color: var(--fg-3); line-height: 1.4; }
+
+.summary-total {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--fg-3);
+}
+
+@media (max-width: 480px) {
+  .summary-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .summary-owes { grid-column: 1 / -1; text-align: left; }
+}

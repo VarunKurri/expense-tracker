@@ -134,11 +134,20 @@
                 aria-label="Split this bill" (click)="splitOn.set(!splitOn())"></button>
       </div>
       @if (splitOn()) {
-        @if (splitIsItemized()) {
-          <p class="form-note">This bill is split item by item. Turn the split off to remove it.</p>
-        } @else {
-          <app-split-editor [myPaidCents]="amountCents()" [(state)]="splitState" />
-        }
+        <div class="form-section">
+          <div class="mini-seg" role="radiogroup" aria-label="Split the">
+            <button type="button" role="radio" [class.active]="splitKind() === 'quick'"
+                    [attr.aria-checked]="splitKind() === 'quick'" (click)="setSplitKind('quick')">Whole bill</button>
+            <button type="button" role="radio" [class.active]="splitKind() === 'itemized'"
+                    [attr.aria-checked]="splitKind() === 'itemized'" (click)="setSplitKind('itemized')">Item by item</button>
+          </div>
+          @if (splitKind() === 'itemized') {
+            <app-itemized-split-editor [myPaidCents]="amountCents()" [(state)]="itemizedState"
+                                       (useAmount)="useSplitAmount($event)" />
+          } @else {
+            <app-split-editor [myPaidCents]="amountCents()" [(state)]="splitState" />
+          }
+        </div>
       }
     }
 

@@ -8,6 +8,7 @@ import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
 import { EncryptionService } from './encryption.service';
 import { SplitPerson } from '../models';
+import { personName } from '../utils/splits';
 
 @Injectable({ providedIn: 'root' })
 /**
@@ -67,6 +68,11 @@ export class PersonService {
   );
 
   people = toSignal(this.people$, { initialValue: [] });
+
+  /** A display name for anyone on a bill — "You" for you. */
+  nameOf(id: string): string {
+    return personName(this.people(), id);
+  }
 
   async add(item: Omit<SplitPerson, 'id' | 'createdAt' | 'updatedAt'>) {
     const user = this.auth.user();

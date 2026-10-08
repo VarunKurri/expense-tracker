@@ -7,14 +7,18 @@ import { FormsModule } from '@angular/forms';
 import { Modal } from '../../../components/modal/modal';
 import { ErrorBanner } from '../../../components/error-banner/error-banner';
 import { SplitEditor } from '../../../components/split-editor/split-editor';
+import { ItemizedSplitEditor } from '../../../components/split-editor/itemized-split-editor';
 import { AccountService } from '../../../services/account.service';
 import { CategoryService } from '../../../services/category.service';
 import { BillService } from '../../../services/bill.service';
 import { TransactionTemplateService } from '../../../services/transaction-template.service';
 import { TransactionService } from '../../../services/transaction.service';
 import { formatCurrency } from '../../../utils/format';
-import { toCents } from '../../../utils/money';
-import { QuickSplitState, buildQuickSplit, emptyQuickState, quickStateFrom, splitProblems } from '../../../utils/splits';
+import { fromCents, toCents } from '../../../utils/money';
+import {
+  ItemizedSplitState, QuickSplitState, buildItemizedSplit, buildQuickSplit, emptyItemizedState, emptyQuickState,
+  itemizedStateFrom, myPaymentToCoverCents, quickStateFrom, splitProblems,
+} from '../../../utils/splits';
 import { BillAmountMode, BillDueDateMode, BillFrequency, Transaction, TransactionSplit, TransactionType } from '../../../models';
 import { BILL_FREQUENCIES } from '../../../utils/bill-schedule';
 import { TransactionTemplate } from '../../../models';
@@ -24,7 +28,7 @@ import { ToastService } from '../../../services/toast.service';
 @Component({
   selector: 'app-transaction-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, Modal, ErrorBanner, SplitEditor],
+  imports: [CommonModule, FormsModule, Modal, ErrorBanner, SplitEditor, ItemizedSplitEditor],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss'
 })
@@ -62,13 +66,26 @@ export class TransactionForm implements OnChanges {
 
   // ── Bill splitting (expenses) ──────────────────────────────
   splitOn = signal(false);
+  /** "Whole bill" (quick) or "Item by item" (itemized, with tax and tip). */
+  splitKind = signal<'quick' | 'itemized'>('quick');
   splitState = signal<QuickSplitState>(emptyQuickState());
+  itemizedState = signal<ItemizedSplitState>(emptyItemizedState());
   /** The split saved on the transaction being edited, if any. */
   private existingSplit: TransactionSplit | null = null;
 
-  /** Itemized splits get their own editor (receipts, tax and tip); this one leaves them be. */
-  splitIsItemized(): boolean {
-    return this.existingSplit?.mode === 'itemized';
+  /** Switching modes keeps who's on the bill and who paid; each mode keeps its own details. */
+  setSplitKind(kind: 'quick' | 'itemized') {
+    if (kind === this.splitKind()) return;
+    const from = kind === 'itemized' ? this.splitState() : this.itemizedState();
+    const carried = { participantIds: [...from.participantIds], otherPayments: from.otherPayments.map(p => ({ ...p })) };
+    if (kind === 'itemized') this.itemizedState.update(s => ({ ...s, ...carried }));
+    else this.splitState.update(s => ({ ...s, ...carried }));
+    this.splitKind.set(kind);
+  }
+
+  /** "Use $X as the amount" from the itemized editor, when the receipt and the amount disagree. */
+  useSplitAmount(cents: number) {
+    this.amount = fromCents(cents);
   }
 
   /** What you paid, in cents: the amount field, which is your payment on the bill. */
@@ -147,7 +164,10 @@ export class TransactionForm implements OnChanges {
       this.isInternalTransfer = this.transaction.isInternalTransfer || false;
       this.existingSplit = this.transaction.split ?? null;
       this.splitOn.set(!!this.existingSplit && this.transaction.type === 'expense');
-      this.splitState.set(this.existingSplit && !this.splitIsItemized() ? quickStateFrom(this.existingSplit) : emptyQuickState());
+      const itemized = this.existingSplit?.mode === 'itemized';
+      this.splitKind.set(itemized ? 'itemized' : 'quick');
+      this.splitState.set(this.existingSplit && !itemized ? quickStateFrom(this.existingSplit) : emptyQuickState());
+      this.itemizedState.set(this.existingSplit && itemized ? itemizedStateFrom(this.existingSplit) : emptyItemizedState());
       this.saveAsTemplate.set(false);
       this.templateName.set('');
     } else {
@@ -160,7 +180,9 @@ export class TransactionForm implements OnChanges {
       this.applyDraft();
       this.existingSplit = null;
       this.splitOn.set(false);
+      this.splitKind.set('quick');
       this.splitState.set(emptyQuickState());
+      this.itemizedState.set(emptyItemizedState());
       this.saveAsTemplate.set(false);
       this.templateName.set('');
     }
@@ -443,13 +465,20 @@ export class TransactionForm implements OnChanges {
       // anything is saved: "what you're owed" must rest on a bill that adds up.
       let split: TransactionSplit | undefined;
       if (type === 'expense' && this.splitOn()) {
-        if (this.splitIsItemized()) {
-          split = this.existingSplit!;
-        } else {
-          split = buildQuickSplit(this.splitState(), toCents(amount), this.existingSplit);
-          const problems = splitProblems(split, toCents(amount));
-          if (problems.includes('no-one-else')) { this.toastService.error('Add someone to split this bill with.'); return; }
-          if (problems.length) { this.toastService.error('Give someone a share of the bill before saving.'); return; }
+        const itemized = this.splitKind() === 'itemized';
+        split = itemized
+          ? buildItemizedSplit(this.itemizedState(), toCents(amount), this.existingSplit)
+          : buildQuickSplit(this.splitState(), toCents(amount), this.existingSplit);
+        const problems = splitProblems(split, toCents(amount));
+        if (problems.includes('no-one-else')) { this.toastService.error('Add someone to split this bill with.'); return; }
+        if (problems.includes('unassigned')) {
+          this.toastService.error(itemized ? "Some items aren't anyone's yet." : 'Give someone a share of the bill before saving.');
+          return;
+        }
+        if (problems.includes('not-covered')) {
+          const cover = formatCurrency(fromCents(myPaymentToCoverCents(this.itemizedState())));
+          this.toastService.error(`The receipt says you paid ${cover}. Fix the items or the amount before saving.`);
+          return;
         }
       }
 

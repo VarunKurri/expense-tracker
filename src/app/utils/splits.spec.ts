@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { ME, MoneyBackEntry, TransactionSplit } from '../models';
 import { outOfPocketCents, surplusCents } from './money-back';
 import {
-  QuickSplitState, buildQuickSplit, emptyQuickState, owedToMeByPerson, quickBillCents, quickSplit, quickStateFrom,
-  restateWeights, splitProblems, splitStatus,
+  ItemizedSplitState, QuickSplitState, assignUnclaimedTo, buildItemizedSplit, buildQuickSplit, emptyItemizedState,
+  emptyQuickState, itemizedBillCents, itemizedStateFrom, myPaymentToCoverCents, newItem, owedToMeByPerson,
+  quickBillCents, quickSplit, quickStateFrom, removeFromItemized, restateWeights, setItemMode, setItemWeight,
+  splitProblems, splitStatus, toggleAssignee,
 } from './splits';
 
 const repay = (amountCents: number, fromPersonId: string, coversPersonIds?: string[], date = '2026-10-01'): MoneyBackEntry =>
@@ -330,5 +332,103 @@ describe('restateWeights: switching mode keeps the split', () => {
     const pct = { ...amounts, mode: 'percent' as const, weights: restateWeights(amounts, 'percent', 12000) };
     const back = restateWeights(pct, 'amount', 12000);
     expect(back).toEqual({ [ME]: 8000, alex: 4000 });
+  });
+});
+
+describe('itemized split editing', () => {
+  // You had the $30 steak, Alex the $10 salad, you shared the $20 wine. 8.875% tax, 20% tip on the pre-tax total.
+  const dinner = (): ItemizedSplitState => ({
+    participantIds: [ME, 'alex'],
+    items: [
+      newItem([ME], 'Steak', 3000),
+      newItem(['alex'], 'Salad', 1000),
+      newItem([ME, 'alex'], 'Wine', 2000),
+    ],
+    charges: { taxMode: 'percent', taxPercent: 8.875, taxCents: 0, tipMode: 'percent', tipPercent: 20, tipCents: 0, tipBasis: 'preTax' },
+    otherPayments: [],
+  });
+
+  it('the bill is items + tax + tip, as the engine adds them up', () => {
+    // $60 + $5.33 tax (8.875% of $60, rounded) + $12 tip
+    expect(itemizedBillCents(dinner())).toBe(6000 + 533 + 1200);
+  });
+
+  it('builds a split that saves once your payment covers the bill', () => {
+    const state = dinner();
+    const total = itemizedBillCents(state);
+    const split = buildItemizedSplit(state, total);
+    expect(split.mode).toBe('itemized');
+    expect(splitProblems(split, total)).toEqual([]);
+    expect(splitProblems(buildItemizedSplit(state, 6000), 6000)).toEqual(['not-covered']);
+    // Alex: $10 salad + $10 wine = $20 of $60 → a third of tax and tip.
+    expect(splitStatus(split).owedToMeCents).toBe(2000 + 178 + 400);
+  });
+
+  it('what you need to have paid, when others paid some', () => {
+    const state = { ...dinner(), otherPayments: [{ personId: 'alex', amountCents: 2000 }] };
+    expect(myPaymentToCoverCents(state)).toBe(itemizedBillCents(state) - 2000);
+  });
+
+  it('empty rows are not part of the bill; unnamed priced rows are kept', () => {
+    const state = { ...dinner(), items: [...dinner().items, newItem(), newItem([ME], '', 500)] };
+    const split = buildItemizedSplit(state, 0);
+    expect(split.items).toHaveLength(4);
+    expect(split.items[3].name).toBe('Item');
+  });
+
+  it('round-trips through a saved split', () => {
+    const state = { ...dinner(), otherPayments: [{ personId: 'alex', amountCents: 1500 }] };
+    expect(itemizedStateFrom(buildItemizedSplit(state, 6000))).toEqual(state);
+  });
+
+  it('starting to itemize keeps who is on the bill and who paid', () => {
+    const quick: QuickSplitState = { ...emptyQuickState(), participantIds: [ME, 'alex'], otherPayments: [{ personId: 'alex', amountCents: 500 }] };
+    const state = emptyItemizedState(quick);
+    expect(state.participantIds).toEqual([ME, 'alex']);
+    expect(state.otherPayments).toEqual([{ personId: 'alex', amountCents: 500 }]);
+    expect(state.items).toHaveLength(1);
+  });
+
+  it('flags unclaimed items, and "the rest is mine" claims them', () => {
+    const state = { ...dinner(), items: [...dinner().items, newItem([], 'Dessert', 900)] };
+    const total = itemizedBillCents(state);
+    expect(splitProblems(buildItemizedSplit(state, total), total)).toContain('unassigned');
+    const mine = assignUnclaimedTo(state, ME);
+    expect(splitProblems(buildItemizedSplit(mine, total), total)).toEqual([]);
+    expect(mine.items[3].assignments).toEqual([{ personId: ME, weight: 1 }]);
+    // Items someone already had are left alone.
+    expect(mine.items[1].assignments).toEqual([{ personId: 'alex', weight: 1 }]);
+  });
+
+  it('removing someone drops their claims and payment', () => {
+    const state = removeFromItemized({ ...dinner(), otherPayments: [{ personId: 'alex', amountCents: 100 }] }, 'alex');
+    expect(state.participantIds).toEqual([ME]);
+    expect(state.items[2].assignments).toEqual([{ personId: ME, weight: 1 }]);
+    expect(state.otherPayments).toEqual([]);
+  });
+
+  it('tapping people on and off an item', () => {
+    const item = newItem([ME], 'Wine', 2000);
+    const both = toggleAssignee(item, 'alex');
+    expect(both.assignments.map(a => a.personId)).toEqual([ME, 'alex']);
+    expect(toggleAssignee(both, ME).assignments.map(a => a.personId)).toEqual(['alex']);
+  });
+
+  it('an item restates when its mode changes: "Alex had two thirds" stays two thirds', () => {
+    const wine = setItemWeight(setItemWeight(setItemMode(newItem([ME, 'alex'], 'Wine', 3000), 'shares', [ME, 'alex']), ME, 1), 'alex', 2);
+    expect(setItemMode(wine, 'amount', [ME, 'alex']).assignments).toEqual([{ personId: ME, weight: 1000 }, { personId: 'alex', weight: 2000 }]);
+    expect(setItemMode(wine, 'percent', [ME, 'alex']).assignments).toEqual([{ personId: ME, weight: 33.33 }, { personId: 'alex', weight: 66.67 }]);
+    // Back to equal: whoever had a part is on it, equally.
+    expect(setItemMode(wine, 'equal', [ME, 'alex']).assignments).toEqual([{ personId: ME, weight: 1 }, { personId: 'alex', weight: 1 }]);
+  });
+
+  it('an item only some people had restates with the others at zero', () => {
+    const salad = setItemMode(newItem(['alex'], 'Salad', 1000), 'amount', [ME, 'alex']);
+    expect(salad.assignments).toEqual([{ personId: ME, weight: 0 }, { personId: 'alex', weight: 1000 }]);
+  });
+
+  it('editing a weight keeps the order (the engine breaks cent ties by position)', () => {
+    const item = setItemMode(newItem([ME, 'alex', 'ben'], 'Pizza', 1000), 'shares', [ME, 'alex', 'ben']);
+    expect(setItemWeight(item, ME, 3).assignments.map(a => a.personId)).toEqual([ME, 'alex', 'ben']);
   });
 });

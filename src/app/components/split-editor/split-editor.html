@@ -1,142 +1,56 @@
-<div class="form-section split-editor">
-  <!-- WHO -->
-  <div class="field">
-    <span class="label-sm">Split with</span>
-    <div class="people">
-      <button type="button" class="chip" [class.active]="includesMe()" [attr.aria-pressed]="includesMe()"
-              (click)="toggleMe()">You</button>
-      @for (id of others(); track id) {
-        <span class="chip active person">
-          {{ name(id) }}
-          <button type="button" class="person-remove" (click)="remove(id)" [attr.aria-label]="'Remove ' + name(id)">✕</button>
-        </span>
-      }
-    </div>
-    <div class="add-person">
-      <input class="input-field" [ngModel]="newName()" (ngModelChange)="newName.set($event)" name="splitNewName"
-             placeholder="Add someone by name" aria-label="Add someone by name"
-             (keydown.enter)="$event.preventDefault(); addByName()" />
-      <button type="button" class="btn-ghost" [disabled]="!newName().trim() || adding()" (click)="addByName()">Add</button>
-    </div>
-    @if (suggestions().length) {
-      <div class="people suggestions">
-        @for (p of suggestions(); track p.id) {
-          <button type="button" class="chip" (click)="include(p.id!)">+ {{ p.name }}</button>
-        }
-      </div>
-    }
-    @if (!includesMe()) {
-      <p class="field-hint">You're not in the split: you paid for them, and all of it is owed back to you.</p>
+<app-split-people [participantIds]="state().participantIds"
+                  (added)="add($event)" (removed)="remove($event)" (meToggled)="toggleMe()" />
+
+<!-- HOW -->
+<div class="field">
+  <span class="label-sm">Divided</span>
+  <div class="mini-seg" role="radiogroup" aria-label="How the bill is divided">
+    @for (m of modes; track m.value) {
+      <button type="button" role="radio" [class.active]="state().mode === m.value"
+              [attr.aria-checked]="state().mode === m.value" (click)="setMode(m.value)">{{ m.label }}</button>
     }
   </div>
-
-  <!-- HOW -->
-  <div class="field">
-    <span class="label-sm">Divided</span>
-    <div class="mini-seg" role="radiogroup" aria-label="How the bill is divided">
-      @for (m of modes; track m.value) {
-        <button type="button" role="radio" [class.active]="state().mode === m.value"
-                [attr.aria-checked]="state().mode === m.value" (click)="setMode(m.value)">{{ m.label }}</button>
-      }
-    </div>
-  </div>
-
-  @if (state().mode !== 'equal' && state().participantIds.length) {
-    <div class="weights">
-      @for (id of state().participantIds; track id) {
-        <label class="weight-row">
-          <span class="weight-name">{{ name(id) }}</span>
-          @switch (state().mode) {
-            @case ('amount') {
-              <span class="input-affix"><span class="affix">$</span>
-                <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
-                       [ngModel]="weightValue(id)" (ngModelChange)="setWeight(id, $event)" [name]="'w-' + id" placeholder="0.00" />
-              </span>
-            }
-            @case ('percent') {
-              <span class="input-affix suffix">
-                <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
-                       [ngModel]="weightValue(id)" (ngModelChange)="setWeight(id, $event)" [name]="'w-' + id" placeholder="0" />
-                <span class="affix">%</span>
-              </span>
-            }
-            @default {
-              <input class="input-field" type="number" step="1" min="0" inputmode="numeric"
-                     [ngModel]="weightValue(id)" (ngModelChange)="setWeight(id, $event)" [name]="'w-' + id" placeholder="1" />
-            }
-          }
-        </label>
-      }
-    </div>
-    @if (balanceNote()) { <p class="field-error">{{ balanceNote() }}</p> }
-    @if (state().mode === 'shares') {
-      <p class="field-hint">Shares are a ratio: 2 and 1 means one person had twice as much.</p>
-    }
-  }
-
-  <!-- WHO ELSE PAID -->
-  <div class="toggle-row">
-    <div>
-      <div class="toggle-label">Someone else paid part of it</div>
-      <div class="toggle-sub">The bill is what you paid plus what they paid.</div>
-    </div>
-    <button type="button" class="toggle" role="switch" [class.on]="othersPaid()" [attr.aria-checked]="othersPaid()"
-            aria-label="Someone else paid part of it" (click)="toggleOthersPaid()"></button>
-  </div>
-  @if (othersPaid()) {
-    <div class="weights">
-      @for (p of state().otherPayments; track $index; let i = $index) {
-        <div class="weight-row payer">
-          <select class="input-field" [ngModel]="p.personId" (ngModelChange)="setPayer(i, $event)" [name]="'payer-' + i"
-                  aria-label="Who paid">
-            @for (id of payerChoices(p.personId); track id) { <option [value]="id">{{ name(id) }}</option> }
-          </select>
-          <span class="input-affix"><span class="affix">$</span>
-            <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
-                   [ngModel]="payerValue(p.amountCents)" (ngModelChange)="setPayerAmount(i, $event)"
-                   [name]="'payer-amt-' + i" placeholder="0.00" aria-label="How much they paid" />
-          </span>
-          <button type="button" class="person-remove" (click)="removePayer(i)" aria-label="Remove payer">✕</button>
-        </div>
-      }
-    </div>
-    @if (payerChoices('').length) {
-      <button type="button" class="link-btn add-payer" (click)="addPayer()">+ Someone else paid too</button>
-    }
-  }
-
-  <!-- WHAT IT COMES TO -->
-  <div class="summary">
-    <div class="summary-head">
-      <span class="form-section-title">Bill</span>
-      <span class="fig">{{ money(billCents()) }}</span>
-    </div>
-    @for (r of rows(); track r.id) {
-      <div class="summary-row">
-        <span class="summary-name">{{ name(r.id) }}</span>
-        <span class="summary-detail">
-          @if (r.paidCents > 0) { paid <span class="fig">{{ money(r.paidCents) }}</span> · }
-          share <span class="fig">{{ money(r.shareCents) }}</span>
-        </span>
-        <span class="summary-owes fig">
-          @if (r.owesMeCents > 0) { owes you {{ money(r.owesMeCents) }} }
-        </span>
-      </div>
-    }
-    @for (t of otherTransfers(); track t.fromPersonId + t.toPersonId) {
-      <p class="field-hint">{{ name(t.fromPersonId) }} owes {{ name(t.toPersonId) }} {{ money(t.amountCents) }} — between them.</p>
-    }
-    @if (status().owedToMeCents > 0) {
-      <p class="summary-total">
-        <span class="fig">{{ money(status().owedToMeCents) }}</span> is owed back to you. Until it is,
-        you're out of pocket the whole <span class="fig">{{ money(myPaidCents()) }}</span>.
-      </p>
-    }
-  </div>
-
-  @if (problems().includes('no-one-else')) {
-    <p class="field-error">Add someone to split with.</p>
-  } @else if (problems().includes('unassigned')) {
-    <p class="field-error">Give someone a share of the bill.</p>
-  }
 </div>
+
+@if (state().mode !== 'equal' && state().participantIds.length) {
+  <div class="weights">
+    @for (id of state().participantIds; track id) {
+      <label class="weight-row">
+        <span class="weight-name">{{ people.nameOf(id) }}</span>
+        @switch (state().mode) {
+          @case ('amount') {
+            <span class="input-affix"><span class="affix">$</span>
+              <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
+                     [ngModel]="weightValue(id)" (ngModelChange)="setWeight(id, $event)" [name]="'w-' + id" placeholder="0.00" />
+            </span>
+          }
+          @case ('percent') {
+            <span class="input-affix suffix">
+              <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
+                     [ngModel]="weightValue(id)" (ngModelChange)="setWeight(id, $event)" [name]="'w-' + id" placeholder="0" />
+              <span class="affix">%</span>
+            </span>
+          }
+          @default {
+            <input class="input-field" type="number" step="1" min="0" inputmode="numeric"
+                   [ngModel]="weightValue(id)" (ngModelChange)="setWeight(id, $event)" [name]="'w-' + id" placeholder="1" />
+          }
+        }
+      </label>
+    }
+  </div>
+  @if (balanceNote()) { <p class="field-error">{{ balanceNote() }}</p> }
+  @if (state().mode === 'shares') {
+    <p class="field-hint">Shares are a ratio: 2 and 1 means one person had twice as much.</p>
+  }
+}
+
+<app-split-payers [payments]="state().otherPayments" (paymentsChange)="setPayments($event)" [candidates]="others()" />
+
+<app-split-summary [split]="split()" [myPaidCents]="myPaidCents()" />
+
+@if (problems().includes('no-one-else')) {
+  <p class="field-error">Add someone to split with.</p>
+} @else if (problems().includes('unassigned')) {
+  <p class="field-error">Give someone a share of the bill.</p>
+}
