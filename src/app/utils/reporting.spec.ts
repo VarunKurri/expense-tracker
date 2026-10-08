@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { Transaction } from '../models';
+import { ME, Transaction } from '../models';
 import {
   MoneyRules, totalExpenses, totalIncome, spendingTransactions, incomeTransactions,
   categoryTotals, monthlySeries, monthsBetween, transferTotals, sankeyLinks, sankeyLabel,
+  NO_SPLITS, SplitTotals, splitTotals,
 } from './reporting';
+import { MoneyBackLedger } from './money-back';
+import { quickSplit } from './splits';
 
 /** Minimal transaction factory — only the fields the reporting math reads. */
 function tx(over: Partial<Transaction> & { type: Transaction['type']; amount: number }): Transaction {
@@ -186,5 +189,91 @@ describe('reporting — sankey', () => {
 
   it('drops zero and negative flows', () => {
     expect(sankeyLinks([{ name: 'A', amount: 0 }], [{ name: 'B', amount: -5 }])).toEqual([]);
+  });
+});
+
+describe('reporting — split bills', () => {
+  // The real money-back logic, so linked and recorded money back both count.
+  class Ledger extends MoneyBackLedger {
+    constructor(public transactions: () => Transaction[]) { super(); }
+  }
+  const totalsOf = (txs: Transaction[]) => {
+    const l = new Ledger(() => txs);
+    return splitTotals(txs, t => l.moneyBackEntriesFor(t));
+  };
+  const bill = (cents: number, who: string[], over: Partial<Transaction> = {}) =>
+    tx({ type: 'expense', amount: cents / 100, split: quickSplit(cents, who), ...over });
+  const repay = (from: string, cents: number, covers = [from]) =>
+    ({ id: `r${from}${cents}`, source: 'repayment' as const, amountCents: cents, date: '2026-09-12', fromPersonId: from, coversPersonIds: covers });
+  const identity = (t: SplitTotals) => t.forOthersCents === t.repaidCents + t.owedCents + t.wontBeRepaidCents;
+
+  it('$180 three ways: your share is $60, $120 is owed to you', () => {
+    const t = totalsOf([bill(18000, [ME, 'a', 'b'])]);
+    expect(t).toEqual({ bills: 1, paidCents: 18000, myShareCents: 6000, forOthersCents: 12000, repaidCents: 0, owedCents: 12000, wontBeRepaidCents: 0 });
+  });
+
+  it('one friend repaying for two clears both; what is left is your share', () => {
+    const t = totalsOf([bill(18000, [ME, 'a', 'b'], { moneyBack: [repay('a', 12000, ['a', 'b'])] })]);
+    expect(t.repaidCents).toBe(12000);
+    expect(t.owedCents).toBe(0);
+    expect(identity(t)).toBe(true);
+  });
+
+  it('a linked bank repayment counts the same as one recorded by hand', () => {
+    const dinner = bill(18000, [ME, 'a', 'b'], { id: 'dinner' });
+    const zelle = tx({ type: 'income', amount: 60, reimbursesId: 'dinner', moneyBackInfo: { source: 'repayment', fromPersonId: 'a' } });
+    const t = totalsOf([dinner, zelle]);
+    expect(t.repaidCents).toBe(6000);
+    expect(t.owedCents).toBe(6000);
+  });
+
+  it('"won\'t be repaid" leaves "owed to you" but is still counted', () => {
+    const t = totalsOf([bill(18000, [ME, 'a', 'b'], { split: { ...quickSplit(18000, [ME, 'a', 'b']), closedPersonIds: ['b'] } })]);
+    expect(t.owedCents).toBe(6000);
+    expect(t.wontBeRepaidCents).toBe(6000);
+    expect(identity(t)).toBe(true);
+  });
+
+  it('paid for others with no share of your own', () => {
+    const t = totalsOf([bill(9000, ['a', 'b'])]);
+    expect(t.myShareCents).toBe(0);
+    expect(t.forOthersCents).toBe(9000);
+    expect(t.owedCents).toBe(9000);
+  });
+
+  it('a refund on a split bill shrinks every share, yours included', () => {
+    const t = totalsOf([bill(24000, [ME, 'a', 'b', 'c'], {
+      moneyBack: [{ id: 'f', source: 'refund', amountCents: 4000, date: '2026-09-11' }],
+    })]);
+    expect(t.myShareCents).toBe(5000);
+    expect(t.forOthersCents).toBe(15000);
+  });
+
+  it('adds up across bills, to the cent, and ignores everything that is not a split expense', () => {
+    const t = totalsOf([
+      bill(10000, [ME, 'a', 'b']),           // 33.34 / 33.33 / 33.33
+      bill(5000, [ME, 'a'], { moneyBack: [repay('a', 1000)] }),
+      tx({ type: 'expense', amount: 99 }),   // not split
+      tx({ type: 'expense', amount: 50, isInternalTransfer: true, split: quickSplit(5000, [ME, 'a']) }),
+      tx({ type: 'income', amount: 40 }),
+    ]);
+    expect(t.bills).toBe(2);
+    expect(t.paidCents).toBe(15000);
+    expect(t.myShareCents + t.forOthersCents).toBe(15000);
+    expect(t.repaidCents).toBe(1000);
+    expect(identity(t)).toBe(true);
+  });
+
+  it('partly paid: Alex paid $60 of a $240 bill, so only Ben and Cara owe you', () => {
+    const split = { ...quickSplit(24000, [ME, 'a', 'b', 'c']), payments: [{ personId: ME, amountCents: 18000 }, { personId: 'a', amountCents: 6000 }] };
+    const t = totalsOf([bill(18000, [ME], { split })]);
+    expect(t.paidCents).toBe(18000);
+    expect(t.myShareCents).toBe(6000);
+    expect(t.forOthersCents).toBe(12000);
+    expect(t.owedCents).toBe(12000);
+  });
+
+  it('nothing split: all zero', () => {
+    expect(totalsOf([tx({ type: 'expense', amount: 20 })])).toEqual(NO_SPLITS);
   });
 });

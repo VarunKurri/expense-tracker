@@ -519,6 +519,37 @@
   color: var(--fg-3);
 }
 
+/* ── SPLIT BILLS — "Owed to you" ─────────────────────────────
+   The figure and its sentence on the left, the four figures behind it on the
+   right; stacked on a phone. */
+.split-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px 32px;
+  align-items: center;
+  padding: 20px 24px;
+}
+.split-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.split-figure { font-size: 34px; }
+.split-sentence { margin: 0; max-width: 560px; color: var(--fg-2); font-size: 14px; line-height: 1.5; }
+.split-hint { margin: 0; color: var(--fg-3); font-size: 12.5px; }
+
+.split-figs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(110px, auto));
+  gap: 14px 28px;
+  margin: 0;
+
+  dt { color: var(--fg-3); margin-bottom: 4px; }
+  dd { margin: 0; font-size: 16px; font-weight: 600; color: var(--fg); }
+}
+
+@media (max-width: 768px) {
+  .split-card { grid-template-columns: 1fr; padding: 16px; }
+  .split-figure { font-size: 28px; }
+  .split-figs { padding-top: 14px; border-top: 1px solid var(--line); }
+}
+
 /* ── DONUT CHART ───────────────────────────────────────────── */
 .donut-wrap {
   padding: 20px;

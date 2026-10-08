@@ -150,7 +150,10 @@
           @for (t of drillTransactions(); track t.id) {
             <tr>
               <td class="fig muted">{{ t.date }}</td>
-              <td>{{ t.merchant }}</td>
+              <td>
+                {{ t.merchant }}
+                @if (t.myShare !== null) { <span class="row-note">Split · your share {{ money(t.myShare) }}</span> }
+              </td>
               <td class="muted">{{ t.category }}</td>
               <td class="right fig" [class.pos]="t.type === 'income'">
                 {{ t.type === 'income' ? '+' : '−' }}{{ money(t.amount) }}
@@ -236,6 +239,33 @@
           }
         </tbody>
       </table>
+    }
+
+    <!-- SPLIT BILLS — how much of the expenses above is other people's share -->
+    @if (showSplits()) {
+      <table class="report-table split-table">
+        <thead>
+          <tr><th>Split bills · {{ splits().bills }}</th><th class="right">Amount</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>You paid</td><td class="right fig">{{ cents(splits().paidCents) }}</td></tr>
+          <tr><td>Your share</td><td class="right fig">{{ cents(splits().myShareCents) }}</td></tr>
+          <tr><td>Paid for others</td><td class="right fig">{{ cents(splits().forOthersCents) }}</td></tr>
+          <tr><td class="muted">Paid back</td><td class="right fig muted">{{ cents(splits().repaidCents) }}</td></tr>
+          <tr><td>Still owed to you</td><td class="right fig">{{ cents(splits().owedCents) }}</td></tr>
+          @if (splits().wontBeRepaidCents > 0) {
+            <tr><td class="muted">Won't be repaid</td><td class="right fig muted">{{ cents(splits().wontBeRepaidCents) }}</td></tr>
+          }
+        </tbody>
+      </table>
+      <p class="table-note">
+        @if (netting()) {
+          Expenses count what you're out of pocket, so what's still owed to you is part of them until it comes back.
+          <a routerLink="/shared">See who owes you →</a>
+        } @else {
+          “Count money back” is off, so split bills count at their full amount above.
+        }
+      </p>
     }
   </section>
 </div>

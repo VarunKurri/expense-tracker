@@ -1,5 +1,6 @@
-import { Transaction } from '../models';
+import { MoneyBackEntry, Transaction } from '../models';
 import { isFullyRefunded, isMoneyBackIncome } from './money-back';
+import { splitStatus } from './splits';
 
 /**
  * Shared money aggregation for the Analysis and Reports pages.
@@ -186,6 +187,60 @@ export function transferTotals(txs: Transaction[]): TransferTotals {
     else movedOut += t.amount;
   }
   return { movedIn: round2(movedIn), movedOut: round2(movedOut), count };
+}
+
+/**
+ * Split bills in a period, in integer cents: what you paid, what was yours,
+ * and what was other people's — and how much of that has come back.
+ *
+ * Spending is always out of pocket (what you paid − money back), so a friend's
+ * unpaid share sits in your spending until it's repaid. These figures say how
+ * much of your spending that is.
+ *
+ * Always true: `forOthersCents = repaidCents + owedCents + wontBeRepaidCents`.
+ */
+export interface SplitTotals {
+  /** Split bills in the period. */
+  bills: number;
+  /** What you paid the merchant on them. */
+  paidCents: number;
+  /** Your part of them, after any refund. */
+  myShareCents: number;
+  /** Other people's shares that you covered. */
+  forOthersCents: number;
+  /** How much of that they've paid back. */
+  repaidCents: number;
+  /** Still owed to you. */
+  owedCents: number;
+  /** Marked "won't be repaid" — stays in your spending for good. */
+  wontBeRepaidCents: number;
+}
+
+export const NO_SPLITS: SplitTotals = {
+  bills: 0, paidCents: 0, myShareCents: 0, forOthersCents: 0, repaidCents: 0, owedCents: 0, wontBeRepaidCents: 0,
+};
+
+/**
+ * Totals for the split bills among `txs` (already filtered to a period).
+ * Per-bill arithmetic is `splitStatus` — the same numbers the transaction view
+ * and the Shared page show, so the three can't disagree.
+ */
+export function splitTotals(txs: Transaction[], moneyBackFor: (t: Transaction) => MoneyBackEntry[]): SplitTotals {
+  const totals = { ...NO_SPLITS };
+  for (const t of spendingTransactions(txs)) {
+    if (!t.split) continue;
+    const status = splitStatus(t.split, moneyBackFor(t));
+    totals.bills++;
+    totals.paidCents += status.myPaidCents;
+    totals.myShareCents += status.myShareCents;
+    for (const p of status.people) {
+      totals.forOthersCents += p.dueToMeCents;
+      totals.repaidCents += p.repaidCents;
+      if (p.state === 'closed') totals.wontBeRepaidCents += p.outstandingCents;
+      else totals.owedCents += p.outstandingCents;
+    }
+  }
+  return totals;
 }
 
 export interface SankeyLink { from: string; to: string; flow: number; }

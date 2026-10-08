@@ -141,6 +141,28 @@
     </div>
   </div>
 
+  <!-- SPLIT BILLS — only when the period has any. Spending counts what you're
+       out of pocket, so a friend's unpaid share is in it until it comes back;
+       this card says how much of your spending that is. -->
+  @if (splits().bills > 0) {
+    <section class="card split-card">
+      <div class="split-main">
+        <a class="card-label" routerLink="/shared">Owed to you ›</a>
+        <div class="num-display split-figure">{{ cents(splits().owedCents) }}</div>
+        <p class="split-sentence">{{ splitText() }}</p>
+        @if (!excludeRefunded()) {
+          <p class="split-hint">“Count money back” is off, so these bills count at their full amount.</p>
+        }
+      </div>
+      <dl class="split-figs">
+        <div><dt class="label-mono">You paid</dt><dd class="fig">{{ cents(splits().paidCents) }}</dd></div>
+        <div><dt class="label-mono">Your share</dt><dd class="fig">{{ cents(splits().myShareCents) }}</dd></div>
+        <div><dt class="label-mono">For others</dt><dd class="fig">{{ cents(splits().forOthersCents) }}</dd></div>
+        <div><dt class="label-mono">Paid back</dt><dd class="fig">{{ cents(splits().repaidCents) }}</dd></div>
+      </dl>
+    </section>
+  }
+
   <!-- MONTHLY TREND CHART -->
   <div class="chart-card">
     <div class="chart-card-head">
@@ -218,10 +240,8 @@
                            total above them. The charge itself is still shown
                            when the two differ — it is what is on the statement. -->
                       −{{ formatCurrency(eff(tx)) }}
-                      @if (reimbursedOn(tx) > 0.005) {
-                        <span class="merchant-tx-net">
-                          {{ formatCurrency(tx.amount) }} · ↩ {{ formatCurrency(reimbursedOn(tx)) }} back
-                        </span>
+                      @if (txNote(tx); as note) {
+                        <span class="merchant-tx-net">{{ note }}</span>
                       }
                     </div>
                   </div>

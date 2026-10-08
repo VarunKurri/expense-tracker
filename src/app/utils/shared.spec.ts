@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { ME, Transaction } from '../models';
 import { MoneyBackLedger } from './money-back';
-import { balancesByPerson, spreadRepayment, totalOwedCents } from './shared';
+import { balancesByPerson, splitSentence, spreadRepayment, totalOwedCents } from './shared';
+import { NO_SPLITS, SplitTotals } from './reporting';
 import { quickSplit, setClosed } from './splits';
 
 class Ledger extends MoneyBackLedger {
@@ -73,5 +74,33 @@ describe('spreadRepayment', () => {
   it('nothing to spread', () => {
     expect(spreadRepayment(open(), 0)).toEqual([]);
     expect(spreadRepayment([], 5000)).toEqual([]);
+  });
+});
+
+describe('splitSentence (the Analysis "Owed to you" card)', () => {
+  const totals = (over: Partial<SplitTotals>): SplitTotals => ({ ...NO_SPLITS, bills: 2, ...over });
+
+  it('owed, nothing back yet', () => {
+    expect(splitSentence(totals({ forOthersCents: 12000, owedCents: 12000 }), 'this month'))
+      .toBe("You covered $120.00 of other people's shares on 2 split bills this month. Until it comes back, it counts in your spending.");
+  });
+
+  it('partly back', () => {
+    expect(splitSentence(totals({ forOthersCents: 12000, repaidCents: 6000, owedCents: 6000 }), ''))
+      .toBe("You covered $120.00 of other people's shares on 2 split bills, and $60.00 has come back. Until the other $60.00 does, it counts in your spending.");
+  });
+
+  it('all back', () => {
+    expect(splitSentence(totals({ bills: 1, forOthersCents: 6000, repaidCents: 6000 }), 'last month'))
+      .toBe("You covered $60.00 of other people's shares on 1 split bill last month, and all of it came back — only your share counts as spending.");
+  });
+
+  it("some won't be repaid", () => {
+    expect(splitSentence(totals({ forOthersCents: 12000, repaidCents: 6000, wontBeRepaidCents: 6000 }), ''))
+      .toBe("You covered $120.00 of other people's shares on 2 split bills. $60.00 won't be repaid, so it stays in your spending.");
+  });
+
+  it('split, but nobody owes you (they paid their own way)', () => {
+    expect(splitSentence(totals({ bills: 1 }), 'this year')).toBe('Nobody owes you on your 1 split bill this year — everyone paid their own way.');
   });
 });

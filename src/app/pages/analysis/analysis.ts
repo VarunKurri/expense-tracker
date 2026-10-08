@@ -15,6 +15,10 @@ import { Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { filterForAnalysis } from '../../utils/analysis-filter';
 import { isMoneyBackIncome } from '../../utils/money-back';
+import { splitTotals } from '../../utils/reporting';
+import { splitSentence } from '../../utils/shared';
+import { splitStatus } from '../../utils/splits';
+import { fromCents } from '../../utils/money';
 import { categoryPalette, chartColors } from '../../utils/theme-colors';
 import { ThemeService } from '../../services/theme.service';
 import {
@@ -229,6 +233,45 @@ export class Analysis implements AfterViewInit, OnDestroy {
   reimbursedOn(t: Transaction): number {
     if (!this.excludeRefunded()) return 0;
     return this.txService.moneyBackFor(t);
+  }
+
+  // ── Split bills ────────────────────────────────────────────
+  /** Split bills in the period: your share, what you covered for others, what's come back. */
+  splits = computed(() => splitTotals(this.filtered(), t => this.txService.moneyBackEntriesFor(t)));
+
+  /** How the period reads in a sentence ("…on 2 split bills this month"). */
+  private periodPhrase = computed(() => {
+    switch (this.range()) {
+      case 'this-month': return 'this month';
+      case 'last-month': return 'last month';
+      case '3-months': return 'in the last 3 months';
+      case 'this-year': return 'this year';
+      case 'custom': return 'in this period';
+      default: return '';
+    }
+  });
+
+  splitText = computed(() => splitSentence(this.splits(), this.periodPhrase()));
+
+  /** Integer cents, as currency. */
+  cents(n: number): string {
+    return this.formatCurrency(fromCents(n));
+  }
+
+  /**
+   * The quiet line under a drill-down row's net figure: the charge itself when
+   * money came back, and your share when the bill was split — so a $49.05
+   * pizza reads as "your share $12.27", not as $49.05 of your own spending.
+   */
+  txNote(t: Transaction): string {
+    const parts: string[] = [];
+    const back = this.reimbursedOn(t);
+    if (back > 0.005) parts.push(`${this.formatCurrency(t.amount)} · ↩ ${this.formatCurrency(back)} back`);
+    if (t.split) {
+      const share = splitStatus(t.split, this.txService.moneyBackEntriesFor(t)).myShareCents;
+      parts.push(`your share ${this.cents(share)}`);
+    }
+    return parts.join(' · ');
   }
 
   // ── KPIs ───────────────────────────────────────────────────

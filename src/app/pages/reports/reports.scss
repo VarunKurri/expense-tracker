@@ -278,6 +278,13 @@
   }
 }
 
+/* A split bill in the drill-down: what the row's amount is made of. */
+.row-note { display: block; margin-top: 2px; font-size: 12px; color: var(--fg-3); }
+
+/* Split bills: a second table under the numbers, set off by a hairline. */
+.split-table { border-top: 1px solid var(--line); }
+.table-note a { color: var(--fg-2); text-decoration: none; font-weight: 500; &:hover { color: var(--fg); } }
+
 /* ── Drill-down ───────────────────────────────────────────── */
 .drill {
   border-color: var(--line-strong);

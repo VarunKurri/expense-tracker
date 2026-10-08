@@ -1,4 +1,7 @@
 import { MoneyBackEntry, Transaction } from '../models';
+import { formatCurrency } from './format';
+import { fromCents } from './money';
+import type { SplitTotals } from './reporting';
 import { sum } from './split/money';
 import { PersonSplitStatus, splitStatus } from './splits';
 
@@ -85,4 +88,30 @@ export function spreadRepayment(openBills: SharedBill[], amountCents: number): R
 /** Everything still owed to you, across everyone. */
 export function totalOwedCents(balances: PersonBalance[]): number {
   return sum(balances.map(b => b.owedCents));
+}
+
+const usd = (cents: number) => formatCurrency(fromCents(cents));
+
+/**
+ * The sentence under "Owed to you" on Analysis: what you covered for other
+ * people on a period's split bills, and what that means for your spending.
+ * `period` reads after the bill count — "this month", "in this period", or ''.
+ */
+export function splitSentence(t: SplitTotals, period: string): string {
+  const bills = `${t.bills} split bill${t.bills === 1 ? '' : 's'}${period ? ' ' + period : ''}`;
+  if (t.forOthersCents === 0) return `Nobody owes you on your ${bills} — everyone paid their own way.`;
+
+  const covered = `You covered ${usd(t.forOthersCents)} of other people's shares on ${bills}`;
+  const wont = t.wontBeRepaidCents > 0
+    ? ` ${usd(t.wontBeRepaidCents)} won't be repaid, so it stays in your spending.`
+    : '';
+  if (t.owedCents === 0) {
+    return t.wontBeRepaidCents === 0
+      ? `${covered}, and all of it came back — only your share counts as spending.`
+      : `${covered}.${wont}`;
+  }
+  const back = t.repaidCents > 0
+    ? `, and ${usd(t.repaidCents)} has come back. Until the other ${usd(t.owedCents)} does, it counts in your spending.`
+    : '. Until it comes back, it counts in your spending.';
+  return `${covered}${back}${wont}`;
 }

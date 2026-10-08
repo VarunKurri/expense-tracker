@@ -21,8 +21,10 @@ import { chartColors, categoryPalette, otherColor } from '../../utils/theme-colo
 import {
   MoneyRules, totalExpenses, totalIncome, categoryTotals, incomeTotals,
   monthlySeries, monthsBetween, transferTotals, sankeyLinks, sankeyLabel,
-  expenseAmount,
+  expenseAmount, splitTotals,
 } from '../../utils/reporting';
+import { splitStatus } from '../../utils/splits';
+import { fromCents } from '../../utils/money';
 import { localDateString } from '../../utils/date';
 
 Chart.register(
@@ -150,6 +152,11 @@ export class Reports implements AfterViewInit, OnDestroy {
       start, end, excludeRefunded: this.netting(), isRefunded: this.isRefunded,
     });
   });
+
+  /** Split bills in the period — the "Split bills" rows under the numbers. */
+  splits = computed(() => splitTotals(this.filtered(), t => this.txService.moneyBackEntriesFor(t)));
+  /** Shown on the reports that count spending. */
+  showSplits = computed(() => this.splits().bills > 0 && (this.report() === 'cash-flow' || this.report() === 'expenses'));
 
   /** Injected so the reporting helpers stay pure and testable. */
   private rules = computed<MoneyRules>(() => this.txService.moneyRules(this.netting()));
@@ -285,6 +292,10 @@ export class Reports implements AfterViewInit, OnDestroy {
         category: this.catName(t.categoryId || '__none__'),
         type: t.type,
         amount: t.type === 'expense' ? expenseAmount(t, rules) : t.amount,
+        /** On a split bill, your part of it — what the row's amount is made of. */
+        myShare: t.type === 'expense' && t.split
+          ? fromCents(splitStatus(t.split, this.txService.moneyBackEntriesFor(t)).myShareCents)
+          : null,
       }));
   });
 
@@ -328,6 +339,10 @@ export class Reports implements AfterViewInit, OnDestroy {
   // ── Formatting ─────────────────────────────────────────────
   money(n: number): string {
     return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  }
+  /** Integer cents, as currency. */
+  cents(n: number): string {
+    return this.money(fromCents(n));
   }
   moneyShort(n: number): string {
     const a = Math.abs(n);
