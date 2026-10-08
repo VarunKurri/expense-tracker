@@ -123,6 +123,25 @@
              [(ngModel)]="date" name="date" />
     </div>
 
+    <!-- SPLIT — shared with friends: who owes you what -->
+    @if (type === 'expense') {
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Split this bill</div>
+          <div class="toggle-sub">Shared with friends? Track who owes you what.</div>
+        </div>
+        <button type="button" class="toggle" role="switch" [class.on]="splitOn()" [attr.aria-checked]="splitOn()"
+                aria-label="Split this bill" (click)="splitOn.set(!splitOn())"></button>
+      </div>
+      @if (splitOn()) {
+        @if (splitIsItemized()) {
+          <p class="form-note">This bill is split item by item. Turn the split off to remove it.</p>
+        } @else {
+          <app-split-editor [myPaidCents]="amountCents()" [(state)]="splitState" />
+        }
+      }
+    }
+
     <!-- RECURRING BILL SECTION — slides in when Subscriptions category selected -->
     @if (isSubscription() && type === 'expense' && !transaction && !hasExistingBill()) {
       <div class="form-section recurring">

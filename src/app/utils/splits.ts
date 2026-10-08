@@ -1,8 +1,9 @@
 import { ME, MoneyBackEntry, TransactionSplit } from '../models';
+import { wholeShareWeights } from './split/shareWeights';
 import { allocate, sum } from './split/money';
 import { settle } from './split/settle';
 import { calculateSplit } from './split/split';
-import type { Bill, BillSummary, Charges, SplitMode, Transfer } from './split/types';
+import type { Bill, BillSummary, Charges, Payment, SplitMode, Transfer } from './split/types';
 
 /**
  * Who owes you what on a split bill, after refunds and repayments.
@@ -258,4 +259,104 @@ export function splitProblems(split: TransactionSplit, transactionAmountCents: n
   const mine = sum(split.payments.filter(p => p.personId === ME).map(p => p.amountCents));
   if (mine !== transactionAmountCents) problems.push('my-payment-mismatch');
   return problems;
+}
+
+/* ------------------------------------------------------------------ */
+/* Quick split editing                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What the quick split editor holds: the choices, not the arithmetic. The
+ * split itself is built from these at save time with the amount as it is
+ * then, so editing the amount after setting up a split can't leave it stale.
+ */
+export interface QuickSplitState {
+  /** Who shares the bill. Leave `ME` out when you paid for others entirely. */
+  participantIds: string[];
+  mode: SplitMode;
+  /**
+   * Per person, meaning set by `mode` (as in Split): `shares` whole numbers,
+   * `percent` percentages adding to 100, `amount` cents adding to the bill.
+   * Ignored for `equal`.
+   */
+  weights: Record<string, number>;
+  /** Other people who paid the merchant part of the bill, in cents. */
+  otherPayments: Payment[];
+}
+
+export function emptyQuickState(): QuickSplitState {
+  return { participantIds: [ME], mode: 'equal', weights: {}, otherPayments: [] };
+}
+
+/** Everyone who paid, you first. Zero and duplicate entries for you are dropped. */
+function payments(state: QuickSplitState, myPaidCents: number): Payment[] {
+  return [
+    { personId: ME, amountCents: myPaidCents },
+    ...state.otherPayments.filter(p => p.personId !== ME && p.amountCents > 0),
+  ];
+}
+
+/** The bill: what you paid plus what anyone else paid towards it. */
+export function quickBillCents(state: QuickSplitState, myPaidCents: number): number {
+  return sum(payments(state, myPaidCents).map(p => p.amountCents));
+}
+
+/**
+ * The split to save. Keeps anything the editor doesn't own (who's marked
+ * "won't be repaid") from the split being edited.
+ */
+export function buildQuickSplit(
+  state: QuickSplitState, myPaidCents: number, existing?: TransactionSplit | null,
+): TransactionSplit {
+  const split = quickSplit(
+    quickBillCents(state, myPaidCents),
+    state.participantIds,
+    state.mode,
+    state.participantIds.map(id => state.weights[id] ?? 0),
+  );
+  split.payments = payments(state, myPaidCents);
+  if (existing?.closedPersonIds?.length) split.closedPersonIds = [...existing.closedPersonIds];
+  if (existing?.source) split.source = existing.source;
+  return split;
+}
+
+/** Read a saved quick split back into the editor. */
+export function quickStateFrom(split: TransactionSplit): QuickSplitState {
+  const item = split.items[0];
+  const weights: Record<string, number> = {};
+  for (const a of item?.assignments ?? []) weights[a.personId] = a.weight;
+  return {
+    participantIds: [...split.participantIds],
+    mode: item?.splitMode ?? 'equal',
+    weights: item?.splitMode === 'equal' ? {} : weights,
+    otherPayments: split.payments.filter(p => p.personId !== ME).map(p => ({ ...p })),
+  };
+}
+
+/**
+ * Switching mode restates the split rather than resetting it (Split's rule):
+ * "$80 / $40" becomes "2 : 1" in shares and "66.67% / 33.33%" in percent.
+ * Each person's current share is worked out by the engine, then expressed in
+ * the new mode's terms.
+ */
+export function restateWeights(state: QuickSplitState, mode: SplitMode, billCents: number): Record<string, number> {
+  const ids = state.participantIds;
+  if (mode === 'equal' || ids.length === 0) return {};
+  const current = ids.map(id => state.mode === 'equal' ? 1 : (state.weights[id] ?? 0));
+  const shareCents = allocate(billCents, current);
+  const out: Record<string, number> = {};
+  if (mode === 'shares') {
+    // Whole-number ratio of the current shares. Messy cents ("$33.34 / $33.33")
+    // would reduce to giant numbers nobody wants to type, so those start even.
+    const whole = state.mode === 'equal' ? ids.map(() => 1) : wholeShareWeights(shareCents);
+    const usable = whole && Math.max(...whole) <= 20 ? whole : ids.map(() => 1);
+    ids.forEach((id, i) => out[id] = usable[i]);
+  } else if (mode === 'percent') {
+    // Basis points through allocate(), so the percentages add to exactly 100.
+    const bps = allocate(10000, shareCents.some(c => c > 0) ? shareCents : ids.map(() => 1));
+    ids.forEach((id, i) => out[id] = bps[i] / 100);
+  } else {
+    ids.forEach((id, i) => out[id] = shareCents[i]);
+  }
+  return out;
 }

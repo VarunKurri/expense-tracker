@@ -6,13 +6,16 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Modal } from '../../../components/modal/modal';
 import { ErrorBanner } from '../../../components/error-banner/error-banner';
+import { SplitEditor } from '../../../components/split-editor/split-editor';
 import { AccountService } from '../../../services/account.service';
 import { CategoryService } from '../../../services/category.service';
 import { BillService } from '../../../services/bill.service';
 import { TransactionTemplateService } from '../../../services/transaction-template.service';
 import { TransactionService } from '../../../services/transaction.service';
 import { formatCurrency } from '../../../utils/format';
-import { BillAmountMode, BillDueDateMode, BillFrequency, Transaction, TransactionType } from '../../../models';
+import { toCents } from '../../../utils/money';
+import { QuickSplitState, buildQuickSplit, emptyQuickState, quickStateFrom, splitProblems } from '../../../utils/splits';
+import { BillAmountMode, BillDueDateMode, BillFrequency, Transaction, TransactionSplit, TransactionType } from '../../../models';
 import { BILL_FREQUENCIES } from '../../../utils/bill-schedule';
 import { TransactionTemplate } from '../../../models';
 import { QuickAddService } from '../../../services/quick-add.service';
@@ -21,7 +24,7 @@ import { ToastService } from '../../../services/toast.service';
 @Component({
   selector: 'app-transaction-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, Modal, ErrorBanner],
+  imports: [CommonModule, FormsModule, Modal, ErrorBanner, SplitEditor],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss'
 })
@@ -56,6 +59,22 @@ export class TransactionForm implements OnChanges {
   templateName = signal('');
 
   formatCurrency = formatCurrency;
+
+  // ── Bill splitting (expenses) ──────────────────────────────
+  splitOn = signal(false);
+  splitState = signal<QuickSplitState>(emptyQuickState());
+  /** The split saved on the transaction being edited, if any. */
+  private existingSplit: TransactionSplit | null = null;
+
+  /** Itemized splits get their own editor (receipts, tax and tip); this one leaves them be. */
+  splitIsItemized(): boolean {
+    return this.existingSplit?.mode === 'itemized';
+  }
+
+  /** What you paid, in cents: the amount field, which is your payment on the bill. */
+  amountCents(): number {
+    return toCents(Number(this.amount) || 0);
+  }
 
   /** Money back already recorded on the expense being edited, for the note in place of the old refund toggle. */
   moneyBack(): number {
@@ -126,6 +145,9 @@ export class TransactionForm implements OnChanges {
       this.fromAccountId = this.transaction.fromAccountId || '';
       this.toAccountId = this.transaction.toAccountId || '';
       this.isInternalTransfer = this.transaction.isInternalTransfer || false;
+      this.existingSplit = this.transaction.split ?? null;
+      this.splitOn.set(!!this.existingSplit && this.transaction.type === 'expense');
+      this.splitState.set(this.existingSplit && !this.splitIsItemized() ? quickStateFrom(this.existingSplit) : emptyQuickState());
       this.saveAsTemplate.set(false);
       this.templateName.set('');
     } else {
@@ -136,6 +158,9 @@ export class TransactionForm implements OnChanges {
       this.merchant.set('');
       this.applySmartDefaultsForType();
       this.applyDraft();
+      this.existingSplit = null;
+      this.splitOn.set(false);
+      this.splitState.set(emptyQuickState());
       this.saveAsTemplate.set(false);
       this.templateName.set('');
     }
@@ -414,6 +439,20 @@ export class TransactionForm implements OnChanges {
       if (!accountId) { this.toastService.error('Please select an account'); return; }
       if (!merchant) { this.toastService.error('Merchant or source is required'); return; }
 
+      // The split is built here, from the amount as it is now, and checked before
+      // anything is saved: "what you're owed" must rest on a bill that adds up.
+      let split: TransactionSplit | undefined;
+      if (type === 'expense' && this.splitOn()) {
+        if (this.splitIsItemized()) {
+          split = this.existingSplit!;
+        } else {
+          split = buildQuickSplit(this.splitState(), toCents(amount), this.existingSplit);
+          const problems = splitProblems(split, toCents(amount));
+          if (problems.includes('no-one-else')) { this.toastService.error('Add someone to split this bill with.'); return; }
+          if (problems.length) { this.toastService.error('Give someone a share of the bill before saving.'); return; }
+        }
+      }
+
       this.submitting.set(true);
       try {
         await this.saveCurrentAsTemplate();
@@ -433,6 +472,8 @@ export class TransactionForm implements OnChanges {
         ...(categoryId ? { categoryId } : {}),
         ...(notes ? { notes } : {}),
         isInternalTransfer,
+        // Turning the split off on an edit clears it; undefined is dropped when saved.
+        ...(split ? { split } : this.existingSplit ? { split: undefined } : {}),
       });
 
       // If Subscriptions category selected, auto-create bill if one doesn't exist yet

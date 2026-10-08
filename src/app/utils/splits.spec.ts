@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { ME, MoneyBackEntry, TransactionSplit } from '../models';
 import { outOfPocketCents, surplusCents } from './money-back';
-import { owedToMeByPerson, quickSplit, splitProblems, splitStatus } from './splits';
+import {
+  QuickSplitState, buildQuickSplit, emptyQuickState, owedToMeByPerson, quickBillCents, quickSplit, quickStateFrom,
+  restateWeights, splitProblems, splitStatus,
+} from './splits';
 
 const repay = (amountCents: number, fromPersonId: string, coversPersonIds?: string[], date = '2026-10-01'): MoneyBackEntry =>
   ({ source: 'repayment', amountCents, date, fromPersonId, coversPersonIds });
@@ -241,5 +244,91 @@ describe('splitProblems', () => {
   it('flags payments that do not cover the bill', () => {
     const short = { ...quickSplit(1000, [ME, 'alex']), payments: [{ personId: ME, amountCents: 800 }] };
     expect(splitProblems(short, 800)).toEqual(['not-covered']);
+  });
+});
+
+describe('quick split editing', () => {
+  const four = (over: Partial<QuickSplitState> = {}): QuickSplitState =>
+    ({ ...emptyQuickState(), participantIds: [ME, 'alex', 'ben', 'cara'], ...over });
+
+  it('starts with just you, equally', () => {
+    expect(emptyQuickState()).toEqual({ participantIds: [ME], mode: 'equal', weights: {}, otherPayments: [] });
+  });
+
+  it('builds an equal split you paid in full, ready to save', () => {
+    const split = buildQuickSplit(four(), 24000);
+    expect(split.mode).toBe('quick');
+    expect(split.payments).toEqual([{ personId: ME, amountCents: 24000 }]);
+    expect(splitProblems(split, 24000)).toEqual([]);
+    expect(splitStatus(split).owedToMeCents).toBe(18000);
+  });
+
+  it('others who paid part of it make the bill bigger than your transaction (scenario 2)', () => {
+    const state = four({ otherPayments: [{ personId: 'alex', amountCents: 6000 }] });
+    expect(quickBillCents(state, 18000)).toBe(24000);
+    const split = buildQuickSplit(state, 18000);
+    expect(splitProblems(split, 18000)).toEqual([]);
+    const s = splitStatus(split);
+    expect(s.myShareCents).toBe(6000);
+    expect(s.owedToMeCents).toBe(12000);
+  });
+
+  it('ignores empty payer rows', () => {
+    const split = buildQuickSplit(four({ otherPayments: [{ personId: 'alex', amountCents: 0 }] }), 24000);
+    expect(split.payments).toHaveLength(1);
+  });
+
+  it('uses the amount at save time, so editing it never leaves the split stale', () => {
+    const state = four();
+    expect(splitStatus(buildQuickSplit(state, 24000)).myShareCents).toBe(6000);
+    expect(splitStatus(buildQuickSplit(state, 20000)).myShareCents).toBe(5000);
+  });
+
+  it('round-trips through a saved split, keeping "won\'t be repaid"', () => {
+    const state = four({ mode: 'shares', weights: { [ME]: 2, alex: 1, ben: 1, cara: 0 }, otherPayments: [{ personId: 'ben', amountCents: 1000 }] });
+    const saved = { ...buildQuickSplit(state, 24000), closedPersonIds: ['cara'] };
+    expect(quickStateFrom(saved)).toEqual(state);
+    expect(buildQuickSplit(quickStateFrom(saved), 24000, saved).closedPersonIds).toEqual(['cara']);
+  });
+
+  it('flags nobody to split with, and nobody having a share', () => {
+    expect(splitProblems(buildQuickSplit(emptyQuickState(), 1000), 1000)).toEqual(['no-one-else']);
+    const zero = four({ mode: 'shares', weights: {} });
+    expect(splitProblems(buildQuickSplit(zero, 1000), 1000)).toContain('unassigned');
+  });
+});
+
+describe('restateWeights: switching mode keeps the split', () => {
+  const two = (mode: QuickSplitState['mode'], weights: Record<string, number> = {}): QuickSplitState =>
+    ({ participantIds: [ME, 'alex'], mode, weights, otherPayments: [] });
+
+  it('equal → shares is one each; → percent is 50/50; → amount is the cents', () => {
+    expect(restateWeights(two('equal'), 'shares', 12000)).toEqual({ [ME]: 1, alex: 1 });
+    expect(restateWeights(two('equal'), 'percent', 12000)).toEqual({ [ME]: 50, alex: 50 });
+    expect(restateWeights(two('equal'), 'amount', 12000)).toEqual({ [ME]: 6000, alex: 6000 });
+  });
+
+  it('$80 / $40 restates as 2 : 1 and 66.67% / 33.33%', () => {
+    const amounts = two('amount', { [ME]: 8000, alex: 4000 });
+    expect(restateWeights(amounts, 'shares', 12000)).toEqual({ [ME]: 2, alex: 1 });
+    expect(restateWeights(amounts, 'percent', 12000)).toEqual({ [ME]: 66.67, alex: 33.33 });
+  });
+
+  it('percentages always add to exactly 100', () => {
+    const three: QuickSplitState = { participantIds: [ME, 'alex', 'ben'], mode: 'equal', weights: {}, otherPayments: [] };
+    const pct = restateWeights(three, 'percent', 10000);
+    expect(Object.values(pct).reduce((a, b) => a + b, 0)).toBeCloseTo(100, 10);
+  });
+
+  it('messy amounts start shares even rather than as giant ratios', () => {
+    const messy = two('amount', { [ME]: 3334, alex: 3333 });
+    expect(restateWeights(messy, 'shares', 6667)).toEqual({ [ME]: 1, alex: 1 });
+  });
+
+  it('the money split is unchanged by switching (amount → percent → amount)', () => {
+    const amounts = two('amount', { [ME]: 8000, alex: 4000 });
+    const pct = { ...amounts, mode: 'percent' as const, weights: restateWeights(amounts, 'percent', 12000) };
+    const back = restateWeights(pct, 'amount', 12000);
+    expect(back).toEqual({ [ME]: 8000, alex: 4000 });
   });
 });
