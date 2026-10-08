@@ -167,7 +167,7 @@
   <div class="chart-card">
     <div class="chart-card-head">
       <div>
-        <div class="chart-card-title">Monthly trend</div>
+        <span class="card-label">Monthly trend</span>
         <div class="chart-card-sub">Income vs spending</div>
       </div>
       <!-- Legend with actual colored swatches -->
@@ -194,8 +194,8 @@
     <div class="card-panel">
       <div class="panel-head">
         <div class="panel-head-row">
-          <div class="panel-title">Top merchants</div>
-          <a class="see-all-link" [routerLink]="['/transactions']" [queryParams]="seeAllTxParams()">See all transactions →</a>
+          <span class="card-label">Top merchants</span>
+          <a class="card-link" [routerLink]="['/transactions']" [queryParams]="seeAllTxParams()">See all transactions →</a>
         </div>
         <div class="panel-sub">by total spend</div>
       </div>
@@ -258,8 +258,8 @@
     <div class="card-panel">
       <div class="panel-head">
         <div class="panel-head-row">
-          <div class="panel-title">Where it went</div>
-          <a class="see-all-link" [routerLink]="['/analysis/categories']" [queryParams]="categoryBreakdownParams()">See all categories →</a>
+          <span class="card-label">Where it went</span>
+          <a class="card-link" [routerLink]="['/analysis/categories']" [queryParams]="categoryBreakdownParams()">See all categories →</a>
         </div>
         <div class="panel-sub">{{ formatCurrency(totalExpenses()) }} total · top 8 categories</div>
       </div>

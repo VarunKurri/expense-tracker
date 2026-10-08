@@ -73,7 +73,12 @@ The app is what we copy. Do not "correct" this back to dark.
 - Cards use `var(--card-grad)`; inputs use `var(--input-grad)`.
 - Shared classes: `.card`, `.btn-primary`, `.btn-solid`, `.btn-ghost`,
   `.btn-danger`, `.btn-add`, `.btn-row`, `.input` / `.input-field`, `.chip`,
-  `.card-label`, `.label-mono`, `.num`, `.fig`, `.num-display`, `.display`.
+  `.card-label`, `.card-link`, `.label-mono`, `.num`, `.fig`, `.num-display`, `.display`.
+- A card's title is always the mono `.card-label` eyebrow — never a bold sans
+  heading. "See all →" beside it is `.card-link` (no underline).
+- Anything that scrolls inside a rounded surface scrolls in an **inner**
+  element (`.modal-body`, the transaction view's `.view-scroll`); the rounded
+  outer box is `overflow: hidden`. Otherwise the scrollbar paints over the corner.
 - **Actions are buttons, not underlined links.** "+ Add item" / "+ Add money
   back" use `.btn-add` (dashed, full width, under the list it adds to); a small
   action inside a row ("Show 2 settled") uses `.btn-row`. Prefer putting a

@@ -653,6 +653,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 /* An inline text link inside a sentence ("Use calculated", "Go to October"). */
+/* "See all →" in a card's header, beside its eyebrow: quiet text that darkens
+   on hover. Never underlined — it sits next to a mono label, not in a sentence. */
+.card-link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fg-3);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--t);
+
+  &:hover { color: var(--fg); }
+  &:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 3px var(--focus-ring); }
+}
+
 /* "+ Add item", "+ Add money back": a dashed, full-width row that adds
    something to the list above it. Quieter than a button, clearer than a link. */
 .btn-add {

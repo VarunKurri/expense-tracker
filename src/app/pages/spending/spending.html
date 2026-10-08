@@ -159,7 +159,7 @@
     <section class="card">
       <div class="card-head">
         <span class="card-label">Latest in {{ monthName() }}</span>
-        <button class="link-btn" (click)="seeAllInTransactions()">See all →</button>
+        <button type="button" class="card-link" (click)="seeAllInTransactions()">See all →</button>
       </div>
 
       @for (tx of latest(); track tx.id) {

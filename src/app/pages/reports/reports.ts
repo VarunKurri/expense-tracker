@@ -24,6 +24,7 @@ import {
   expenseAmount, splitTotals,
 } from '../../utils/reporting';
 import { splitStatus } from '../../utils/splits';
+import { splitSentence } from '../../utils/shared';
 import { fromCents } from '../../utils/money';
 import { localDateString } from '../../utils/date';
 
@@ -155,6 +156,19 @@ export class Reports implements AfterViewInit, OnDestroy {
 
   /** Split bills in the period — the "Split bills" rows under the numbers. */
   splits = computed(() => splitTotals(this.filtered(), t => this.txService.moneyBackEntriesFor(t)));
+  /** "You covered $74.69 of other people's shares on 2 split bills in the last 6 months…" */
+  splitText = computed(() => splitSentence(this.splits(), this.periodPhrase()));
+
+  /** How the period reads in a sentence. */
+  private periodPhrase = computed(() => {
+    switch (this.range()) {
+      case '3-months': return 'in the last 3 months';
+      case '6-months': return 'in the last 6 months';
+      case 'this-year': return 'this year';
+      default: return 'in this period';
+    }
+  });
+
   /** Shown on the reports that count spending. */
   showSplits = computed(() => this.splits().bills > 0 && (this.report() === 'cash-flow' || this.report() === 'expenses'));
 

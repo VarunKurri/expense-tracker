@@ -1,238 +1,242 @@
 @if (tx(); as tx) {
   <div class="view-backdrop" (click)="close()"></div>
   <div class="view-panel" role="dialog" aria-modal="true" aria-label="Transaction details">
-    <div class="view-handle"></div>
+    <!-- The panel keeps its rounded corners; this scrolls inside it, so the
+         scrollbar never paints over a corner. -->
+    <div class="view-scroll">
+      <div class="view-handle"></div>
 
-    <div class="view-header">
-      <button class="view-close" (click)="close()" aria-label="Close">✕</button>
-      <button class="view-edit-btn" (click)="edit()">Edit</button>
-    </div>
-
-    <div class="view-amount-wrap">
-      <div class="view-amount"
-           [class.pos]="tx.type === 'income'"
-           [class.neg]="tx.type === 'expense'">
-        @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
-        @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
-        @else { {{ formatCurrency(tx.amount) }} }
+      <div class="view-header">
+        <button class="view-close" (click)="close()" aria-label="Close">✕</button>
+        <button class="view-edit-btn" (click)="edit()">Edit</button>
       </div>
-      @if (txService.isFullyRefunded(tx)) {
-        <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
-      }
-      @if (tx.isInternalTransfer) {
-        <div class="view-refunded-badge">↔ Internal transfer — excluded from analysis</div>
-      }
-    </div>
 
-    <div class="view-details">
-      @if (tx.type !== 'transfer') {
-        <div class="view-row">
-          <span class="view-row-label">{{ tx.type === 'income' ? 'Source' : 'Merchant' }}</span>
-          <span class="view-row-value">{{ tx.merchant || '—' }}</span>
+      <div class="view-amount-wrap">
+        <div class="view-amount"
+             [class.pos]="tx.type === 'income'"
+             [class.neg]="tx.type === 'expense'">
+          @if (tx.type === 'expense') { −{{ formatCurrency(tx.amount) }} }
+          @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
+          @else { {{ formatCurrency(tx.amount) }} }
         </div>
-      }
-      <div class="view-row">
-        <span class="view-row-label">Date</span>
-        <span class="view-row-value">{{ formatFullDate(tx.date) }}</span>
+        @if (txService.isFullyRefunded(tx)) {
+          <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
+        }
+        @if (tx.isInternalTransfer) {
+          <div class="view-refunded-badge">↔ Internal transfer — excluded from analysis</div>
+        }
       </div>
-      @if (tx.type === 'transfer') {
-        <div class="view-row">
-          <span class="view-row-label">From</span>
-          <span class="view-row-value">{{ accountName(tx.fromAccountId) }}</span>
-        </div>
-        <div class="view-row">
-          <span class="view-row-label">To</span>
-          <span class="view-row-value">{{ accountName(tx.toAccountId) }}</span>
-        </div>
-      } @else {
-        <div class="view-row">
-          <span class="view-row-label">Account</span>
-          <span class="view-row-value">{{ accountName(tx.accountId) }}</span>
-        </div>
-        @if (categoryFor(tx.categoryId); as cat) {
+
+      <div class="view-details">
+        @if (tx.type !== 'transfer') {
           <div class="view-row">
-            <span class="view-row-label">Category</span>
-            <span class="view-row-value">{{ cat.icon }} {{ cat.name }}</span>
+            <span class="view-row-label">{{ tx.type === 'income' ? 'Source' : 'Merchant' }}</span>
+            <span class="view-row-value">{{ tx.merchant || '—' }}</span>
           </div>
         }
-      }
-      @if (tx.notes) {
-        <div class="view-row view-row-notes">
-          <span class="view-row-label">Notes</span>
-          <span class="view-row-value notes-text">{{ tx.notes }}</span>
+        <div class="view-row">
+          <span class="view-row-label">Date</span>
+          <span class="view-row-value">{{ formatFullDate(tx.date) }}</span>
         </div>
-      }
-      <div class="view-row">
-        <span class="view-row-label">Type</span>
-        <span class="view-row-value view-type-badge" [class]="tx.type">
-          {{ tx.type === 'income' ? 'Income' : tx.type === 'expense' ? 'Expense' : 'Transfer' }}
-        </span>
-      </div>
-    </div>
-
-    <!-- MONEY BACK — refunds and repayments in one place, on every expense
-         whether or not anything has come back yet, so the same transaction reads
-         the same way opened from anywhere. -->
-    @if (tx.type === 'expense') {
-      <div class="view-reimburse">
-        <div class="view-reimburse-head">Money back</div>
-        @if (split(); as s) {
-          <!-- SPLIT — one row per person; tap to record what they paid back -->
-          <div class="split-people">
-            @for (p of s.people; track p.personId) {
-              <button type="button" class="split-person" [class.settled]="p.state !== 'owed' && p.state !== 'partial'"
-                      [disabled]="!canOpenPerson(p)" (click)="openPerson(p)" [attr.aria-label]="personAriaLabel(p)">
-                <span class="split-person-main">
-                  <span class="split-person-name">{{ people.nameOf(p.personId) }}</span>
-                  <span class="split-person-status">{{ personStatus(p) }}</span>
-                </span>
-                <span class="split-person-amount fig">{{ formatCents(personAmountCents(p)) }}</span>
-              </button>
-            }
+        @if (tx.type === 'transfer') {
+          <div class="view-row">
+            <span class="view-row-label">From</span>
+            <span class="view-row-value">{{ accountName(tx.fromAccountId) }}</span>
           </div>
-          <p class="reimburse-hint split-hint">
-            Your share is <span class="fig">{{ formatCents(s.myShareCents) }}</span>.
-            @if (s.owedToMeCents > 0) {
-              <span class="fig">{{ formatCents(s.owedToMeCents) }}</span> is still owed to you — tap someone to record what they paid back.
-            } @else {
-              Nobody owes you anything on this.
-            }
-            @if (s.unappliedRepaymentCents > 0) {
-              <span class="fig">{{ formatCents(s.unappliedRepaymentCents) }}</span> came back beyond what anyone owed, so it covers your share too.
-            }
-          </p>
+          <div class="view-row">
+            <span class="view-row-label">To</span>
+            <span class="view-row-value">{{ accountName(tx.toAccountId) }}</span>
+          </div>
+        } @else {
+          <div class="view-row">
+            <span class="view-row-label">Account</span>
+            <span class="view-row-value">{{ accountName(tx.accountId) }}</span>
+          </div>
+          @if (categoryFor(tx.categoryId); as cat) {
+            <div class="view-row">
+              <span class="view-row-label">Category</span>
+              <span class="view-row-value">{{ cat.icon }} {{ cat.name }}</span>
+            </div>
+          }
         }
-        @if (moneyBackTotal() > 0) {
-          <div class="reimburse-summary">
-            @if (refundState() === 'full' && reimbursementSurplus() <= 0.005) {
-              Refunded in full, so it's left out of analysis while money back is counted.
-            } @else {
-              <strong class="fig">{{ formatCurrency(moneyBackTotal()) }}</strong> back
-              of <span class="fig">{{ formatCurrency(tx.amount) }}</span>
-              @if (reimbursementSurplus() > 0.005) {
-                · Surplus <strong class="amt-surplus fig">{{ formatCurrency(reimbursementSurplus()) }}</strong>
-              } @else {
-                · Out of pocket <strong class="fig" [class.amt-expense]="netExpense() > 0.005">{{ formatCurrency(netExpense()) }}</strong>
+        @if (tx.notes) {
+          <div class="view-row view-row-notes">
+            <span class="view-row-label">Notes</span>
+            <span class="view-row-value notes-text">{{ tx.notes }}</span>
+          </div>
+        }
+        <div class="view-row">
+          <span class="view-row-label">Type</span>
+          <span class="view-row-value view-type-badge" [class]="tx.type">
+            {{ tx.type === 'income' ? 'Income' : tx.type === 'expense' ? 'Expense' : 'Transfer' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- MONEY BACK — refunds and repayments in one place, on every expense
+           whether or not anything has come back yet, so the same transaction reads
+           the same way opened from anywhere. -->
+      @if (tx.type === 'expense') {
+        <div class="view-reimburse">
+          <div class="view-reimburse-head">Money back</div>
+          @if (split(); as s) {
+            <!-- SPLIT — one row per person; tap to record what they paid back -->
+            <div class="split-people">
+              @for (p of s.people; track p.personId) {
+                <button type="button" class="split-person" [class.settled]="p.state !== 'owed' && p.state !== 'partial'"
+                        [disabled]="!canOpenPerson(p)" (click)="openPerson(p)" [attr.aria-label]="personAriaLabel(p)">
+                  <span class="split-person-main">
+                    <span class="split-person-name">{{ people.nameOf(p.personId) }}</span>
+                    <span class="split-person-status">{{ personStatus(p) }}</span>
+                  </span>
+                  <span class="split-person-amount fig">{{ formatCents(personAmountCents(p)) }}</span>
+                </button>
               }
+            </div>
+            <p class="reimburse-hint split-hint">
+              Your share is <span class="fig">{{ formatCents(s.myShareCents) }}</span>.
+              @if (s.owedToMeCents > 0) {
+                <span class="fig">{{ formatCents(s.owedToMeCents) }}</span> is still owed to you — tap someone to record what they paid back.
+              } @else {
+                Nobody owes you anything on this.
+              }
+              @if (s.unappliedRepaymentCents > 0) {
+                <span class="fig">{{ formatCents(s.unappliedRepaymentCents) }}</span> came back beyond what anyone owed, so it covers your share too.
+              }
+            </p>
+          }
+          @if (moneyBackTotal() > 0) {
+            <div class="reimburse-summary">
+              @if (refundState() === 'full' && reimbursementSurplus() <= 0.005) {
+                Refunded in full, so it's left out of analysis while money back is counted.
+              } @else {
+                <strong class="fig">{{ formatCurrency(moneyBackTotal()) }}</strong> back
+                of <span class="fig">{{ formatCurrency(tx.amount) }}</span>
+                @if (reimbursementSurplus() > 0.005) {
+                  · Surplus <strong class="amt-surplus fig">{{ formatCurrency(reimbursementSurplus()) }}</strong>
+                } @else {
+                  · Out of pocket <strong class="fig" [class.amt-expense]="netExpense() > 0.005">{{ formatCurrency(netExpense()) }}</strong>
+                }
+              }
+            </div>
+            @if (legacyRefund()) {
+              <div class="reimburse-row">
+                <span class="reimburse-row-text">↩ Refund · +{{ formatCurrency(tx.amount) }} · marked refunded</span>
+                <button class="reimburse-unlink" (click)="removeLegacyRefund()" title="Remove" aria-label="Remove refund">✕</button>
+              </div>
             }
-          </div>
-          @if (legacyRefund()) {
-            <div class="reimburse-row">
-              <span class="reimburse-row-text">↩ Refund · +{{ formatCurrency(tx.amount) }} · marked refunded</span>
-              <button class="reimburse-unlink" (click)="removeLegacyRefund()" title="Remove" aria-label="Remove refund">✕</button>
-            </div>
-          }
-          @for (e of untracked(); track e.id) {
-            <div class="reimburse-row">
-              <span class="reimburse-row-text">
-                ↩ {{ sourceLabel(e.source) }}{{ fromLabel(e) }} · +{{ formatCents(e.amountCents) }} · {{ formatDate(e.date) }}{{ e.note ? ' · ' + e.note : '' }}
-              </span>
-              <button class="reimburse-unlink" (click)="removeUntracked(e)" title="Remove" aria-label="Remove money back">✕</button>
-            </div>
-          }
-          @for (l of links(); track l.income.id) {
-            <div class="reimburse-row">
-              <span class="reimburse-row-text">
-                ↩ {{ sourceLabel(incomeSource(l.income)) }}{{ fromLabel(l.income.moneyBackInfo ?? {}) }} · {{ l.income.merchant || 'Income' }}
-                · +{{ formatCents(l.amountCents) }}{{ isSpread(l.income) ? ' of ' + formatCurrency(l.income.amount) : '' }} · {{ formatDate(l.income.date) }}
-              </span>
-              <button class="reimburse-unlink" (click)="unlinkReimbursement(l.income)" title="Unlink" aria-label="Unlink income">✕</button>
-            </div>
-          }
-        } @else {
-          <p class="reimburse-hint">
-            Got money back on this — a refund, or a friend paying you back? Add it, and analysis
-            counts only what it really cost you.
-          </p>
-        }
-        <div class="money-back-actions">
-          <button class="btn-add reimburse-add" (click)="openDraft()">+ Add money back</button>
-          <button class="btn-add reimburse-add" (click)="openLinkPicker(tx)">+ Link income</button>
-        </div>
-      </div>
-    }
-
-    @if (tx.type === 'income') {
-      <div class="view-reimburse">
-        <div class="view-reimburse-head">Money back</div>
-        @if (moneyBackParts().length > 1) {
-          <div class="reimburse-summary">
-            ↩ {{ sourceLabel(incomeSource(tx)) }}{{ fromLabel(tx.moneyBackInfo ?? {}) }}, spread over {{ moneyBackParts().length }} bills
-          </div>
-          @for (p of moneyBackParts(); track p.expense.id) {
-            <div class="reimburse-row">
-              <span class="reimburse-row-text">{{ p.expense.merchant || 'Expense' }} · {{ formatDate(p.expense.date) }}</span>
-              <span class="fig">+{{ formatCents(p.amountCents) }}</span>
-            </div>
-          }
-          <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink from all {{ moneyBackParts().length }}</button>
-        } @else if (reimbursesExpense(); as exp) {
-          <div class="reimburse-summary">
-            ↩ {{ sourceLabel(incomeSource(tx)) }} on <strong>{{ exp.merchant || 'an expense' }}</strong> ·
-            @if (reimbursesSurplus() > 0) {
-              {{ formatCurrency(reimbursesCovered()) }} covered +
-              <strong class="amt-surplus">{{ formatCurrency(reimbursesSurplus()) }} surplus</strong>
-            } @else {
-              {{ formatCurrency(exp.amount) }} on {{ formatDate(exp.date) }}
+            @for (e of untracked(); track e.id) {
+              <div class="reimburse-row">
+                <span class="reimburse-row-text">
+                  ↩ {{ sourceLabel(e.source) }}{{ fromLabel(e) }} · +{{ formatCents(e.amountCents) }} · {{ formatDate(e.date) }}{{ e.note ? ' · ' + e.note : '' }}
+                </span>
+                <button class="reimburse-unlink" (click)="removeUntracked(e)" title="Remove" aria-label="Remove money back">✕</button>
+              </div>
             }
-          </div>
-          <div class="mini-seg" role="radiogroup" aria-label="Kind of money back">
-            <button type="button" role="radio" [class.active]="incomeSource(tx) === 'refund'" [attr.aria-checked]="incomeSource(tx) === 'refund'" (click)="setIncomeSource(tx, 'refund')">Refund</button>
-            <button type="button" role="radio" [class.active]="incomeSource(tx) === 'repayment'" [attr.aria-checked]="incomeSource(tx) === 'repayment'" (click)="setIncomeSource(tx, 'repayment')">Repayment</button>
-          </div>
-          <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink</button>
-        } @else {
-          <p class="reimburse-hint">
-            Is this money back on a purchase — a refund, or a friend paying you back?
-            Link it so it isn't counted as income.
-          </p>
-          <button class="btn-add reimburse-add" (click)="openLinkPicker(tx)">+ Link to a purchase</button>
-        }
-      </div>
-    }
-
-    <!-- LOAN — a payment on a loan (or money lent / repaid), on any page. -->
-    @if (loanLink(); as link) {
-      <div class="view-reimburse view-loan">
-        <div class="view-reimburse-head">Loan</div>
-        <div class="reimburse-summary">
-          @if (link.kind === 'down') {
-            {{ link.loan.type === 'loan-given' ? 'Money lent' : 'Down payment' }} for <strong>{{ link.loan.name }}</strong>
-          } @else if (link.split; as sp) {
-            <strong>{{ link.loan.name }}</strong> · {{ sp.installment ? 'payment ' + sp.n + ' of ' + link.termMonths : 'extra payment' }}
-            <br />{{ formatCurrency(sp.interest) }} interest · {{ formatCurrency(sp.principal) }} principal{{ sp.surplus > 0 ? ' · ' + formatCurrency(sp.surplus) + ' extra' : '' }}
-            @if (sp.lump; as lump) {
-              <br />Lump sum · {{ lump.mode === 'reduce-emi' ? 'payment lowered to ' + formatCurrency(lump.payment) : 'loan shortened to ' + lump.termMonths + ' payments' }}
+            @for (l of links(); track l.income.id) {
+              <div class="reimburse-row">
+                <span class="reimburse-row-text">
+                  ↩ {{ sourceLabel(incomeSource(l.income)) }}{{ fromLabel(l.income.moneyBackInfo ?? {}) }} · {{ l.income.merchant || 'Income' }}
+                  · +{{ formatCents(l.amountCents) }}{{ isSpread(l.income) ? ' of ' + formatCurrency(l.income.amount) : '' }} · {{ formatDate(l.income.date) }}
+                </span>
+                <button class="reimburse-unlink" (click)="unlinkReimbursement(l.income)" title="Unlink" aria-label="Unlink income">✕</button>
+              </div>
             }
           } @else {
-            Payment on <strong>{{ link.loan.name }}</strong>
+            <p class="reimburse-hint">
+              Got money back on this — a refund, or a friend paying you back? Add it, and analysis
+              counts only what it really cost you.
+            </p>
+          }
+          <div class="money-back-actions">
+            <button class="btn-add reimburse-add" (click)="openDraft()">+ Add money back</button>
+            <button class="btn-add reimburse-add" (click)="openLinkPicker(tx)">+ Link income</button>
+          </div>
+        </div>
+      }
+
+      @if (tx.type === 'income') {
+        <div class="view-reimburse">
+          <div class="view-reimburse-head">Money back</div>
+          @if (moneyBackParts().length > 1) {
+            <div class="reimburse-summary">
+              ↩ {{ sourceLabel(incomeSource(tx)) }}{{ fromLabel(tx.moneyBackInfo ?? {}) }}, spread over {{ moneyBackParts().length }} bills
+            </div>
+            @for (p of moneyBackParts(); track p.expense.id) {
+              <div class="reimburse-row">
+                <span class="reimburse-row-text">{{ p.expense.merchant || 'Expense' }} · {{ formatDate(p.expense.date) }}</span>
+                <span class="fig">+{{ formatCents(p.amountCents) }}</span>
+              </div>
+            }
+            <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink from all {{ moneyBackParts().length }}</button>
+          } @else if (reimbursesExpense(); as exp) {
+            <div class="reimburse-summary">
+              ↩ {{ sourceLabel(incomeSource(tx)) }} on <strong>{{ exp.merchant || 'an expense' }}</strong> ·
+              @if (reimbursesSurplus() > 0) {
+                {{ formatCurrency(reimbursesCovered()) }} covered +
+                <strong class="amt-surplus">{{ formatCurrency(reimbursesSurplus()) }} surplus</strong>
+              } @else {
+                {{ formatCurrency(exp.amount) }} on {{ formatDate(exp.date) }}
+              }
+            </div>
+            <div class="mini-seg" role="radiogroup" aria-label="Kind of money back">
+              <button type="button" role="radio" [class.active]="incomeSource(tx) === 'refund'" [attr.aria-checked]="incomeSource(tx) === 'refund'" (click)="setIncomeSource(tx, 'refund')">Refund</button>
+              <button type="button" role="radio" [class.active]="incomeSource(tx) === 'repayment'" [attr.aria-checked]="incomeSource(tx) === 'repayment'" (click)="setIncomeSource(tx, 'repayment')">Repayment</button>
+            </div>
+            <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink</button>
+          } @else {
+            <p class="reimburse-hint">
+              Is this money back on a purchase — a refund, or a friend paying you back?
+              Link it so it isn't counted as income.
+            </p>
+            <button class="btn-add reimburse-add" (click)="openLinkPicker(tx)">+ Link to a purchase</button>
           }
         </div>
-        <div class="loan-actions">
-          <button class="btn-add reimburse-add" (click)="openLoan(link.loan)">Open loan</button>
-          <button class="btn-add reimburse-add" (click)="unlinkFromLoan()">Unlink</button>
+      }
+
+      <!-- LOAN — a payment on a loan (or money lent / repaid), on any page. -->
+      @if (loanLink(); as link) {
+        <div class="view-reimburse view-loan">
+          <div class="view-reimburse-head">Loan</div>
+          <div class="reimburse-summary">
+            @if (link.kind === 'down') {
+              {{ link.loan.type === 'loan-given' ? 'Money lent' : 'Down payment' }} for <strong>{{ link.loan.name }}</strong>
+            } @else if (link.split; as sp) {
+              <strong>{{ link.loan.name }}</strong> · {{ sp.installment ? 'payment ' + sp.n + ' of ' + link.termMonths : 'extra payment' }}
+              <br />{{ formatCurrency(sp.interest) }} interest · {{ formatCurrency(sp.principal) }} principal{{ sp.surplus > 0 ? ' · ' + formatCurrency(sp.surplus) + ' extra' : '' }}
+              @if (sp.lump; as lump) {
+                <br />Lump sum · {{ lump.mode === 'reduce-emi' ? 'payment lowered to ' + formatCurrency(lump.payment) : 'loan shortened to ' + lump.termMonths + ' payments' }}
+              }
+            } @else {
+              Payment on <strong>{{ link.loan.name }}</strong>
+            }
+          </div>
+          <div class="loan-actions">
+            <button class="btn-add reimburse-add" (click)="openLoan(link.loan)">Open loan</button>
+            <button class="btn-add reimburse-add" (click)="unlinkFromLoan()">Unlink</button>
+          </div>
         </div>
-      </div>
-    } @else if (loanOptions().length) {
-      <div class="view-reimburse view-loan">
-        <div class="view-reimburse-head">Loan</div>
-        <p class="reimburse-hint">
-          {{ loanOptions().length === 1 ? 'Part of ' + loanOptions()[0].name + '?' : 'Part of a loan?' }}
-          Link it to track what's paid and what's left.
-        </p>
-        @if (loanOptions().length > 1) {
-          <select class="input-field" [ngModel]="selectedLoan()?.id"
-                  (ngModelChange)="linkLoanId.set($event)" name="linkLoan" aria-label="Which loan">
-            @for (l of loanOptions(); track l.id) { <option [value]="l.id">{{ l.name }}</option> }
-          </select>
-        }
-        <div class="loan-actions">
-          @for (r of loanRoles(); track r.kind) {
-            <button class="btn-add reimburse-add" (click)="linkToLoan(r.kind)">+ {{ r.label }}</button>
+      } @else if (loanOptions().length) {
+        <div class="view-reimburse view-loan">
+          <div class="view-reimburse-head">Loan</div>
+          <p class="reimburse-hint">
+            {{ loanOptions().length === 1 ? 'Part of ' + loanOptions()[0].name + '?' : 'Part of a loan?' }}
+            Link it to track what's paid and what's left.
+          </p>
+          @if (loanOptions().length > 1) {
+            <select class="input-field" [ngModel]="selectedLoan()?.id"
+                    (ngModelChange)="linkLoanId.set($event)" name="linkLoan" aria-label="Which loan">
+              @for (l of loanOptions(); track l.id) { <option [value]="l.id">{{ l.name }}</option> }
+            </select>
           }
+          <div class="loan-actions">
+            @for (r of loanRoles(); track r.kind) {
+              <button class="btn-add reimburse-add" (click)="linkToLoan(r.kind)">+ {{ r.label }}</button>
+            }
+          </div>
         </div>
-      </div>
-    }
+      }
+    </div>
   </div>
 }
 

@@ -281,9 +281,16 @@
 /* A split bill in the drill-down: what the row's amount is made of. */
 .row-note { display: block; margin-top: 2px; font-size: 12px; color: var(--fg-3); }
 
-/* Split bills: a second table under the numbers, set off by a hairline. */
-.split-table { border-top: 1px solid var(--line); }
-.table-note a { color: var(--fg-2); text-decoration: none; font-weight: 500; &:hover { color: var(--fg); } }
+/* Split bills: the sentence that says what the rows mean, above them. */
+.split-lede {
+  margin: 0;
+  padding: 16px 20px 12px;
+  max-width: 640px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg-2);
+}
+.split-card .report-table { border-top: 1px solid var(--line); }
 
 /* ── Drill-down ───────────────────────────────────────────── */
 .drill {

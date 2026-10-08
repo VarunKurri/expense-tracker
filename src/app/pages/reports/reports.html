@@ -240,13 +240,18 @@
         </tbody>
       </table>
     }
+  </section>
 
-    <!-- SPLIT BILLS — how much of the expenses above is other people's share -->
-    @if (showSplits()) {
-      <table class="report-table split-table">
-        <thead>
-          <tr><th>Split bills · {{ splits().bills }}</th><th class="right">Amount</th></tr>
-        </thead>
+  <!-- SPLIT BILLS — its own question: how much of the expenses above is other
+       people's share, and how much of that has come back. -->
+  @if (showSplits()) {
+    <section class="card split-card">
+      <div class="card-head">
+        <a class="card-label" routerLink="/shared">Split bills ›</a>
+        <a class="card-link" routerLink="/shared">See who owes you →</a>
+      </div>
+      <p class="split-lede">{{ splitText() }}</p>
+      <table class="report-table">
         <tbody>
           <tr><td>You paid</td><td class="right fig">{{ cents(splits().paidCents) }}</td></tr>
           <tr><td>Your share</td><td class="right fig">{{ cents(splits().myShareCents) }}</td></tr>
@@ -259,13 +264,10 @@
         </tbody>
       </table>
       <p class="table-note">
-        @if (netting()) {
-          Expenses count what you're out of pocket, so what's still owed to you is part of them until it comes back.
-          <a routerLink="/shared">See who owes you →</a>
-        } @else {
-          “Count money back” is off, so split bills count at their full amount above.
-        }
+        {{ netting()
+          ? "Expenses count what you're out of pocket, so what's still owed to you is part of them until it comes back."
+          : '“Count money back” is off, so split bills count at their full amount in the expenses above.' }}
       </p>
-    }
-  </section>
+    </section>
+  }
 </div>

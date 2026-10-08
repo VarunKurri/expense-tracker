@@ -44,19 +44,6 @@
   border-bottom: 1px solid var(--line);
 }
 
-.link-btn {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--fg-3);
-  background: transparent;
-  border: none;
-  font-family: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-
-  &:hover { color: var(--fg); }
-}
-
 .empty {
   margin: 0;
   padding: 26px 20px;
