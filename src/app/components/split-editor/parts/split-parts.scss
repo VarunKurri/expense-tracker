@@ -57,7 +57,6 @@
 .summary {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
@@ -66,30 +65,39 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-weight: 600;
+  padding-bottom: 6px;
 }
 
+.summary-bill { font-size: 13px; color: var(--fg-3); .fig { color: var(--fg); font-weight: 600; } }
+
+/* Name and what it means on the left, the share on the right. */
 .summary-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 2px 10px;
+  display: flex;
+  justify-content: space-between;
   align-items: baseline;
-  font-size: 13px;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
 }
 
-.summary-name { color: var(--fg); font-weight: 500; }
-.summary-detail { color: var(--fg-3); }
-.summary-owes { color: var(--fg); font-weight: 600; text-align: right; min-width: 0; }
-.summary-items { grid-column: 1 / -1; font-size: 12px; color: var(--fg-3); line-height: 1.4; }
+.summary-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.summary-name { font-size: 14px; font-weight: 500; color: var(--fg); }
+.summary-note { font-size: 12px; line-height: 1.4; color: var(--fg-3); }
+.summary-amount { font-size: 14px; font-weight: 600; color: var(--fg); white-space: nowrap; }
+
+.summary-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
 
 .summary-total {
   margin: 4px 0 0;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--fg-3);
-}
-
-@media (max-width: 480px) {
-  .summary-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .summary-owes { grid-column: 1 / -1; text-align: left; }
 }

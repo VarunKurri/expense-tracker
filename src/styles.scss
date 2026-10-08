@@ -894,3 +894,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     border-color: transparent;
   }
 }
+
+/* A person's name as a chip ("Split with", who had an item). Names are UI
+   text, not data, so they take the UI voice — the mono chip is for figures,
+   dates and filters. */
+.chip.name {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  padding: 6px 12px;
+}

@@ -20,11 +20,31 @@
   &.unclaimed { border-style: dashed; border-color: var(--line-strong); }
 }
 
-.item-line {
+.item-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 120px) auto;
+  grid-template-areas:
+    "name  price remove"
+    "who   mode  .";
   gap: 8px;
   align-items: center;
+}
+
+.item-name   { grid-area: name; }
+.item-price  { grid-area: price; }
+.item-remove { grid-area: remove; }
+.item-who    { grid-area: who; }
+.item-mode   { grid-area: mode; }
+
+/* Phone: the name gets the whole width, then price and how it's divided. */
+@media (max-width: 480px) {
+  .item-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name  name  remove"
+      "price mode  mode"
+      "who   who   who";
+  }
 }
 
 .item-remove {
@@ -39,14 +59,6 @@
   &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
 }
 
-.item-who {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 .people {
   display: flex;
   flex-wrap: wrap;
@@ -54,8 +66,7 @@
 }
 
 .item-mode {
-  width: auto;
-  margin-left: auto;
+  width: 100%;
   padding-top: 6px;
   padding-bottom: 6px;
   font-size: 12.5px;
@@ -83,11 +94,12 @@
   font-size: 13px;
 }
 
-.mismatch {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+/* Tax / tip: the number, then % or $ beside it. */
+.charge {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 8px;
+  align-items: center;
 }
 
-.mini-seg { margin-bottom: 6px; }
+.use-amount { align-self: flex-start; font-size: 13px; }

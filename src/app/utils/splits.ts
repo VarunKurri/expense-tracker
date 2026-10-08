@@ -302,9 +302,14 @@ function payments(state: QuickSplitState, myPaidCents: number): Payment[] {
   ];
 }
 
+/** What was paid towards the bill: you, plus anyone else who paid part. */
+export function paidTowardsBillCents(state: Pick<QuickSplitState, 'otherPayments'>, myPaidCents: number): number {
+  return myPaidCents + sum(state.otherPayments.filter(p => p.personId !== ME && p.amountCents > 0).map(p => p.amountCents));
+}
+
 /** The bill: what you paid plus what anyone else paid towards it. */
 export function quickBillCents(state: QuickSplitState, myPaidCents: number): number {
-  return sum(payments(state, myPaidCents).map(p => p.amountCents));
+  return paidTowardsBillCents(state, myPaidCents);
 }
 
 /**
@@ -337,6 +342,20 @@ export function quickStateFrom(split: TransactionSplit): QuickSplitState {
     weights: item?.splitMode === 'equal' ? {} : weights,
     otherPayments: split.payments.filter(p => p.personId !== ME).map(p => ({ ...p })),
   };
+}
+
+/**
+ * How much of the bill the typed weights account for, for the "$X of $Y
+ * assigned · $Z left" line. Equal and shares always cover the whole bill;
+ * amounts are what's typed; percentages are that share of the bill. Display
+ * only — the split itself always divides the whole bill, in proportion.
+ */
+export function quickAssignedCents(state: QuickSplitState, myPaidCents: number): number {
+  const bill = quickBillCents(state, myPaidCents);
+  const typed = sum(state.participantIds.map(id => state.weights[id] ?? 0));
+  if (state.mode === 'amount') return typed;
+  if (state.mode === 'percent') return Math.round((bill * typed) / 100);
+  return bill;
 }
 
 /**

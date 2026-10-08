@@ -4,7 +4,7 @@ import { outOfPocketCents, surplusCents } from './money-back';
 import {
   ItemizedSplitState, QuickSplitState, assignUnclaimedTo, buildItemizedSplit, buildQuickSplit, emptyItemizedState,
   emptyQuickState, itemizedBillCents, itemizedStateFrom, myPaymentToCoverCents, newItem, owedToMeByPerson,
-  quickBillCents, quickSplit, quickStateFrom, removeFromItemized, restateWeights, setItemMode, setItemWeight,
+  quickAssignedCents, quickBillCents, quickSplit, quickStateFrom, removeFromItemized, restateWeights, setItemMode, setItemWeight,
   splitProblems, splitStatus, toggleAssignee,
 } from './splits';
 
@@ -430,5 +430,17 @@ describe('itemized split editing', () => {
   it('editing a weight keeps the order (the engine breaks cent ties by position)', () => {
     const item = setItemMode(newItem([ME, 'alex', 'ben'], 'Pizza', 1000), 'shares', [ME, 'alex', 'ben']);
     expect(setItemWeight(item, ME, 3).assignments.map(a => a.personId)).toEqual([ME, 'alex', 'ben']);
+  });
+});
+
+describe('quickAssignedCents: the "left to assign" line', () => {
+  const base: QuickSplitState = { participantIds: [ME, 'alex'], mode: 'equal', weights: {}, otherPayments: [] };
+  it('equal and shares always cover the bill', () => {
+    expect(quickAssignedCents(base, 1292)).toBe(1292);
+    expect(quickAssignedCents({ ...base, mode: 'shares', weights: { [ME]: 2, alex: 1 } }, 1292)).toBe(1292);
+  });
+  it('amounts are what is typed; percentages are that share of the bill', () => {
+    expect(quickAssignedCents({ ...base, mode: 'amount', weights: { [ME]: 500, alex: 300 } }, 1292)).toBe(800);
+    expect(quickAssignedCents({ ...base, mode: 'percent', weights: { [ME]: 50, alex: 30 } }, 1000)).toBe(800);
   });
 });

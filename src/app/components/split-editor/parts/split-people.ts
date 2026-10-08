@@ -17,10 +17,10 @@ import { ToastService } from '../../../services/toast.service';
     <div class="field">
       <span class="label-sm">Split with</span>
       <div class="people">
-        <button type="button" class="chip" [class.active]="includesMe()" [attr.aria-pressed]="includesMe()"
+        <button type="button" class="chip name" [class.active]="includesMe()" [attr.aria-pressed]="includesMe()"
                 (click)="meToggled.emit()">You</button>
         @for (id of others(); track id) {
-          <span class="chip active person">
+          <span class="chip name active person">
             {{ people.nameOf(id) }}
             <button type="button" class="person-remove" (click)="removed.emit(id)"
                     [attr.aria-label]="'Remove ' + people.nameOf(id)">✕</button>
@@ -36,7 +36,7 @@ import { ToastService } from '../../../services/toast.service';
       @if (suggestions().length) {
         <div class="people suggestions">
           @for (p of suggestions(); track p.id) {
-            <button type="button" class="chip" (click)="include(p.id!)">+ {{ p.name }}</button>
+            <button type="button" class="chip name" (click)="include(p.id!)">+ {{ p.name }}</button>
           }
         </div>
       }

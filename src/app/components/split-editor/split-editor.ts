@@ -7,9 +7,10 @@ import { fromCents, toCents } from '../../utils/money';
 import { amountGapCents, splitIsBalanced } from '../../utils/split/split';
 import type { SplitMode } from '../../utils/split/types';
 import {
-  QuickSplitState, buildQuickSplit, quickBillCents, restateWeights, splitProblems,
+  QuickSplitState, buildQuickSplit, quickAssignedCents, quickBillCents, restateWeights, splitProblems,
 } from '../../utils/splits';
 import { SplitPayers } from './parts/split-payers';
+import { SplitProgress } from './parts/split-progress';
 import { SplitPeople } from './parts/split-people';
 import { SplitSummary } from './parts/split-summary';
 
@@ -31,7 +32,7 @@ export const SPLIT_MODES: { value: SplitMode; label: string }[] = [
 @Component({
   selector: 'app-split-editor',
   standalone: true,
-  imports: [FormsModule, SplitPeople, SplitPayers, SplitSummary],
+  imports: [FormsModule, SplitPeople, SplitPayers, SplitProgress, SplitSummary],
   templateUrl: './split-editor.html',
   styleUrl: './split-editor.scss',
 })
@@ -46,6 +47,7 @@ export class SplitEditor {
 
   // ── Derived, all from the engine ───────────────────────────
   billCents = computed(() => quickBillCents(this.state(), this.myPaidCents()));
+  assignedCents = computed(() => quickAssignedCents(this.state(), this.myPaidCents()));
   split = computed(() => buildQuickSplit(this.state(), this.myPaidCents()));
   problems = computed(() => splitProblems(this.split(), this.myPaidCents()));
   others = computed(() => this.state().participantIds.filter(id => id !== ME));
@@ -115,12 +117,12 @@ export function parseWeight(mode: SplitMode, value: number | string | null): num
 export function balanceNote(mode: SplitMode, assignments: { weight: number }[], gapCents: number, what: string): string {
   if (mode === 'percent') {
     const total = assignments.reduce((s, a) => s + a.weight, 0);
-    return `These add up to ${Math.round(total * 100) / 100}%, not 100%. It's divided in proportion until they do.`;
+    return `These add up to ${Math.round(total * 100) / 100}%, not 100%. Until they do, ${what} is divided in proportion.`;
   }
   if (mode === 'amount') {
     return gapCents > 0
-      ? `${formatCurrency(fromCents(gapCents))} isn't assigned to anyone yet. It's divided in proportion until it is.`
-      : `That's ${formatCurrency(fromCents(-gapCents))} more than ${what}. It's divided in proportion until it adds up.`;
+      ? `${formatCurrency(fromCents(gapCents))} isn't assigned yet. Until it is, ${what} is divided in proportion.`
+      : `That's ${formatCurrency(fromCents(-gapCents))} more than ${what}. Until it adds up, it's divided in proportion.`;
   }
   return '';
 }

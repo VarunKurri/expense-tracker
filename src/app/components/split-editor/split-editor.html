@@ -39,18 +39,23 @@
       </label>
     }
   </div>
-  @if (balanceNote()) { <p class="field-error">{{ balanceNote() }}</p> }
   @if (state().mode === 'shares') {
     <p class="field-hint">Shares are a ratio: 2 and 1 means one person had twice as much.</p>
   }
 }
+
+<!-- HOW MUCH IS LEFT — always on screen -->
+<div class="field">
+  <app-split-progress [totalCents]="billCents()" [addedCents]="assignedCents()" verb="assigned" />
+  @if (balanceNote()) { <p class="field-hint">{{ balanceNote() }}</p> }
+</div>
 
 <app-split-payers [payments]="state().otherPayments" (paymentsChange)="setPayments($event)" [candidates]="others()" />
 
 <app-split-summary [split]="split()" [myPaidCents]="myPaidCents()" />
 
 @if (problems().includes('no-one-else')) {
-  <p class="field-error">Add someone to split with.</p>
+  <p class="field-hint">Add someone to split with.</p>
 } @else if (problems().includes('unassigned')) {
-  <p class="field-error">Give someone a share of the bill.</p>
+  <p class="field-hint">Give someone a share of the bill.</p>
 }

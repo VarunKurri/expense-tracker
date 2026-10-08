@@ -7,10 +7,11 @@ import { fromCents, toCents } from '../../utils/money';
 import { amountGapCents, calculateSplit, splitIsBalanced } from '../../utils/split/split';
 import type { ChargeMode, SplitMode, TipBasis } from '../../utils/split/types';
 import {
-  ItemizedSplitState, assignUnclaimedTo, buildItemizedSplit, myPaymentToCoverCents, newItem, removeFromItemized,
+  ItemizedSplitState, assignUnclaimedTo, buildItemizedSplit, myPaymentToCoverCents, newItem, paidTowardsBillCents, removeFromItemized,
   setItemMode, setItemWeight, splitProblems, toBill, toggleAssignee,
 } from '../../utils/splits';
 import { SplitPayers } from './parts/split-payers';
+import { SplitProgress } from './parts/split-progress';
 import { SplitPeople } from './parts/split-people';
 import { SplitSummary } from './parts/split-summary';
 import { SPLIT_MODES, balanceNote, parseWeight } from './split-editor';
@@ -26,7 +27,7 @@ import { SPLIT_MODES, balanceNote, parseWeight } from './split-editor';
 @Component({
   selector: 'app-itemized-split-editor',
   standalone: true,
-  imports: [FormsModule, SplitPeople, SplitPayers, SplitSummary],
+  imports: [FormsModule, SplitPeople, SplitPayers, SplitProgress, SplitSummary],
   templateUrl: './itemized-split-editor.html',
   styleUrl: './itemized-split-editor.scss',
 })
@@ -47,6 +48,9 @@ export class ItemizedSplitEditor {
   problems = computed(() => splitProblems(this.split(), this.myPaidCents()));
   others = computed(() => this.state().participantIds.filter(id => id !== ME));
   includesMe = computed(() => this.state().participantIds.includes(ME));
+
+  /** The bill being split: what you paid plus what anyone else paid. */
+  billCents = computed(() => paidTowardsBillCents(this.state(), this.myPaidCents()));
 
   /** What you'd have had to pay for the receipt to add up, given what others paid. */
   coverCents = computed(() => myPaymentToCoverCents(this.state()));

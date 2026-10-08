@@ -89,17 +89,21 @@ describe('ItemizedSplitEditor', () => {
     expect(el.textContent).toContain('Items $60.00 · tax $6.00 · tip $12.00');
     host.paid.set(7800); // you paid the $78 bill
     await settle();
-    expect(el.textContent).toContain('owes you $26.00');
-    expect(el.textContent).toContain('Salad, Wine (1/2) · tax $2.00 · tip $4.00');
+    const alex = [...el.querySelectorAll('.summary-row')].find(r => r.textContent!.includes('Alex'))!;
+    expect(alex.textContent).toContain('$26.00');
+    expect(alex.textContent).toContain('Owes you · 2 items · tax $2.00 · tip $4.00');
+    expect(el.textContent).toContain('✓ Adds up');
   });
 
   it('when the receipt and the amount disagree, offers to use the receipt total', async () => {
     await enterDinner();
-    expect(el.textContent).toContain('The receipt comes to $60.00');
-    button('Use $60.00 as the amount').click();
+    expect(el.textContent).toContain('$60.00 of $0.00 added');
+    expect(el.textContent).toContain('$60.00 over');
+    button('Or make the amount $60.00 to match the receipt').click();
     await settle();
     expect(host.paid()).toBe(6000);
-    expect(el.textContent).not.toContain('The receipt comes to');
+    expect(el.textContent).toContain('✓ Adds up');
+    expect(el.textContent).not.toContain('to match the receipt');
     expect(splitProblems(buildItemizedSplit(host.state(), host.paid()), host.paid())).toEqual([]);
   });
 
@@ -146,5 +150,17 @@ describe('ItemizedSplitEditor', () => {
     (el.querySelector('[aria-label="Remove Alex"]') as HTMLElement).click();
     await settle();
     expect(host.state().items.flatMap(i => i.assignments.map(a => a.personId))).not.toContain('alex');
+  });
+
+  it('shows how much is left to add while tax and tip are typed', async () => {
+    await enterDinner();
+    host.paid.set(7800);
+    await settle();
+    expect(el.textContent).toContain('$60.00 of $78.00 added');
+    expect(el.textContent).toContain('$18.00 left');
+    await type(el.querySelector('input[aria-label="Tax"]')!, '10');
+    expect(el.textContent).toContain('$12.00 left');
+    await type(el.querySelector('input[aria-label="Tip"]')!, '20');
+    expect(el.textContent).toContain('✓ Adds up');
   });
 });

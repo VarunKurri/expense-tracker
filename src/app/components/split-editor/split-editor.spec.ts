@@ -80,8 +80,11 @@ describe('SplitEditor (quick split)', () => {
     expect(people.added).toEqual(['Ben']);
     expect(host.state().participantIds).toEqual([ME, 'alex', 'ben']);
     // $180 three ways
-    expect(el.textContent).toContain('owes you $60.00');
-    expect(el.textContent).toContain('$120.00 is owed back to you');
+    const ben = [...el.querySelectorAll('.summary-row')].find(r => r.textContent!.includes('Ben'))!;
+    expect(ben.textContent).toContain('Owes you');
+    expect(ben.textContent).toContain('$60.00');
+    expect(el.textContent).toMatch(/Owed back to you\s*\$120\.00/);
+    expect(el.textContent).toContain('$180.00 of $180.00 assigned');
     expect(el.textContent).not.toContain('Add someone to split with.');
   });
 
@@ -111,6 +114,8 @@ describe('SplitEditor (quick split)', () => {
     expect(inputs.map(i => i.value)).toEqual(['90', '90']);
     await typeInto(inputs[0], '120');
     // $120 + $90 ≠ $180: still divided in proportion, and it says so.
+    expect(el.textContent).toContain('$210.00 of $180.00 assigned');
+    expect(el.textContent).toContain('$30.00 over');
     expect(el.textContent).toContain('more than the bill');
     await typeInto(inputs[1], '60');
     expect(el.textContent).not.toContain('more than the bill');
@@ -130,7 +135,7 @@ describe('SplitEditor (quick split)', () => {
     expect(s.myShareCents).toBe(8000);
     expect(s.people.map(p => [p.personId, p.dueToMeCents])).toEqual([['alex', 2000], ['ben', 8000]]);
     expect(el.textContent).toContain('$240.00');
-    expect(el.textContent).toContain('$100.00 is owed back to you');
+    expect(el.textContent).toMatch(/Owed back to you\s*\$100\.00/);
     expect(el.textContent).not.toContain('between them');
   });
 
