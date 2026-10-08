@@ -80,20 +80,14 @@
           <!-- SPLIT — one row per person; tap to record what they paid back -->
           <div class="split-people">
             @for (p of s.people; track p.personId) {
-              <div class="split-person" [class.settled]="p.state === 'repaid' || p.state === 'none'">
-                <button type="button" class="split-person-main" (click)="openDraft(p.personId)"
-                        [disabled]="p.outstandingCents === 0 || p.state === 'closed'"
-                        [attr.aria-label]="'Record a repayment from ' + people.nameOf(p.personId)">
+              <button type="button" class="split-person" [class.settled]="p.state !== 'owed' && p.state !== 'partial'"
+                      [disabled]="!canOpenPerson(p)" (click)="openPerson(p)" [attr.aria-label]="personAriaLabel(p)">
+                <span class="split-person-main">
                   <span class="split-person-name">{{ people.nameOf(p.personId) }}</span>
-                  <span class="split-person-detail fig">{{ personDetail(p) }}</span>
-                </button>
-                <span class="chip split-state" [class.active]="p.state === 'repaid'">{{ stateLabel(p) }}</span>
-                @if (p.state === 'owed' || p.state === 'partial') {
-                  <button type="button" class="btn-row split-close" (click)="setPersonClosed(p.personId, true)">Won't be repaid</button>
-                } @else if (p.state === 'closed') {
-                  <button type="button" class="btn-row split-close" (click)="setPersonClosed(p.personId, false)">Reopen</button>
-                }
-              </div>
+                  <span class="split-person-status">{{ personStatus(p) }}</span>
+                </span>
+                <span class="split-person-amount fig">{{ formatCents(personAmountCents(p)) }}</span>
+              </button>
             }
           </div>
           <p class="reimburse-hint split-hint">
@@ -282,7 +276,8 @@
 
 <!-- ADD MONEY BACK — a refund, a friend paying you back, cash, store credit:
      anything that came back without landing in an account Trackr tracks -->
-<app-modal [open]="draftOpen()" title="Add money back" size="sm" (closed)="closeDraft()">
+<app-modal [open]="draftOpen()" [title]="draftPersonId() ? 'Repayment from ' + people.nameOf(draftPersonId()!) : 'Add money back'"
+           size="sm" (closed)="closeDraft()">
   <div class="form">
     <div class="field">
       <div class="mini-seg" role="radiogroup" aria-label="Kind of money back">
@@ -341,6 +336,10 @@
     </p>
   </div>
   <div class="modal-actions" modal-footer>
+    <!-- Apart from Save, on the left: not expecting it back is a different decision. -->
+    @if (draftPersonId()) {
+      <button class="btn-ghost" [disabled]="saving()" (click)="closeDraftPerson()">Won't be repaid</button>
+    }
     <div class="actions-right">
       <button class="btn-ghost" (click)="closeDraft()">Cancel</button>
       <button class="btn-primary" [disabled]="saving()" (click)="saveDraft()">Save</button>
@@ -369,3 +368,12 @@
     <p class="field-hint">Whose share this pays off. One friend can pay for several — even for you.</p>
   </div>
 </ng-template>
+
+<app-confirm
+  [open]="!!reopening()"
+  [title]="'Reopen ' + (reopening() ? people.nameOf(reopening()!) : '') + '\'s share?'"
+  [message]="reopenMessage()"
+  confirmText="Reopen"
+  [danger]="false"
+  (confirmed)="confirmReopen()"
+  (cancelled)="reopening.set(null)" />

@@ -195,50 +195,36 @@
     margin-bottom: 8px;
   }
 
-  /* Each row reads like a transaction row: the whole row highlights on hover
-     and opens the repayment, with "Won't be repaid" sitting above it. */
+  /* Each person reads like a transaction row: name and a plain status line
+     on the left, the figure on the right. The whole row is the button — tap
+     to record what they paid back ("Won't be repaid" lives in that dialog). */
   .split-person {
-    position: relative;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "main state" "main close";
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 4px 10px;
+    gap: 12px;
+    width: calc(100% + 32px);
     margin: 0 -16px;
     padding: 10px 16px;
+    border: none;
     border-bottom: 1px solid var(--line);
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
     transition: background 0.18s ease;
 
     &:last-child { border-bottom: none; }
-    &.settled .split-person-detail { color: var(--fg-4); }
-    &:has(.split-person-main:not(:disabled)):hover { background: var(--bg-3); }
-    &:has(.split-person-main:focus-visible) { box-shadow: inset 0 0 0 3px var(--focus-ring); }
-  }
-
-  .split-person-main {
-    grid-area: main;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    min-width: 0;
-    padding: 0;
-    border: none;
-    background: none;
-    text-align: left;
-    font: inherit;
-    cursor: pointer;
-
-    /* Stretched over the whole row, so anywhere on it opens the repayment. */
-    &::after { content: ''; position: absolute; inset: 0; }
+    &:hover:not(:disabled) { background: var(--bg-3); }
     &:disabled { cursor: default; }
-    &:focus-visible { outline: none; }
+    &:focus-visible { outline: none; box-shadow: inset 0 0 0 3px var(--focus-ring); }
+    &.settled .split-person-amount { color: var(--fg-4); }
   }
 
+  .split-person-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .split-person-name { font-size: 14px; font-weight: 500; color: var(--fg); }
-  .split-person-detail { font-size: 12.5px; color: var(--fg-3); }
-  .split-state { grid-area: state; justify-self: end; padding: 4px 10px; pointer-events: none; }
-  .split-close { grid-area: close; justify-self: end; position: relative; z-index: 1; }
+  .split-person-status { font-size: 12.5px; color: var(--fg-3); }
+  .split-person-amount { font-size: 14px; font-weight: 600; color: var(--fg); white-space: nowrap; }
   .split-hint { margin-top: 2px; }
 }
 

@@ -76,7 +76,9 @@ The app is what we copy. Do not "correct" this back to dark.
   `.card-label`, `.label-mono`, `.num`, `.fig`, `.num-display`, `.display`.
 - **Actions are buttons, not underlined links.** "+ Add item" / "+ Add money
   back" use `.btn-add` (dashed, full width, under the list it adds to); a small
-  action inside a row ("Won't be repaid", "Show 2 settled") uses `.btn-row`.
+  action inside a row ("Show 2 settled") uses `.btn-row`. Prefer putting a
+  row's secondary action in the dialog the row opens (as "Won't be repaid"
+  sits in a person's repayment dialog) over stacking a button beside a chip.
   `.link-btn` is only for a link sitting inside a sentence.
 - **A tappable row highlights, it doesn't underline.** Rows that open something
   (transactions, bills on Shared, people on a split) run to the card's edges and

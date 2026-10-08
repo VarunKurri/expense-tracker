@@ -172,7 +172,7 @@ describe('TransactionView — money back', () => {
     // $240 dinner, four ways: you, Alex, Ben, Cara — $60 each.
     const dinner: Transaction = { ...haircut, id: 'dinner', amount: 240, merchant: 'Ramen Bar', split: quickSplit(24000, [ME, 'alex', 'ben', 'cara']) };
     const rows = () => [...view().querySelectorAll('.split-person')].map(r =>
-      [...r.querySelectorAll('.split-person-name, .split-person-detail, .split-state, .split-close')]
+      [...r.querySelectorAll('.split-person-name, .split-person-status, .split-person-amount')]
         .map(e => e.textContent!.trim()).join(' '));
     const saved = () => txs.transactions().find(t => t.id === 'dinner')!;
     const status = () => splitStatus(saved().split!, txs.moneyBackEntriesFor(saved()));
@@ -180,9 +180,9 @@ describe('TransactionView — money back', () => {
     it('shows each person: what they owe, and their state', async () => {
       await open(dinner);
       expect(rows()).toEqual([
-        "Alex Owes $60.00 Owed Won't be repaid",
-        "Ben Owes $60.00 Owed Won't be repaid",
-        "Cara Owes $60.00 Owed Won't be repaid",
+        'Alex Owes you $60.00',
+        'Ben Owes you $60.00',
+        'Cara Owes you $60.00',
       ]);
       expect(view().textContent).toContain('Your share is $60.00.');
       expect(view().textContent).toContain('$180.00 is still owed to you');
@@ -199,7 +199,7 @@ describe('TransactionView — money back', () => {
       await settle();
 
       expect(saved().moneyBack).toEqual([expect.objectContaining({ source: 'repayment', amountCents: 6000, fromPersonId: 'alex', coversPersonIds: ['alex'] })]);
-      expect(rows()[0]).toContain('Repaid');
+      expect(rows()[0]).toBe('Alex Paid you back $60.00');
       expect(txs.effectiveExpenseAmount(saved())).toBe(180);
       expect(view().textContent).toContain('↩ Repayment from Alex');
     });
@@ -229,20 +229,39 @@ describe('TransactionView — money back', () => {
       await typeAmount('40');
       button('Save').click();
       await settle();
-      expect(rows()[0]).toContain('Owes $50.00');
+      expect(rows()[0]).toBe('Alex Owes you $50.00');
       expect(view().textContent).toContain('Your share is $50.00.');
     });
 
-    it("\"won't be repaid\" closes a balance but keeps it in your spending", async () => {
+    it("\"won't be repaid\" — in the person's dialog — closes a balance but keeps it in your spending", async () => {
       await open(dinner);
-      const close = [...view().querySelectorAll('.split-close')][2] as HTMLElement; // Cara
-      close.click();
+      (view().querySelector('[aria-label="Record a repayment from Cara"]') as HTMLElement).click();
+      await settle();
+      expect(el.textContent).toContain('Repayment from Cara');
+      button("Won't be repaid").click();
       await settle();
       expect(saved().split!.closedPersonIds).toEqual(['cara']);
-      expect(rows()[2]).toContain("Won't be repaid");
-      expect(rows()[2]).toContain('Reopen');
+      expect(rows()[2]).toBe("Cara Won't be repaid $60.00");
       expect(view().textContent).toContain('$120.00 is still owed to you');
       expect(txs.effectiveExpenseAmount(saved())).toBe(240);
+    });
+
+    it('tapping a closed row offers to reopen it', async () => {
+      await open({ ...dinner, split: { ...dinner.split!, closedPersonIds: ['cara'] } });
+      (view().querySelector('[aria-label="Reopen Cara\'s share"]') as HTMLElement).click();
+      await settle();
+      expect(el.textContent).toContain("Reopen Cara's share?");
+      button('Reopen').click();
+      await settle();
+      expect(saved().split!.closedPersonIds).toEqual([]);
+      expect(rows()[2]).toBe('Cara Owes you $60.00');
+    });
+
+    it('"Won\'t be repaid" is only offered when the dialog is about one person', async () => {
+      await open(dinner);
+      button('+ Add money back').click();
+      await settle();
+      expect(button("Won't be repaid")).toBeUndefined();
     });
 
     it('linking a bank income as a repayment asks who it was from', async () => {

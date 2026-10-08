@@ -11,6 +11,7 @@ import { Router } from '@angular/router';
 import { loanDirection, loanPayments, loanState } from '../../utils/loans';
 import { localDateString } from '../../utils/date';
 import { Modal } from '../modal/modal';
+import { Confirm } from '../confirm/confirm';
 import { ManualAsset, ME, MoneyBackSource, Transaction, UntrackedReturn } from '../../models';
 import { PersonService } from '../../services/person.service';
 import { PersonSplitStatus, outstandingFor, setClosed, splitStatus } from '../../utils/splits';
@@ -39,7 +40,7 @@ let nextLockId = 0;
 @Component({
   selector: 'app-transaction-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, Modal],
+  imports: [CommonModule, FormsModule, Modal, Confirm],
   templateUrl: './transaction-view.html',
   styleUrl: './transaction-view.scss',
 })
@@ -188,22 +189,62 @@ export class TransactionView {
   /** Everyone on the bill but you. */
   splitOthers = computed(() => (this.tx()?.split?.participantIds ?? []).filter(id => id !== ME));
 
-  stateLabel(p: PersonSplitStatus): string {
+  /** The status line under a person's name — plain words, no chip. */
+  personStatus(p: PersonSplitStatus): string {
     switch (p.state) {
-      case 'owed': return 'Owed';
-      case 'partial': return 'Partly repaid';
-      case 'repaid': return 'Repaid';
+      case 'owed': return 'Owes you';
+      case 'partial': return `Paid back ${this.formatCents(p.repaidCents)} of ${this.formatCents(p.dueToMeCents)}`;
+      case 'repaid': return 'Paid you back';
       case 'closed': return "Won't be repaid";
-      default: return p.paidCents > 0 ? 'Paid their way' : 'Nothing owed';
+      default: return p.paidCents > 0 ? 'Paid their own way' : 'Nothing to pay back';
     }
   }
 
-  /** What a person's row says, beside their state. */
-  personDetail(p: PersonSplitStatus): string {
-    if (p.dueToMeCents === 0) return `Share ${this.formatCents(p.shareCents)}`;
-    if (p.state === 'repaid') return `${this.formatCents(p.repaidCents)} back`;
-    if (p.repaidCents > 0) return `${this.formatCents(p.repaidCents)} back · owes ${this.formatCents(p.outstandingCents)}`;
-    return `Owes ${this.formatCents(p.outstandingCents)}`;
+  /** The figure on the right: what's still owed, or — once settled — what came back. */
+  personAmountCents(p: PersonSplitStatus): number {
+    if (p.state === 'repaid') return p.repaidCents;
+    if (p.state === 'none') return p.shareCents;
+    return p.outstandingCents;
+  }
+
+  /** Rows with something to act on: record a repayment, or reopen a closed one. */
+  canOpenPerson(p: PersonSplitStatus): boolean {
+    return p.state === 'owed' || p.state === 'partial' || p.state === 'closed';
+  }
+
+  personAriaLabel(p: PersonSplitStatus): string {
+    const name = this.people.nameOf(p.personId);
+    return p.state === 'closed' ? `Reopen ${name}'s share` : `Record a repayment from ${name}`;
+  }
+
+  /** Tapping a person: record what they paid back — or, if closed, offer to reopen. */
+  openPerson(p: PersonSplitStatus) {
+    if (p.state === 'closed') this.reopening.set(p.personId);
+    else this.openDraft(p.personId);
+  }
+
+  /** The person whose closed share is being reopened (the confirm dialog). */
+  reopening = signal<string | null>(null);
+
+  reopenMessage = computed(() => {
+    const id = this.reopening();
+    const p = id ? this.split()?.people.find(x => x.personId === id) : null;
+    if (!p) return '';
+    return `${this.formatCents(p.outstandingCents)} counts as owed to you again. It's in your spending either way until it's paid back.`;
+  });
+
+  async confirmReopen() {
+    const id = this.reopening();
+    this.reopening.set(null);
+    if (id) await this.setPersonClosed(id, false);
+  }
+
+  /** "Won't be repaid", from the repayment dialog opened on that person. */
+  async closeDraftPerson() {
+    const id = this.draftPersonId();
+    if (!id) return;
+    await this.setPersonClosed(id, true);
+    this.closeDraft();
   }
 
   /** "Won't be repaid" / reopen. Their share stays in your spending either way. */
@@ -244,6 +285,8 @@ export class TransactionView {
   draftCovers = signal<string[]>([]);
   /** Once the amount is typed, choosing people stops re-filling it. */
   private draftAmountTyped = false;
+  /** Opened from a person's row: whose — so the footer can offer "Won't be repaid". */
+  draftPersonId = signal<string | null>(null);
 
   /** Asking "from whom" only makes sense on a split bill, for a repayment. */
   askWho = computed(() => !!this.split() && this.draftSource() === 'repayment');
@@ -261,6 +304,7 @@ export class TransactionView {
   /** Opened from a person's row, it's a repayment from them, filled in with what they owe. */
   openDraft(fromPersonId?: string) {
     this.draftOpen.set(true);
+    this.draftPersonId.set(fromPersonId ?? null);
     this.draftSource.set(fromPersonId ? 'repayment' : 'refund');
     this.draftFull.set(false);
     this.draftAmount.set(null);
