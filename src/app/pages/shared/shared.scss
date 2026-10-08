@@ -1,0 +1,111 @@
+// The Shared page's own layout. Cards, buttons, inputs and chips come from styles.scss.
+.page {
+  padding: 28px 32px 48px;
+  max-width: 920px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.page-head {
+  h1 {
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: var(--fg);
+    margin-bottom: 4px;
+  }
+  .sub { color: var(--fg-3); font-size: 14px; margin: 0; }
+}
+
+/* ── Hero: the figure, and why it matters ─────────────────── */
+.hero {
+  padding: 20px 24px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hero-figure .num-display { font-size: 44px; }
+.hero-sentence { margin: 0; color: var(--fg-2); font-size: 15px; line-height: 1.5; max-width: 560px; }
+
+/* ── A person ─────────────────────────────────────────────── */
+.person { padding: 18px 24px; display: flex; flex-direction: column; gap: 10px; }
+
+.person-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.person-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.person-title h3 { margin: 0; font-size: 18px; font-weight: 600; color: var(--fg); }
+.person-sub { font-size: 13px; color: var(--fg-3); .fig { color: var(--fg); font-weight: 600; } }
+
+.bills { display: flex; flex-direction: column; }
+
+/* A bill they're on: tap to open it. */
+.bill {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border: none;
+  border-top: 1px solid var(--line);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover .bill-name { text-decoration: underline; text-underline-offset: 2px; }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); border-radius: var(--radius-xs); }
+  &.settled .bill-name, &.settled .bill-note { color: var(--fg-4); }
+}
+.bill-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bill-name { font-size: 14px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bill-date { color: var(--fg-3); }
+.bill-note { font-size: 13px; color: var(--fg-2); white-space: nowrap; }
+
+.history { align-self: flex-start; font-size: 13px; color: var(--fg-3); }
+
+.square { padding: 16px 24px; display: flex; flex-direction: column; gap: 6px; p { margin: 0; color: var(--fg-3); font-size: 14px; } }
+
+/* ── Empty: an editorial moment ───────────────────────────── */
+.empty {
+  padding: 40px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  .display { font-size: 32px; color: var(--fg); margin: 0; }
+  p { color: var(--fg-3); font-size: 14px; line-height: 1.5; margin: 0; max-width: 460px; }
+}
+
+/* ── The repayment dialog's preview ───────────────────────── */
+.preview {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.preview-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--fg);
+  & + & { border-top: 1px solid var(--line); }
+  .label-mono { color: var(--fg-3); margin-left: 6px; }
+}
+
+@media (max-width: 768px) {
+  .page { padding: 20px 16px 40px; }
+  .hero, .person, .square { padding: 16px; }
+  .hero-figure .num-display { font-size: 34px; }
+  .empty .display { font-size: 26px; }
+  .person-head { flex-direction: column; align-items: stretch; }
+}

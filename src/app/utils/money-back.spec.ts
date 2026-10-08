@@ -3,7 +3,7 @@ import { Transaction } from '../models';
 import { filterForAnalysis } from './analysis-filter';
 import { budgetSpent } from './budgets';
 import {
-  MoneyBackLedger, fullRefundEntry, isFullyRefunded, refundState, refundedPatch, untrackedEntries,
+  MoneyBackLedger, fullRefundEntry, incomeLinks, isFullyRefunded, isMoneyBackIncome, refundState, refundedPatch, untrackedEntries,
 } from './money-back';
 import { totalExpenses, totalIncome } from './reporting';
 
@@ -166,5 +166,41 @@ describe('refundedPatch (bulk "Mark refunded")', () => {
       ],
     });
     expect(refundedPatch(t, false).moneyBack).toEqual([t.moneyBack![1]]);
+  });
+});
+
+describe('one payment spread over several bills', () => {
+  // Mrunaal sent $85 for three dinners: $30, $25, $30.
+  const d1 = tx({ amount: 90, date: '2026-09-01' });
+  const d2 = tx({ amount: 75, date: '2026-09-10' });
+  const d3 = tx({ amount: 90, date: '2026-09-20' });
+  const zelle = tx({
+    type: 'income', amount: 85, categoryId: 'pay',
+    moneyBackSplits: [{ expenseId: d1.id!, amountCents: 3000 }, { expenseId: d2.id!, amountCents: 2500 }, { expenseId: d3.id!, amountCents: 3000 }],
+    moneyBackInfo: { source: 'repayment', fromPersonId: 'm', coversPersonIds: ['m'] },
+  });
+  const salary = tx({ type: 'income', amount: 1000, categoryId: 'pay' });
+  const txs = [d1, d2, d3, zelle, salary];
+  const l = ledgerOf(txs);
+
+  it('each bill nets only its own part', () => {
+    expect(l.moneyBackFor(d1)).toBe(30);
+    expect(l.moneyBackFor(d2)).toBe(25);
+    expect(l.effectiveExpenseAmount(d3)).toBe(60);
+    expect(l.moneyBackEntriesFor(d2)[0]).toMatchObject({ source: 'repayment', amountCents: 2500, fromPersonId: 'm' });
+  });
+
+  it('is money back, not income — once', () => {
+    expect(isMoneyBackIncome(zelle)).toBe(true);
+    expect(incomeLinks(zelle)).toHaveLength(3);
+    const counted = filterForAnalysis(txs, { excludeRefunded: true, isRefunded: t => l.isFullyRefunded(t) });
+    expect(totalIncome(counted, l.moneyRules(true))).toBe(1000);
+    expect(totalExpenses(counted, l.moneyRules(true))).toBe(255 - 85);
+  });
+
+  it('a single link still reads as before', () => {
+    const one = tx({ type: 'income', amount: 20, reimbursesId: d1.id });
+    expect(incomeLinks(one)).toEqual([{ expenseId: d1.id, amountCents: 2000 }]);
+    expect(incomeLinks(salary)).toEqual([]);
   });
 });

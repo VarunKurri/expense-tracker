@@ -15,7 +15,7 @@ import { QuickAddService } from '../../services/quick-add.service';
 import { ToastService } from '../../services/toast.service';
 import { ReconciliationService } from '../../services/reconciliation.service';
 import { DateRange, transactionRange } from '../../utils/date-ranges';
-import { refundedPatch } from '../../utils/money-back';
+import { isMoneyBackIncome, refundedPatch } from '../../utils/money-back';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
 type SpecialFilter = 'all' | 'uncategorized' | 'refunded' | 'not-refunded' | 'internal-transfer';
@@ -97,7 +97,7 @@ export class Transactions {
     if (this.txService.isFullyRefunded(t)) return true;
     // A reimbursement (income linked to an expense) isn't real income — it's folded
     // into the expense's true cost — so it's greyed out and left out of the totals.
-    if (t.type === 'income' && t.reimbursesId) return true;
+    if (isMoneyBackIncome(t)) return true;
     return false;
   }
 

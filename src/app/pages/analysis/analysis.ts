@@ -14,6 +14,7 @@ import { TransactionView } from '../../components/transaction-view/transaction-v
 import { Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { filterForAnalysis } from '../../utils/analysis-filter';
+import { isMoneyBackIncome } from '../../utils/money-back';
 import { categoryPalette, chartColors } from '../../utils/theme-colors';
 import { ThemeService } from '../../services/theme.service';
 import {
@@ -209,7 +210,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
   income = computed(() => {
     const netting = this.excludeRefunded();
     return this.filtered().filter(t =>
-      t.type === 'income' && !t.isInternalTransfer && (!netting || !t.reimbursesId)
+      t.type === 'income' && !t.isInternalTransfer && (!netting || !isMoneyBackIncome(t))
     );
   });
 
@@ -366,7 +367,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
       const key = t.date.slice(0, 7);
       if (!months.has(key)) continue;
       const entry = months.get(key)!;
-      if (t.type === 'income' && (!netting || !t.reimbursesId)) entry.income += t.amount;
+      if (t.type === 'income' && (!netting || !isMoneyBackIncome(t))) entry.income += t.amount;
       if (t.type === 'expense' && !this.txService.isFullyRefunded(t)) {
         entry.expenses += this.eff(t);
         if (netting) entry.income += this.txService.reimbursementSurplus(t);

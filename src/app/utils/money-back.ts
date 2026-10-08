@@ -37,10 +37,29 @@ export function surplusCents(paidCents: number, entries: MoneyBackEntry[]): numb
  * An income linked to an expense, as money back. Links made before refunds
  * existed carry no `moneyBackInfo`; they were always "a friend paid me back".
  */
-export function linkedEntry(income: Transaction): MoneyBackEntry {
+/** Where an income goes as money back, and how much to each expense. */
+export interface IncomeLink { expenseId: string; amountCents: number; }
+
+/**
+ * An income's money-back links: one expense (`reimbursesId`, its whole
+ * amount) or spread over several (`moneyBackSplits`). Empty for any other
+ * income — which then counts as income.
+ */
+export function incomeLinks(t: Transaction): IncomeLink[] {
+  if (t.type !== 'income') return [];
+  if (t.moneyBackSplits?.length) return t.moneyBackSplits;
+  return t.reimbursesId ? [{ expenseId: t.reimbursesId, amountCents: toCents(t.amount) }] : [];
+}
+
+/** Money back on some purchase: kept out of income while money back is counted. */
+export function isMoneyBackIncome(t: Transaction): boolean {
+  return incomeLinks(t).length > 0;
+}
+
+export function linkedEntry(income: Transaction, amountCents = toCents(income.amount)): MoneyBackEntry {
   return {
     source: income.moneyBackInfo?.source ?? 'repayment',
-    amountCents: toCents(income.amount),
+    amountCents,
     date: income.date,
     fromPersonId: income.moneyBackInfo?.fromPersonId,
     coversPersonIds: income.moneyBackInfo?.coversPersonIds,
@@ -61,8 +80,11 @@ export function untrackedEntries(t: Transaction): MoneyBackEntry[] {
 }
 
 /** Every piece of money back on an expense: what's on it, plus its linked incomes. */
-export function moneyBackEntries(expense: Transaction, linkedIncomes: Transaction[] = []): MoneyBackEntry[] {
-  return [...untrackedEntries(expense), ...linkedIncomes.map(linkedEntry)];
+/** An income linked to an expense, with the part of it that went there. */
+export interface LinkedIncome { income: Transaction; amountCents: number; }
+
+export function moneyBackEntries(expense: Transaction, linked: LinkedIncome[] = []): MoneyBackEntry[] {
+  return [...untrackedEntries(expense), ...linked.map(l => linkedEntry(l.income, l.amountCents))];
 }
 
 export type RefundState = 'none' | 'partial' | 'full';
@@ -112,12 +134,12 @@ export function refundedPatch(t: Transaction, refunded: boolean): Partial<Transa
   };
 }
 
-/** Incomes linked to each expense through `reimbursesId`, by expense id. */
-export function linkedIncomesMap(txs: Transaction[]): Map<string, Transaction[]> {
-  const map = new Map<string, Transaction[]>();
-  for (const t of txs) {
-    if (t.type === 'income' && t.reimbursesId) {
-      map.set(t.reimbursesId, [...(map.get(t.reimbursesId) ?? []), t]);
+/** Incomes linked to each expense, with the part that went there, by expense id. */
+export function linkedIncomesMap(txs: Transaction[]): Map<string, LinkedIncome[]> {
+  const map = new Map<string, LinkedIncome[]>();
+  for (const income of txs) {
+    for (const link of incomeLinks(income)) {
+      map.set(link.expenseId, [...(map.get(link.expenseId) ?? []), { income, amountCents: link.amountCents }]);
     }
   }
   return map;
@@ -137,9 +159,9 @@ export abstract class MoneyBackLedger {
 
   // Rebuilt only when the transaction list itself changes (signals hand back
   // the same array until then), so totalling a page stays linear.
-  private linkCache?: { txs: Transaction[]; map: Map<string, Transaction[]> };
+  private linkCache?: { txs: Transaction[]; map: Map<string, LinkedIncome[]> };
 
-  private linked(): Map<string, Transaction[]> {
+  private linked(): Map<string, LinkedIncome[]> {
     const txs = this.transactions();
     if (this.linkCache?.txs !== txs) this.linkCache = { txs, map: linkedIncomesMap(txs) };
     return this.linkCache.map;
@@ -147,13 +169,18 @@ export abstract class MoneyBackLedger {
 
   /** The incomes linked to an expense as money back. */
   linkedIncomesFor(expense?: Transaction | null): Transaction[] {
+    return this.linksFor(expense).map(l => l.income);
+  }
+
+  /** The incomes linked to an expense, with how much of each went to it. */
+  linksFor(expense?: Transaction | null): LinkedIncome[] {
     return expense?.id ? this.linked().get(expense.id) ?? [] : [];
   }
 
   /** Every piece of money back on an expense, tracked and untracked. */
   moneyBackEntriesFor(t: Transaction): MoneyBackEntry[] {
     if (t.type !== 'expense') return [];
-    return moneyBackEntries(t, this.linkedIncomesFor(t));
+    return moneyBackEntries(t, this.linksFor(t));
   }
 
   /** How much came back on an expense, in dollars. */
@@ -177,8 +204,13 @@ export abstract class MoneyBackLedger {
 
   /** Refunded in full, in part, or not at all — counting refund incomes linked from the bank. */
   refundState(t: Transaction): RefundState {
-    const linkedRefunds = this.linkedIncomesFor(t).map(linkedEntry).filter(e => e.source === 'refund');
+    const linkedRefunds = this.linksFor(t).map(l => linkedEntry(l.income, l.amountCents)).filter(e => e.source === 'refund');
     return refundState(t, moneyBackTotalCents(linkedRefunds));
+  }
+
+  /** An income that is money back on some purchase (for templates). */
+  isMoneyBackIncome(t: Transaction): boolean {
+    return isMoneyBackIncome(t);
   }
 
   /** A purchase refunded in full: left out of analysis while money back is counted. */
@@ -201,8 +233,10 @@ export abstract class MoneyBackLedger {
    *  incomes together), not to any single payment — this just lets a linked
    *  income's own row indicate "this is part of a package that came out ahead." */
   reimbursementSurplusForIncome(income: Transaction): number {
-    if (income.type !== 'income' || !income.reimbursesId) return 0;
-    const expense = this.transactions().find(t => t.id === income.reimbursesId);
-    return expense ? this.reimbursementSurplus(expense) : 0;
+    const ids = new Set(incomeLinks(income).map(l => l.expenseId));
+    if (!ids.size) return 0;
+    return this.transactions()
+      .filter(t => t.id && ids.has(t.id))
+      .reduce((total, expense) => total + this.reimbursementSurplus(expense), 0);
   }
 }

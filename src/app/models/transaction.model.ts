@@ -47,6 +47,10 @@ export interface Transaction {
   // truly spent. Differs from `refunded`, which fully excludes an expense (whole
   // amount paid back). Derived, not stored, on the expense side.
   reimbursesId?: string; // on an income: the expense transaction id it pays back
+  // On an income that pays back several expenses at once ("Mrunaal sent $85
+  // for three dinners"): how much of it went to each. Used instead of
+  // `reimbursesId`; the parts always add up to the income's amount.
+  moneyBackSplits?: { expenseId: string; amountCents: number }[];
 
   // Internal transfer tracking (e.g. a credit card payment: an expense on the
   // paying account and an income on the card account, both real per-account, but

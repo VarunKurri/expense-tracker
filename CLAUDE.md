@@ -127,6 +127,7 @@ src/app/
     budgets/
     analysis/
     forecast/       Analysis → Forecast tab: cash ahead (maths in utils/forecast.ts)
+    shared/         who owes you, across every split bill (maths in utils/shared.ts, utils/splits.ts)
     net-worth/      accounts + manual assets/debts (ManualAsset, dated valuations)
       loan-detail/  one loan: payments made/missed/to come (maths in utils/loans.ts)
   app.ts            shell with sidebar

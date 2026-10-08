@@ -16,6 +16,7 @@ import { TransactionService } from '../../services/transaction.service';
 import { CategoryService } from '../../services/category.service';
 import { ThemeService } from '../../services/theme.service';
 import { filterForAnalysis } from '../../utils/analysis-filter';
+import { isMoneyBackIncome } from '../../utils/money-back';
 import { chartColors, categoryPalette, otherColor } from '../../utils/theme-colors';
 import {
   MoneyRules, totalExpenses, totalIncome, categoryTotals, incomeTotals,
@@ -272,7 +273,7 @@ export class Reports implements AfterViewInit, OnDestroy {
     // Expenses and Income tabs each show only their own side; Cash flow shows both.
     if (this.report() === 'expenses') txs = txs.filter(t => t.type === 'expense');
     if (this.report() === 'income') {
-      txs = txs.filter(t => t.type === 'income' && (!rules.netting || !t.reimbursesId));
+      txs = txs.filter(t => t.type === 'income' && (!rules.netting || !isMoneyBackIncome(t)));
     }
 
     return [...txs]

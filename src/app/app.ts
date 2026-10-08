@@ -143,6 +143,7 @@ export class App {
       // just "something's due sometime this week."
       badge: (this.billService.overdueBills().length + this.billService.upcomingBills(1).length) || null },
     { path: '/budgets',      label: 'Budgets',      iconName: 'budgets' },
+    { path: '/shared',       label: 'Shared',       iconName: 'shared' },
     { path: '/analysis',     label: 'Analysis',     iconName: 'analysis' },
   ]);
 

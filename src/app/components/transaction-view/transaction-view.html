@@ -136,12 +136,13 @@
               <button class="reimburse-unlink" (click)="removeUntracked(e)" title="Remove" aria-label="Remove money back">✕</button>
             </div>
           }
-          @for (r of linkedIncomes(); track r.id) {
+          @for (l of links(); track l.income.id) {
             <div class="reimburse-row">
               <span class="reimburse-row-text">
-                ↩ {{ sourceLabel(incomeSource(r)) }}{{ fromLabel(r.moneyBackInfo ?? {}) }} · {{ r.merchant || 'Income' }} · +{{ formatCurrency(r.amount) }} · {{ formatDate(r.date) }}
+                ↩ {{ sourceLabel(incomeSource(l.income)) }}{{ fromLabel(l.income.moneyBackInfo ?? {}) }} · {{ l.income.merchant || 'Income' }}
+                · +{{ formatCents(l.amountCents) }}{{ isSpread(l.income) ? ' of ' + formatCurrency(l.income.amount) : '' }} · {{ formatDate(l.income.date) }}
               </span>
-              <button class="reimburse-unlink" (click)="unlinkReimbursement(r)" title="Unlink" aria-label="Unlink income">✕</button>
+              <button class="reimburse-unlink" (click)="unlinkReimbursement(l.income)" title="Unlink" aria-label="Unlink income">✕</button>
             </div>
           }
         } @else {
@@ -160,7 +161,18 @@
     @if (tx.type === 'income') {
       <div class="view-reimburse">
         <div class="view-reimburse-head">Money back</div>
-        @if (reimbursesExpense(); as exp) {
+        @if (moneyBackParts().length > 1) {
+          <div class="reimburse-summary">
+            ↩ {{ sourceLabel(incomeSource(tx)) }}{{ fromLabel(tx.moneyBackInfo ?? {}) }}, spread over {{ moneyBackParts().length }} bills
+          </div>
+          @for (p of moneyBackParts(); track p.expense.id) {
+            <div class="reimburse-row">
+              <span class="reimburse-row-text">{{ p.expense.merchant || 'Expense' }} · {{ formatDate(p.expense.date) }}</span>
+              <span class="fig">+{{ formatCents(p.amountCents) }}</span>
+            </div>
+          }
+          <button class="reimburse-add" (click)="unlinkReimbursement(tx)">Unlink from all {{ moneyBackParts().length }}</button>
+        } @else if (reimbursesExpense(); as exp) {
           <div class="reimburse-summary">
             ↩ {{ sourceLabel(incomeSource(tx)) }} on <strong>{{ exp.merchant || 'an expense' }}</strong> ·
             @if (reimbursesSurplus() > 0) {

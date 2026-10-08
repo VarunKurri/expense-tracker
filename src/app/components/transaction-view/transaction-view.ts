@@ -14,7 +14,7 @@ import { Modal } from '../modal/modal';
 import { ManualAsset, ME, MoneyBackSource, Transaction, UntrackedReturn } from '../../models';
 import { PersonService } from '../../services/person.service';
 import { PersonSplitStatus, outstandingFor, setClosed, splitStatus } from '../../utils/splits';
-import { RefundState, newReturnId } from '../../utils/money-back';
+import { RefundState, incomeLinks, newReturnId } from '../../utils/money-back';
 import { fromCents, toCents } from '../../utils/money';
 
 let nextLockId = 0;
@@ -118,11 +118,28 @@ export class TransactionView {
     return t ? this.txService.effectiveExpenseAmount(t) : 0;
   });
 
-  /** For an income that pays back an expense: the expense it pays back. */
-  reimbursesExpense = computed<Transaction | null>(() => {
+  /** On an expense: the incomes linked to it, with the part of each that went here. */
+  links = computed(() => this.txService.linksFor(this.tx()));
+
+  /** True when an income was spread over several bills (so its row shows the part). */
+  isSpread(income: Transaction): boolean {
+    return incomeLinks(income).length > 1;
+  }
+
+  /** On an income that's money back: each purchase it paid back, and how much went to each. */
+  moneyBackParts = computed(() => {
     const t = this.tx();
-    if (t?.type !== 'income' || !t.reimbursesId) return null;
-    return this.txService.transactions().find(x => x.id === t.reimbursesId) ?? null;
+    if (!t) return [];
+    const txs = this.txService.transactions();
+    return incomeLinks(t)
+      .map(l => ({ expense: txs.find(x => x.id === l.expenseId), amountCents: l.amountCents }))
+      .filter((p): p is { expense: Transaction; amountCents: number } => !!p.expense);
+  });
+
+  /** For an income that pays back one expense: that expense. */
+  reimbursesExpense = computed<Transaction | null>(() => {
+    const parts = this.moneyBackParts();
+    return parts.length === 1 ? parts[0].expense : null;
   });
 
   /** Shown on the income side too, so a surplus is visible from either end. */
@@ -471,7 +488,7 @@ export class TransactionView {
     return this.txService.transactions().filter(t =>
       t.type === wantType && t.id !== from.id &&
       // An income can only ever reimburse one expense.
-      !(t.type === 'income' && !!t.reimbursesId) &&
+      !this.txService.isMoneyBackIncome(t) &&
       (!q || (t.merchant || '').toLowerCase().includes(q) || String(t.amount).includes(q))
     ).slice(0, 50);
   });
@@ -513,8 +530,11 @@ export class TransactionView {
   async unlinkReimbursement(income: Transaction) {
     if (!income.id) return;
     try {
-      await this.txService.update(income.id, { reimbursesId: undefined, moneyBackInfo: undefined });
-      this.toast.success('Unlinked.');
+      // A payment spread over several bills unlinks as a whole, so its parts always
+      // add up to what was actually paid.
+      const bills = incomeLinks(income).length;
+      await this.txService.update(income.id, { reimbursesId: undefined, moneyBackSplits: undefined, moneyBackInfo: undefined });
+      this.toast.success(bills > 1 ? `Unlinked from ${bills} bills.` : 'Unlinked.');
     } catch {
       this.toast.error('Could not unlink. Please try again.');
     }

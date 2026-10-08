@@ -1,5 +1,5 @@
 import { Transaction } from '../models';
-import { isFullyRefunded } from './money-back';
+import { isFullyRefunded, isMoneyBackIncome } from './money-back';
 
 /**
  * Shared money aggregation for the Analysis and Reports pages.
@@ -54,7 +54,7 @@ export function spendingTransactions(txs: Transaction[]): Transaction[] {
 /** Incomes that count as earning. */
 export function incomeTransactions(txs: Transaction[], rules: MoneyRules): Transaction[] {
   return txs.filter(t =>
-    t.type === 'income' && !t.isInternalTransfer && (!rules.netting || !t.reimbursesId)
+    t.type === 'income' && !t.isInternalTransfer && (!rules.netting || !isMoneyBackIncome(t))
   );
 }
 
@@ -131,7 +131,7 @@ export function monthlySeries(
     const key = t.date.slice(0, 7);
     const entry = acc.get(key);
     if (!entry) continue;
-    if (t.type === 'income' && (!rules.netting || !t.reimbursesId)) {
+    if (t.type === 'income' && (!rules.netting || !isMoneyBackIncome(t))) {
       entry.income += t.amount;
     }
     if (t.type === 'expense') {

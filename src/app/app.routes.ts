@@ -32,6 +32,11 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/accounts/account-detail/account-detail').then(m => m.AccountDetail)
   },
   {
+    path: 'shared',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/shared/shared').then(m => m.Shared)
+  },
+  {
     path: 'net-worth',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/net-worth/net-worth').then(m => m.NetWorth)

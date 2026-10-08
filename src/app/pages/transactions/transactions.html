@@ -446,7 +446,7 @@
                       @if (txService.isFullyRefunded(tx)) {
                         <span class="refunded-badge">↩ Refunded</span>
                       }
-                      @if (tx.type === 'income' && tx.reimbursesId) {
+                      @if (txService.isMoneyBackIncome(tx)) {
                         <span class="refunded-badge">↩ {{ tx.moneyBackInfo?.source === 'refund' ? 'Refund' : 'Repayment' }}{{ txService.reimbursementSurplusForIncome(tx) > 0 ? ' + surplus' : '' }}</span>
                       }
                       @if (tx.type === 'expense' && !txService.isFullyRefunded(tx) && txService.moneyBackFor(tx) > 0) {
