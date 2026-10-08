@@ -11,7 +11,7 @@ import { Router } from '@angular/router';
 import { loanDirection, loanPayments, loanState } from '../../utils/loans';
 import { localDateString } from '../../utils/date';
 import { Modal } from '../modal/modal';
-import { ManualAsset, MoneyBackSource, Transaction, UntrackedReturn } from '../../models';
+import { ManualAsset, Transaction, UntrackedReturn } from '../../models';
 import { RefundState, newReturnId } from '../../utils/money-back';
 import { fromCents, toCents } from '../../utils/money';
 
@@ -135,60 +135,54 @@ export class TransactionView {
     return Math.min(exp.amount, this.txService.moneyBackFor(exp));
   });
 
-  sourceLabel(source: MoneyBackSource): string {
-    return source === 'refund' ? 'Refund' : 'Repayment';
-  }
-
-  /** A linked income's kind. Links from before refunds existed were repayments. */
-  incomeSource(income: Transaction): MoneyBackSource {
-    return income.moneyBackInfo?.source ?? 'repayment';
-  }
-
   saving = signal(false);
 
-  /** Mark the whole purchase refunded: records whatever hasn't been refunded yet. */
-  async markFullyRefunded() {
-    const t = this.tx();
-    if (!t?.id) return;
-    const refundedSoFar = this.txService.moneyBackEntriesFor(t)
-      .filter(e => e.source === 'refund')
-      .reduce((total, e) => total + e.amountCents, 0);
-    const left = toCents(t.amount) - refundedSoFar;
-    if (left <= 0) return;
-    const entry: UntrackedReturn = { id: newReturnId(), source: 'refund', amountCents: left, date: localDateString() };
-    await this.saveMoneyBack(t, [...(t.moneyBack ?? []), entry], 'Marked as refunded.');
-  }
-
-  // The "Add refund" / "Record repayment" dialog.
-  draftSource = signal<MoneyBackSource | null>(null);
+  // The "Add money back" dialog. One dialog for a store refund, a friend paying
+  // you back, cash, store credit: on an ordinary expense which one it was makes
+  // no difference to the numbers, so it isn't asked. (On a split bill it does —
+  // a refund shrinks everyone's share — and the split asks "from whom" there.)
+  draftOpen = signal(false);
+  /** "Everything came back": no amount or date to fill in. */
+  draftFull = signal(false);
   draftAmount = signal<number | null>(null);
   draftDate = signal('');
   draftNote = signal('');
 
-  openDraft(source: MoneyBackSource) {
-    this.draftSource.set(source);
+  /** What hasn't come back yet — what "The full amount / The rest" records. */
+  remainingCents = computed(() => {
+    const t = this.tx();
+    if (!t) return 0;
+    return Math.max(0, toCents(t.amount) - toCents(this.moneyBackTotal()));
+  });
+
+  openDraft() {
+    this.draftOpen.set(true);
+    this.draftFull.set(false);
     this.draftAmount.set(null);
     this.draftDate.set(localDateString());
     this.draftNote.set('');
   }
 
   closeDraft() {
-    this.draftSource.set(null);
+    this.draftOpen.set(false);
   }
 
   async saveDraft() {
     const t = this.tx();
-    const source = this.draftSource();
-    if (!t?.id || !source) return;
-    const amountCents = toCents(Number(this.draftAmount()));
+    if (!t?.id) return;
+    const full = this.draftFull() && this.remainingCents() > 0;
+    const amountCents = full ? this.remainingCents() : toCents(Number(this.draftAmount()));
     if (amountCents <= 0) { this.toast.error('Enter how much came back.'); return; }
-    if (!this.draftDate()) { this.toast.error('Pick the date it came back.'); return; }
+    const date = full ? localDateString() : this.draftDate();
+    if (!date) { this.toast.error('Pick the date it came back.'); return; }
     const note = this.draftNote().trim();
+    // Recorded as a refund: with no person attached, it's money back on the
+    // purchase itself. Covering the whole of it is what "Refunded" means.
     const entry: UntrackedReturn = {
-      id: newReturnId(), source, amountCents, date: this.draftDate(), ...(note ? { note } : {}),
+      id: newReturnId(), source: 'refund', amountCents, date, ...(note ? { note } : {}),
     };
     const ok = await this.saveMoneyBack(t, [...(t.moneyBack ?? []), entry],
-      source === 'refund' ? 'Refund added.' : 'Repayment recorded.');
+      full ? 'Marked as fully paid back.' : 'Money back added.');
     if (ok) this.closeDraft();
   }
 
@@ -222,15 +216,6 @@ export class TransactionView {
       return false;
     } finally {
       this.saving.set(false);
-    }
-  }
-
-  async setIncomeSource(income: Transaction, source: MoneyBackSource) {
-    if (!income.id || this.incomeSource(income) === source) return;
-    try {
-      await this.txService.update(income.id, { moneyBackInfo: { ...income.moneyBackInfo, source } });
-    } catch {
-      this.toast.error('Could not save. Please try again.');
     }
   }
 
@@ -338,8 +323,6 @@ export class TransactionView {
   // ── Link picker ────────────────────────────────────────────
   linkingFrom = signal<Transaction | null>(null);
   linkSearch = signal('');
-  /** What the linked income is: a refund from the store, or a person paying you back. */
-  linkSource = signal<MoneyBackSource>('repayment');
 
   /** Opposite-type transactions: an expense picks an income, and vice versa. */
   linkCandidates = computed<Transaction[]>(() => {
@@ -357,7 +340,6 @@ export class TransactionView {
 
   openLinkPicker(tx: Transaction) {
     this.linkSearch.set('');
-    this.linkSource.set('repayment');
     this.linkingFrom.set(tx);
   }
 
@@ -373,11 +355,8 @@ export class TransactionView {
     const expense = from.type === 'expense' ? from : candidate;
     if (!income.id || !expense.id) return;
     try {
-      await this.txService.update(income.id, {
-        reimbursesId: expense.id,
-        moneyBackInfo: { ...income.moneyBackInfo, source: this.linkSource() },
-      });
-      this.toast.success(this.linkSource() === 'refund' ? 'Refund linked.' : 'Repayment linked.');
+      await this.txService.update(income.id, { reimbursesId: expense.id });
+      this.toast.success('Linked.');
       this.closeLinkPicker();
     } catch {
       this.toast.error('Could not link. Please try again.');
@@ -422,7 +401,7 @@ export class TransactionView {
   @HostListener('document:keydown.escape')
   onEscape() {
     // The dialogs sit on top of the panel, so Escape closes those first.
-    if (this.draftSource()) { this.closeDraft(); return; }
+    if (this.draftOpen()) { this.closeDraft(); return; }
     if (this.linkingFrom()) { this.closeLinkPicker(); return; }
     if (this.transaction()) this.close();
   }

@@ -190,20 +190,17 @@
     &:disabled { opacity: 0.5; cursor: default; }
   }
 
-  /* Four actions: two to a row, so they still fit at phone width. */
+  /* Two actions side by side; they wrap to a column on a narrow phone. */
   .money-back-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0 8px;
-    .reimburse-add { flex: 1 1 calc(50% - 4px); }
+    .reimburse-add { flex: 1 1 140px; }
   }
-
-  .mini-seg { margin-bottom: 4px; }
 }
 
 /* ── Link picker ───────────────────────────────────────────── */
 .link-search { width: 100%; margin-bottom: 12px; }
-.link-source { margin-bottom: 12px; }
 
 .link-list {
   display: flex;
