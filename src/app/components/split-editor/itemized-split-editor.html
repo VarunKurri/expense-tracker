@@ -62,12 +62,10 @@
       </div>
     }
   </div>
-  <div class="item-actions">
-    <button type="button" class="link-btn" (click)="addItem()">+ Add item</button>
-    @if (anyUnclaimed() && includesMe()) {
-      <button type="button" class="link-btn" (click)="claimTheRest()">Give unclaimed items to me</button>
-    }
-  </div>
+  <button type="button" class="btn-add add-item" (click)="addItem()">+ Add item</button>
+  @if (anyUnclaimed() && includesMe()) {
+    <button type="button" class="btn-row claim" (click)="claimTheRest()">Give unclaimed items to me</button>
+  }
 </div>
 
 <!-- TAX AND TIP — each one row: the number, then whether it's % or $ -->
@@ -123,7 +121,7 @@
     Tax and tip are shared in proportion to what each person had.
   </p>
   @if (mismatch()) {
-    <button type="button" class="link-btn use-amount" (click)="useAmount.emit(coverCents())">
+    <button type="button" class="btn-row use-amount" (click)="useAmount.emit(coverCents())">
       Or make the amount {{ money(coverCents()) }} to match the receipt
     </button>
   }

@@ -30,7 +30,7 @@
 .hero-sentence { margin: 0; color: var(--fg-2); font-size: 15px; line-height: 1.5; max-width: 560px; }
 
 /* ── A person ─────────────────────────────────────────────── */
-.person { padding: 18px 24px; display: flex; flex-direction: column; gap: 10px; }
+.person { --pad-x: 24px; --pad-y: 18px; padding: var(--pad-y) var(--pad-x); display: flex; flex-direction: column; gap: 10px; }
 
 .person-head {
   display: flex;
@@ -43,23 +43,29 @@
 .person-sub { font-size: 13px; color: var(--fg-3); .fig { color: var(--fg); font-weight: 600; } }
 
 .bills { display: flex; flex-direction: column; }
+/* With nothing below, the last row runs to the card's bottom edge too. */
+.bills:last-child { margin-bottom: calc(-1 * var(--pad-y)); }
+.bills:last-child .bill:last-child { border-radius: 0 0 var(--radius) var(--radius); }
 
-/* A bill they're on: tap to open it. */
+/* A bill they're on: tap to open it. Reads like a transaction row — the row
+   runs to the card's edges and highlights on hover. */
 .bill {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  padding: 10px 0;
+  margin: 0 calc(-1 * var(--pad-x));
+  padding: 12px var(--pad-x);
   border: none;
   border-top: 1px solid var(--line);
   background: none;
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 0.18s ease;
 
-  &:hover .bill-name { text-decoration: underline; text-underline-offset: 2px; }
-  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); border-radius: var(--radius-xs); }
+  &:hover { background: var(--bg-3); }
+  &:focus-visible { outline: none; box-shadow: inset 0 0 0 3px var(--focus-ring); }
   &.settled .bill-name, &.settled .bill-note { color: var(--fg-4); }
 }
 .bill-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -67,7 +73,7 @@
 .bill-date { color: var(--fg-3); }
 .bill-note { font-size: 13px; color: var(--fg-2); white-space: nowrap; }
 
-.history { align-self: flex-start; font-size: 13px; color: var(--fg-3); }
+.history { align-self: flex-start; }
 
 .square { padding: 16px 24px; display: flex; flex-direction: column; gap: 6px; p { margin: 0; color: var(--fg-3); font-size: 14px; } }
 
@@ -104,7 +110,8 @@
 
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
-  .hero, .person, .square { padding: 16px; }
+  .hero, .square { padding: 16px; }
+  .person { --pad-x: 16px; --pad-y: 16px; }
   .hero-figure .num-display { font-size: 34px; }
   .empty .display { font-size: 26px; }
   .person-head { flex-direction: column; align-items: stretch; }

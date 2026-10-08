@@ -653,6 +653,45 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 /* An inline text link inside a sentence ("Use calculated", "Go to October"). */
+/* "+ Add item", "+ Add money back": a dashed, full-width row that adds
+   something to the list above it. Quieter than a button, clearer than a link. */
+.btn-add {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t), color var(--t);
+
+  &:hover:not(:disabled) { background: var(--bg-3); color: var(--fg); }
+  &:disabled { opacity: 0.5; cursor: default; }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+}
+
+/* A small outlined action inside a row ("Won't be repaid", "Give unclaimed
+   items to me") — a quiet button, never an underlined link. */
+.btn-row {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg-2);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--t), color var(--t);
+
+  &:hover:not(:disabled) { border-color: var(--line-strong); color: var(--fg); }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+}
+
 .link-btn {
   background: none;
   border: 0;

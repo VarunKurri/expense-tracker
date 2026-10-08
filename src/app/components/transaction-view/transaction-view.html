@@ -89,9 +89,9 @@
                 </button>
                 <span class="chip split-state" [class.active]="p.state === 'repaid'">{{ stateLabel(p) }}</span>
                 @if (p.state === 'owed' || p.state === 'partial') {
-                  <button type="button" class="link-btn split-close" (click)="setPersonClosed(p.personId, true)">Won't be repaid</button>
+                  <button type="button" class="btn-row split-close" (click)="setPersonClosed(p.personId, true)">Won't be repaid</button>
                 } @else if (p.state === 'closed') {
-                  <button type="button" class="link-btn split-close" (click)="setPersonClosed(p.personId, false)">Reopen</button>
+                  <button type="button" class="btn-row split-close" (click)="setPersonClosed(p.personId, false)">Reopen</button>
                 }
               </div>
             }
@@ -152,8 +152,8 @@
           </p>
         }
         <div class="money-back-actions">
-          <button class="reimburse-add" (click)="openDraft()">+ Add money back</button>
-          <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Link income</button>
+          <button class="btn-add reimburse-add" (click)="openDraft()">+ Add money back</button>
+          <button class="btn-add reimburse-add" (click)="openLinkPicker(tx)">+ Link income</button>
         </div>
       </div>
     }
@@ -171,7 +171,7 @@
               <span class="fig">+{{ formatCents(p.amountCents) }}</span>
             </div>
           }
-          <button class="reimburse-add" (click)="unlinkReimbursement(tx)">Unlink from all {{ moneyBackParts().length }}</button>
+          <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink from all {{ moneyBackParts().length }}</button>
         } @else if (reimbursesExpense(); as exp) {
           <div class="reimburse-summary">
             ↩ {{ sourceLabel(incomeSource(tx)) }} on <strong>{{ exp.merchant || 'an expense' }}</strong> ·
@@ -186,13 +186,13 @@
             <button type="button" role="radio" [class.active]="incomeSource(tx) === 'refund'" [attr.aria-checked]="incomeSource(tx) === 'refund'" (click)="setIncomeSource(tx, 'refund')">Refund</button>
             <button type="button" role="radio" [class.active]="incomeSource(tx) === 'repayment'" [attr.aria-checked]="incomeSource(tx) === 'repayment'" (click)="setIncomeSource(tx, 'repayment')">Repayment</button>
           </div>
-          <button class="reimburse-add" (click)="unlinkReimbursement(tx)">Unlink</button>
+          <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink</button>
         } @else {
           <p class="reimburse-hint">
             Is this money back on a purchase — a refund, or a friend paying you back?
             Link it so it isn't counted as income.
           </p>
-          <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Link to a purchase</button>
+          <button class="btn-add reimburse-add" (click)="openLinkPicker(tx)">+ Link to a purchase</button>
         }
       </div>
     }
@@ -215,8 +215,8 @@
           }
         </div>
         <div class="loan-actions">
-          <button class="reimburse-add" (click)="openLoan(link.loan)">Open loan</button>
-          <button class="reimburse-add" (click)="unlinkFromLoan()">Unlink</button>
+          <button class="btn-add reimburse-add" (click)="openLoan(link.loan)">Open loan</button>
+          <button class="btn-add reimburse-add" (click)="unlinkFromLoan()">Unlink</button>
         </div>
       </div>
     } @else if (loanOptions().length) {
@@ -234,7 +234,7 @@
         }
         <div class="loan-actions">
           @for (r of loanRoles(); track r.kind) {
-            <button class="reimburse-add" (click)="linkToLoan(r.kind)">+ {{ r.label }}</button>
+            <button class="btn-add reimburse-add" (click)="linkToLoan(r.kind)">+ {{ r.label }}</button>
           }
         </div>
       </div>

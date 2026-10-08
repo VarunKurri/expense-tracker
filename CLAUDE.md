@@ -72,8 +72,15 @@ The app is what we copy. Do not "correct" this back to dark.
   14px (cards) · `--radius-pill` 999px (chips, tab pills).
 - Cards use `var(--card-grad)`; inputs use `var(--input-grad)`.
 - Shared classes: `.card`, `.btn-primary`, `.btn-solid`, `.btn-ghost`,
-  `.btn-danger`, `.input` / `.input-field`, `.chip`, `.card-label`,
-  `.label-mono`, `.num`, `.fig`, `.num-display`, `.display`.
+  `.btn-danger`, `.btn-add`, `.btn-row`, `.input` / `.input-field`, `.chip`,
+  `.card-label`, `.label-mono`, `.num`, `.fig`, `.num-display`, `.display`.
+- **Actions are buttons, not underlined links.** "+ Add item" / "+ Add money
+  back" use `.btn-add` (dashed, full width, under the list it adds to); a small
+  action inside a row ("Won't be repaid", "Show 2 settled") uses `.btn-row`.
+  `.link-btn` is only for a link sitting inside a sentence.
+- **A tappable row highlights, it doesn't underline.** Rows that open something
+  (transactions, bills on Shared, people on a split) run to the card's edges and
+  take `background: var(--bg-3)` on hover, like `.tx-row`.
 - `.glass` / `.glass-strong` are legacy aliases for flat surfaces, kept only so
   un-converted templates still render. Do not use them in new markup.
 - **Every form and dialog uses `<app-modal>`** (components/modal) — one shell:

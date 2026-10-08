@@ -40,7 +40,7 @@ import { fromCents, toCents } from '../../../utils/money';
         }
       </div>
       @if (choices('').length) {
-        <button type="button" class="link-btn add-payer" (click)="add()">+ Someone else paid too</button>
+        <button type="button" class="btn-add add-payer" (click)="add()">+ Someone else paid too</button>
       }
     }
   `,

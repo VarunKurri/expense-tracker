@@ -94,13 +94,8 @@
 
 .item-total { margin: -2px 0 0; }
 
-.item-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 8px;
-  font-size: 13px;
-}
+.add-item { margin-top: 4px; }
+.claim { align-self: flex-start; }
 
 /* Tax / tip: the number, then % or $ beside it. */
 .charge {
@@ -110,4 +105,4 @@
   align-items: center;
 }
 
-.use-amount { align-self: flex-start; font-size: 13px; }
+.use-amount { align-self: flex-start; }
