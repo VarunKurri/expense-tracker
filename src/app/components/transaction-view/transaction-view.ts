@@ -11,7 +11,7 @@ import { Router } from '@angular/router';
 import { loanDirection, loanPayments, loanState } from '../../utils/loans';
 import { localDateString } from '../../utils/date';
 import { Modal } from '../modal/modal';
-import { ManualAsset, Transaction, UntrackedReturn } from '../../models';
+import { ManualAsset, MoneyBackSource, Transaction, UntrackedReturn } from '../../models';
 import { RefundState, newReturnId } from '../../utils/money-back';
 import { fromCents, toCents } from '../../utils/money';
 
@@ -135,13 +135,33 @@ export class TransactionView {
     return Math.min(exp.amount, this.txService.moneyBackFor(exp));
   });
 
+  sourceLabel(source: MoneyBackSource): string {
+    return source === 'refund' ? 'Refund' : 'Repayment';
+  }
+
+  /** A linked income's kind. Links from before refunds existed were repayments. */
+  incomeSource(income: Transaction): MoneyBackSource {
+    return income.moneyBackInfo?.source ?? 'repayment';
+  }
+
+  /** Fix a link's kind without unlinking and relinking. */
+  async setIncomeSource(income: Transaction, source: MoneyBackSource) {
+    if (!income.id || this.incomeSource(income) === source) return;
+    try {
+      await this.txService.update(income.id, { moneyBackInfo: { ...income.moneyBackInfo, source } });
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
+
   saving = signal(false);
 
-  // The "Add money back" dialog. One dialog for a store refund, a friend paying
-  // you back, cash, store credit: on an ordinary expense which one it was makes
-  // no difference to the numbers, so it isn't asked. (On a split bill it does —
-  // a refund shrinks everyone's share — and the split asks "from whom" there.)
+  // The "Add money back" dialog: money that never reached a tracked account
+  // (cash, store credit). It asks refund or repayment because on a split bill
+  // they differ — a refund lowers everyone's share, a repayment settles one
+  // person's — and a bill can be split after its money back was recorded.
   draftOpen = signal(false);
+  draftSource = signal<MoneyBackSource>('refund');
   /** "Everything came back": no amount or date to fill in. */
   draftFull = signal(false);
   draftAmount = signal<number | null>(null);
@@ -157,6 +177,7 @@ export class TransactionView {
 
   openDraft() {
     this.draftOpen.set(true);
+    this.draftSource.set('refund');
     this.draftFull.set(false);
     this.draftAmount.set(null);
     this.draftDate.set(localDateString());
@@ -176,13 +197,12 @@ export class TransactionView {
     const date = full ? localDateString() : this.draftDate();
     if (!date) { this.toast.error('Pick the date it came back.'); return; }
     const note = this.draftNote().trim();
-    // Recorded as a refund: with no person attached, it's money back on the
-    // purchase itself. Covering the whole of it is what "Refunded" means.
+    const source = this.draftSource();
     const entry: UntrackedReturn = {
-      id: newReturnId(), source: 'refund', amountCents, date, ...(note ? { note } : {}),
+      id: newReturnId(), source, amountCents, date, ...(note ? { note } : {}),
     };
     const ok = await this.saveMoneyBack(t, [...(t.moneyBack ?? []), entry],
-      full ? 'Marked as fully paid back.' : 'Money back added.');
+      source === 'refund' ? (full ? 'Marked as refunded.' : 'Refund added.') : (full ? 'Marked as paid back.' : 'Repayment added.'));
     if (ok) this.closeDraft();
   }
 
@@ -323,6 +343,8 @@ export class TransactionView {
   // ── Link picker ────────────────────────────────────────────
   linkingFrom = signal<Transaction | null>(null);
   linkSearch = signal('');
+  /** Repayment by default: a linked income is usually a friend's Venmo or Zelle. */
+  linkSource = signal<MoneyBackSource>('repayment');
 
   /** Opposite-type transactions: an expense picks an income, and vice versa. */
   linkCandidates = computed<Transaction[]>(() => {
@@ -340,6 +362,7 @@ export class TransactionView {
 
   openLinkPicker(tx: Transaction) {
     this.linkSearch.set('');
+    this.linkSource.set('repayment');
     this.linkingFrom.set(tx);
   }
 
@@ -355,8 +378,11 @@ export class TransactionView {
     const expense = from.type === 'expense' ? from : candidate;
     if (!income.id || !expense.id) return;
     try {
-      await this.txService.update(income.id, { reimbursesId: expense.id });
-      this.toast.success('Linked.');
+      await this.txService.update(income.id, {
+        reimbursesId: expense.id,
+        moneyBackInfo: { ...income.moneyBackInfo, source: this.linkSource() },
+      });
+      this.toast.success(this.linkSource() === 'refund' ? 'Refund linked.' : 'Repayment linked.');
       this.closeLinkPicker();
     } catch {
       this.toast.error('Could not link. Please try again.');

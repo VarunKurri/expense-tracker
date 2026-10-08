@@ -447,7 +447,7 @@
                         <span class="refunded-badge">↩ Refunded</span>
                       }
                       @if (tx.type === 'income' && tx.reimbursesId) {
-                        <span class="refunded-badge">↩ Money back{{ txService.reimbursementSurplusForIncome(tx) > 0 ? ' + surplus' : '' }}</span>
+                        <span class="refunded-badge">↩ {{ tx.moneyBackInfo?.source === 'refund' ? 'Refund' : 'Repayment' }}{{ txService.reimbursementSurplusForIncome(tx) > 0 ? ' + surplus' : '' }}</span>
                       }
                       @if (tx.type === 'expense' && !txService.isFullyRefunded(tx) && txService.moneyBackFor(tx) > 0) {
                         <!-- A reimbursement is money coming back — always green, always the

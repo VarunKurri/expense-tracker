@@ -306,7 +306,7 @@ describe('Budgets', () => {
     expect(view.textContent).toContain('Money back');
     expect(view.textContent).toContain('Out of pocket $40.00');
     expect(view.textContent).toContain('$80.00');
-    expect(view.textContent).toContain('Link an income');
+    expect(view.textContent).toContain('Link income');
     // The old hand-built panel is gone: the only view is the shared one.
     expect([...el.querySelectorAll('.view-panel')].every(p => p.closest('app-transaction-view'))).toBe(true);
   });

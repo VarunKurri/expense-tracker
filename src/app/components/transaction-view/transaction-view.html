@@ -92,14 +92,14 @@
           </div>
           @if (legacyRefund()) {
             <div class="reimburse-row">
-              <span class="reimburse-row-text">↩ +{{ formatCurrency(tx.amount) }} · marked refunded</span>
+              <span class="reimburse-row-text">↩ Refund · +{{ formatCurrency(tx.amount) }} · marked refunded</span>
               <button class="reimburse-unlink" (click)="removeLegacyRefund()" title="Remove" aria-label="Remove refund">✕</button>
             </div>
           }
           @for (e of untracked(); track e.id) {
             <div class="reimburse-row">
               <span class="reimburse-row-text">
-                ↩ +{{ formatCents(e.amountCents) }} · {{ formatDate(e.date) }}{{ e.note ? ' · ' + e.note : '' }}
+                ↩ {{ sourceLabel(e.source) }} · +{{ formatCents(e.amountCents) }} · {{ formatDate(e.date) }}{{ e.note ? ' · ' + e.note : '' }}
               </span>
               <button class="reimburse-unlink" (click)="removeUntracked(e)" title="Remove" aria-label="Remove money back">✕</button>
             </div>
@@ -107,7 +107,7 @@
           @for (r of linkedIncomes(); track r.id) {
             <div class="reimburse-row">
               <span class="reimburse-row-text">
-                ↩ {{ r.merchant || 'Income' }} · +{{ formatCurrency(r.amount) }} · {{ formatDate(r.date) }}
+                ↩ {{ sourceLabel(incomeSource(r)) }} · {{ r.merchant || 'Income' }} · +{{ formatCurrency(r.amount) }} · {{ formatDate(r.date) }}
               </span>
               <button class="reimburse-unlink" (click)="unlinkReimbursement(r)" title="Unlink" aria-label="Unlink income">✕</button>
             </div>
@@ -120,7 +120,7 @@
         }
         <div class="money-back-actions">
           <button class="reimburse-add" (click)="openDraft()">+ Add money back</button>
-          <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Link an income</button>
+          <button class="reimburse-add" (click)="openLinkPicker(tx)">+ Link income</button>
         </div>
       </div>
     }
@@ -130,13 +130,17 @@
         <div class="view-reimburse-head">Money back</div>
         @if (reimbursesExpense(); as exp) {
           <div class="reimburse-summary">
-            ↩ Money back on <strong>{{ exp.merchant || 'an expense' }}</strong> ·
+            ↩ {{ sourceLabel(incomeSource(tx)) }} on <strong>{{ exp.merchant || 'an expense' }}</strong> ·
             @if (reimbursesSurplus() > 0) {
               {{ formatCurrency(reimbursesCovered()) }} covered +
               <strong class="amt-surplus">{{ formatCurrency(reimbursesSurplus()) }} surplus</strong>
             } @else {
               {{ formatCurrency(exp.amount) }} on {{ formatDate(exp.date) }}
             }
+          </div>
+          <div class="mini-seg" role="radiogroup" aria-label="Kind of money back">
+            <button type="button" role="radio" [class.active]="incomeSource(tx) === 'refund'" [attr.aria-checked]="incomeSource(tx) === 'refund'" (click)="setIncomeSource(tx, 'refund')">Refund</button>
+            <button type="button" role="radio" [class.active]="incomeSource(tx) === 'repayment'" [attr.aria-checked]="incomeSource(tx) === 'repayment'" (click)="setIncomeSource(tx, 'repayment')">Repayment</button>
           </div>
           <button class="reimburse-add" (click)="unlinkReimbursement(tx)">Unlink</button>
         } @else {
@@ -200,6 +204,17 @@
   [title]="linkingFrom()?.type === 'income' ? 'Money back on which purchase?' : 'Which income was the money back?'"
   size="sm"
   (closed)="closeLinkPicker()">
+  <div class="field">
+    <div class="mini-seg" role="radiogroup" aria-label="Kind of money back">
+      <button type="button" role="radio" [class.active]="linkSource() === 'refund'" [attr.aria-checked]="linkSource() === 'refund'" (click)="linkSource.set('refund')">Refund</button>
+      <button type="button" role="radio" [class.active]="linkSource() === 'repayment'" [attr.aria-checked]="linkSource() === 'repayment'" (click)="linkSource.set('repayment')">Repayment</button>
+    </div>
+    <p class="field-hint">
+      {{ linkSource() === 'refund'
+        ? 'From the merchant. On a split bill, it lowers everyone\'s share.'
+        : 'From a person paying you back. On a split bill, it settles what they owe.' }}
+    </p>
+  </div>
   <input class="link-search input-field"
          [ngModel]="linkSearch()"
          (ngModelChange)="linkSearch.set($event)"
@@ -222,13 +237,27 @@
      anything that came back without landing in an account Trackr tracks -->
 <app-modal [open]="draftOpen()" title="Add money back" size="sm" (closed)="closeDraft()">
   <div class="form">
+    <div class="field">
+      <div class="mini-seg" role="radiogroup" aria-label="Kind of money back">
+        <button type="button" role="radio" [class.active]="draftSource() === 'refund'" [attr.aria-checked]="draftSource() === 'refund'" (click)="draftSource.set('refund')">Refund</button>
+        <button type="button" role="radio" [class.active]="draftSource() === 'repayment'" [attr.aria-checked]="draftSource() === 'repayment'" (click)="draftSource.set('repayment')">Repayment</button>
+      </div>
+      <p class="field-hint">
+        {{ draftSource() === 'refund'
+          ? 'From the merchant. On a split bill, it lowers everyone\'s share.'
+          : 'From a person paying you back. On a split bill, it settles what they owe.' }}
+      </p>
+    </div>
     @if (remainingCents() > 0) {
       <div class="toggle-row">
         <div>
           <div class="toggle-label">
             {{ moneyBackTotal() > 0 ? 'The rest' : 'The full amount' }} ({{ formatCents(remainingCents()) }})
           </div>
-          <div class="toggle-sub">Everything came back, so this purchase costs you nothing.</div>
+          <div class="toggle-sub">
+            {{ draftSource() === 'refund' ? 'The merchant refunded everything.' : 'You were paid back for all of it.' }}
+            This purchase then costs you nothing.
+          </div>
         </div>
         <button type="button" class="toggle" role="switch"
                 [class.on]="draftFull()" [attr.aria-checked]="draftFull()"

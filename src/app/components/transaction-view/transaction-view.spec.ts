@@ -69,10 +69,10 @@ describe('TransactionView — money back', () => {
     });
   });
 
-  it('offers two actions, without asking refund or repayment', async () => {
+  it('offers two actions', async () => {
     await open(haircut);
     const actions = [...view().querySelectorAll('.money-back-actions button')].map(b => b.textContent!.trim());
-    expect(actions).toEqual(['+ Add money back', '+ Link an income']);
+    expect(actions).toEqual(['+ Add money back', '+ Link income']);
   });
 
   it('"The full amount" needs no amount or date, and the purchase reads as refunded', async () => {
@@ -121,11 +121,39 @@ describe('TransactionView — money back', () => {
     expect(view().textContent).toContain('Out of pocket $36.00');
   });
 
-  it('linking an income asks only which income', async () => {
+  it('"The full amount" as a repayment pays it back without calling it refunded', async () => {
     await open(haircut);
-    button('+ Link an income').click();
+    button('+ Add money back').click();
     await settle();
-    expect(button('Refund')).toBeUndefined();
-    expect(button('Repayment')).toBeUndefined();
+    button('Repayment').click();
+    await settle();
+    expect(el.textContent).toContain('You were paid back for all of it.');
+    (el.querySelector('[role="switch"]') as HTMLElement).click();
+    await settle();
+    button('Save').click();
+    await settle();
+
+    const saved = txs.transactions()[0];
+    expect(saved.moneyBack).toEqual([expect.objectContaining({ source: 'repayment', amountCents: 4600 })]);
+    expect(txs.isFullyRefunded(saved)).toBe(false);
+    expect(txs.effectiveExpenseAmount(saved)).toBe(0);
+    expect(view().textContent).toContain('↩ Repayment · +$46.00');
+  });
+
+  it('linking an income asks refund or repayment — repayment by default', async () => {
+    const venmo: Transaction = { id: 'v', type: 'income', amount: 46, date: '2026-10-05', merchant: 'Venmo', createdAt: 0, updatedAt: 0 };
+    await open(haircut, [venmo]);
+    button('+ Link income').click();
+    await settle();
+    expect(button('Repayment').getAttribute('aria-checked')).toBe('true');
+    button('Refund').click();
+    await settle();
+    (el.querySelector('.link-item') as HTMLElement).click();
+    await settle();
+
+    const linked = txs.transactions().find(t => t.id === 'v')!;
+    expect(linked.reimbursesId).toBe('cut');
+    expect(linked.moneyBackInfo?.source).toBe('refund');
+    expect(txs.isFullyRefunded(txs.transactions()[0])).toBe(true);
   });
 });
