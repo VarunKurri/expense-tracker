@@ -275,20 +275,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;
-  padding: 20px 24px;
-}
-
-.chart-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-}
-
-.chart-card-sub {
-  font-size: 13px;
-  color: var(--fg-3);
-  margin-top: 6px;
+  overflow: hidden;
 }
 
 /* ── LEGEND — fixed with actual colored swatches ───────────── */
@@ -321,6 +308,7 @@
 .bar-chart-wrap {
   height: 200px;
   position: relative;
+  margin: 12px 20px 20px;
 }
 
 /* ── BOTTOM GRID ───────────────────────────────────────────── */
@@ -338,23 +326,24 @@
   overflow: hidden;
 }
 
+/* Every card's head: the eyebrow and, on the right, its link or legend —
+   nothing else above the hairline, as on Spending and the Dashboard. */
 .panel-head {
-  padding: 18px 20px 12px;
-  border-bottom: 1px solid var(--line);
-}
-
-.panel-head-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 6px 12px;
+  gap: 8px 12px;
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--line);
 }
 
-.panel-sub {
+/* The line under the hairline that says what the card shows. */
+.panel-intro {
+  margin: 0;
+  padding: 14px 20px 4px;
   font-size: 13px;
   color: var(--fg-3);
-  margin-top: 6px;
 }
 
 .panel-empty {

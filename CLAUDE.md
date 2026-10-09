@@ -75,7 +75,10 @@ The app is what we copy. Do not "correct" this back to dark.
   `.btn-danger`, `.btn-add`, `.btn-row`, `.input` / `.input-field`, `.chip`,
   `.card-label`, `.card-link`, `.label-mono`, `.num`, `.fig`, `.num-display`, `.display`.
 - A card's title is always the mono `.card-label` eyebrow — never a bold sans
-  heading. "See all →" beside it is `.card-link` (no underline).
+  heading. "See all →" beside it is `.card-link` (no underline). Above the
+  head's hairline sit only the eyebrow and its link or legend; a subtitle
+  ("By total spend") goes below the hairline. A plain title is not a link when
+  the card already has a "See all →".
 - Anything that scrolls inside a rounded surface scrolls in an **inner**
   element (`.modal-body`, the transaction view's `.view-scroll`); the rounded
   outer box is `overflow: hidden`. Otherwise the scrollbar paints over the corner.
