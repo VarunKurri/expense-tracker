@@ -1,6 +1,7 @@
 import { LoanMethod, LoanTerms, LumpSum, ManualAsset, ManualAssetType, Transaction } from '../models';
 import { localDateString, parseLocalDate } from './date';
 import { isFullyRefunded } from './money-back';
+import { fromCents, toCents } from './money';
 
 /**
  * Loans: what a payment is, how much is still owed, and what is left to pay.
@@ -35,9 +36,17 @@ import { isFullyRefunded } from './money-back';
  *    lowers the monthly payment (same end date) or keeps it (ends sooner).
  *
  * Pure functions: the Net worth page, the loan page and the tests share them.
+ *
+ * **Money is integer cents inside.** Every running balance (principal left,
+ * interest due, totals paid) is whole cents, and a formula's result — the EMI,
+ * a month's interest — is rounded to a cent exactly once, where it becomes
+ * money. The exported functions still take and return dollars, so callers
+ * don't change; but 360 months of payments add up to the cent instead of
+ * collecting float dust from re-rounding dollars at every step.
  */
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
+/** A computed amount of cents (a formula's result), rounded to a whole cent. */
+const roundCents = (c: number) => Math.round(c) + 0;
 
 /** Loan types you owe on. Everything else with terms is money you lent. */
 export const BORROWED_TYPES: ManualAssetType[] = ['mortgage', 'auto-loan', 'student-loan', 'personal-loan', 'other-liability'];
@@ -63,17 +72,26 @@ export function countsInNetWorth(asset: ManualAsset): boolean {
 // ── Formulas ─────────────────────────────────────────────────
 
 export function monthlyPayment(principal: number, ratePct: number, months: number, method: LoanMethod): number {
-  if (principal <= 0 || months <= 0) return 0;
-  if (method === 'none' || ratePct <= 0) return round2(principal / months);
-  if (method === 'flat') return round2((principal + flatInterest(principal, ratePct, months)) / months);
-  const r = ratePct / 1200;
-  const f = Math.pow(1 + r, months);
-  return round2(principal * r * f / (f - 1));
+  return fromCents(paymentCents(toCents(principal), ratePct, months, method));
 }
 
 /** Total interest on a flat-rate loan: P × rate × years. */
 export function flatInterest(principal: number, ratePct: number, months: number): number {
-  return round2(principal * (ratePct / 100) * (months / 12));
+  return fromCents(flatInterestCents(toCents(principal), ratePct, months));
+}
+
+/** The regular payment, in cents. */
+function paymentCents(principal: number, ratePct: number, months: number, method: LoanMethod): number {
+  if (principal <= 0 || months <= 0) return 0;
+  if (method === 'none' || ratePct <= 0) return roundCents(principal / months);
+  if (method === 'flat') return roundCents((principal + flatInterestCents(principal, ratePct, months)) / months);
+  const r = ratePct / 1200;
+  const f = Math.pow(1 + r, months);
+  return roundCents(principal * r * f / (f - 1));
+}
+
+function flatInterestCents(principal: number, ratePct: number, months: number): number {
+  return roundCents(principal * (ratePct / 100) * (months / 12));
 }
 
 /**
@@ -91,11 +109,11 @@ export function equivalentReducingRate(flatRatePct: number, months: number): num
   return Math.round(((lo + hi) / 2) * 100) / 100;
 }
 
-/** Interest that builds up on one due date. */
+/** Interest that builds up on one due date, in cents, on `principalLeft` cents. */
 function periodInterest(terms: LoanTerms, principalLeft: number): number {
   if (terms.method === 'none' || terms.rate <= 0) return 0;
-  if (terms.method === 'flat') return round2(flatInterest(terms.amountFinanced, terms.rate, terms.termMonths) / terms.termMonths);
-  return round2(principalLeft * terms.rate / 1200);
+  if (terms.method === 'flat') return roundCents(flatInterestCents(toCents(terms.amountFinanced), terms.rate, terms.termMonths) / terms.termMonths);
+  return roundCents(principalLeft * terms.rate / 1200);
 }
 
 // ── Dates ────────────────────────────────────────────────────
@@ -154,14 +172,18 @@ export interface ScheduleRow {
 /** The payment plan as agreed: every payment on time, nothing extra. */
 export function schedule(terms: LoanTerms): ScheduleRow[] {
   const rows: ScheduleRow[] = [];
-  let left = terms.amountFinanced;
-  for (let k = 0; k < terms.termMonths && left > 0.004; k++) {
+  const payment = toCents(terms.payment);
+  let left = toCents(terms.amountFinanced);
+  for (let k = 0; k < terms.termMonths && left > 0; k++) {
     const interest = periodInterest(terms, left);
     const last = k === terms.termMonths - 1;
     // The last payment settles whatever rounding left behind.
-    const principal = last ? left : Math.min(left, round2(terms.payment - interest));
-    left = round2(left - principal);
-    rows.push({ n: k + 1, date: dueDate(terms.firstPaymentDate, k), payment: round2(interest + principal), interest, principal, balance: left });
+    const principal = last ? left : Math.min(left, payment - interest);
+    left -= principal;
+    rows.push({
+      n: k + 1, date: dueDate(terms.firstPaymentDate, k),
+      payment: fromCents(interest + principal), interest: fromCents(interest), principal: fromCents(principal), balance: fromCents(left),
+    });
   }
   return rows;
 }
@@ -187,7 +209,7 @@ function rightDirection(asset: ManualAsset, t: Transaction): boolean {
  * month) is far bigger and carries on at the regular amount instead.
  */
 function roundingLeftover(payment: number): number {
-  return Math.max(1, payment * 0.05);
+  return Math.max(100, payment * 0.05); // cents: at least $1, or 5% of the payment
 }
 
 /** How close an amount must be to the payment to be recognised automatically. */
@@ -343,10 +365,10 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
   const lumps = new Map((terms.lumpSums ?? []).map(l => [l.txId, l]));
 
   // Before tracking began, the loan followed its schedule: start from where the
-  // schedule says it was, counting those payments as made.
+  // schedule says it was, counting those payments as made. All in cents.
   const settled = terms.settledThrough;
   const startAt = settled ? (settled < asOf ? settled : asOf) : null;
-  let principalLeft = terms.amountFinanced;
+  let principalLeft = toCents(terms.amountFinanced);
   let interestDue = 0;
   let principalPaid = 0, interestPaid = 0, totalPaid = 0;
   let assumed = 0;
@@ -354,10 +376,10 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
     for (const r of schedule(terms)) {
       if (r.date > startAt) break;
       assumed++;
-      principalLeft = r.balance;
-      principalPaid = round2(principalPaid + r.principal);
-      interestPaid = round2(interestPaid + r.interest);
-      totalPaid = round2(totalPaid + r.payment);
+      principalLeft = toCents(r.balance);
+      principalPaid += toCents(r.principal);
+      interestPaid += toCents(r.interest);
+      totalPaid += toCents(r.payment);
     }
   }
   const after = (d: string) => !startAt || d > startAt;
@@ -385,13 +407,13 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
   let paymentsSinceSettle = 0;
   let duesPassed = assumed;
   let installments = assumed;       // monthly payments counted so far
-  let payment = terms.payment;      // the regular payment, until a lump sum changes it
+  let payment = toCents(terms.payment); // the regular payment, until a lump sum changes it
   let term = terms.termMonths;      // how long the loan runs, until a lump sum shortens it
 
   /** Installment k's interest, on what is owed now. Flat and no-interest loans stop charging at the end of the term. */
   const accrue = (k: number) => {
     if (principalLeft > 0 && (k < term || terms.method === 'reducing')) {
-      interestDue = round2(interestDue + periodInterest(terms, principalLeft));
+      interestDue += periodInterest(terms, principalLeft);
     }
   };
   const duesUpTo = (date: string) => {
@@ -409,27 +431,28 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
       const installment = !lump?.onTop;
       // Waived: as if it arrived on its due date — its own installment's interest, no more, no less.
       if (waived && installment) accrue(installments);
-      const amount = e.tx.amount;
+      const amount = toCents(e.tx.amount);
       const toInterest = Math.min(amount, interestDue);
-      const toPrincipal = Math.min(principalLeft, round2(amount - toInterest));
-      const surplus = round2(amount - toInterest - toPrincipal);
-      interestDue = round2(interestDue - toInterest);
-      principalLeft = round2(principalLeft - toPrincipal);
-      interestPaid = round2(interestPaid + toInterest);
-      principalPaid = round2(principalPaid + toPrincipal);
-      totalPaid = round2(totalPaid + amount);
+      const toPrincipal = Math.min(principalLeft, amount - toInterest);
+      const surplus = amount - toInterest - toPrincipal;
+      interestDue -= toInterest;
+      principalLeft -= toPrincipal;
+      interestPaid += toInterest;
+      principalPaid += toPrincipal;
+      totalPaid += amount;
       if (installment) { installments++; paymentsSinceSettle++; }
-      if (lump && principalLeft > 0.004) {
+      if (lump && principalLeft > 0) {
         if (lump.mode === 'reduce-emi') payment = reamortise(terms, principalLeft, Math.max(1, term - installments));
         else term = installments + monthsToClear(terms, principalLeft, payment);
       }
       splits.push({
-        tx: e.tx, n: installments, installment, interest: round2(toInterest), principal: round2(toPrincipal), surplus, principalLeft,
-        ...(lump ? { lump: { ...lump, payment, termMonths: term } } : {}),
+        tx: e.tx, n: installments, installment,
+        interest: fromCents(toInterest), principal: fromCents(toPrincipal), surplus: fromCents(surplus), principalLeft: fromCents(principalLeft),
+        ...(lump ? { lump: { ...lump, payment: fromCents(payment), termMonths: term } } : {}),
       });
     } else {
       // A statement balance: the figure is known, and everything due before it is settled.
-      principalLeft = round2(e.value);
+      principalLeft = toCents(e.value);
       interestDue = 0;
       settlePoint = e.date;
       paymentsSinceSettle = 0;
@@ -441,28 +464,29 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
   let covered = paymentsMade;
   if (settlePoint) covered = Math.max(paymentsMade, duesUpTo(settlePoint) + paymentsSinceSettle);
 
+  // Back to dollars only here, on the way out.
   return {
-    principalLeft, interestDue, owed: round2(principalLeft + interestDue),
-    paymentsMade, assumedPayments: assumed, covered, duesPassed, payment, termMonths: term,
-    principalPaid, interestPaid, totalPaid, downPayment, splits,
+    principalLeft: fromCents(principalLeft), interestDue: fromCents(interestDue), owed: fromCents(principalLeft + interestDue),
+    paymentsMade, assumedPayments: assumed, covered, duesPassed, payment: fromCents(payment), termMonths: term,
+    principalPaid: fromCents(principalPaid), interestPaid: fromCents(interestPaid), totalPaid: fromCents(totalPaid), downPayment, splits,
   };
 }
 
-/** The regular payment that clears `principal` in `months`, the loan's way. */
+/** The regular payment that clears `principal` cents in `months`, the loan's way (cents). */
 function reamortise(terms: LoanTerms, principal: number, months: number): number {
   // Flat: the same interest each month as before, on top of an even share of what's left.
-  if (terms.method === 'flat' && terms.rate > 0) return round2(principal / months + periodInterest(terms, principal));
-  return monthlyPayment(principal, terms.rate, months, terms.method);
+  if (terms.method === 'flat' && terms.rate > 0) return roundCents(principal / months) + periodInterest(terms, principal);
+  return paymentCents(principal, terms.rate, months, terms.method);
 }
 
-/** How many regular payments it takes to clear `principal`. */
+/** How many regular payments (cents) it takes to clear `principal` cents. */
 function monthsToClear(terms: LoanTerms, principal: number, payment: number): number {
   let left = principal, n = 0;
-  while (left > 0.004 && n < 1200) {
-    const step = round2(payment - periodInterest(terms, left));
+  while (left > 0 && n < 1200) {
+    const step = payment - periodInterest(terms, left);
     if (step <= 0) return 1200; // the payment doesn't even cover the interest
     // Rounding rides along with the last payment.
-    left = left - step < roundingLeftover(payment) ? 0 : round2(left - step);
+    left = left - step < roundingLeftover(payment) ? 0 : left - step;
     n++;
   }
   return n;
@@ -506,8 +530,10 @@ export interface LoanOutlook {
 export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: string, payments = loanPayments(asset, txs)): LoanOutlook {
   const terms = asset.loan!;
   const now = loanState(asset, txs, today, payments);
-  let principalLeft = now.principalLeft;
-  let interestDue = now.interestDue;
+  // In cents from here on, like loanState inside.
+  let principalLeft = toCents(now.principalLeft);
+  let interestDue = toCents(now.interestDue);
+  const regular = toCents(now.payment);
 
   // Due dates whose window has closed: a payment for them is now missed. Counted
   // against payments made, so a payment on the 2nd covers the 25th before it,
@@ -524,7 +550,7 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
 
   // The next payment expected: the first due date not covered by a payment and not missed.
   const nextIndex = Math.max(now.covered, duesClosed);
-  const owing = now.owed > 0.004;
+  const owing = toCents(now.owed) > 0;
   const nextDue = owing && nextIndex < terms.termMonths ? dueDate(terms.firstPaymentDate, nextIndex) : null;
 
   let leftToPay = 0, futureInterest = 0, paymentsLeft = 0;
@@ -534,8 +560,8 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
   const accrues = (k: number) => principalLeft > 0 && (k < now.termMonths || terms.method === 'reducing');
   const charge = () => {
     const i = periodInterest(terms, principalLeft);
-    interestDue = round2(interestDue + i);
-    futureInterest = round2(futureInterest + i);
+    interestDue += i;
+    futureInterest += i;
   };
 
   // Paid ahead: due dates already covered still charge their interest when they
@@ -548,37 +574,37 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
   // but is still within its window — paying the regular amount each time.
   // Anything missed is folded into what's owed and paid off along the way.
   let due = nextIndex;
-  while ((principalLeft > 0.004 || interestDue > 0.004) && due < terms.termMonths * 3) {
+  while ((principalLeft > 0 || interestDue > 0) && due < terms.termMonths * 3) {
     // Standard: interest comes with each due date not reached yet. Waived: with each payment, by installment.
     const k = waived ? now.covered + paymentsLeft : due;
     if ((waived || due >= now.duesPassed) && accrues(k)) charge();
-    const owedNow = round2(principalLeft + interestDue);
+    const owedNow = principalLeft + interestDue;
     // Regular payments until it's cleared. On the last scheduled one, rounding
     // is settled with it, as lenders do; anything more (payments missed along
     // the way) carries on at the regular amount, so the loan honestly runs
     // longer instead of ending in one huge payment.
-    const settlesRounding = k >= now.termMonths - 1 && owedNow - now.payment < roundingLeftover(now.payment);
-    const pay = settlesRounding ? owedNow : Math.min(owedNow, now.payment);
+    const settlesRounding = k >= now.termMonths - 1 && owedNow - regular < roundingLeftover(regular);
+    const pay = settlesRounding ? owedNow : Math.min(owedNow, regular);
     const toInterest = Math.min(pay, interestDue);
-    const toPrincipal = Math.min(principalLeft, round2(pay - toInterest));
-    interestDue = round2(interestDue - toInterest);
-    principalLeft = round2(principalLeft - toPrincipal);
-    leftToPay = round2(leftToPay + pay);
+    const toPrincipal = Math.min(principalLeft, pay - toInterest);
+    interestDue -= toInterest;
+    principalLeft -= toPrincipal;
+    leftToPay += pay;
     paymentsLeft++;
     payoffDate = dueDate(terms.firstPaymentDate, due);
     upcoming.push({
-      n: now.covered + paymentsLeft, date: payoffDate, payment: round2(pay),
-      interest: round2(toInterest), principal: round2(toPrincipal), balance: principalLeft,
+      n: now.covered + paymentsLeft, date: payoffDate, payment: fromCents(pay),
+      interest: fromCents(toInterest), principal: fromCents(toPrincipal), balance: fromCents(principalLeft),
     });
     due++;
   }
 
   return {
-    paymentsLeft, leftToPay,
-    payoffDate: now.owed > 0.004 ? payoffDate : null,
+    paymentsLeft, leftToPay: fromCents(leftToPay),
+    payoffDate: owing ? payoffDate : null,
     // Interest already built up but not yet paid is part of the cost too.
-    futureInterest: round2(now.interestDue + futureInterest),
-    lifetimeInterest: round2(now.interestPaid + now.interestDue + futureInterest),
+    futureInterest: fromCents(toCents(now.interestDue) + futureInterest),
+    lifetimeInterest: fromCents(toCents(now.interestPaid) + toCents(now.interestDue) + futureInterest),
     behindBy,
     missedDates,
     upcoming,
@@ -610,5 +636,5 @@ export function estimatedValue(asset: ManualAsset, date: string): number | null 
     if (v.date <= date && v.date >= anchor.date) anchor = v;
   }
   const years = (parseLocalDate(date).getTime() - parseLocalDate(anchor.date).getTime()) / (365.25 * 86_400_000);
-  return round2(anchor.value * Math.pow(1 - rate, years));
+  return fromCents(roundCents(toCents(anchor.value) * Math.pow(1 - rate, years)));
 }

@@ -586,3 +586,49 @@ describe('lump sums', () => {
     expect(o.upcoming[o.upcoming.length - 1].balance).toBe(0);
   });
 });
+
+describe('integer cents: every figure adds up to the cent', () => {
+  const cents = (dollars: number) => Math.round(dollars * 100);
+  const sumCents = (xs: number[]) => xs.reduce((s, x) => s + cents(x), 0);
+
+  it('half a cent rounds up, as money should — floats had $1.005 as $1.00', () => {
+    // $2.01 over 2 months is $1.005 a month: a whole cent can only be $1.01.
+    // (Math.round(1.005 * 100) is 100, because 1.005 is really 1.00499999…)
+    expect(monthlyPayment(2.01, 0, 2, 'none')).toBe(1.01);
+  });
+
+  it('a 30-year mortgage: 360 rows whose principal adds up to the loan, exactly', () => {
+    const t = terms({ amountFinanced: 300000, rate: 6, termMonths: 360, payment: monthlyPayment(300000, 6, 360, 'reducing') });
+    const rows = schedule(t);
+    expect(rows).toHaveLength(360);
+    expect(sumCents(rows.map(r => r.principal))).toBe(30_000_000);
+    for (const r of rows) expect(cents(r.payment)).toBe(cents(r.interest) + cents(r.principal));
+    expect(rows[359].balance).toBe(0);
+    // Every figure is a whole number of cents — no float dust like 1798.6499999.
+    for (const r of rows) for (const v of [r.payment, r.interest, r.principal, r.balance]) expect(v * 100).toBeCloseTo(cents(v), 6);
+  });
+
+  it('paying every scheduled payment: principal paid is the loan to the cent, and paid = principal + interest', () => {
+    const t = terms({ amountFinanced: 300000, rate: 6, termMonths: 360, payment: monthlyPayment(300000, 6, 360, 'reducing'),
+      firstPaymentDate: '2026-08-05', match: { text: 'mortgage co' } });
+    const asset = loan(t, 'mortgage');
+    const pays = schedule(t).map(r => tx({ amount: r.payment, date: r.date, merchant: 'MORTGAGE CO' }));
+    const s = loanState(asset, pays, '2056-12-31');
+    expect(s.principalLeft).toBe(0);
+    expect(s.interestDue).toBe(0);
+    expect(cents(s.principalPaid)).toBe(30_000_000);
+    expect(cents(s.totalPaid)).toBe(cents(s.principalPaid) + cents(s.interestPaid));
+    expect(cents(s.totalPaid)).toBe(sumCents(pays.map(p => p.amount)));
+  });
+
+  it('what is left to pay, plus what has been paid, is the whole schedule', () => {
+    const t = terms();
+    const asset = loan(t);
+    const rows = schedule(t);
+    const pays = rows.slice(0, 17).map(r => tx({ amount: r.payment, date: r.date }));
+    const today = rows[16].date;
+    const out = loanOutlook(asset, pays, today);
+    const paid = loanState(asset, pays, today).totalPaid;
+    expect(cents(paid) + cents(out.leftToPay)).toBe(sumCents(rows.map(r => r.payment)));
+  });
+});
