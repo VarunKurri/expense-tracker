@@ -415,6 +415,8 @@ export interface ItemizedSplitState {
   items: SplitItem[];
   charges: Charges;
   otherPayments: Payment[];
+  /** 'receipt' once the items came from a scanned receipt. */
+  source?: TransactionSplit['source'];
 }
 
 let nextItem = 0;
@@ -480,7 +482,7 @@ export function buildItemizedSplit(
       { personId: ME, amountCents: myPaidCents },
       ...state.otherPayments.filter(p => p.personId !== ME && p.amountCents > 0),
     ],
-    source: existing?.source ?? 'manual',
+    source: state.source ?? existing?.source ?? 'manual',
   };
   if (existing?.closedPersonIds?.length) split.closedPersonIds = [...existing.closedPersonIds];
   return split;
@@ -492,6 +494,8 @@ export function itemizedStateFrom(split: TransactionSplit): ItemizedSplitState {
     items: split.items.map(i => ({ ...i, assignments: i.assignments.map(a => ({ ...a })) })),
     charges: { ...split.charges },
     otherPayments: split.payments.filter(p => p.personId !== ME).map(p => ({ ...p })),
+    // Only a receipt is worth carrying; anything else saves as it was.
+    ...(split.source === 'receipt' ? { source: 'receipt' as const } : {}),
   };
 }
 

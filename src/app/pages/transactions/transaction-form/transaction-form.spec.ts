@@ -13,6 +13,20 @@ import { PersonService } from '../../../services/person.service';
 import { ME, Transaction } from '../../../models';
 import { MoneyBackLedger } from '../../../utils/money-back';
 import { buildItemizedSplit, emptyItemizedState, newItem, personName, quickSplit, splitStatus } from '../../../utils/splits';
+import { ReceiptScanService } from '../../../services/receipt-scan.service';
+import { ReceiptScan } from '../../../utils/receipt';
+
+/** What the fake scanner returns next (or throws). */
+let nextScan: ReceiptScan | Error;
+const receipt = (over: Partial<ReceiptScan> = {}): ReceiptScan => ({
+  isReceipt: true, merchant: 'Hashtag India', date: '2026-09-29',
+  items: [
+    { name: 'Nalli Gosht Mandi', quantity: 2, unitPriceCents: 2500, totalCents: 5000 },
+    { name: 'Chai', quantity: 1, unitPriceCents: null, totalCents: 300 },
+  ],
+  subtotalCents: 5300, discountCents: 0, feesCents: 0, taxCents: 387, tipCents: 0, totalCents: 5687, confidence: 0.95,
+  ...over,
+});
 
 class FakeTransactions extends MoneyBackLedger {
   transactions = signal<Transaction[]>([]);
@@ -69,6 +83,7 @@ describe('TransactionForm — splitting a bill', () => {
         { provide: QuickAddService, useValue: { defaultType: () => 'expense' } },
         { provide: ToastService, useValue: { success() {}, error: (m: string) => errors.push(m) } },
         { provide: PersonService, useValue: { people, nameOf: (id: string) => personName(people(), id) } },
+        { provide: ReceiptScanService, useValue: { scan: async () => { if (nextScan instanceof Error) throw nextScan; return nextScan; } } },
       ],
     });
     fixture = TestBed.createComponent(Host);
@@ -158,5 +173,76 @@ describe('TransactionForm — splitting a bill', () => {
     await host.form().save();
     expect(errors).toEqual([]);
     expect(host.saved[0].split!.items.map(i => i.name)).toEqual(['Salad', 'Steak']);
+  });
+
+  describe('scanning a receipt', () => {
+    const pick = async () => {
+      await host.form().onReceiptPicked({ target: { files: [new File(['x'], 'r.jpg', { type: 'image/jpeg' })], value: '' } } as any);
+      await settle();
+    };
+
+    it('fills an empty new expense: merchant, date, amount — and the items, ready to split', async () => {
+      nextScan = receipt();
+      await openWith(null);
+      await pick();
+      const form = host.form();
+      expect(form.merchant()).toBe('Hashtag India');
+      expect(form.date).toBe('2026-09-29');
+      expect(form.amount).toBe(56.87);
+      expect(form.itemizedState().items.map(i => i.name)).toEqual(['Nalli Gosht Mandi', 'Chai']);
+      expect(form.itemizedState().charges.taxCents).toBe(387);
+      expect(el.textContent).toContain('2 items · tax $3.87 · tip $0.00 · total $56.87');
+      expect(el.textContent).toContain('turn on Split this bill');
+    });
+
+    it("never overwrites what you've typed", async () => {
+      nextScan = receipt();
+      await openWith(dinner); // Ramen Bar, $180, 2026-10-02
+      await pick();
+      expect(host.form().merchant()).toBe('Ramen Bar');
+      expect(host.form().amount).toBe(180);
+      expect(host.form().date).toBe('2026-10-02');
+    });
+
+    it('splitting it: claim the lines, save — the split is marked as from a receipt', async () => {
+      nextScan = receipt();
+      await openWith(null);
+      await pick();
+      const form = host.form();
+      form.accountId = 'card';
+      form.splitOn.set(true);
+      form.itemizedState.update(s => ({
+        ...s, participantIds: [ME, 'alex'],
+        items: s.items.map(i => ({ ...i, assignments: [{ personId: ME, weight: 1 }, { personId: 'alex', weight: 1 }] })),
+      }));
+      await settle();
+      expect(el.textContent).toContain('tap who had each one');
+      await form.save();
+
+      expect(errors).toEqual([]);
+      const saved = host.saved[0];
+      expect(saved.aiExtracted).toBe(true);
+      expect(saved.aiConfidence).toBe(0.95);
+      expect(saved.split!.source).toBe('receipt');
+      expect(splitStatus(saved.split!).billTotalCents).toBe(5687);
+    });
+
+    it('says when the lines and the printed total disagree', async () => {
+      nextScan = receipt({ totalCents: 6187 });
+      await openWith(null);
+      await pick();
+      expect(el.querySelector('.scan-note .field-error')!.textContent).toContain("The lines add up to $56.87, but the receipt's total is $61.87.");
+    });
+
+    it("a photo that isn't a receipt, or a failed scan, changes nothing", async () => {
+      await openWith(null);
+      nextScan = receipt({ isReceipt: false });
+      await pick();
+      nextScan = new Error('The receipt reader is busy. Try again in a minute.');
+      await pick();
+      expect(errors).toEqual(["That doesn't look like a receipt. Try another photo.", 'The receipt reader is busy. Try again in a minute.']);
+      expect(host.form().merchant()).toBe('');
+      expect(host.form().scanned()).toBeNull();
+    });
   });
 });

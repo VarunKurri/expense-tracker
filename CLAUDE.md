@@ -129,6 +129,10 @@ The app is what we copy. Do not "correct" this back to dark.
 
 - `ANTHROPIC_API_KEY` is stored as a Firebase Functions secret, NEVER hardcoded
 - Never print API keys in logs or terminal output
+- `OPENAI_API_KEY` (receipt scanning, `functions/src/receipt.ts`) is a Firebase
+  Functions secret too: `firebase functions:secrets:set OPENAI_API_KEY`. The
+  model is the `RECEIPT_MODEL` param (default `gpt-6-luna`). The receipt photo
+  is never stored or logged — only token counts are logged.
 
 ## File structure
 

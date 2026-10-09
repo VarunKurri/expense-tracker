@@ -24,6 +24,8 @@ import { BILL_FREQUENCIES } from '../../../utils/bill-schedule';
 import { TransactionTemplate } from '../../../models';
 import { QuickAddService } from '../../../services/quick-add.service';
 import { ToastService } from '../../../services/toast.service';
+import { ReceiptScanService } from '../../../services/receipt-scan.service';
+import { ReceiptScan, itemizedFromScan, scanAmountCents, scanBillCents, scanMismatchCents } from '../../../utils/receipt';
 
 @Component({
   selector: 'app-transaction-form',
@@ -40,6 +42,7 @@ export class TransactionForm implements OnChanges {
   private transactionService = inject(TransactionService);
   private toastService = inject(ToastService);
   private quickAddService = inject(QuickAddService);
+  private receiptScanner = inject(ReceiptScanService);
 
   @Input() open = false;
   @Input() transaction: Transaction | null = null;
@@ -81,6 +84,66 @@ export class TransactionForm implements OnChanges {
     if (kind === 'itemized') this.itemizedState.update(s => ({ ...s, ...carried }));
     else this.splitState.update(s => ({ ...s, ...carried }));
     this.splitKind.set(kind);
+  }
+
+  // ── Receipt scan (expenses) ────────────────────────────────
+  scanning = signal(false);
+  /** The last receipt read into this form — kept for the note and saved as aiExtracted. */
+  scanned = signal<ReceiptScan | null>(null);
+
+  /** A photo was picked: read it, then fill in what the form doesn't have yet. */
+  async onReceiptPicked(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // so picking the same photo again still fires
+    if (!file || this.scanning()) return;
+    this.scanning.set(true);
+    try {
+      const scan = await this.receiptScanner.scan(file);
+      if (!scan.isReceipt) {
+        this.toastService.error("That doesn't look like a receipt. Try another photo.");
+        return;
+      }
+      this.applyScan(scan);
+    } catch (err: any) {
+      this.toastService.error(err?.message || "Couldn't scan that receipt.");
+    } finally {
+      this.scanning.set(false);
+    }
+  }
+
+  /**
+   * What the receipt fills in. It never overwrites what you've typed: the
+   * merchant only when empty, the date only on a new transaction still set to
+   * today, the amount only when there isn't one. The items, tax and tip always
+   * go into "Item by item", ready for when you split the bill.
+   */
+  applyScan(scan: ReceiptScan) {
+    if (scan.merchant && !this.merchant().trim()) this.onMerchantChange(scan.merchant);
+    if (scan.date && !this.transaction && this.date === this.localDateString()) this.date = scan.date;
+    if (!Number(this.amount)) this.amount = fromCents(scanAmountCents(scan));
+    if (this.splitKind() !== 'itemized') this.setSplitKind('itemized');
+    this.itemizedState.update(s => itemizedFromScan(scan, s));
+    this.scanned.set(scan);
+  }
+
+  /** "4 items · tax $6.16 · tip $0.00 · total $56.87" */
+  scanSummary(scan: ReceiptScan): string {
+    const n = scan.items.length;
+    const parts = [`${n} item${n === 1 ? '' : 's'}`, `tax ${formatCurrency(fromCents(scan.taxCents))}`, `tip ${formatCurrency(fromCents(scan.tipCents))}`];
+    if (scan.totalCents !== null) parts.push(`total ${formatCurrency(fromCents(scan.totalCents))}`);
+    return parts.join(' · ');
+  }
+
+  /** When the lines and the printed total disagree, say so — a line was probably misread. */
+  scanWarning(scan: ReceiptScan): string {
+    const gap = scanMismatchCents(scan);
+    if (gap !== 0) {
+      return `The lines add up to ${formatCurrency(fromCents(scanBillCents(scan)))}, but the receipt's total is `
+        + `${formatCurrency(fromCents(scan.totalCents ?? 0))}. A line may have been misread — check the items before saving.`;
+    }
+    if (scan.confidence < 0.6) return 'Parts of this receipt were hard to read. Check the numbers before saving.';
+    return '';
   }
 
   /** "Use $X as the amount" from the itemized editor, when the receipt and the amount disagree. */
@@ -170,6 +233,7 @@ export class TransactionForm implements OnChanges {
       this.itemizedState.set(this.existingSplit && itemized ? itemizedStateFrom(this.existingSplit) : emptyItemizedState());
       this.saveAsTemplate.set(false);
       this.templateName.set('');
+      this.scanned.set(null);
     } else {
       this.type = this.quickAddService.defaultType() || 'expense';
       this.amount = 0;
@@ -185,6 +249,7 @@ export class TransactionForm implements OnChanges {
       this.itemizedState.set(emptyItemizedState());
       this.saveAsTemplate.set(false);
       this.templateName.set('');
+      this.scanned.set(null);
     }
 
     // Default bill fields
@@ -458,6 +523,7 @@ export class TransactionForm implements OnChanges {
       const billDueDateMode = this.billDueDateMode;
       const billAutopay = this.billAutopay;
       const isNewTransaction = !this.transaction;
+      const scanned = type === 'expense' ? this.scanned() : null;
       if (!accountId) { this.toastService.error('Please select an account'); return; }
       if (!merchant) { this.toastService.error('Merchant or source is required'); return; }
 
@@ -501,6 +567,8 @@ export class TransactionForm implements OnChanges {
         ...(categoryId ? { categoryId } : {}),
         ...(notes ? { notes } : {}),
         isInternalTransfer,
+        // Filled in from a receipt: marked so it can be told apart later.
+        ...(scanned ? { aiExtracted: true, aiConfidence: scanned.confidence } : {}),
         // Turning the split off on an edit clears it; undefined is dropped when saved.
         ...(split ? { split } : this.existingSplit ? { split: undefined } : {}),
       });

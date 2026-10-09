@@ -112,3 +112,6 @@
 @media (prefers-reduced-motion: reduce) {
   .recurring { animation: none; }
 }
+
+/* ── Receipt scan — what was read, and anything to check ───── */
+.scan-note { display: flex; flex-direction: column; gap: 4px; }

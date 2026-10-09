@@ -734,3 +734,6 @@ export const plaidWebhook = onRequest(
     res.status(200).send('ok');
   },
 );
+
+// Receipt scanning (OpenAI) — see receipt.ts.
+export { scanReceipt } from './receipt';
