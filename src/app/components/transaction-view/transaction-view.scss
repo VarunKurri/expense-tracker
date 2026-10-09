@@ -32,9 +32,13 @@
 }
 
 @media (min-width: 640px) {
+  /* Centred with margin: auto, not transform: a transformed box traps any
+     fixed-position pop-up inside it (the receipt opened tiny, inside the
+     sheet). This way a pop-up from the sheet fills the window like any other. */
   .view-panel {
-    bottom: auto; left: 50%; top: 50%;
-    transform: translate(-50%, -50%);
+    inset: 0;
+    margin: auto;
+    height: fit-content;
     width: 480px; max-height: 85vh;
     border-radius: 20px; border: 1px solid var(--line);
     box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 24px 64px rgba(0,0,0,0.1);
@@ -308,8 +312,8 @@
 @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 @keyframes popIn   {
-  from { transform: translate(-50%, -48%) scale(0.97); opacity: 0; }
-  to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  from { transform: translateY(8px) scale(0.97); opacity: 0; }
+  to   { transform: none; opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

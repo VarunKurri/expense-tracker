@@ -45,6 +45,7 @@ export class Icon {
     arrowDown: 'M10 3v14M4 11l6 6 6-6',
     trash:     'M5 6h10M8 6V4h4v2m-6 0l1 11h6l1-11',
     edit:      'M12 4l4 4L7 17H3v-4zM11 5l4 4',
+    note:      'M4 5h12M4 9h12M4 13h7',
     filter:    'M3 5h14M5 10h10M8 15h4',
     calendar:  'M4 5h12a1 1 0 011 1v11a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM3 9h14M7 3v4M13 3v4',
     receipt:   'M5 3h10v14l-2-1-1.5 1L10 16l-1.5 1L7 16l-2 1V3zm2 4h6m-6 3h6m-6 3h4',

@@ -16,6 +16,7 @@ import { ToastService } from '../../services/toast.service';
 import { ReconciliationService } from '../../services/reconciliation.service';
 import { DateRange, transactionRange } from '../../utils/date-ranges';
 import { isMoneyBackIncome, refundedPatch } from '../../utils/money-back';
+import { Icon } from '../../components/icon/icon';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
 type SpecialFilter = 'all' | 'uncategorized' | 'refunded' | 'not-refunded' | 'internal-transfer';
@@ -33,7 +34,7 @@ type QuickEditDraft = {
   standalone: true,
   imports: [
     CommonModule, FormsModule, TransactionForm, Confirm,
-    ReconcileReview, ErrorBanner, TransactionView,
+    ReconcileReview, ErrorBanner, TransactionView, Icon,
   ],
   templateUrl: './transactions.html',
   styleUrl: './transactions.scss',

@@ -1,5 +1,6 @@
 import { Component, ElementRef, input, output, signal, viewChild } from '@angular/core';
 import { Modal } from '../modal/modal';
+import { Icon } from '../icon/icon';
 import { canTakePhoto } from '../../utils/device';
 
 /**
@@ -8,15 +9,17 @@ import { canTakePhoto } from '../../utils/device';
  *
  * - No photo: "Take photo" (phones and tablets — opens the camera) and "Upload".
  *   On a phone, "Upload" also offers the camera or the photo library.
- * - A photo: its thumbnail (tap for full size), an optional action from the
- *   host ("Fill in from it"), Replace and Remove.
+ * - A photo: its thumbnail — tap for full size. Where it can be changed (the
+ *   form), a ✕ on the thumbnail removes it and the host may add one action
+ *   ("Fill in from it"). To replace a photo, remove it and add the new one.
+ *   Where it can't (the details sheet), it's only shown.
  *
  * It only reports what was picked; the host decides when to store it.
  */
 @Component({
   selector: 'app-receipt-attach',
   standalone: true,
-  imports: [Modal],
+  imports: [Modal, Icon],
   templateUrl: './receipt-attach.html',
   styleUrl: './receipt-attach.scss',
 })
@@ -31,8 +34,10 @@ export class ReceiptAttach {
   hint = input('Attach a photo of the receipt.');
   /** Under "Receipt attached". */
   note = input('');
-  /** An extra action beside Replace / Remove, e.g. "Fill in from it". Hidden when empty. */
+  /** One action beside the photo, e.g. "Fill in from it". Hidden when empty. */
   actionLabel = input('');
+  /** Whether an attached photo can be removed here. The details sheet only shows it. */
+  editable = input(true);
 
   picked = output<File>();
   removed = output<void>();

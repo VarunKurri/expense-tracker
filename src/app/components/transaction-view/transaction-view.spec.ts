@@ -303,22 +303,14 @@ describe('TransactionView — money back', () => {
       expect(view().querySelector('.receipt-thumb img')!.getAttribute('src')).toBe('data:image/jpeg;base64,NEW');
     });
 
-    it('a saved receipt shows, opens full size, and removing it asks first', async () => {
+    it('a saved receipt shows and opens full size — but changing or removing it is in Edit', async () => {
       await open({ ...haircut, receiptId: 'old' });
       await settleLoads();
+      expect(view().querySelector('[aria-label="Remove the receipt"]')).toBeNull();
+      expect(view().textContent).toContain('to change or remove it, choose Edit');
       (view().querySelector('.receipt-thumb') as HTMLElement).click();
       await settle();
       expect(document.querySelector('.receipt-full')!.getAttribute('src')).toBe('data:image/jpeg;base64,OLD');
-
-      button('Remove').click();
-      await settle();
-      expect(el.textContent).toContain('Remove the receipt?');
-      expect(txs.transactions()[0].receiptId).toBe('old'); // nothing yet
-      [...document.querySelectorAll('app-confirm button')].find(b => b.textContent!.trim() === 'Remove')!
-        .dispatchEvent(new Event('click'));
-      await settleLoads();
-      expect(txs.transactions()[0].receiptId).toBeUndefined();
-      expect(receipts.removed).toEqual(['old']);
     });
 
     it('only expenses have one', async () => {

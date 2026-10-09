@@ -30,13 +30,34 @@ describe('ReceiptAttach — taking a photo vs uploading one', () => {
     expect(inputs.every(i => i.accept === 'image/*')).toBe(true);
   });
 
-  it('once attached: the thumbnail, and Replace / Remove', () => {
-    const f = render(false);
+  const attached = (f: ComponentFixture<ReceiptAttach>) => {
     f.componentRef.setInput('image', 'data:image/jpeg;base64,AAA');
     f.componentRef.setInput('actionLabel', 'Fill in from it');
     f.detectChanges();
-    expect(f.nativeElement.querySelector('.receipt-thumb img').getAttribute('src')).toBe('data:image/jpeg;base64,AAA');
-    expect([...f.nativeElement.querySelectorAll('.receipt-actions button')].map((b: Element) => b.textContent!.trim()))
-      .toEqual(['Fill in from it', 'Replace', 'Remove']);
+    return f.nativeElement as HTMLElement;
+  };
+
+  it('in the form: the thumbnail with a ✕ to remove it, and one action', () => {
+    const el = attached(render(false));
+    expect(el.querySelector('.receipt-thumb img')!.getAttribute('src')).toBe('data:image/jpeg;base64,AAA');
+    expect(el.querySelector('[aria-label="Remove the receipt"]')).toBeTruthy();
+    expect([...el.querySelectorAll('.receipt-actions button')].map(b => b.textContent!.trim())).toEqual(['Fill in from it']);
+  });
+
+  it('on the details sheet: only the thumbnail — no ✕, no action', () => {
+    const f = render(false);
+    f.componentRef.setInput('editable', false);
+    const el = attached(f);
+    expect(el.querySelector('.receipt-thumb')).toBeTruthy();
+    expect(el.querySelector('[aria-label="Remove the receipt"]')).toBeNull();
+    expect(el.querySelector('.receipt-actions')).toBeNull();
+  });
+
+  it('tapping the thumbnail opens it full size', () => {
+    const f = render(false);
+    const el = attached(f);
+    (el.querySelector('.receipt-thumb') as HTMLElement).click();
+    f.detectChanges();
+    expect(document.querySelector('.receipt-full')!.getAttribute('src')).toBe('data:image/jpeg;base64,AAA');
   });
 });

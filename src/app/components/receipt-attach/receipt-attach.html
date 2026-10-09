@@ -1,18 +1,24 @@
 @if (image(); as src) {
   <div class="receipt-attached">
-    <button type="button" class="receipt-thumb" (click)="viewing.set(true)" aria-label="View the receipt">
-      <img [src]="src" alt="Receipt" />
-    </button>
+    <div class="receipt-thumb-wrap">
+      <button type="button" class="receipt-thumb" (click)="viewing.set(true)" aria-label="View the receipt">
+        <img [src]="src" alt="Receipt" />
+      </button>
+      @if (editable()) {
+        <button type="button" class="receipt-remove" [disabled]="busy()" (click)="removed.emit()"
+                aria-label="Remove the receipt" title="Remove the receipt">
+          <app-icon name="close" [size]="11" [stroke]="2" />
+        </button>
+      }
+    </div>
     <div class="receipt-info">
-      <div class="toggle-label">Receipt attached</div>
+      <div class="toggle-label">Receipt</div>
       @if (note()) { <div class="toggle-sub">{{ note() }}</div> }
-      <div class="receipt-actions">
-        @if (actionLabel()) {
-          <button type="button" class="btn-primary sm" [disabled]="busy()" (click)="action.emit()">{{ actionLabel() }}</button>
-        }
-        <button type="button" class="btn-row" [disabled]="busy()" (click)="upload()">Replace</button>
-        <button type="button" class="btn-row" [disabled]="busy()" (click)="removed.emit()">Remove</button>
-      </div>
+      @if (editable() && actionLabel()) {
+        <div class="receipt-actions">
+          <button type="button" class="btn-row" [disabled]="busy()" (click)="action.emit()">{{ actionLabel() }}</button>
+        </div>
+      }
     </div>
   </div>
 } @else {

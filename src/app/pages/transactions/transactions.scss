@@ -595,9 +595,12 @@
   &.neg { color: var(--red); }
 }
 
-.has-notes {
-  font-size: 11px;
-  opacity: 0.5;
+/* Notes and a receipt, as two small line icons side by side. */
+.tx-flags {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-3);
 }
 
 .quick-edit-btn {

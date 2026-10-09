@@ -248,13 +248,22 @@ describe('TransactionForm — splitting a bill', () => {
     it('removing it clears it from the transaction, and deletes the photo', async () => {
       await openWith({ ...dinner, receiptId: 'old' });
       await settle();
-      button('Remove').click();
+      (el.querySelector('[aria-label="Remove the receipt"]') as HTMLElement).click();
       await settle();
       expect(el.textContent).toContain('Attach a photo of the receipt');
       await host.form().save();
       expect('receiptId' in host.saved[0]).toBe(true);
       expect(host.saved[0].receiptId).toBeUndefined();
       expect(receipts.removed).toEqual(['old']);
+    });
+
+    it('Edit starts from the live transaction: a receipt attached from the details sheet is there', async () => {
+      // The page still holds the copy from when the sheet opened — without the receipt.
+      (TestBed.inject(TransactionService) as unknown as FakeTransactions).transactions.set([{ ...dinner, receiptId: 'old' }]);
+      await openWith(dinner);
+      await settle();
+      expect(host.form().receiptImage()).toBe('data:image/jpeg;base64,OLD');
+      expect(button('Fill in from it')).toBeTruthy();
     });
 
     it('an unchanged receipt is left alone', async () => {

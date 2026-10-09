@@ -128,7 +128,7 @@ export class TransactionForm implements OnChanges {
 
   removeReceipt() {
     this.pendingReceipt = null;
-    this.receiptRemoved = !!this.transaction?.receiptId;
+    this.receiptRemoved = !!this.editing?.receiptId;
     this.receiptImage.set(null);
   }
 
@@ -153,7 +153,7 @@ export class TransactionForm implements OnChanges {
 
   /** The line under "Receipt attached". */
   receiptNote(): string {
-    return 'Saved with this transaction, encrypted like the rest of your data. “Fill in from it” has OpenAI read it; OpenAI doesn’t keep it.';
+    return 'Saved encrypted with this transaction. Tap it to see it full size. “Fill in from it” has OpenAI read it; OpenAI doesn’t keep it.';
   }
 
   /** Fetch the saved photo of the transaction being edited. */
@@ -165,7 +165,7 @@ export class TransactionForm implements OnChanges {
     const id = tx.receiptId;
     this.receiptLoading.set(true);
     this.receipts.load(id)
-      .then(r => { if (this.transaction?.receiptId === id && !this.pendingReceipt) this.receiptImage.set(r?.image ?? null); })
+      .then(r => { if (this.editing?.receiptId === id && !this.pendingReceipt) this.receiptImage.set(r?.image ?? null); })
       .catch(() => this.toastService.error("Couldn't load the receipt photo."))
       .finally(() => this.receiptLoading.set(false));
   }
@@ -285,20 +285,32 @@ export class TransactionForm implements OnChanges {
     }
   }
 
+  /**
+   * The transaction being edited, as it stands now. The page hands the form the
+   * copy it had when the details sheet opened; anything changed since — a
+   * receipt attached from the sheet, money back recorded — is only in the live
+   * list. Reading the live one means Edit always starts from the truth.
+   */
+  private editing: Transaction | null = null;
+
   private load() {
-    if (this.transaction) {
-      this.type = this.transaction.type;
-      this.amount = this.transaction.amount;
-      this.date = this.transaction.date;
-      this.notes = this.transaction.notes || '';
-      this.merchant.set(this.transaction.merchant || '');
-      this.accountId = this.transaction.accountId || '';
-      this.categoryId.set(this.transaction.categoryId || '');
-      this.fromAccountId = this.transaction.fromAccountId || '';
-      this.toAccountId = this.transaction.toAccountId || '';
-      this.isInternalTransfer = this.transaction.isInternalTransfer || false;
-      this.existingSplit = this.transaction.split ?? null;
-      this.splitOn.set(!!this.existingSplit && this.transaction.type === 'expense');
+    const live = this.transaction?.id
+      ? this.transactionService.transactions().find(t => t.id === this.transaction!.id) ?? this.transaction
+      : this.transaction;
+    this.editing = live;
+    if (live) {
+      this.type = live.type;
+      this.amount = live.amount;
+      this.date = live.date;
+      this.notes = live.notes || '';
+      this.merchant.set(live.merchant || '');
+      this.accountId = live.accountId || '';
+      this.categoryId.set(live.categoryId || '');
+      this.fromAccountId = live.fromAccountId || '';
+      this.toAccountId = live.toAccountId || '';
+      this.isInternalTransfer = live.isInternalTransfer || false;
+      this.existingSplit = live.split ?? null;
+      this.splitOn.set(!!this.existingSplit && live.type === 'expense');
       const itemized = this.existingSplit?.mode === 'itemized';
       this.splitKind.set(itemized ? 'itemized' : 'quick');
       this.splitState.set(this.existingSplit && !itemized ? quickStateFrom(this.existingSplit) : emptyQuickState());
@@ -306,7 +318,7 @@ export class TransactionForm implements OnChanges {
       this.saveAsTemplate.set(false);
       this.templateName.set('');
       this.scanned.set(null);
-      this.loadReceipt(this.transaction);
+      this.loadReceipt(live);
     } else {
       this.type = this.quickAddService.defaultType() || 'expense';
       this.amount = 0;
@@ -603,7 +615,7 @@ export class TransactionForm implements OnChanges {
       const scanned = type === 'expense' ? this.scanned() : null;
       const pendingReceipt = type === 'expense' ? this.pendingReceipt : null;
       const receiptRemoved = type === 'expense' && this.receiptRemoved;
-      const oldReceiptId = this.transaction?.receiptId;
+      const oldReceiptId = this.editing?.receiptId;
       if (!accountId) { this.toastService.error('Please select an account'); return; }
       if (!merchant) { this.toastService.error('Merchant or source is required'); return; }
 

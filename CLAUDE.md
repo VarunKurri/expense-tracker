@@ -114,7 +114,15 @@ The app is what we copy. Do not "correct" this back to dark.
   any month selection rather than a row of month pills),
   `app-confirm`, `app-modal`, `app-toast`, `app-logo`, `app-icon`,
   `app-receipt-attach` (a receipt photo: Take photo on phones/tablets, Upload
-  everywhere, thumbnail → full size, Replace / Remove).
+  everywhere, thumbnail → full size; in Edit a ✕ on the thumbnail removes it,
+  on the details sheet it's read-only — `[editable]="false"`).
+- A form opened from the details sheet must read the **live** transaction
+  (`transactionService.transactions()` by id), never the copy the page passed
+  in — that copy is stale the moment the sheet changes anything.
+- Never centre a fixed panel with `transform`: it traps any pop-up inside it
+  (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;
+  margin: auto; height: fit-content`.
+- Small indicators on rows (notes, receipt) are `app-icon` line icons, never emoji.
   `app-transaction-view` is the **only** transaction view — Dashboard, Spending,
   Analysis and Transactions all render it, including reimbursement linking.
   Never fork a second copy: the three that existed before drifted, and only one

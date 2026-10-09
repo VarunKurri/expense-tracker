@@ -476,11 +476,16 @@
                       @if (tx.isInternalTransfer) {
                         <span class="refunded-badge">↔ Transfer</span>
                       }
-                      @if (tx.notes) {
-                        <span class="has-notes">📝</span>
-                      }
-                      @if (tx.receiptId) {
-                        <span class="has-notes" title="Receipt attached" aria-label="Receipt attached">🧾</span>
+                      <!-- What's attached: quiet line icons, side by side -->
+                      @if (tx.notes || tx.receiptId) {
+                        <span class="tx-flags">
+                          @if (tx.notes) {
+                            <span title="Has notes" aria-label="Has notes"><app-icon name="note" [size]="13" [stroke]="1.6" /></span>
+                          }
+                          @if (tx.receiptId) {
+                            <span title="Receipt attached" aria-label="Receipt attached"><app-icon name="receipt" [size]="13" [stroke]="1.6" /></span>
+                          }
+                        </span>
                       }
                     </div>
                     @if (!bulkMode()) {

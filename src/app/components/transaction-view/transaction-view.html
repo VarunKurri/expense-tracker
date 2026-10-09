@@ -76,11 +76,12 @@
       <!-- RECEIPT — a photo kept with the expense -->
       @if (tx.type === 'expense') {
         <div class="view-receipt">
+          <!-- Read-only once attached: replacing or removing it is in Edit. -->
           <app-receipt-attach
-            [image]="receiptImage()" [loading]="receiptLoading()" [busy]="receiptBusy()"
+            [image]="receiptImage()" [loading]="receiptLoading()" [busy]="receiptBusy()" [editable]="false"
             [hint]="receiptBusy() ? 'Saving the photo…' : 'Keep a photo of the receipt with this purchase.'"
-            note="Saved with this transaction, encrypted like the rest of your data."
-            (picked)="attachReceipt($event)" (removed)="confirmingReceiptRemoval.set(true)" />
+            note="Saved encrypted with this transaction. Tap it to see it full size; to change or remove it, choose Edit."
+            (picked)="attachReceipt($event)" />
         </div>
       }
 
@@ -393,10 +394,3 @@
   (confirmed)="confirmReopen()"
   (cancelled)="reopening.set(null)" />
 
-<app-confirm
-  [open]="confirmingReceiptRemoval()"
-  title="Remove the receipt?"
-  message="The photo is deleted for good. The transaction stays as it is."
-  confirmText="Remove"
-  (confirmed)="removeReceipt()"
-  (cancelled)="confirmingReceiptRemoval.set(false)" />

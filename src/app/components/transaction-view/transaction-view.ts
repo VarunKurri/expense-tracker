@@ -81,13 +81,13 @@ export class TransactionView {
   });
 
   // ── Receipt photo ──────────────────────────────────────────
-  // Attach, see, replace or remove it right here — no need to open Edit for a
-  // transaction that's already logged. The photo itself is ReceiptService's.
+  // Attach one right here — no need to open Edit for a transaction that's
+  // already logged. Once attached it's shown, not changed: replacing or
+  // removing it is in Edit. The photo itself is ReceiptService's.
   private receipts = inject(ReceiptService);
   receiptImage = signal<string | null>(null);
   receiptLoading = signal(false);
   receiptBusy = signal(false);
-  confirmingReceiptRemoval = signal(false);
 
   /** Fetch the photo whenever the transaction's receipt changes (and only then). */
   private receiptId = computed(() => this.tx()?.receiptId);
@@ -115,27 +115,9 @@ export class TransactionView {
       const receiptId = await this.receipts.save(photo);
       await this.txService.update(t.id, { receiptId });
       if (old) this.receipts.remove(old).catch(err => console.warn('Could not delete the old receipt photo:', err));
-      this.toast.success(old ? 'Receipt replaced.' : 'Receipt attached.');
+      this.toast.success('Receipt attached.');
     } catch (err: any) {
       this.toast.error(err?.message || "The receipt photo couldn't be saved. Please try again.");
-    } finally {
-      this.receiptBusy.set(false);
-    }
-  }
-
-  /** Removing deletes the photo for good, so it asks first. */
-  async removeReceipt() {
-    this.confirmingReceiptRemoval.set(false);
-    const t = this.tx();
-    if (!t?.id || !t.receiptId) return;
-    const old = t.receiptId;
-    this.receiptBusy.set(true);
-    try {
-      await this.txService.update(t.id, { receiptId: undefined });
-      await this.receipts.remove(old);
-      this.toast.success('Receipt removed.');
-    } catch {
-      this.toast.error("Couldn't remove the receipt. Please try again.");
     } finally {
       this.receiptBusy.set(false);
     }
