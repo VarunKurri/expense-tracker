@@ -267,9 +267,10 @@ availableCredit(account: Account): number {
 
     let batch = writeBatch(this.db);
     let count = 0;
+    const receiptIds = this.receiptIdsOf(ids);
 
-    for (const id of ids) {
-      batch.delete(doc(this.db, `users/${user.uid}/transactions/${id}`));
+    for (const id of [...ids.map(i => `transactions/${i}`), ...receiptIds.map(r => `receipts/${r}`)]) {
+      batch.delete(doc(this.db, `users/${user.uid}/${id}`));
       count++;
 
       if (count % 400 === 0) {
@@ -284,6 +285,18 @@ availableCredit(account: Account): number {
   async remove(id: string) {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
+    const [receiptId] = this.receiptIdsOf([id]);
     await deleteDoc(doc(this.db, `users/${user.uid}/transactions/${id}`));
+    // Its receipt photo goes with it; a leftover photo would just take up space.
+    if (receiptId) {
+      await deleteDoc(doc(this.db, `users/${user.uid}/receipts/${receiptId}`))
+        .catch(err => console.warn('Could not delete the receipt photo:', err));
+    }
+  }
+
+  /** The receipt photos attached to these transactions. */
+  private receiptIdsOf(ids: string[]): string[] {
+    const wanted = new Set(ids);
+    return this.transactions().filter(t => t.id && wanted.has(t.id) && t.receiptId).map(t => t.receiptId!);
   }
 }

@@ -1,0 +1,44 @@
+@if (image(); as src) {
+  <div class="receipt-attached">
+    <button type="button" class="receipt-thumb" (click)="viewing.set(true)" aria-label="View the receipt">
+      <img [src]="src" alt="Receipt" />
+    </button>
+    <div class="receipt-info">
+      <div class="toggle-label">Receipt attached</div>
+      @if (note()) { <div class="toggle-sub">{{ note() }}</div> }
+      <div class="receipt-actions">
+        @if (actionLabel()) {
+          <button type="button" class="btn-primary sm" [disabled]="busy()" (click)="action.emit()">{{ actionLabel() }}</button>
+        }
+        <button type="button" class="btn-row" [disabled]="busy()" (click)="upload()">Replace</button>
+        <button type="button" class="btn-row" [disabled]="busy()" (click)="removed.emit()">Remove</button>
+      </div>
+    </div>
+  </div>
+} @else {
+  <div class="toggle-row">
+    <div>
+      <div class="toggle-label">Receipt</div>
+      <div class="toggle-sub">{{ loading() ? 'Loading the receipt…' : hint() }}</div>
+    </div>
+    @if (!loading()) {
+      <div class="receipt-buttons">
+        @if (camera) {
+          <button type="button" class="btn-primary sm" [disabled]="busy()" (click)="takePhoto()">Take photo</button>
+        }
+        <button type="button" class="btn-primary sm" [disabled]="busy()" (click)="upload()">Upload</button>
+      </div>
+    }
+  </div>
+}
+
+<!-- capture="environment" opens the back camera straight away; without it a
+     phone asks camera or library, and a desktop opens the file picker. -->
+<input #cameraInput type="file" accept="image/*" capture="environment" hidden (change)="onFile($event)" aria-label="Take a photo of the receipt" />
+<input #fileInput type="file" accept="image/*" hidden (change)="onFile($event)" aria-label="Upload a receipt photo" />
+
+<app-modal [open]="viewing()" title="Receipt" size="lg" (closed)="viewing.set(false)">
+  @if (image(); as src) {
+    <img class="receipt-full" [src]="src" alt="Receipt, full size" />
+  }
+</app-modal>

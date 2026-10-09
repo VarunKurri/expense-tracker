@@ -12,6 +12,8 @@ import { loanDirection, loanPayments, loanState } from '../../utils/loans';
 import { localDateString } from '../../utils/date';
 import { Modal } from '../modal/modal';
 import { Confirm } from '../confirm/confirm';
+import { ReceiptAttach } from '../receipt-attach/receipt-attach';
+import { ReceiptService } from '../../services/receipt.service';
 import { ManualAsset, ME, MoneyBackSource, Transaction, UntrackedReturn } from '../../models';
 import { PersonService } from '../../services/person.service';
 import { PersonSplitStatus, outstandingFor, setClosed, splitStatus } from '../../utils/splits';
@@ -40,7 +42,7 @@ let nextLockId = 0;
 @Component({
   selector: 'app-transaction-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, Modal, Confirm],
+  imports: [CommonModule, FormsModule, Modal, Confirm, ReceiptAttach],
   templateUrl: './transaction-view.html',
   styleUrl: './transaction-view.scss',
 })
@@ -77,6 +79,67 @@ export class TransactionView {
     if (!snapshot?.id) return snapshot;
     return this.txService.transactions().find(t => t.id === snapshot.id) ?? snapshot;
   });
+
+  // ── Receipt photo ──────────────────────────────────────────
+  // Attach, see, replace or remove it right here — no need to open Edit for a
+  // transaction that's already logged. The photo itself is ReceiptService's.
+  private receipts = inject(ReceiptService);
+  receiptImage = signal<string | null>(null);
+  receiptLoading = signal(false);
+  receiptBusy = signal(false);
+  confirmingReceiptRemoval = signal(false);
+
+  /** Fetch the photo whenever the transaction's receipt changes (and only then). */
+  private receiptId = computed(() => this.tx()?.receiptId);
+  private receiptLoader = effect(onCleanup => {
+    const id = this.receiptId();
+    this.receiptImage.set(null);
+    if (!id) { this.receiptLoading.set(false); return; }
+    let current = true;
+    onCleanup(() => { current = false; });
+    this.receiptLoading.set(true);
+    this.receipts.load(id)
+      .then(r => { if (current) this.receiptImage.set(r?.image ?? null); })
+      .catch(() => { if (current) this.toast.error("Couldn't load the receipt photo."); })
+      .finally(() => { if (current) this.receiptLoading.set(false); });
+  });
+
+  /** A photo was taken or picked: store it and point the transaction at it. */
+  async attachReceipt(file: File) {
+    const t = this.tx();
+    if (!t?.id || this.receiptBusy()) return;
+    const old = t.receiptId;
+    this.receiptBusy.set(true);
+    try {
+      const photo = await this.receipts.fit(file);
+      const receiptId = await this.receipts.save(photo);
+      await this.txService.update(t.id, { receiptId });
+      if (old) this.receipts.remove(old).catch(err => console.warn('Could not delete the old receipt photo:', err));
+      this.toast.success(old ? 'Receipt replaced.' : 'Receipt attached.');
+    } catch (err: any) {
+      this.toast.error(err?.message || "The receipt photo couldn't be saved. Please try again.");
+    } finally {
+      this.receiptBusy.set(false);
+    }
+  }
+
+  /** Removing deletes the photo for good, so it asks first. */
+  async removeReceipt() {
+    this.confirmingReceiptRemoval.set(false);
+    const t = this.tx();
+    if (!t?.id || !t.receiptId) return;
+    const old = t.receiptId;
+    this.receiptBusy.set(true);
+    try {
+      await this.txService.update(t.id, { receiptId: undefined });
+      await this.receipts.remove(old);
+      this.toast.success('Receipt removed.');
+    } catch {
+      this.toast.error("Couldn't remove the receipt. Please try again.");
+    } finally {
+      this.receiptBusy.set(false);
+    }
+  }
 
   // ── Money back: refunds and repayments ─────────────────────
   // One section for everything that came back on a purchase — see

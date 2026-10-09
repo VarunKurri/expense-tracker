@@ -479,6 +479,9 @@
                       @if (tx.notes) {
                         <span class="has-notes">📝</span>
                       }
+                      @if (tx.receiptId) {
+                        <span class="has-notes" title="Receipt attached" aria-label="Receipt attached">🧾</span>
+                      }
                     </div>
                     @if (!bulkMode()) {
                       <button class="quick-edit-btn"

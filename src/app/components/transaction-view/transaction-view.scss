@@ -123,6 +123,9 @@
   &.transfer { background: var(--bg-3); color: var(--fg-3); }
 }
 
+/* ── Receipt photo ─────────────────────────────────────────── */
+.view-receipt { margin: 14px 20px 0; }
+
 /* ── Money back (and the loan card, which shares its look) ─── */
 .view-reimburse {
   margin: 14px 20px 0;

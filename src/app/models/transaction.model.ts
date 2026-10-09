@@ -27,6 +27,8 @@ export interface Transaction {
   aiExtracted?: boolean;
   aiConfidence?: number;
   receiptUrl?: string;
+  /** A photo of the receipt: a document in `users/{uid}/receipts` (models/receipt.model.ts). */
+  receiptId?: string;
 
   // Money back (refunds and repayments) — see models/money-back.model.ts and
   // utils/money-back.ts. An expense's money back is every income linked to it

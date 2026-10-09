@@ -14,6 +14,19 @@ import { ME, Transaction } from '../../../models';
 import { MoneyBackLedger } from '../../../utils/money-back';
 import { buildItemizedSplit, emptyItemizedState, newItem, personName, quickSplit, splitStatus } from '../../../utils/splits';
 import { ReceiptScanService } from '../../../services/receipt-scan.service';
+import { ReceiptService } from '../../../services/receipt.service';
+
+/** Receipt photos, kept in memory the way ReceiptService keeps them in Firestore. */
+class FakeReceipts {
+  stored = new Map<string, string>([['old', 'data:image/jpeg;base64,OLD']]);
+  removed: string[] = [];
+  private n = 0;
+  async fit() { return { dataUrl: 'data:image/jpeg;base64,NEW', width: 800, height: 1600 }; }
+  async save(photo: { dataUrl: string }) { const id = `r${++this.n}`; this.stored.set(id, photo.dataUrl); return id; }
+  async load(id: string) { const image = this.stored.get(id); return image ? { id, image, width: 1, height: 1, createdAt: 0 } : null; }
+  async remove(id: string) { this.removed.push(id); this.stored.delete(id); }
+}
+let receipts: FakeReceipts;
 import { ReceiptScan } from '../../../utils/receipt';
 
 /** What the fake scanner returns next (or throws). */
@@ -83,7 +96,8 @@ describe('TransactionForm — splitting a bill', () => {
         { provide: QuickAddService, useValue: { defaultType: () => 'expense' } },
         { provide: ToastService, useValue: { success() {}, error: (m: string) => errors.push(m) } },
         { provide: PersonService, useValue: { people, nameOf: (id: string) => personName(people(), id) } },
-        { provide: ReceiptScanService, useValue: { scan: async () => { if (nextScan instanceof Error) throw nextScan; return nextScan; } } },
+        { provide: ReceiptScanService, useValue: { scanImage: async () => { if (nextScan instanceof Error) throw nextScan; return nextScan; } } },
+        { provide: ReceiptService, useFactory: () => (receipts = new FakeReceipts()) },
       ],
     });
     fixture = TestBed.createComponent(Host);
@@ -175,33 +189,79 @@ describe('TransactionForm — splitting a bill', () => {
     expect(host.saved[0].split!.items.map(i => i.name)).toEqual(['Salad', 'Steak']);
   });
 
-  describe('scanning a receipt', () => {
+  describe('a receipt photo', () => {
+    const photo = () => new File(['x'], 'receipt.jpg', { type: 'image/jpeg' });
     const pick = async () => {
-      await host.form().onReceiptPicked({ target: { files: [new File(['x'], 'r.jpg', { type: 'image/jpeg' })], value: '' } } as any);
+      await host.form().attachReceipt(photo());
       await settle();
     };
 
-    it('fills an empty new expense: merchant, date, amount — and the items, ready to split', async () => {
+    it('on a blank new expense, attaching it also reads it: merchant, date, amount, items', async () => {
       nextScan = receipt();
       await openWith(null);
       await pick();
       const form = host.form();
+      expect(form.receiptImage()).toBe('data:image/jpeg;base64,NEW');
       expect(form.merchant()).toBe('Hashtag India');
       expect(form.date).toBe('2026-09-29');
       expect(form.amount).toBe(56.87);
       expect(form.itemizedState().items.map(i => i.name)).toEqual(['Nalli Gosht Mandi', 'Chai']);
-      expect(form.itemizedState().charges.taxCents).toBe(387);
       expect(el.textContent).toContain('2 items · tax & fees $3.87 · tip $0.00 · total $56.87');
       expect(el.textContent).toContain('turn on Split this bill');
     });
 
-    it("never overwrites what you've typed", async () => {
+    it("on an expense you've already filled in, it's only attached — reading it is a tap away, and never overwrites", async () => {
       nextScan = receipt();
       await openWith(dinner); // Ramen Bar, $180, 2026-10-02
       await pick();
+      expect(host.form().scanned()).toBeNull();
+      expect(button('Fill in from it')).toBeTruthy();
+      button('Fill in from it').click();
+      await settle();
+      expect(host.form().scanned()).not.toBeNull();
       expect(host.form().merchant()).toBe('Ramen Bar');
       expect(host.form().amount).toBe(180);
       expect(host.form().date).toBe('2026-10-02');
+    });
+
+    it('is stored when the transaction is saved, and the transaction points at it', async () => {
+      nextScan = receipt();
+      await openWith(null);
+      await pick();
+      host.form().accountId = 'card';
+      await host.form().save();
+      expect(errors).toEqual([]);
+      expect(host.saved[0].receiptId).toBe('r1');
+      expect(receipts.stored.get('r1')).toBe('data:image/jpeg;base64,NEW');
+    });
+
+    it('an existing receipt shows when editing; replacing it stores the new one and deletes the old', async () => {
+      await openWith({ ...dinner, receiptId: 'old' });
+      await settle();
+      expect(host.form().receiptImage()).toBe('data:image/jpeg;base64,OLD');
+      await pick();
+      await host.form().save();
+      expect(host.saved[0].receiptId).toBe('r1');
+      expect(receipts.removed).toEqual(['old']);
+    });
+
+    it('removing it clears it from the transaction, and deletes the photo', async () => {
+      await openWith({ ...dinner, receiptId: 'old' });
+      await settle();
+      button('Remove').click();
+      await settle();
+      expect(el.textContent).toContain('Attach a photo of the receipt');
+      await host.form().save();
+      expect('receiptId' in host.saved[0]).toBe(true);
+      expect(host.saved[0].receiptId).toBeUndefined();
+      expect(receipts.removed).toEqual(['old']);
+    });
+
+    it('an unchanged receipt is left alone', async () => {
+      await openWith({ ...dinner, receiptId: 'old' });
+      await host.form().save();
+      expect('receiptId' in host.saved[0]).toBe(false);
+      expect(receipts.removed).toEqual([]);
     });
 
     it('splitting it: claim the lines, save — the split is marked as from a receipt', async () => {
@@ -249,15 +309,19 @@ describe('TransactionForm — splitting a bill', () => {
       expect(el.querySelector('.scan-note .field-error')!.textContent).toContain("The lines add up to $56.87, but the receipt's total is $61.87.");
     });
 
-    it("a photo that isn't a receipt, or a failed scan, changes nothing", async () => {
+    it("a photo that isn't a receipt, or a failed read, fills in nothing — but the photo stays attached", async () => {
       await openWith(null);
       nextScan = receipt({ isReceipt: false });
       await pick();
       nextScan = new Error('The receipt reader is busy. Try again in a minute.');
       await pick();
-      expect(errors).toEqual(["That doesn't look like a receipt. Try another photo.", 'The receipt reader is busy. Try again in a minute.']);
+      expect(errors).toEqual([
+        "That doesn't look like a receipt, so nothing was filled in. It's still attached.",
+        'The receipt reader is busy. Try again in a minute.',
+      ]);
       expect(host.form().merchant()).toBe('');
       expect(host.form().scanned()).toBeNull();
+      expect(host.form().receiptImage()).toBe('data:image/jpeg;base64,NEW');
     });
   });
 });

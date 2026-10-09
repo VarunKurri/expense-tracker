@@ -76,6 +76,8 @@ const LEGACY_KDF_ITERATIONS = 250_000;
 
 const ENCRYPTION_VERSION = 1;
 const VERIFIER_TEXT = 'trackr-encryption-verifier-v1';
+// Collections that may hold documents from before encryption, for migrateUserData.
+// `receipts` isn't here: receipt photos have been encrypted from the start.
 const COLLECTIONS = ['accounts', 'categories', 'transactions', 'transactionTemplates', 'bills', 'budgets', 'transactionRules', 'manualAssets', 'people'];
 
 @Injectable({ providedIn: 'root' })

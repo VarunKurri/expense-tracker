@@ -25,6 +25,9 @@ import { TransactionTemplate } from '../../../models';
 import { QuickAddService } from '../../../services/quick-add.service';
 import { ToastService } from '../../../services/toast.service';
 import { ReceiptScanService } from '../../../services/receipt-scan.service';
+import { ReceiptService } from '../../../services/receipt.service';
+import { ReceiptAttach } from '../../../components/receipt-attach/receipt-attach';
+import { FittedImage } from '../../../utils/image';
 import {
   ReceiptScan, itemizedFromScan, scanAmountCents, scanBillCents, scanMismatchCents, scanTaxAndFeesCents, scanTaxParts,
 } from '../../../utils/receipt';
@@ -32,7 +35,7 @@ import {
 @Component({
   selector: 'app-transaction-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, Modal, ErrorBanner, SplitEditor, ItemizedSplitEditor],
+  imports: [CommonModule, FormsModule, Modal, ErrorBanner, SplitEditor, ItemizedSplitEditor, ReceiptAttach],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss'
 })
@@ -45,6 +48,7 @@ export class TransactionForm implements OnChanges {
   private toastService = inject(ToastService);
   private quickAddService = inject(QuickAddService);
   private receiptScanner = inject(ReceiptScanService);
+  private receipts = inject(ReceiptService);
 
   @Input() open = false;
   @Input() transaction: Transaction | null = null;
@@ -88,30 +92,82 @@ export class TransactionForm implements OnChanges {
     this.splitKind.set(kind);
   }
 
-  // ── Receipt scan (expenses) ────────────────────────────────
+  // ── Receipt (expenses) ─────────────────────────────────────
+  // A photo of the receipt, kept with the transaction (ReceiptService). It can
+  // also be read to fill in the form (ReceiptScanService) — but attaching one
+  // and reading it are separate: a receipt is worth keeping either way.
+
+  /** The photo shown: a newly picked one, or the one already saved. */
+  receiptImage = signal<string | null>(null);
+  /** A photo picked in this form, stored when the transaction is saved. */
+  private pendingReceipt: FittedImage | null = null;
+  /** The saved photo was removed in this form; deleted when the transaction is saved. */
+  private receiptRemoved = false;
+  receiptLoading = signal(false);
   scanning = signal(false);
   /** The last receipt read into this form — kept for the note and saved as aiExtracted. */
   scanned = signal<ReceiptScan | null>(null);
 
-  /** A photo was picked: read it, then fill in what the form doesn't have yet. */
-  async onReceiptPicked(event: Event) {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = ''; // so picking the same photo again still fires
-    if (!file || this.scanning()) return;
+  /**
+   * A photo was taken or picked. It's attached; and on a blank new expense —
+   * the "snap the receipt to log it" case — it's read straight away too.
+   */
+  async attachReceipt(file: File) {
+    try {
+      const photo = await this.receipts.fit(file);
+      this.pendingReceipt = photo;
+      this.receiptRemoved = false;
+      this.receiptImage.set(photo.dataUrl);
+    } catch (err: any) {
+      this.toastService.error(err?.message || "Couldn't open that photo.");
+      return;
+    }
+    const blank = !this.transaction && !Number(this.amount) && !this.merchant().trim();
+    if (blank) await this.readReceipt();
+  }
+
+  removeReceipt() {
+    this.pendingReceipt = null;
+    this.receiptRemoved = !!this.transaction?.receiptId;
+    this.receiptImage.set(null);
+  }
+
+  /** "Fill in from it": read the attached photo and fill in what's missing. */
+  async readReceipt() {
+    const image = this.receiptImage();
+    if (!image || this.scanning()) return;
     this.scanning.set(true);
     try {
-      const scan = await this.receiptScanner.scan(file);
+      const scan = await this.receiptScanner.scanImage(image);
       if (!scan.isReceipt) {
-        this.toastService.error("That doesn't look like a receipt. Try another photo.");
+        this.toastService.error("That doesn't look like a receipt, so nothing was filled in. It's still attached.");
         return;
       }
       this.applyScan(scan);
     } catch (err: any) {
-      this.toastService.error(err?.message || "Couldn't scan that receipt.");
+      this.toastService.error(err?.message || "Couldn't read that receipt.");
     } finally {
       this.scanning.set(false);
     }
+  }
+
+  /** The line under "Receipt attached". */
+  receiptNote(): string {
+    return 'Saved with this transaction, encrypted like the rest of your data. “Fill in from it” has OpenAI read it; OpenAI doesn’t keep it.';
+  }
+
+  /** Fetch the saved photo of the transaction being edited. */
+  private loadReceipt(tx: Transaction) {
+    this.pendingReceipt = null;
+    this.receiptRemoved = false;
+    this.receiptImage.set(null);
+    if (!tx.receiptId) { this.receiptLoading.set(false); return; }
+    const id = tx.receiptId;
+    this.receiptLoading.set(true);
+    this.receipts.load(id)
+      .then(r => { if (this.transaction?.receiptId === id && !this.pendingReceipt) this.receiptImage.set(r?.image ?? null); })
+      .catch(() => this.toastService.error("Couldn't load the receipt photo."))
+      .finally(() => this.receiptLoading.set(false));
   }
 
   /**
@@ -250,6 +306,7 @@ export class TransactionForm implements OnChanges {
       this.saveAsTemplate.set(false);
       this.templateName.set('');
       this.scanned.set(null);
+      this.loadReceipt(this.transaction);
     } else {
       this.type = this.quickAddService.defaultType() || 'expense';
       this.amount = 0;
@@ -266,6 +323,10 @@ export class TransactionForm implements OnChanges {
       this.saveAsTemplate.set(false);
       this.templateName.set('');
       this.scanned.set(null);
+      this.pendingReceipt = null;
+      this.receiptRemoved = false;
+      this.receiptImage.set(null);
+      this.receiptLoading.set(false);
     }
 
     // Default bill fields
@@ -540,6 +601,9 @@ export class TransactionForm implements OnChanges {
       const billAutopay = this.billAutopay;
       const isNewTransaction = !this.transaction;
       const scanned = type === 'expense' ? this.scanned() : null;
+      const pendingReceipt = type === 'expense' ? this.pendingReceipt : null;
+      const receiptRemoved = type === 'expense' && this.receiptRemoved;
+      const oldReceiptId = this.transaction?.receiptId;
       if (!accountId) { this.toastService.error('Please select an account'); return; }
       if (!merchant) { this.toastService.error('Merchant or source is required'); return; }
 
@@ -565,6 +629,22 @@ export class TransactionForm implements OnChanges {
       }
 
       this.submitting.set(true);
+
+      // A new photo is stored first, so the transaction can point at it.
+      let receiptId = oldReceiptId;
+      if (pendingReceipt) {
+        try {
+          receiptId = await this.receipts.save(pendingReceipt);
+        } catch (err: any) {
+          this.toastService.error(err?.message || "The receipt photo couldn't be saved. Try again, or remove it to save without it.");
+          this.submitting.set(false);
+          return;
+        }
+      } else if (receiptRemoved) {
+        receiptId = undefined;
+      }
+      const receiptChanged = receiptId !== oldReceiptId;
+
       try {
         await this.saveCurrentAsTemplate();
       } catch (err) {
@@ -585,9 +665,16 @@ export class TransactionForm implements OnChanges {
         isInternalTransfer,
         // Filled in from a receipt: marked so it can be told apart later.
         ...(scanned ? { aiExtracted: true, aiConfidence: scanned.confidence } : {}),
+        // A new receipt photo, or none any more (undefined is dropped when saved).
+        ...(receiptChanged ? { receiptId } : {}),
         // Turning the split off on an edit clears it; undefined is dropped when saved.
         ...(split ? { split } : this.existingSplit ? { split: undefined } : {}),
       });
+
+      // The photo it replaced, or that was removed, isn't needed any more.
+      if (receiptChanged && oldReceiptId) {
+        this.receipts.remove(oldReceiptId).catch(err => console.warn('Could not delete the old receipt photo:', err));
+      }
 
       // If Subscriptions category selected, auto-create bill if one doesn't exist yet
       if (isSubscription && merchant && isNewTransaction) {

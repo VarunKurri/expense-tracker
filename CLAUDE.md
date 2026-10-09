@@ -112,7 +112,9 @@ The app is what we copy. Do not "correct" this back to dark.
   `app-transaction-view` (read-only transaction sheet), `app-transaction-form`,
   `app-month-picker` (`‹ Month ›` stepper with a jump-to-month grid — use it for
   any month selection rather than a row of month pills),
-  `app-confirm`, `app-modal`, `app-toast`, `app-logo`, `app-icon`.
+  `app-confirm`, `app-modal`, `app-toast`, `app-logo`, `app-icon`,
+  `app-receipt-attach` (a receipt photo: Take photo on phones/tablets, Upload
+  everywhere, thumbnail → full size, Replace / Remove).
   `app-transaction-view` is the **only** transaction view — Dashboard, Spending,
   Analysis and Transactions all render it, including reimbursement linking.
   Never fork a second copy: the three that existed before drifted, and only one
@@ -131,8 +133,13 @@ The app is what we copy. Do not "correct" this back to dark.
 - Never print API keys in logs or terminal output
 - `OPENAI_API_KEY` (receipt scanning, `functions/src/receipt.ts`) is a Firebase
   Functions secret too: `firebase functions:secrets:set OPENAI_API_KEY`. The
-  model is the `RECEIPT_MODEL` param (default `gpt-6-luna`). The receipt photo
-  is never stored or logged — only token counts are logged.
+  model is the `RECEIPT_MODEL` param (default `gpt-6-luna`). The function never
+  stores or logs the photo — only token counts are logged.
+- Receipt photos attached to expenses (`Transaction.receiptId`) live in
+  `users/{uid}/receipts`, one encrypted document each (`ReceiptService`), shrunk
+  in the browser to fit Firestore's 1 MiB (`utils/image.ts`). No Firebase
+  Storage. They're fetched only when opened — never put a live listener on that
+  collection, or every page load downloads every photo.
 
 ## File structure
 

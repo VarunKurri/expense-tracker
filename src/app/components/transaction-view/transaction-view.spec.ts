@@ -14,6 +14,17 @@ import { ME } from '../../models';
 import { quickSplit, splitStatus } from '../../utils/splits';
 import { PersonService } from '../../services/person.service';
 import { personName } from '../../utils/splits';
+import { ReceiptService } from '../../services/receipt.service';
+
+class FakeReceipts {
+  stored = new Map<string, string>([['old', 'data:image/jpeg;base64,OLD']]);
+  removed: string[] = [];
+  async fit() { return { dataUrl: 'data:image/jpeg;base64,NEW', width: 800, height: 1600 }; }
+  async save(photo: { dataUrl: string }) { this.stored.set('r1', photo.dataUrl); return 'r1'; }
+  async load(id: string) { const image = this.stored.get(id); return image ? { id, image, width: 1, height: 1, createdAt: 0 } : null; }
+  async remove(id: string) { this.removed.push(id); this.stored.delete(id); }
+}
+let receipts: FakeReceipts;
 
 /** The real money-back logic; updates are applied the way Firestore would (undefined dropped). */
 class FakeTransactions extends MoneyBackLedger {
@@ -76,6 +87,7 @@ describe('TransactionView — money back', () => {
         { provide: AccountService, useValue: { accounts: signal([]) } },
         { provide: ManualAssetService, useValue: { items: signal([]) } },
         { provide: ToastService, useValue: { success() {}, error() {} } },
+        { provide: ReceiptService, useFactory: () => (receipts = new FakeReceipts()) },
       ],
     });
   });
@@ -276,6 +288,42 @@ describe('TransactionView — money back', () => {
       await settle();
       expect(txs.transactions().find(t => t.id === 'v')!.moneyBackInfo).toEqual({ source: 'repayment', fromPersonId: 'ben', coversPersonIds: ['ben'] });
       expect(status().people.find(p => p.personId === 'ben')!.state).toBe('repaid');
+    });
+  });
+
+  describe('the receipt photo', () => {
+    const settleLoads = async () => { await settle(); await new Promise(r => setTimeout(r)); await settle(); };
+
+    it('attach one straight from the view: it is stored and the expense points at it', async () => {
+      await open(haircut);
+      expect(view().textContent).toContain('Keep a photo of the receipt with this purchase.');
+      await fixture.componentInstance.attachReceipt(new File(['x'], 'r.jpg', { type: 'image/jpeg' }));
+      await settleLoads();
+      expect(txs.transactions()[0].receiptId).toBe('r1');
+      expect(view().querySelector('.receipt-thumb img')!.getAttribute('src')).toBe('data:image/jpeg;base64,NEW');
+    });
+
+    it('a saved receipt shows, opens full size, and removing it asks first', async () => {
+      await open({ ...haircut, receiptId: 'old' });
+      await settleLoads();
+      (view().querySelector('.receipt-thumb') as HTMLElement).click();
+      await settle();
+      expect(document.querySelector('.receipt-full')!.getAttribute('src')).toBe('data:image/jpeg;base64,OLD');
+
+      button('Remove').click();
+      await settle();
+      expect(el.textContent).toContain('Remove the receipt?');
+      expect(txs.transactions()[0].receiptId).toBe('old'); // nothing yet
+      [...document.querySelectorAll('app-confirm button')].find(b => b.textContent!.trim() === 'Remove')!
+        .dispatchEvent(new Event('click'));
+      await settleLoads();
+      expect(txs.transactions()[0].receiptId).toBeUndefined();
+      expect(receipts.removed).toEqual(['old']);
+    });
+
+    it('only expenses have one', async () => {
+      await open({ ...haircut, type: 'income' });
+      expect(view().querySelector('app-receipt-attach')).toBeNull();
     });
   });
 });

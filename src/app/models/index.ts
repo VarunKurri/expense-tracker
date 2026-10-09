@@ -8,3 +8,4 @@ export * from './budget.model';
 export * from './manual-asset.model';
 export * from './split.model';
 export * from './money-back.model';
+export * from './receipt.model';

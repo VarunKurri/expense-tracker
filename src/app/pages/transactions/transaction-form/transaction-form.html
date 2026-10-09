@@ -47,18 +47,14 @@
       }
     }
 
-    <!-- RECEIPT SCAN — fills in what's on the receipt; everything stays editable -->
+    <!-- RECEIPT — a photo kept with the transaction; it can also fill in the form -->
     @if (type === 'expense') {
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">Scan a receipt</div>
-          <div class="toggle-sub">Fills in the merchant, date, amount, items, tax and tip. The photo is read by OpenAI and never saved.</div>
-        </div>
-        <button type="button" class="btn-primary sm" [disabled]="scanning()" (click)="receiptInput.click()">
-          {{ scanning() ? 'Reading…' : (scanned() ? 'Scan again' : 'Scan') }}
-        </button>
-        <input #receiptInput type="file" accept="image/*" hidden (change)="onReceiptPicked($event)" aria-label="Receipt photo" />
-      </div>
+      <app-receipt-attach
+        [image]="receiptImage()" [loading]="receiptLoading()" [busy]="scanning()"
+        hint="Attach a photo of the receipt — Trackr can fill in the merchant, amount, items, tax and tip from it."
+        [note]="receiptNote()"
+        [actionLabel]="scanning() ? 'Reading…' : (scanned() ? 'Read again' : 'Fill in from it')"
+        (picked)="attachReceipt($event)" (removed)="removeReceipt()" (action)="readReceipt()" />
       @if (scanned(); as scan) {
         <div class="form-note scan-note">
           <div><strong>{{ scan.merchant || 'Receipt' }}</strong> · {{ scanSummary(scan) }}</div>

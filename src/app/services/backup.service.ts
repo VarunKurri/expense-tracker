@@ -9,7 +9,9 @@ import { EncryptionService } from './encryption.service';
 // can be restored even to a fresh account. Document ids are preserved so references
 // (transaction -> account/category, budget -> category) stay intact on restore.
 
-const COLLECTIONS = ['accounts', 'categories', 'transactions', 'transactionTemplates', 'bills', 'budgets', 'transactionRules', 'manualAssets', 'people'];
+const COLLECTIONS = ['accounts', 'categories', 'transactions', 'transactionTemplates', 'bills', 'budgets', 'transactionRules', 'manualAssets', 'people', 'receipts'];
+/** Documents per batch on restore. A Firestore commit is capped at 10 MiB, and a receipt photo is up to ~1 MiB. */
+const batchSize = (col: string) => (col === 'receipts' ? 8 : 400);
 const BACKUP_ITERATIONS = 250_000;
 
 interface BackupFile {
@@ -101,7 +103,7 @@ export class BackupService {
           : doc(collection(this.db, `users/${user.uid}/${col}`));
         batch.set(ref, await this.encryption.encryptForWrite(data));
         pending++;
-        if (pending === 400) {
+        if (pending === batchSize(col)) {
           await batch.commit();
           batch = writeBatch(this.db);
           pending = 0;
