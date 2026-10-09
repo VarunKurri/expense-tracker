@@ -17,7 +17,7 @@
     </div>
   </div>
 
-  <!-- Section sub-nav — the Reports screen lives alongside this one rather than
+  <!-- Section sub-nav: the Reports screen lives alongside this one rather than
        hanging off a button in the filter row. -->
   <nav class="subnav">
     <span class="subnav-tab active" aria-current="page">Overview</span>
@@ -63,7 +63,7 @@
       {{ excludeRefunded() ? '✓ Count money back' : 'Count money back' }}
     </button>
 
-    <!-- No emoji — clean text button -->
+    <!-- No emoji, just a clean text button -->
     <button class="filter-btn"
             [class.active]="excludedCategories().size > 0"
             (click)="showCategoryFilter.set(!showCategoryFilter())">
@@ -74,7 +74,7 @@
     </button>
 
     <span class="filter-note"
-          title="Money moved between your own accounts — like paying off a credit card from checking — is never counted as income or spending in these totals, whether Plaid auto-detected it or you flagged it manually on the transaction.">
+          title="Money moved between your own accounts (like paying off a credit card from checking) is never counted as income or spending in these totals, whether Plaid auto-detected it or you flagged it manually on the transaction.">
       ⓘ Internal transfers always excluded
     </span>
 
@@ -110,13 +110,13 @@
         </div>
         <div class="kpi-sub">{{ formatCurrency(top.amount) }}</div>
       } @else {
-        <div class="kpi-value muted">—</div>
+        <div class="kpi-value muted">None</div>
       }
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Savings rate</div>
       @if (totalIncome() === 0) {
-        <div class="kpi-value muted">—</div>
+        <div class="kpi-value muted">No data</div>
         <div class="kpi-sub">No income this period</div>
       } @else if (savingsRate() !== null) {
         <div class="kpi-value"
@@ -126,7 +126,7 @@
         </div>
         <div class="kpi-sub">{{ savingsRateLabel() }}</div>
       } @else {
-        <div class="kpi-value muted">—</div>
+        <div class="kpi-value muted">No data</div>
         <div class="kpi-sub">income vs expenses</div>
       }
     </div>
@@ -136,12 +136,12 @@
         <div class="kpi-value">{{ formatCurrency(big.amount) }}</div>
         <div class="kpi-sub">{{ big.merchant || 'Unknown' }}</div>
       } @else {
-        <div class="kpi-value muted">—</div>
+        <div class="kpi-value muted">None</div>
       }
     </div>
   </div>
 
-  <!-- SPLIT BILLS — only when the period has any. Spending counts what you're
+  <!-- SPLIT BILLS: only when the period has any. Spending counts what you're
        out of pocket, so a friend's unpaid share is in it until it comes back;
        this card says how much of your spending that is. -->
   @if (splits().bills > 0) {
@@ -188,7 +188,7 @@
   <!-- BOTTOM GRID -->
   <div class="bottom-grid">
 
-    <!-- TOP MERCHANTS — rows are now clickable -->
+    <!-- TOP MERCHANTS: rows are now clickable -->
     <div class="card-panel">
       <div class="panel-head">
         <span class="card-label">Top merchants</span>
@@ -202,7 +202,7 @@
         @for (m of topMerchants(); track m.name) {
           <div class="merchant-item">
 
-            <!-- Main row — click to expand if multiple, open view if single -->
+            <!-- Main row: click to expand if multiple, open view if single -->
             <div class="merchant-row"
                  [class.expanded]="expandedMerchant() === m.name"
                  (click)="m.count === 1 ? openTxView(m.lastTx) : toggleMerchant(m.name)">
@@ -234,7 +234,7 @@
                     <div class="merchant-tx-amount">
                       <!-- The net figure, so these rows add up to the merchant
                            total above them. The charge itself is still shown
-                           when the two differ — it is what is on the statement. -->
+                           when the two differ, because it is what is on the statement. -->
                       −{{ formatCurrency(eff(tx)) }}
                       @if (txNote(tx); as note) {
                         <span class="merchant-tx-net">{{ note }}</span>

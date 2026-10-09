@@ -26,8 +26,8 @@ export class ReconcileReview {
   }
 
   accountName(id?: string): string {
-    if (!id) return '—';
-    return this.accountSvc.accounts().find(a => a.id === id)?.name ?? '—';
+    if (!id) return 'None';
+    return this.accountSvc.accounts().find(a => a.id === id)?.name ?? 'None';
   }
 
   formatCurrency(n: number): string {

@@ -1,5 +1,5 @@
 /**
- * Something you own or owe that no bank connection reports — a home, a car,
+ * Something you own or owe that no bank connection reports: a home, a car,
  * a car loan, a 401(k) at a provider Plaid can't reach, money you lent a friend.
  *
  * Plain entries carry a list of dated valuations rather than one number, so
@@ -23,7 +23,7 @@ export interface Valuation {
 
 /**
  * How interest is charged.
- * - reducing: the standard EMI — interest each month on what is still owed.
+ * - reducing: the standard EMI, with interest each month on what is still owed.
  * - flat: interest on the original amount for the whole term, split evenly.
  * - none: an interest-free loan (family, friends).
  */
@@ -35,7 +35,7 @@ export interface LoanTerms {
   method: LoanMethod;
   /** The lender (for a loan you took) or the borrower (for money lent). */
   counterparty?: string;
-  /** When the loan was taken out — the day the car was bought. */
+  /** When the loan was taken out, e.g. the day the car was bought. */
   startDate: string;
   /** What it bought, before any down payment. Optional; informational. */
   price?: number;
@@ -48,9 +48,9 @@ export interface LoanTerms {
   firstPaymentDate: string;
   /**
    * When payments arrive.
-   * - exact: on the due day (bank autopay) — missed after 5 days.
-   * - flexible: around the due day, sometimes later — missed after `lateDays`.
-   * - none: no set day, roughly monthly — never flagged as missed.
+   * - exact: on the due day (bank autopay); missed after 5 days.
+   * - flexible: around the due day, sometimes later; missed after `lateDays`.
+   * - none: no set day, roughly monthly; never flagged as missed.
    * Absent means exact.
    */
   dueMode?: 'exact' | 'flexible' | 'none';

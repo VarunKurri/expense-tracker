@@ -30,7 +30,7 @@ let nextLockId = 0;
  * `dashboard.html` alongside near-identical ones in `analysis.html` and
  * `transactions.html`, and the copies had drifted: only the Transactions one
  * grew reimbursement linking, so the same transaction told you a different
- * story depending on which screen you opened it from — and the one place the
+ * story depending on which screen you opened it from. And the one place the
  * numbers most need explaining (an expense that was partly paid back) was the
  * part that was missing everywhere else.
  *
@@ -81,7 +81,7 @@ export class TransactionView {
   });
 
   // ── Receipt photo ──────────────────────────────────────────
-  // Attach one right here — no need to open Edit for a transaction that's
+  // Attach one right here; no need to open Edit for a transaction that's
   // already logged. Once attached it's shown, not changed: replacing or
   // removing it is in Edit. The photo itself is ReceiptService's.
   private receipts = inject(ReceiptService);
@@ -124,8 +124,8 @@ export class TransactionView {
   }
 
   // ── Money back: refunds and repayments ─────────────────────
-  // One section for everything that came back on a purchase — see
-  // utils/money-back.ts. Tracked money back is an income linked to the expense;
+  // One section for everything that came back on a purchase (see
+  // utils/money-back.ts). Tracked money back is an income linked to the expense;
   // untracked (cash, store credit) is recorded on the expense itself.
 
   /** Incomes linked to this expense. */
@@ -151,7 +151,7 @@ export class TransactionView {
   });
 
   /**
-   * The part of the money back that exceeds the expense — the difference
+   * The part of the money back that exceeds the expense: the difference
    * between "you still spent something" and "you came out ahead".
    */
   reimbursementSurplus = computed(() => {
@@ -234,7 +234,7 @@ export class TransactionView {
   /** Everyone on the bill but you. */
   splitOthers = computed(() => (this.tx()?.split?.participantIds ?? []).filter(id => id !== ME));
 
-  /** The status line under a person's name — plain words, no chip. */
+  /** The status line under a person's name, in plain words with no chip. */
   personStatus(p: PersonSplitStatus): string {
     switch (p.state) {
       case 'owed': return 'Owes you';
@@ -245,7 +245,7 @@ export class TransactionView {
     }
   }
 
-  /** The figure on the right: what's still owed, or — once settled — what came back. */
+  /** The figure on the right: what's still owed or, once settled, what came back. */
   personAmountCents(p: PersonSplitStatus): number {
     if (p.state === 'repaid') return p.repaidCents;
     if (p.state === 'none') return p.shareCents;
@@ -262,7 +262,7 @@ export class TransactionView {
     return p.state === 'closed' ? `Reopen ${name}'s share` : `Record a repayment from ${name}`;
   }
 
-  /** Tapping a person: record what they paid back — or, if closed, offer to reopen. */
+  /** Tapping a person: record what they paid back or, if closed, offer to reopen. */
   openPerson(p: PersonSplitStatus) {
     if (p.state === 'closed') this.reopening.set(p.personId);
     else this.openDraft(p.personId);
@@ -304,7 +304,7 @@ export class TransactionView {
     }
   }
 
-  /** "Repayment from Mrunaal for Mrunaal and Priya" — who and whose share, when known. */
+  /** "Repayment from Mrunaal for Mrunaal and Priya": who and whose share, when known. */
   fromLabel(e: { fromPersonId?: string; coversPersonIds?: string[] }): string {
     if (!e.fromPersonId) return '';
     const from = this.people.nameOf(e.fromPersonId);
@@ -316,8 +316,8 @@ export class TransactionView {
 
   // The "Add money back" dialog: money that never reached a tracked account
   // (cash, store credit). It asks refund or repayment because on a split bill
-  // they differ — a refund lowers everyone's share, a repayment settles one
-  // person's — and a bill can be split after its money back was recorded.
+  // they differ (a refund lowers everyone's share, a repayment settles one
+  // person's), and a bill can be split after its money back was recorded.
   draftOpen = signal(false);
   draftSource = signal<MoneyBackSource>('refund');
   /** "Everything came back": no amount or date to fill in. */
@@ -330,7 +330,7 @@ export class TransactionView {
   draftCovers = signal<string[]>([]);
   /** Once the amount is typed, choosing people stops re-filling it. */
   private draftAmountTyped = false;
-  /** Opened from a person's row: whose — so the footer can offer "Won't be repaid". */
+  /** Opened from a person's row: whose it is, so the footer can offer "Won't be repaid". */
   draftPersonId = signal<string | null>(null);
 
   /** Asking "from whom" only makes sense on a split bill, for a repayment. */
@@ -339,7 +339,7 @@ export class TransactionView {
   askLinkWho = computed(() =>
     !!this.split() && this.linkSource() === 'repayment' && this.linkingFrom()?.type === 'expense');
 
-  /** What hasn't come back yet — what "The full amount / The rest" records. */
+  /** What hasn't come back yet, which is what "The full amount / The rest" records. */
   remainingCents = computed(() => {
     const t = this.tx();
     if (!t) return 0;
@@ -384,7 +384,7 @@ export class TransactionView {
     this.prefillRepayment();
   }
 
-  /** Whoever still owes, first — the likeliest person to be paying you back. */
+  /** Whoever still owes, first: the likeliest person to be paying you back. */
   private firstOwing(): string {
     const s = this.split();
     return s?.people.find(p => p.outstandingCents > 0 && p.state !== 'closed')?.personId ?? this.splitOthers()[0] ?? '';

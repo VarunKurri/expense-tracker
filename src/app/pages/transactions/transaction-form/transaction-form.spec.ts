@@ -62,7 +62,7 @@ const dinner: Transaction = {
   createdAt: 0, updatedAt: 0,
 };
 
-describe('TransactionForm — splitting a bill', () => {
+describe('TransactionForm: splitting a bill', () => {
   let fixture: ComponentFixture<Host>;
   let host: Host;
   let el: HTMLElement;
@@ -210,7 +210,7 @@ describe('TransactionForm — splitting a bill', () => {
       expect(el.textContent).toContain('turn on Split this bill');
     });
 
-    it("on an expense you've already filled in, it's only attached — reading it is a tap away, and never overwrites", async () => {
+    it("on an expense you've already filled in, it's only attached; reading it is a tap away, and never overwrites", async () => {
       nextScan = receipt();
       await openWith(dinner); // Ramen Bar, $180, 2026-10-02
       await pick();
@@ -258,7 +258,7 @@ describe('TransactionForm — splitting a bill', () => {
     });
 
     it('Edit starts from the live transaction: a receipt attached from the details sheet is there', async () => {
-      // The page still holds the copy from when the sheet opened — without the receipt.
+      // The page still holds the copy from when the sheet opened, without the receipt.
       (TestBed.inject(TransactionService) as unknown as FakeTransactions).transactions.set([{ ...dinner, receiptId: 'old' }]);
       await openWith(dinner);
       await settle();
@@ -273,7 +273,7 @@ describe('TransactionForm — splitting a bill', () => {
       expect(receipts.removed).toEqual([]);
     });
 
-    it('splitting it: claim the lines, save — the split is marked as from a receipt', async () => {
+    it('splitting it: claim the lines and save, and the split is marked as from a receipt', async () => {
       nextScan = receipt();
       await openWith(null);
       await pick();
@@ -285,7 +285,7 @@ describe('TransactionForm — splitting a bill', () => {
         items: s.items.map(i => ({ ...i, assignments: [{ personId: ME, weight: 1 }, { personId: 'alex', weight: 1 }] })),
       }));
       await settle();
-      expect(el.textContent).toContain('tap who had each one');
+      expect(el.textContent).toContain('Tap who had each one');
       await form.save();
 
       expect(errors).toEqual([]);
@@ -318,7 +318,7 @@ describe('TransactionForm — splitting a bill', () => {
       expect(el.querySelector('.scan-note .field-error')!.textContent).toContain("The lines add up to $56.87, but the receipt's total is $61.87.");
     });
 
-    it("a photo that isn't a receipt, or a failed read, fills in nothing — but the photo stays attached", async () => {
+    it("a photo that isn't a receipt, or a failed read, fills in nothing, but the photo stays attached", async () => {
       await openWith(null);
       nextScan = receipt({ isReceipt: false });
       await pick();

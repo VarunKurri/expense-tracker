@@ -45,7 +45,7 @@ export function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** Money in/out for one account within a given "YYYY-MM" month — includes transfers
+/** Money in/out for one account within a given "YYYY-MM" month. Includes transfers
  *  (a transfer is a real movement of money through that specific account, even
  *  though it's excluded from app-wide income/expense totals). */
 export function monthActivityForAccount(

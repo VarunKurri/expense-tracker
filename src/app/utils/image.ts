@@ -2,7 +2,7 @@
  * Shrinking a photo in the browser, before it goes anywhere.
  *
  * A receipt photo straight off a phone is 3–12 MB. Shrunk to 1600px on its
- * longest side as a JPEG it's 150–400 KB and every line is still readable —
+ * longest side as a JPEG it's 150–400 KB and every line is still readable:
  * small enough to store encrypted in one Firestore document (1 MiB, and
  * encryption makes it ~1.8× bigger), and cheap to send to the receipt reader.
  */
@@ -16,7 +16,7 @@ export interface FittedImage {
 
 /**
  * The largest a stored photo's data URL may be. Encrypted, it's about 1.33×
- * this, plus a little JSON — comfortably under Firestore's 1 MiB per document.
+ * this, plus a little JSON, which is comfortably under Firestore's 1 MiB per document.
  */
 export const MAX_IMAGE_CHARS = 650_000;
 

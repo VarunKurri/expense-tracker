@@ -20,7 +20,7 @@ interface BackupFile {
   createdAt: string;
   salt: string; // base64
   iv: string;   // base64
-  data: string; // base64 — AES-GCM(JSON bundle)
+  data: string; // base64: AES-GCM(JSON bundle)
 }
 
 @Injectable({ providedIn: 'root' })

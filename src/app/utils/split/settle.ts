@@ -14,7 +14,7 @@ export interface NetPosition {
  * Turn net positions into "A pays B" instructions.
  *
  * Greedy largest-creditor-against-largest-debtor. It is not guaranteed to find
- * the theoretical minimum number of transfers — that problem is NP-hard — but
+ * the theoretical minimum number of transfers (that problem is NP-hard), but
  * it never needs more than `n - 1`, and at a dinner table the difference
  * between optimal and near-optimal is one extra Venmo at most. Being able to
  * explain the result matters more than shaving a transfer off it.
@@ -28,7 +28,7 @@ export interface NetPosition {
  *
  * When payments don't cover the bill the positions won't sum to zero. Rather
  * than fabricate a transfer to balance the books, the leftover is simply left
- * on the debtors' side and reported as unpaid — the restaurant is still owed
+ * on the debtors' side and reported as unpaid. The restaurant is still owed
  * that money, and no amount of shuffling between friends changes it.
  */
 export function settle(positions: NetPosition[]): Transfer[] {

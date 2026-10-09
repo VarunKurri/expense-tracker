@@ -95,7 +95,7 @@ describe('ItemizedSplitEditor', () => {
     expect(el.textContent).toContain('✓ Adds up');
   });
 
-  it('tax & fees can be negative — discounts bigger than tax — and comes off everyone in proportion', async () => {
+  it('tax & fees can be negative (discounts bigger than tax) and comes off everyone in proportion', async () => {
     await enterDinner();
     ([...el.querySelectorAll('[aria-label="Tax as"] button')][1] as HTMLElement).click(); // $
     await settle();

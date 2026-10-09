@@ -22,11 +22,12 @@
   animation: slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* The scrolling part, inside the panel's rounded edge — like a modal's body. */
+/* The scrolling part, inside the panel's rounded edge, like a modal's body. */
 .view-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden; /* up and down only, like .modal-body */
   overscroll-behavior: contain;
   padding: 0 0 calc(40px + env(safe-area-inset-bottom));
 }
@@ -207,7 +208,7 @@
 
   .mini-seg { margin-bottom: 4px; }
 
-  /* A split bill: one row per person — name and what they owe, their state,
+  /* A split bill: one row per person: name and what they owe, their state,
      and "Won't be repaid". The name and amount are the button: tap to record. */
   .split-people {
     display: flex;
@@ -216,7 +217,7 @@
   }
 
   /* Each person reads like a transaction row: name and a plain status line
-     on the left, the figure on the right. The whole row is the button — tap
+     on the left, the figure on the right. The whole row is the button: tap
      to record what they paid back ("Won't be repaid" lives in that dialog). */
   .split-person {
     display: flex;

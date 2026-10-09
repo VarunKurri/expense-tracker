@@ -5,15 +5,15 @@
    Ported from Origin's (useorigin.com) production stylesheet.
 
    Three type voices:
-     display  Newsreader, weight 300 — stands in for Origin's Lyon Display.
+     display  Newsreader, weight 300. Stands in for Origin's Lyon Display.
               One word per headline is italicised (see `.display em`).
-     ui       Inter — stands in for Suisse Intl. Origin loads Inter as its own
+     ui       Inter. Stands in for Suisse Intl. Origin loads Inter as its own
               fallback, so this matches their intent exactly.
-     mono     Roboto Mono, 10px/500 UPPERCASE — labels, eyebrows, data, buttons.
+     mono     Roboto Mono, 10px/500 UPPERCASE: labels, eyebrows, data, buttons.
 
    Colour discipline: the canvas is near-black and surfaces are monochrome.
    Colour appears only as a data signal (chart lines, sparklines, category
-   tiles). White-on-black is the ONLY primary action — never a coloured fill.
+   tiles). White-on-black is the ONLY primary action, never a coloured fill.
 
    Fonts are loaded from index.html, not here, so they are not queued behind
    this stylesheet.
@@ -40,7 +40,7 @@
   --fg-3: #8A8A8F;          /* mono labels, secondary text */
   --fg-4: #B0B0B5;          /* future/disabled */
 
-  /* Cards are flat white in the product — no gradient wash. */
+  /* Cards are flat white in the product, with no gradient wash. */
   --card-grad:  #FFFFFF;
   --input-grad: linear-gradient(#FFFFFF, #FFFFFF);   /* an image, so a select's chevron can layer over it */
   /* Drawn by us rather than the browser: Chrome pins its own arrow to the
@@ -49,7 +49,7 @@
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 20 20' fill='none' stroke='%238A8A8F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 8l5 5 5-5'/%3E%3C/svg%3E");
   --forecast-grad: linear-gradient(180deg, rgba(59, 142, 255, 0.22), rgba(59, 142, 255, 0.02));
 
-  /* UI accent — selection, focus, "you are here".
+  /* UI accent: selection, focus, "you are here".
    *
    * Monochrome on purpose. Origin's product spends no colour on chrome: a
    * selected pill is ink-filled, a focused field gets a neutral ring, and the
@@ -61,13 +61,13 @@
   --accent-bg:   rgba(19, 19, 19, 0.06);       /* subtle selected background */
   --focus-ring:  rgba(19, 19, 19, 0.12);
 
-  /* Tells the browser which way to paint the controls it draws itself — the
-   * date field's calendar button, native dropdowns, scrollbars. Without it the
+  /* Tells the browser which way to paint the controls it draws itself (the
+   * date field's calendar button, native dropdowns, scrollbars). Without it the
    * browser follows the OS instead of the app, so the date picker's icon stayed
    * black-on-black whenever the app was dark and the OS was light. */
   color-scheme: light;
 
-  /* Data signals — charts and amounts only, never UI chrome. */
+  /* Data signals: charts and amounts only, never UI chrome. */
   --blue:     #3B8EFF;      /* the chart accent: spend area, calendar heat */
   --blue-bg:  rgba(59, 142, 255, 0.12);
   --teal:     #0E9F6E;      /* positive / income */
@@ -137,7 +137,7 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
 
-/* Category accent ramp — donut segments, Sankey nodes, the circular icon chips
+/* Category accent ramp: donut segments, Sankey nodes, the circular icon chips
    in breakdown lists.
    
    Eight hues in a FIXED order, assigned in sequence and never cycled: the order
@@ -148,7 +148,7 @@
    (#FFFFFF light, #131313 dark): lightness band, chroma floor, CVD separation
    and normal-vision separation all pass in both modes. The light column warns
    on contrast for three slots, which is satisfied by the direct labels and the
-   table view every chart ships with. Do not hand-edit these — re-run the
+   table view every chart ships with. Do not hand-edit these; re-run the
    validator if they ever need to change. */
 :root,
 :root[data-theme="light"] {
@@ -259,7 +259,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* Origin's signature: a headline in light serif with one word italicised.
    Usage: <h1 class="display">Track <em>your entire</em> financial life.</h1>
 
-   SCOPE: editorial moments only — insight/promo cards ("See where your money
+   SCOPE: editorial moments only: insight/promo cards ("See where your money
    goes."), empty states, onboarding. Origin's product sets page titles and all
    figures in the UI sans; the serif is a garnish, not the number style. Use
    `.num-display` for money, never `.display`.
@@ -294,7 +294,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   }
 }
 
-/* Mono uppercase eyebrow — Origin's SAVINGS / CASH FLOW / SPENDING labels.
+/* Mono uppercase eyebrow, like Origin's SAVINGS / CASH FLOW / SPENDING labels.
    Their spec: Roboto Mono, 10px, 500, uppercase, -0.03em, line-height 2. */
 .label-mono {
   font-family: var(--font-mono);
@@ -306,14 +306,14 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   color: var(--fg-3);
 }
 
-/* Money and other figures — mono, tabular so columns line up. */
+/* Money and other figures: mono, tabular so columns line up. */
 .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
 }
 
-/* Amounts in lists and tables — the UI sans with even-width digits, so columns
+/* Amounts in lists and tables: the UI sans with even-width digits, so columns
    line up. Money is never set in the mono `.num`: that is the data voice
    (dates, counts), and a mono amount reads as a different app. */
 .fig {
@@ -322,7 +322,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   letter-spacing: -0.01em;
 }
 
-/* Large hero figure ($589, $962 in Origin's cards) — sans semibold with tight
+/* Large hero figure ($589, $962 in Origin's cards): sans semibold with tight
    tracking. Deliberately NOT the serif: Origin's product sets every number
    this way. */
 .num-display {
@@ -334,7 +334,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   line-height: 1.1;
 }
 
-/* Card eyebrow — Origin's `NET WORTH ›`, `SPENT IN SEPTEMBER ›`,
+/* Card eyebrow, like Origin's `NET WORTH ›`, `SPENT IN SEPTEMBER ›`,
    `LATEST TRANSACTIONS ›`. A mono uppercase label, optionally a link with a
    trailing chevron. This heads nearly every card in their product. */
 .card-label {
@@ -379,7 +379,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
    BUTTONS
 
    Origin's product uses a quiet outlined button for nearly every action
-   ("Add account", "Create budget", "Connect credit score", "Save") — not a
+   ("Add account", "Create budget", "Connect credit score", "Save"), not a
    filled one. `.btn-solid` exists for the rare high-emphasis CTA, which is
    what their marketing site uses.
    ============================================ */
@@ -484,7 +484,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   border-radius: var(--radius-sm);
   background: var(--input-grad);
   /* A solid colour under the gradient. In dark mode --input-grad is an image,
-     which leaves background-color transparent — and the browser builds a
+     which leaves background-color transparent, and the browser builds a
      <select>'s dropdown list from that colour, so it fell back to white. */
   background-color: var(--surface);
   border: 1px solid var(--line);
@@ -505,14 +505,14 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 /* iPhone: Safari zooms the whole page into any field set under 16px when you
    tap it, and leaves it zoomed after the form closes. On touch screens every
-   field is 16px — including page-level filters that set their own smaller
+   field is 16px, including page-level filters that set their own smaller
    size, hence !important. Desktop keeps 14px. */
 @media (pointer: coarse) {
   input, select, textarea, .input, .input-field { font-size: 16px !important; }
 }
 
 /* Selects get our chevron, inset like the text on the left, in place of the
-   browser's own arrow — which sits flush against the border whatever the
+   browser's own arrow, which sits flush against the border whatever the
    padding. Layered over --input-grad so dark mode keeps its gradient fill. */
 select.input-field,
 select.input {
@@ -544,14 +544,34 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
   opacity: 0.7;
   &:hover { opacity: 1; }
+
+/* Date fields on iPhone and iPad. Safari draws a date field at its own
+   minimum width with the date centred, so on a phone `width: 100%` lost: the
+   field ran past the form's right edge and the whole form scrolled sideways.
+   Without the native look it takes the width it's given and reads left, like
+   every other field. (Only iOS needs this; elsewhere the field already fits.) */
+input[type="date"] { min-width: 0; max-width: 100%; }
+
+@supports (-webkit-touch-callout: none) {
+  input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input[type="date"]::-webkit-date-and-time-value {
+    margin: 0;
+    text-align: left;
+    /* An empty date field would otherwise collapse shorter than a filled one. */
+    min-height: 1.4em;
+  }
+}
 }
 
 /* ============================================
    FORMS
 
    Every form in the app is built from these, inside the shared <app-modal>
-   shell. They used to be redefined privately by each form — with a dark input
-   fill, a bordered Cancel, a teal toggle — and the copies drifted apart. A
+   shell. They used to be redefined privately by each form (with a dark input
+   fill, a bordered Cancel, a teal toggle), and the copies drifted apart. A
    form's own stylesheet should now hold only what is genuinely unique to it.
 
    Monochrome throughout: a selected segment is ink-filled, a switched-on
@@ -572,7 +592,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   min-width: 0;
 }
 
-/* Field label — the same mono eyebrow as .label-mono, sized for forms. */
+/* Field label: the same mono eyebrow as .label-mono, sized for forms. */
 .label-sm {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -600,7 +620,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   gap: 12px;
 }
 
-/* A bordered group of related fields — "Credit card details", "Recurring bill". */
+/* A bordered group of related fields, like "Credit card details", "Recurring bill". */
 .form-section {
   display: flex;
   flex-direction: column;
@@ -654,7 +674,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* An inline text link inside a sentence ("Use calculated", "Go to October"). */
 /* "See all →" in a card's header, beside its eyebrow: quiet text that darkens
-   on hover. Never underlined — it sits next to a mono label, not in a sentence. */
+   on hover. Never underlined: it sits next to a mono label, not in a sentence. */
 .card-link {
   padding: 0;
   border: none;
@@ -693,7 +713,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 /* A small outlined action inside a row ("Won't be repaid", "Give unclaimed
-   items to me") — a quiet button, never an underlined link. */
+   items to me"): a quiet button, never an underlined link. */
 .btn-row {
   padding: 4px 10px;
   border: 1px solid var(--line);
@@ -846,7 +866,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   &.active { border-color: var(--fg); box-shadow: inset 0 0 0 2px var(--surface); }
 }
 
-/* ── Choice cards — two options that each need a sentence ─── */
+/* ── Choice cards: two options that each need a sentence ─── */
 .choice-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -954,7 +974,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 /* A person's name as a chip ("Split with", who had an item). Names are UI
-   text, not data, so they take the UI voice — the mono chip is for figures,
+   text, not data, so they take the UI voice; the mono chip is for figures,
    dates and filters. */
 .chip.name {
   font-family: var(--font-ui);

@@ -8,7 +8,7 @@ import {
 import { MoneyBackLedger } from './money-back';
 import { quickSplit } from './splits';
 
-/** Minimal transaction factory — only the fields the reporting math reads. */
+/** Minimal transaction factory: only the fields the reporting math reads. */
 function tx(over: Partial<Transaction> & { type: Transaction['type']; amount: number }): Transaction {
   return {
     id: over.id ?? Math.random().toString(36).slice(2),
@@ -31,7 +31,7 @@ function rulesWith(netting: boolean, reimbursed: Record<string, number> = {}): M
   };
 }
 
-describe('reporting — spending and income selection', () => {
+describe('reporting: spending and income selection', () => {
   it('excludes internal transfers from both sides', () => {
     const txs = [
       tx({ type: 'expense', amount: 100 }),
@@ -72,7 +72,7 @@ describe('reporting — spending and income selection', () => {
   });
 });
 
-describe('reporting — category totals', () => {
+describe('reporting: category totals', () => {
   it('sorts largest first and pools uncategorised under __none__', () => {
     const txs = [
       tx({ type: 'expense', amount: 10, categoryId: 'food' }),
@@ -99,7 +99,7 @@ describe('reporting — category totals', () => {
   });
 });
 
-describe('reporting — monthly series', () => {
+describe('reporting: monthly series', () => {
   it('emits every requested month, including empty ones', () => {
     const rows = monthlySeries([tx({ type: 'expense', amount: 10, date: '2026-08-04' })],
       rulesWith(true), ['2026-07', '2026-08', '2026-09']);
@@ -132,7 +132,7 @@ describe('reporting — monthly series', () => {
   });
 });
 
-describe('reporting — monthsBetween', () => {
+describe('reporting: monthsBetween', () => {
   it('spans a year boundary', () => {
     expect(monthsBetween('2026-11-05', '2027-02-20'))
       .toEqual(['2026-11', '2026-12', '2027-01', '2027-02']);
@@ -150,7 +150,7 @@ describe('reporting — monthsBetween', () => {
   });
 });
 
-describe('reporting — transfers', () => {
+describe('reporting: transfers', () => {
   it('reports money moved without counting it as income or spending', () => {
     const txs = [
       tx({ type: 'transfer', amount: 250, fromAccountId: 'a', toAccountId: 'b' }),
@@ -167,7 +167,7 @@ describe('reporting — transfers', () => {
   });
 });
 
-describe('reporting — totals in whole cents', () => {
+describe('reporting: totals in whole cents', () => {
   it('a thousand 10¢ coffees are exactly $100', () => {
     const txs = Array.from({ length: 1000 }, () => tx({ type: 'expense', amount: 0.1, categoryId: 'coffee' }));
     const r = rulesWith(true);
@@ -191,7 +191,7 @@ describe('reporting — totals in whole cents', () => {
 
   it('a total is the sum of its rows as shown, to the cent', () => {
     // An amount with a stray third decimal (an old import) shows as $0.13. Two
-    // of them are $0.26 — not $0.25, which adding first and rounding after gives.
+    // of them are $0.26, not $0.25, which adding first and rounding after gives.
     const txs = [
       tx({ type: 'expense', amount: 0.125, categoryId: 'a' }),
       tx({ type: 'expense', amount: 0.125, categoryId: 'b' }),
@@ -225,7 +225,7 @@ describe('reporting — totals in whole cents', () => {
   });
 });
 
-describe('reporting — sankey', () => {
+describe('reporting: sankey', () => {
   it('routes sources through a single pool to categories', () => {
     const links = sankeyLinks(
       [{ name: 'Salary', amount: 300 }],
@@ -250,7 +250,7 @@ describe('reporting — sankey', () => {
   });
 });
 
-describe('reporting — split bills', () => {
+describe('reporting: split bills', () => {
   // The real money-back logic, so linked and recorded money back both count.
   class Ledger extends MoneyBackLedger {
     constructor(public transactions: () => Transaction[]) { super(); }

@@ -53,7 +53,7 @@ export class CategoryBreakdown {
 
   totalExpenses = computed(() => totalExpenses(this.filtered(), this.rules()));
 
-  // Every category with spend in the period — no top-8 cap, unlike the Analysis
+  // Every category with spend in the period. No top-8 cap, unlike the Analysis
   // donut this page is drilling in from.
   categories = computed(() => {
     const total = this.totalExpenses();
@@ -86,7 +86,7 @@ export class CategoryBreakdown {
 
   // Query params for drilling into Transactions, filtered to exactly this
   // category within the same period this whole page is scoped to. Also marks it
-  // as an "analysis view" — same as Analysis' own "See all transactions" link —
+  // as an "analysis view" (same as Analysis' own "See all transactions" link),
   // so refunded/internal-transfer rows still show (this page's own category
   // totals already exclude them) but greyed out and struck through, rather than
   // silently vanishing and leaving the drill-through looking incomplete.

@@ -7,7 +7,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
  *
  * The browser shrinks the photo (1600px JPEG) and sends it here; this sends it
  * to OpenAI and returns the model's reading as JSON. The photo is never stored
- * or logged — it lives only for the length of this call. Only token counts are
+ * or logged; it lives only for the length of this call. Only token counts are
  * logged, so the cost of a scan can be checked in the Functions logs.
  *
  * Setup (once):
@@ -23,17 +23,17 @@ const openaiKey = defineSecret('OPENAI_API_KEY');
 const DEFAULT_MODEL = 'gpt-6-luna';
 const receiptModel = defineString('RECEIPT_MODEL', { default: DEFAULT_MODEL });
 
-/** Scans per person per day — a guard against a runaway loop costing money. */
+/** Scans per person per day, as a guard against a runaway loop costing money. */
 const DAILY_LIMIT = 40;
 /** ~4 MB of image; the browser sends well under 1 MB. */
 const MAX_IMAGE_CHARS = 5_600_000;
 
-const INSTRUCTIONS = `You read photos of receipts — shops, restaurants and delivery apps (DoorDash, Uber Eats, Instacart, Grubhub) — and report exactly what is printed.
+const INSTRUCTIONS = `You read photos of receipts from shops, restaurants and delivery apps (DoorDash, Uber Eats, Instacart, Grubhub) and report exactly what is printed.
 - Money is integer cents: $12.50 is 1250. Every amount you return is positive.
 - items: one entry per printed item line, at its printed price. If a line shows a quantity ("2 x Mandi 50.00", "3× Biryani US$41.97"), set quantity to it, totalCents to the line total, and unitPriceCents to the price of one. Otherwise quantity 1 and unitPriceCents null unless printed. Never take discounts off item prices, except a discount printed directly under one item, which belongs to that item.
 - Never list subtotal, tax, tip, total, payment, card, change or balance lines as items.
-- fees: every charge that is not an item, tax or tip, each with its printed name — delivery fee, service fee, small order fee, long distance fee, expanded range fee, regulatory response fee, bag fee, service charge.
-- discounts: everything that lowers the total, each with its printed name — discounts, promotions, coupons, member savings, DashPass/Uber One savings, app credits (e.g. "DoorDash Credits"), gift cards.
+- fees: every charge that is not an item, tax or tip, each with its printed name: delivery fee, service fee, small order fee, long distance fee, expanded range fee, regulatory response fee, bag fee, service charge.
+- discounts: everything that lowers the total, each with its printed name: discounts, promotions, coupons, member savings, DashPass/Uber One savings, app credits (e.g. "DoorDash Credits"), gift cards.
 - taxCents: all tax lines added together ("Estimated Tax" counts).
 - tipCents: gratuity or tip, including a Dasher/driver tip or a handwritten tip; 0 if none. Ignore suggested-tip tables.
 - totalCents: the final amount charged, after discounts and credits and including tip.
@@ -94,7 +94,7 @@ async function takeQuota(uid: string): Promise<void> {
     const snap = await tx.get(ref);
     const count = snap.exists && snap.get('day') === day ? Number(snap.get('count')) || 0 : 0;
     if (count >= DAILY_LIMIT) {
-      throw new HttpsError('resource-exhausted', `That's ${DAILY_LIMIT} scans today — the limit resets tomorrow.`);
+      throw new HttpsError('resource-exhausted', `That's ${DAILY_LIMIT} scans today. The limit resets tomorrow.`);
     }
     tx.set(ref, { day, count: count + 1, updatedAt: FieldValue.serverTimestamp() });
   });
@@ -159,7 +159,7 @@ export const scanReceipt = onCall(
 
     const body: any = await res.json().catch(() => null);
     if (!res.ok) {
-      // Status and error code only — never the request, never the image.
+      // Status and error code only: never the request, never the image.
       console.error('scanReceipt: OpenAI error', { model, status: res.status, code: body?.error?.code ?? null });
       if (res.status === 401) throw new HttpsError('failed-precondition', "Receipt scanning isn't set up yet (the OpenAI key is missing or wrong).");
       if (res.status === 429) throw new HttpsError('resource-exhausted', 'The receipt reader is busy. Try again in a minute.');

@@ -4,13 +4,13 @@ import { Component, input } from '@angular/core';
  * The Trackr mark: a rounded tile with an ascending sparkline.
  *
  * Chosen over a lettermark because the wordmark already carries the name in
- * Newsreader — the tile only has to read as "tracking", and it does so at
+ * Newsreader. The tile only has to read as "tracking", and it does so at
  * 16px where a serif "T" turns to mush.
  *
  * `tone`:
- *   'mono'  — tile in --fg, mark knocked out in --bg. The in-app default,
+ *   'mono':  tile in --fg, mark knocked out in --bg. The in-app default,
  *             which keeps the sidebar monochrome the way Origin's is.
- *   'brand' — blue→teal gradient tile. For the marketing surfaces (landing,
+ *   'brand': blue→teal gradient tile. For the marketing surfaces (landing,
  *             login) where colour is welcome.
  */
 @Component({

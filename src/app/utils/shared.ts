@@ -6,7 +6,7 @@ import { sum } from './split/money';
 import { PersonSplitStatus, splitStatus } from './splits';
 
 /**
- * Everyone who owes you, across every split bill — the Shared page.
+ * Everyone who owes you, across every split bill: the Shared page.
  *
  * Per-bill arithmetic is `splitStatus` (Split's engine plus refunds and
  * repayments); this only gathers it by person, and spreads one repayment
@@ -22,7 +22,7 @@ export interface PersonBalance {
   personId: string;
   /** Still owed to you, across bills not marked "won't be repaid". */
   owedCents: number;
-  /** Bills they still owe on, oldest first — the order a repayment pays them off. */
+  /** Bills they still owe on, oldest first, which is the order a repayment pays them off. */
   openBills: SharedBill[];
   /** Every split bill they were on, newest first. */
   allBills: SharedBill[];
@@ -95,11 +95,11 @@ const usd = (cents: number) => formatCurrency(fromCents(cents));
 /**
  * The sentence under "Owed to you" on Analysis: what you covered for other
  * people on a period's split bills, and what that means for your spending.
- * `period` reads after the bill count — "this month", "in this period", or ''.
+ * `period` reads after the bill count: "this month", "in this period", or ''.
  */
 export function splitSentence(t: SplitTotals, period: string): string {
   const bills = `${t.bills} split bill${t.bills === 1 ? '' : 's'}${period ? ' ' + period : ''}`;
-  if (t.forOthersCents === 0) return `Nobody owes you on your ${bills} — everyone paid their own way.`;
+  if (t.forOthersCents === 0) return `Nobody owes you on your ${bills}. Everyone paid their own way.`;
 
   const covered = `You covered ${usd(t.forOthersCents)} of other people's shares on ${bills}`;
   const wont = t.wontBeRepaidCents > 0
@@ -107,7 +107,7 @@ export function splitSentence(t: SplitTotals, period: string): string {
     : '';
   if (t.owedCents === 0) {
     return t.wontBeRepaidCents === 0
-      ? `${covered}, and all of it came back — only your share counts as spending.`
+      ? `${covered}, and all of it came back, so only your share counts as spending.`
       : `${covered}.${wont}`;
   }
   const back = t.repaidCents > 0

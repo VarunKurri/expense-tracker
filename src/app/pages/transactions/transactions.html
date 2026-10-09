@@ -39,7 +39,7 @@
       <div class="rb-text">
         <span class="rb-icon">📊</span>
         <span>
-          <strong>Analysis view</strong> — matching the Analysis page.
+          <strong>Analysis view</strong>, matching the Analysis page.
           Internal transfers{{ analysisExcludeRefunded() ? ' and refunded rows' : '' }}
           are shown but greyed out and left out of the totals.
         </span>
@@ -96,7 +96,7 @@
       }
     </div>
 
-    <!-- Date range — Last 30 days is default and first option -->
+    <!-- Date range: Last 30 days is the default and first option -->
     <select class="filter-select"
             [value]="filterDateRange()"
             (change)="filterDateRange.set($any($event.target).value)">
@@ -450,7 +450,7 @@
                         <span class="refunded-badge">↩ {{ tx.moneyBackInfo?.source === 'refund' ? 'Refund' : 'Repayment' }}{{ txService.reimbursementSurplusForIncome(tx) > 0 ? ' + surplus' : '' }}</span>
                       }
                       @if (tx.type === 'expense' && !txService.isFullyRefunded(tx) && txService.moneyBackFor(tx) > 0) {
-                        <!-- A reimbursement is money coming back — always green, always the
+                        <!-- A reimbursement is money coming back: always green, always the
                              full amount, same convention as an income row. In analysis view
                              (with netting active) it's struck through with the net effect
                              shown alongside, rather than recolored to imply "still owed." -->
@@ -459,7 +459,7 @@
                             ↩ +{{ formatCurrency(txService.moneyBackFor(tx)) }}
                           </span>
                           @if (showNetAnalysis(tx)) {
-                            <!-- Exactly-reimbursed ($0 either way) stays neutral — it's
+                            <!-- Exactly-reimbursed ($0 either way) stays neutral, since it's
                                  neither still owed nor a gain, so no color applies. -->
                             <span class="tx-net-amt"
                                   [class.pos]="txService.reimbursementSurplus(tx) > 0.005"
@@ -537,7 +537,7 @@
 <app-confirm
   [open]="bulkConfirmOpen()"
   title="Delete selected transactions?"
-  [message]="'This will permanently delete ' + selectedCount() + ' selected transaction' + (selectedCount() === 1 ? '' : 's') + '. This cannot be undone — review the list below before confirming.'"
+  [message]="'This will permanently delete ' + selectedCount() + ' selected transaction' + (selectedCount() === 1 ? '' : 's') + '. This cannot be undone, so review the list below before confirming.'"
   confirmText="Delete selected"
   (confirmed)="confirmBulkDelete()"
   (cancelled)="bulkConfirmOpen.set(false)">

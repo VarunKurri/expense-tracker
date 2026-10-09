@@ -63,10 +63,10 @@ export function decryptToken(value: EncryptedValue, keyBase64: string): string {
 // RSA-OAEP + AES-GCM so `EncryptionService.decryptDoc` can read it.
 
 export interface EnvelopeValue {
-  encryptedDEK: string; // base64 — DEK wrapped with RSA-OAEP to the user's public key
+  encryptedDEK: string; // base64: DEK wrapped with RSA-OAEP to the user's public key
   iv: string; // base64
-  ciphertext: string; // base64 — payload under AES-256-GCM
-  tag: string; // base64 — GCM auth tag
+  ciphertext: string; // base64: payload under AES-256-GCM
+  tag: string; // base64: GCM auth tag
 }
 
 /**

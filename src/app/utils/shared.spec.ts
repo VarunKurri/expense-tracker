@@ -31,7 +31,7 @@ describe('balancesByPerson', () => {
     expect(totalOwedCents(balances())).toBe(8500 + 6000);
   });
 
-  it('lists open bills oldest first — the order a repayment pays them off', () => {
+  it('lists open bills oldest first, the order a repayment pays them off', () => {
     expect(balances()[0].openBills.map(b => b.tx.id)).toEqual([dinner.id, pizza.id, tacos.id]);
     expect(balances()[0].allBills.map(b => b.tx.id)).toEqual([tacos.id, pizza.id, dinner.id]);
   });
@@ -92,7 +92,7 @@ describe('splitSentence (the Analysis "Owed to you" card)', () => {
 
   it('all back', () => {
     expect(splitSentence(totals({ bills: 1, forOthersCents: 6000, repaidCents: 6000 }), 'last month'))
-      .toBe("You covered $60.00 of other people's shares on 1 split bill last month, and all of it came back — only your share counts as spending.");
+      .toBe("You covered $60.00 of other people's shares on 1 split bill last month, and all of it came back, so only your share counts as spending.");
   });
 
   it("some won't be repaid", () => {
@@ -101,6 +101,6 @@ describe('splitSentence (the Analysis "Owed to you" card)', () => {
   });
 
   it('split, but nobody owes you (they paid their own way)', () => {
-    expect(splitSentence(totals({ bills: 1 }), 'this year')).toBe('Nobody owes you on your 1 split bill this year — everyone paid their own way.');
+    expect(splitSentence(totals({ bills: 1 }), 'this year')).toBe('Nobody owes you on your 1 split bill this year. Everyone paid their own way.');
   });
 });

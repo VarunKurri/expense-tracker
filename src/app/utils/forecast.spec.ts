@@ -37,7 +37,7 @@ const carLoan = (): ManualAsset => ({
 });
 
 describe('the months it is based on', () => {
-  it('are the last complete months — never the one in progress', () => {
+  it('are the last complete months, never the one in progress', () => {
     expect(pastMonths(today, 3)).toEqual(['2026-07', '2026-08', '2026-09']);
     expect(pastMonths('2027-01-15', 2)).toEqual(['2026-11', '2026-12']);
   });
@@ -93,7 +93,7 @@ describe('everyday spending, by category', () => {
     expect(b.categories.reduce((s, c) => s + c.everyday, 0) - b.unfiledBills).toBe(b.everyday);
   });
 
-  it('a bill comes out of its own category — a quarterly one nets to nothing, not a third', () => {
+  it('a bill comes out of its own category: a quarterly one nets to nothing, not a third', () => {
     const txs = [...life(), spend('insurance', 360, '08', 'GEICO')];   // paid once a quarter
     const geico = bill({ name: 'Geico', amount: 360, frequency: 'quarterly', categoryId: 'insurance' });
     const b = forecastBasis(txs, [], [geico], rules, months);
@@ -201,7 +201,7 @@ describe('the forecast', () => {
     expect(f.basis.everyday).toBe(2500);
   });
 
-  it('money lent comes back as repayments — not counted again from the income history', () => {
+  it('money lent comes back as repayments, not counted again from the income history', () => {
     const lent: ManualAsset = {
       id: 'ravi', name: 'Loan to Ravi', type: 'loan-given', valuations: [], createdAt: 0, updatedAt: 0,
       loan: {
@@ -241,7 +241,7 @@ describe('net worth, projected', () => {
     const carLost = estimatedValue(car, '2026-10-31')! - estimatedValue(car, '2026-11-30')!;
     const step = points[1].net - points[0].net;
     expect(step).toBeCloseTo(nov.net + (payment.amount - payment.interest!) - carLost, 1);
-    // So net worth grows by what you save less the interest — and less the car's ~$250 a month.
+    // So net worth grows by what you save less the interest, and less the car's ~$250 a month.
     expect(step).toBeCloseTo(1500 - payment.interest! - carLost, 1);
     expect(carLost).toBeGreaterThan(200);
   });

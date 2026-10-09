@@ -206,7 +206,7 @@ describe('loans and estimates in net worth', () => {
 function round2(n: number) { return Math.round(n * 100) / 100; }
 
 describe('loan accounts from Plaid', () => {
-  it('count what you owe as a debt, under Loans — not as cash', () => {
+  it('count what you owe as a debt, under Loans, not as cash', () => {
     const plaidLoan = acct({ id: 'pl', type: 'loan', openingBalance: 18000 });
     const payment = tx({ type: 'income', accountId: 'pl', amount: 333.12, date: '2026-09-05' });
     const c = composition(holdingsOn([plaidLoan], [], [payment], '2026-09-30'));

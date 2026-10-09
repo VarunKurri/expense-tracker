@@ -47,11 +47,11 @@
       }
     }
 
-    <!-- RECEIPT — a photo kept with the transaction; it can also fill in the form -->
+    <!-- RECEIPT: a photo kept with the transaction; it can also fill in the form -->
     @if (type === 'expense') {
       <app-receipt-attach
         [image]="receiptImage()" [loading]="receiptLoading()" [busy]="scanning()"
-        hint="Attach a photo of the receipt — Trackr can fill in the merchant, amount, items, tax and tip from it."
+        hint="Attach a photo of the receipt, and Trackr can fill in the merchant, amount, items, tax and tip from it."
         [note]="receiptNote()"
         [actionLabel]="scanning() ? 'Reading…' : (scanned() ? 'Read again' : 'Fill in from it')"
         (picked)="attachReceipt($event)" (removed)="removeReceipt()" (action)="readReceipt()" />
@@ -66,7 +66,7 @@
           }
           <div>
             @if (splitOn() && splitKind() === 'itemized') {
-              The items are under Item by item below — tap who had each one.
+              The items are under Item by item below. Tap who had each one.
             } @else {
               To divide it item by item, turn on Split this bill.
             }
@@ -152,7 +152,7 @@
              [(ngModel)]="date" name="date" />
     </div>
 
-    <!-- SPLIT — shared with friends: who owes you what -->
+    <!-- SPLIT: shared with friends (who owes you what) -->
     @if (type === 'expense') {
       <div class="toggle-row">
         <div>
@@ -180,7 +180,7 @@
       }
     }
 
-    <!-- RECURRING BILL SECTION — slides in when Subscriptions category selected -->
+    <!-- RECURRING BILL SECTION: slides in when Subscriptions category selected -->
     @if (isSubscription() && type === 'expense' && !transaction && !hasExistingBill()) {
       <div class="form-section recurring">
         <div>
@@ -302,7 +302,7 @@
       }
     }
 
-    <!-- MONEY BACK — refunds and repayments live on the transaction view now, so
+    <!-- MONEY BACK: refunds and repayments live on the transaction view now, so
          partial refunds and who-paid-what have one home. -->
     @if (transaction && type === 'expense') {
       <p class="form-note">

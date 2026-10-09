@@ -8,7 +8,7 @@ import { fromCents, toCents } from './money';
  *
  * These were previously computed()s living inside `analysis.ts`. They are pulled
  * out here as pure functions so Reports produces *identical* numbers rather than
- * a second, subtly different implementation — the two pages showing different
+ * a second, subtly different implementation. The two pages showing different
  * totals for the same period would be a bug the user could not diagnose.
  *
  * The rules encoded here were established across ROADMAP phases 8 and 11 and are
@@ -18,7 +18,7 @@ import { fromCents, toCents } from './money';
  *    per-account movement but is neither spending nor earning app-wide; counting
  *    it inflates both sides.
  *  - **Reimbursement netting is governed by one flag.** With netting on, an
- *    income that reimburses an expense is not income — it reduces that expense's
+ *    income that reimburses an expense is not income; it reduces that expense's
  *    true cost instead. With it off, everything counts exactly as recorded.
  *  - **Surplus is real income.** When reimbursements exceed the original expense,
  *    the excess is profit rather than being silently floored away.
@@ -40,7 +40,7 @@ export interface MoneyRules {
   /**
    * Whether a purchase was refunded in full (left out entirely while netting).
    * Defaults to the pure check, which can't see refund incomes linked from the
-   * bank — pages pass `TransactionService.isFullyRefunded`, which can.
+   * bank. Pages pass `TransactionService.isFullyRefunded`, which can.
    */
   fullyRefunded?: (t: Transaction) => boolean;
 }
@@ -87,7 +87,7 @@ export interface CategoryTotal { categoryId: string; amount: number; }
 
 /**
  * Spending per category, largest first. `__none__` collects uncategorised.
- * Callers decide how many slots to show and fold the tail into "Other" — the
+ * Callers decide how many slots to show and fold the tail into "Other", as the
  * category colour ramp is only eight hues deep.
  */
 export function categoryTotals(txs: Transaction[], rules: MoneyRules): CategoryTotal[] {
@@ -101,7 +101,7 @@ export function categoryTotals(txs: Transaction[], rules: MoneyRules): CategoryT
     .sort((a, b) => b.amount - a.amount);
 }
 
-/** Income per category, largest first — the Income report's breakdown. */
+/** Income per category, largest first: the Income report's breakdown. */
 export function incomeTotals(txs: Transaction[], rules: MoneyRules): CategoryTotal[] {
   const byCat = new Map<string, number>();
   for (const t of incomeTransactions(txs, rules)) {
@@ -124,7 +124,7 @@ export interface MonthRow {
 /**
  * Month-by-month income, spending and net, oldest first.
  *
- * Months with no activity are still emitted so the series has no gaps — a
+ * Months with no activity are still emitted so the series has no gaps. A
  * missing month in a bar chart reads as "no data available" rather than "zero",
  * which is a different claim.
  */
@@ -199,7 +199,7 @@ export function transferTotals(txs: Transaction[]): TransferTotals {
 
 /**
  * Split bills in a period, in integer cents: what you paid, what was yours,
- * and what was other people's — and how much of that has come back.
+ * and what was other people's, and how much of that has come back.
  *
  * Spending is always out of pocket (what you paid − money back), so a friend's
  * unpaid share sits in your spending until it's repaid. These figures say how
@@ -220,7 +220,7 @@ export interface SplitTotals {
   repaidCents: number;
   /** Still owed to you. */
   owedCents: number;
-  /** Marked "won't be repaid" — stays in your spending for good. */
+  /** Marked "won't be repaid", so it stays in your spending for good. */
   wontBeRepaidCents: number;
 }
 
@@ -230,7 +230,7 @@ export const NO_SPLITS: SplitTotals = {
 
 /**
  * Totals for the split bills among `txs` (already filtered to a period).
- * Per-bill arithmetic is `splitStatus` — the same numbers the transaction view
+ * Per-bill arithmetic is `splitStatus`, the same numbers the transaction view
  * and the Shared page show, so the three can't disagree.
  */
 export function splitTotals(txs: Transaction[], moneyBackFor: (t: Transaction) => MoneyBackEntry[]): SplitTotals {

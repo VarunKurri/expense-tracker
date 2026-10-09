@@ -67,7 +67,7 @@
       </div>
       <div class="card stat">
         <span class="label-mono">{{ lent() ? 'Repaid by' : 'Paid off' }}</span>
-        <span class="stat-value">{{ o.payoffDate ? formatDate(o.payoffDate) : '—' }}</span>
+        <span class="stat-value">{{ o.payoffDate ? formatDate(o.payoffDate) : 'Done' }}</span>
         <span class="stat-sub">Started {{ formatDate(t.startDate) }}</span>
       </div>
     </div>
@@ -199,7 +199,7 @@
             <span class="row-date">{{ formatDate(c.date) }}</span>
             <span class="row-main">
               <span class="row-name">Statement balance</span>
-              <span class="row-sub">Entered by you — the balance was reset to this</span>
+              <span class="row-sub">Entered by you. The balance was reset to this.</span>
             </span>
             <span class="row-amount">{{ money(c.value) }}</span>
             <button class="btn-ghost sm" (click)="removeCorrection(c.date)">Remove</button>
@@ -334,7 +334,7 @@
 <app-modal [open]="correcting()" [title]="lent() ? 'Enter the balance' : 'Enter statement balance'" size="sm" (closed)="correcting.set(false)">
   <div class="form">
     <p class="form-note">
-      If {{ lent() ? 'the amount still owed' : 'your lender’s statement' }} differs from what Trackr worked out — lenders that charge interest daily drift a few dollars —
+      If {{ lent() ? 'the amount still owed' : 'your lender’s statement' }} differs from what Trackr worked out (lenders that charge interest daily drift a few dollars),
       enter it here. The balance resets to it on that date, and payments after it carry on from there.
     </p>
     <div class="form-grid">

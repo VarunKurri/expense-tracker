@@ -10,7 +10,7 @@ export const ME = 'me';
 
 /**
  * Someone you split bills with. Saved once (encrypted, `people` collection) so
- * the same Alex is recognised across every bill — that's what makes "Alex owes
+ * the same Alex is recognised across every bill. That's what makes "Alex owes
  * you $85 across three dinners" possible.
  */
 export interface SplitPerson {
@@ -22,7 +22,7 @@ export interface SplitPerson {
 
 /**
  * A line on the bill. Split's `Item` (whose `priceCents` is the line total,
- * which is all the engine divides) plus how many there were — "2 × Mandi" is
+ * which is all the engine divides) plus how many there were, so "2 × Mandi" is
  * one line, not two. When a quantity is set, `priceCents` is always
  * `unitPriceCents × quantity`, so the two can't disagree.
  */
@@ -45,8 +45,8 @@ export interface SplitItem extends Item {
  */
 export interface TransactionSplit {
   /**
-   * `quick`    — one line for the whole bill ("$180, four ways").
-   * `itemized` — individual items, tax and tip (usually from a receipt).
+   * `quick`:    one line for the whole bill ("$180, four ways").
+   * `itemized`: individual items, tax and tip (usually from a receipt).
    * Both are ordinary `items` underneath; the mode only picks the editor.
    */
   mode: 'quick' | 'itemized';

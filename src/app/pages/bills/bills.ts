@@ -136,7 +136,7 @@ export class Bills {
     }
   }
 
-  // ── Bill groups — only active bills in the live sections ──
+  // ── Bill groups: only active bills in the live sections ──
   overdue = computed(() =>
     this.billService.overdueBills().filter(b => b.active)
   );
@@ -266,7 +266,7 @@ export class Bills {
   }
 
   // ── Mark as paid ──────────────────────────────────────────
-  /** True when the bill's account is Plaid-linked — the real payment already
+  /** True when the bill's account is Plaid-linked. The real payment already
    *  arrives via sync, so "Mark paid" here must only advance the due date, never
    *  log its own transaction (that would duplicate the synced one). */
   private isPlaidLinkedBill(bill: Bill): boolean {
@@ -297,7 +297,7 @@ export class Bills {
         merchant: bill.name,
         accountId: bill.accountId,
         categoryId: bill.categoryId,
-        notes: `${bill.frequency} bill — manual payment`,
+        notes: `${bill.frequency} bill, manual payment`,
       });
       const nextDate = this.billService.nextDueDate(bill);
       await this.billService.update(bill.id, { nextDueDate: nextDate });
@@ -434,7 +434,7 @@ export class Bills {
 
   private paymentNote(bill: Bill): string {
     const mode = this.billModeLabel(bill);
-    return mode ? `${bill.frequency} bill — ${mode.toLowerCase()} manual payment` : `${bill.frequency} bill — manual payment`;
+    return mode ? `${bill.frequency} bill, ${mode.toLowerCase()} manual payment` : `${bill.frequency} bill, manual payment`;
   }
 
   formatCurrencyRounded(n: number): string {

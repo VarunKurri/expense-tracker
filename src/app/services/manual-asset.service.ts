@@ -11,7 +11,7 @@ import { ManualAsset } from '../models';
 
 @Injectable({ providedIn: 'root' })
 /**
- * Manual assets and debts (home, car, loans…) — anything without a bank
+ * Manual assets and debts (home, car, loans…): anything without a bank
  * connection. Encrypted like every other collection.
  */
 export class ManualAssetService {

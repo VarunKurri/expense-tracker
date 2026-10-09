@@ -24,7 +24,7 @@ export class AutopayService {
     const user = this.auth.user();
     if (!user) { this.running = false; return; }
 
-    // Use local date, not UTC — avoids false "tomorrow" result in US evening hours
+    // Use local date, not UTC, to avoid a false "tomorrow" result in US evening hours
     const today = localDateString();
 
     try {
@@ -35,7 +35,7 @@ export class AutopayService {
         if (this.failedBillIds.has(bill.id)) continue;
         if (bill.nextDueDate > today) continue;
 
-        // A Plaid-linked account will deliver the real transaction via sync —
+        // A Plaid-linked account will deliver the real transaction via sync;
         // fabricating one here would double it up. Still advance nextDueDate below
         // so the reminder widget/nav badge stay accurate; just skip creating a
         // transaction for these bills.
@@ -68,7 +68,7 @@ export class AutopayService {
                   merchant: bill.name,
                   accountId: bill.accountId,
                   categoryId: bill.categoryId,
-                  notes: `Autopay — ${bill.frequency} bill`,
+                  notes: `Autopay: ${bill.frequency} bill`,
                 });
               }
             }

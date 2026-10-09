@@ -9,8 +9,8 @@ import { parseCents } from './split/money';
  * rather than 101. Reading the number's decimal digits (the same approach as
  * Split's `parseCents`) gets it right.
  *
- * Stored amounts stay in dollars — converting every encrypted document isn't
- * worth the risk — so convert at the edge with `toCents`, do the arithmetic in
+ * Stored amounts stay in dollars (converting every encrypted document isn't
+ * worth the risk), so convert at the edge with `toCents`, do the arithmetic in
  * whole cents, and convert back once with `fromCents` for display.
  */
 export function toCents(dollars: number): number {

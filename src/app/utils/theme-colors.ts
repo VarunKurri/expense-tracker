@@ -2,7 +2,7 @@
  * Reads design tokens out of `src/styles.scss` at runtime.
  *
  * Chart.js takes real colour strings, not CSS custom properties, so chart
- * colours can't just be written as `var(--blue)` — they have to be resolved.
+ * colours can't just be written as `var(--blue)`; they have to be resolved.
  * Reading them here (rather than hardcoding hex in each chart) keeps the charts
  * on the token layer and makes them follow the light/dark switch.
  *
@@ -26,7 +26,7 @@ export function chartColors() {
     negative: token('--red', '#DC3545'),
     /** Axis tick labels. */
     tick: token('--fg-3', '#8A8A8F'),
-    /** Gridlines — deliberately faint in both themes. */
+    /** Gridlines, deliberately faint in both themes. */
     grid: token('--line', '#E8E8EA'),
     /** Canvas colour, for donut segment borders. */
     surface: token('--surface', '#FFFFFF'),
@@ -39,7 +39,7 @@ export function chartColors() {
  * Category accent ramp (`--cat-1..8`) for donut segments, Sankey nodes and
  * category chips.
  *
- * Assign these in sequence and never cycle them — the fixed order is what keeps
+ * Assign these in sequence and never cycle them. The fixed order is what keeps
  * adjacent slots distinguishable under colour-blindness. Past eight categories,
  * fold the tail into an "Other" slice rather than generating a ninth hue.
  */
@@ -49,7 +49,7 @@ export function categoryPalette(): string[] {
   return fallback.map((f, i) => token(`--cat-${i + 1}`, f));
 }
 
-/** Neutral for the folded "Other" slice — never one of the eight identity hues. */
+/** Neutral for the folded "Other" slice, never one of the eight identity hues. */
 export function otherColor(): string {
   return token('--fg-4', '#B0B0B5');
 }

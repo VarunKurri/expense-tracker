@@ -55,13 +55,13 @@ export class Dashboard implements OnDestroy {
 
   /**
    * The donut's canvas only exists while there is spending to show, so it
-   * appears some time after the page does — on a cold start, only once every
+   * appears some time after the page does: on a cold start, only once every
    * transaction has been decrypted, which takes longer the more there are.
    *
    * Angular calls this setter the moment the canvas enters or leaves the page,
    * so the chart is built exactly then. The previous version polled on a
    * timer, checked once at first render, and gave up immediately if no
-   * spending had loaded yet — so on a fresh load or hard refresh the donut
+   * spending had loaded yet, so on a fresh load or hard refresh the donut
    * never appeared, and only showed after navigating away and back, when the
    * data was already there.
    */
@@ -103,7 +103,7 @@ export class Dashboard implements OnDestroy {
   }
 
   editFromTxView(tx: Transaction) {
-    // Editing leaves the day popup behind — the form is a new destination, not
+    // Editing leaves the day popup behind. The form is a new destination, not
     // a step deeper into it.
     this.returnToDay.set(null);
     this.viewingTx.set(null);
@@ -190,8 +190,8 @@ export class Dashboard implements OnDestroy {
   }
 
   /**
-   * Net worth, counted exactly as the Net worth page counts it — accounts plus
-   * any homes, cars or loans you added there — so the two never disagree.
+   * Net worth, counted exactly as the Net worth page counts it (accounts plus
+   * any homes, cars or loans you added there), so the two never disagree.
    */
   private netWorthPoints = computed(() =>
     netWorthSeries(
@@ -212,7 +212,7 @@ export class Dashboard implements OnDestroy {
 
   // ── Spending calendar ─────────────────────────────────────
   /**
-   * The month the calendar card shows. The dashboard is always "now" — stepping
+   * The month the calendar card shows. The dashboard is always "now"; stepping
    * through months is what the Spending page is for.
    */
   calendarMonth = monthKeyOf();
@@ -220,9 +220,9 @@ export class Dashboard implements OnDestroy {
 
   /**
    * What the calendar counts as spending. Deliberately the same rules the
-   * Analysis and Reports pages use by default — expenses only, no internal
+   * Analysis and Reports pages use by default (expenses only, no internal
    * transfers, refunded transactions dropped, and partial reimbursements netted
-   * off — so the figure on this card matches what those pages show for the same
+   * off), so the figure on this card matches what those pages show for the same
    * month rather than being a fourth, slightly different number.
    */
   monthSpending = computed(() =>
@@ -237,14 +237,14 @@ export class Dashboard implements OnDestroy {
     Math.round(this.monthSpending().reduce((s, t) => s + this.spendAmount(t), 0) * 100) / 100
   );
 
-  /** The day popup's open state — null when closed. */
+  /** The day popup's open state; null when closed. */
   selectedDay = signal<string | null>(null);
 
   /**
    * The day to come back to when the transaction view closes.
    *
    * Without this, closing a transaction opened from a day popup dumps you on
-   * the dashboard — you lose your place and have to find the day again. Closing
+   * the dashboard: you lose your place and have to find the day again. Closing
    * an overlay should undo the step that opened it, not the whole stack.
    */
   private returnToDay = signal<string | null>(null);
@@ -340,7 +340,7 @@ export class Dashboard implements OnDestroy {
     return new Date(dateStr + 'T00:00:00');
   }
 
-  // Local date string — never UTC
+  // Local date string, never UTC
   private localDateString(d: Date = new Date()): string {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -433,7 +433,7 @@ export class Dashboard implements OnDestroy {
   isNegative(n: number): boolean { return n < 0; }
   /**
    * Red only for an account that has gone below zero. A card's balance is what
-   * you owe, so a negative one means you overpaid — money in your favour, not
+   * you owe, so a negative one means you overpaid. That is money in your favour, not
    * a warning (it used to show red, as if it were debt).
    */
   isOverdrawn(account: Account): boolean {
@@ -481,7 +481,7 @@ export class Dashboard implements OnDestroy {
   ngOnDestroy() {
     this.miniDonut?.destroy();
     // Scroll locks are released by the overlay components themselves, via
-    // ScrollLockService — writing to body.overflow here would bypass its
+    // ScrollLockService. Writing to body.overflow here would bypass its
     // counter and could release a lock another overlay still holds.
   }
 

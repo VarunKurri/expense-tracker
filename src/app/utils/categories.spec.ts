@@ -118,7 +118,7 @@ describe('plaidNamesFor', () => {
   });
 });
 
-describe('planCategoryDeletion — transactions', () => {
+describe('planCategoryDeletion: transactions', () => {
   const txs = [
     { id: 't1', type: 'expense', amount: 10, date: '2026-09-01', categoryId: 'dining' },
     { id: 't2', type: 'expense', amount: 20, date: '2026-09-02', categoryId: 'food' },
@@ -135,7 +135,7 @@ describe('planCategoryDeletion — transactions', () => {
   });
 
   it('hands its Plaid names to the target, so bank transactions follow', () => {
-    // No bank transaction is written to — the sync overwrites them when the
+    // No bank transaction is written to; the sync overwrites them when the
     // bank modifies one, so a stored category would not be guaranteed to last.
     const plan = planCategoryDeletion(input({ matchedBankTransactions: 42 }));
     expect(plan.aliasesToTarget).toEqual(['Dining']);
@@ -151,21 +151,21 @@ describe('planCategoryDeletion — transactions', () => {
     expect(plan.aliasesToTarget).toEqual([]);
   });
 
-  it('hands over nothing with no target — bank transactions go uncategorised', () => {
+  it('hands over nothing with no target, so bank transactions go uncategorised', () => {
     const plan = planCategoryDeletion(input({ targetId: null, matchedBankTransactions: 5 }));
     expect(plan.aliasesToTarget).toEqual([]);
     expect(plan.bankTransactions).toBe(5);
   });
 });
 
-describe('planCategoryDeletion — budgets', () => {
+describe('planCategoryDeletion: budgets', () => {
   it('moves a budget when the target has none for that period', () => {
     const plan = planCategoryDeletion(input({ budgets: [budget({ id: 'b1', categoryId: 'dining' })] }));
     expect(plan.budgetMoves).toEqual([{ id: 'b1', patch: { categoryId: 'food' } }]);
     expect(plan.budgetDeletes).toEqual([]);
   });
 
-  it('deletes it when the target already has one — never two for one period', () => {
+  it('deletes it when the target already has one, never two for one period', () => {
     const plan = planCategoryDeletion(input({ budgets: [
       budget({ id: 'b1', categoryId: 'dining' }),
       budget({ id: 'b2', categoryId: 'food' }),
@@ -193,7 +193,7 @@ describe('planCategoryDeletion — budgets', () => {
   });
 });
 
-describe('planCategoryDeletion — rules, bills, templates', () => {
+describe('planCategoryDeletion: rules, bills, templates', () => {
   it('re-points a rule that files into it', () => {
     const plan = planCategoryDeletion(input({ rules: [rule({ id: 'r1', setCategoryId: 'dining' })] }));
     expect(plan.rulePatches).toEqual([{ id: 'r1', patch: { setCategoryId: 'food' } }]);

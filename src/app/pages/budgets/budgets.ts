@@ -63,8 +63,8 @@ export class Budgets {
 
   /**
    * The month and the refund toggle live in the URL (`?month=2026-07`), so
-   * coming back from a budget's detail page — with the browser's Back or the
-   * page's own "← Budgets" — lands on the month you were looking at instead of
+   * coming back from a budget's detail page (with the browser's Back or the
+   * page's own "← Budgets") lands on the month you were looking at instead of
    * snapping to this month.
    */
   selectedMonth = signal(this.currentMonth);
@@ -102,7 +102,7 @@ export class Budgets {
   isPastMonth = computed(() => this.selectedMonth() < this.currentMonth);
   isFutureMonth = computed(() => this.selectedMonth() > this.currentMonth);
 
-  // "Resets November 1" — first day of the month after selectedMonth
+  // "Resets November 1": first day of the month after selectedMonth
   resetDate = computed(() => {
     const [y, m] = this.selectedMonth().split('-').map(Number);
     return new Date(y, m, 1).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
@@ -122,7 +122,7 @@ export class Budgets {
     [...new Set(this.budgetService.budgets().filter(b => !b.isDefault && b.month).map(b => b.month!))]);
 
   // Budgets whose category no longer exists (e.g. after a category was merged/deleted).
-  // Their amount is intact — they just need re-pointing to a current category.
+  // Their amount is intact; they just need re-pointing to a current category.
   orphanedBudgets = computed(() => {
     const ids = new Set(this.categoryService.categories().map(c => c.id));
     return this.budgetService.budgets().filter(b => !ids.has(b.categoryId));
@@ -180,7 +180,7 @@ export class Budgets {
 
     for (const e of effectiveBudgets(this.budgetService.budgets(), month)) {
       const cat = categories.find(c => c.id === e.categoryId);
-      if (!cat) continue; // orphaned — listed in the panel above instead
+      if (!cat) continue; // orphaned, so it is listed in the panel above instead
       const spent = budgetSpent(txs, e.categoryId, month, rules);
       rows.push({
         budget: e.budget,
@@ -205,7 +205,7 @@ export class Budgets {
     });
   });
 
-  /** Categories budgeted only in other months — invisible here, so say where they are. */
+  /** Categories budgeted only in other months. They are invisible here, so say where they are. */
   elsewhere = computed(() =>
     budgetsElsewhere(this.budgetService.budgets(), this.selectedMonth())
       .filter(e => this.categoryService.categories().some(c => c.id === e.categoryId))
@@ -246,7 +246,7 @@ export class Budgets {
   heroLabel = computed(() =>
     this.isFutureMonth() ? `Budgeted for ${this.monthName()}` : `Spent in ${this.monthName()}`);
 
-  /** One plain sentence on how the month is going — Origin's "why it matters" line. */
+  /** One plain sentence on how the month is going: Origin's "why it matters" line. */
   heroSentence = computed(() => {
     const t = this.totals();
     const n = this.budgetRows().length;

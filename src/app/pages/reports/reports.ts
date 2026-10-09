@@ -79,7 +79,7 @@ export class Reports implements AfterViewInit, OnDestroy {
   /** Netting matches the Analysis page's "exclude refunded" default. */
   netting = signal(true);
 
-  todayStr = localDateString(); // local, not UTC — UTC is already tomorrow on a US evening
+  todayStr = localDateString(); // local, not UTC (UTC is already tomorrow on a US evening)
 
   reports: { value: ReportKey; label: string }[] = [
     { value: 'cash-flow', label: 'Cash flow' },
@@ -154,7 +154,7 @@ export class Reports implements AfterViewInit, OnDestroy {
     });
   });
 
-  /** Split bills in the period — the "Split bills" rows under the numbers. */
+  /** Split bills in the period: the "Split bills" rows under the numbers. */
   splits = computed(() => splitTotals(this.filtered(), t => this.txService.moneyBackEntriesFor(t)));
   /** "You covered $74.69 of other people's shares on 2 split bills in the last 6 months…" */
   splitText = computed(() => splitSentence(this.splits(), this.periodPhrase()));
@@ -201,7 +201,7 @@ export class Reports implements AfterViewInit, OnDestroy {
    * Category rows for the current report, capped at eight named slots with the
    * tail folded into "Other".
    *
-   * Eight is the depth of the validated colour ramp — a ninth slice would need a
+   * Eight is the depth of the validated colour ramp. A ninth slice would need a
    * hue that has not been checked for colour-blind separation, so the tail is
    * pooled instead.
    */
@@ -252,7 +252,7 @@ export class Reports implements AfterViewInit, OnDestroy {
                 | { kind: 'category'; name: string; categoryId: string }
                 | null>(null);
 
-  /** Category id for a display name — the charts only carry names. */
+  /** Category id for a display name, since the charts only carry names. */
   private categoryIdFor(name: string): string {
     if (name === 'Uncategorized') return '__none__';
     return this.categoryService.categories().find(c => c.name === name)?.id ?? '';
@@ -274,7 +274,7 @@ export class Reports implements AfterViewInit, OnDestroy {
    * The transactions behind whatever was clicked, newest first.
    *
    * Filtered by the SAME rules the headline figures use, so the rows always add
-   * up to the number that was clicked — internal transfers excluded, and the
+   * up to the number that was clicked: internal transfers excluded, and the
    * report's own side (spending or income) respected.
    */
   drillTransactions = computed(() => {
@@ -306,7 +306,7 @@ export class Reports implements AfterViewInit, OnDestroy {
         category: this.catName(t.categoryId || '__none__'),
         type: t.type,
         amount: t.type === 'expense' ? expenseAmount(t, rules) : t.amount,
-        /** On a split bill, your part of it — what the row's amount is made of. */
+        /** On a split bill, your part of it, i.e. what the row's amount is made of. */
         myShare: t.type === 'expense' && t.split
           ? fromCents(splitStatus(t.split, this.txService.moneyBackEntriesFor(t)).myShareCents)
           : null,
@@ -389,7 +389,7 @@ export class Reports implements AfterViewInit, OnDestroy {
 
     const c = chartColors();
 
-    // Every mark is a way into the underlying transactions — a report you
+    // Every mark is a way into the underlying transactions; a report you
     // cannot open is just a picture.
     const onClick = (kind: 'month' | 'category') => (_evt: any, els: any[]) => {
       if (!els.length) return;
@@ -486,7 +486,7 @@ export class Reports implements AfterViewInit, OnDestroy {
       return;
     }
 
-    // Bars. Only Cash flow shows both series — Expenses and Income each show
+    // Bars. Only Cash flow shows both series. Expenses and Income each show
     // their own, which is the whole point of picking that tab.
     const stacked = view === 'stacked';
     const bar = (label: string, data: number[], colour: string) => ({
@@ -574,7 +574,7 @@ export class Reports implements AfterViewInit, OnDestroy {
     });
   }
 
-  /** Legend entries for the current chart — never colour alone. */
+  /** Legend entries for the current chart, never colour alone. */
   legend = computed(() => {
     const c = chartColors();
     switch (this.report()) {

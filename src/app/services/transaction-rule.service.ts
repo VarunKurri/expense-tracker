@@ -58,7 +58,7 @@ export class TransactionRuleService {
             }
             this.ngZone.run(() => {
               // A rule that fails to decrypt is hidden, which means it also
-              // stops running — say so, rather than letting categorisation go
+              // stops running. Say so, rather than letting categorisation go
               // quietly wrong.
               this.error.set(failed > 0
                 ? `${failed} rule${failed === 1 ? '' : 's'} failed to decrypt, so ${failed === 1 ? 'it is' : 'they are'} hidden and not running.`
@@ -76,13 +76,13 @@ export class TransactionRuleService {
     })
   );
 
-  /** Every rule as stored — for listing and editing. */
+  /** Every rule as stored, for listing and editing. */
   rules = toSignal(this.rules$, { initialValue: [] });
 
   /**
    * The rules that are safe to *run*: any action filing into a category that
-   * has since been deleted is dropped. Everything that applies rules — manual
-   * add, CSV import, bulk apply and its preview counts — must read this rather
+   * has since been deleted is dropped. Everything that applies rules (manual
+   * add, CSV import, bulk apply and its preview counts) must read this rather
    * than `rules`, or a deleted category gets written back onto transactions.
    */
   activeRules = computed(() => {
@@ -127,8 +127,8 @@ export class TransactionRuleService {
   }
 
   /**
-   * Moves a rule one place up or down. `rules` is already in display order —
-   * the same order they run in — so that is the order that gets renumbered.
+   * Moves a rule one place up or down. `rules` is already in display order
+   * (the same order they run in), so that is the order that gets renumbered.
    * See `reorderPriorities` for why this renumbers instead of swapping.
    */
   async reorder(id: string, direction: -1 | 1) {

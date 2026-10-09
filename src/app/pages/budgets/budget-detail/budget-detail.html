@@ -24,7 +24,7 @@
         <span class="num-display" [class.warn]="status() === 'warn'" [class.over]="status() === 'over'">
           {{ formatCurrency(spent()) }}
         </span>
-        <span class="hero-of">of {{ budget() ? formatCurrency(budget()!.amount) : '—' }}</span>
+        <span class="hero-of">{{ budget() ? 'of ' + formatCurrency(budget()!.amount) : 'No budget set' }}</span>
       </div>
 
       @if (budget()) {
@@ -52,11 +52,11 @@
       </div>
       <div class="card stat-card">
         <span class="label-mono">Average</span>
-        <span class="stat-value">{{ counted().length ? formatCurrency(average()) : '—' }}</span>
+        <span class="stat-value">{{ counted().length ? formatCurrency(average()) : 'None' }}</span>
       </div>
       <div class="card stat-card">
         <span class="label-mono">Largest</span>
-        <span class="stat-value">{{ counted().length ? formatCurrency(largest()) : '—' }}</span>
+        <span class="stat-value">{{ counted().length ? formatCurrency(largest()) : 'None' }}</span>
       </div>
     </div>
 

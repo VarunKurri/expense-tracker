@@ -113,7 +113,7 @@ export class TransactionService extends MoneyBackLedger {
 
   /**
    * Transactions with this category actually stored on them. Excludes bank
-   * transactions that only match it by name — those carry no stored category
+   * transactions that only match it by name; those carry no stored category
    * and follow the category's Plaid aliases instead.
    */
   storedInCategory(categoryId: string): Transaction[] {
@@ -193,7 +193,7 @@ availableCredit(account: Account): number {
     const current = await this.encryption.decryptDoc<Transaction>(snap.data());
     // setDoc (full replace), not updateDoc (partial merge): a Plaid-synced transaction
     // is a differently-shaped `__envelope` document (encryptedDEK, tag, no __encrypted
-    // flag). Editing it re-encrypts it as a symmetric `__encrypted` doc — updateDoc
+    // flag). Editing it re-encrypts it as a symmetric `__encrypted` doc; updateDoc
     // would leave the old envelope-only fields in place alongside the new ciphertext,
     // producing a document that's neither validly enveloped nor validly symmetric.
     await setDoc(ref, await this.encryption.encryptForWrite({ ...current, ...patch, updatedAt: Date.now() }) as any);

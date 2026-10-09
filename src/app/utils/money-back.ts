@@ -3,7 +3,7 @@ import { fromCents, toCents } from './money';
 import type { MoneyRules } from './reporting';
 
 /**
- * Money back on an expense — refunds and repayments alike — and what it leaves
+ * Money back on an expense (refunds and repayments alike) and what it leaves
  * you out of pocket. All integer cents.
  *
  * Refunds, reimbursements and split repayments used to be three separate
@@ -43,7 +43,7 @@ export interface IncomeLink { expenseId: string; amountCents: number; }
 /**
  * An income's money-back links: one expense (`reimbursesId`, its whole
  * amount) or spread over several (`moneyBackSplits`). Empty for any other
- * income — which then counts as income.
+ * income, which then counts as income.
  */
 export function incomeLinks(t: Transaction): IncomeLink[] {
   if (t.type !== 'income') return [];
@@ -68,7 +68,7 @@ export function linkedEntry(income: Transaction, amountCents = toCents(income.am
 
 /**
  * Money back recorded on the expense itself, including the legacy
- * `refunded: true` flag read as one full refund — so data from before the
+ * `refunded: true` flag read as one full refund, so data from before the
  * merge keeps exactly the totals it always had.
  */
 export function untrackedEntries(t: Transaction): MoneyBackEntry[] {
@@ -90,7 +90,7 @@ export function moneyBackEntries(expense: Transaction, linked: LinkedIncome[] = 
 export type RefundState = 'none' | 'partial' | 'full';
 
 /**
- * Refunds only — a friend paying you back doesn't make a purchase "refunded".
+ * Refunds only: a friend paying you back doesn't make a purchase "refunded".
  * A fully refunded expense is left out of analysis entirely (with the toggle
  * on), as the old "Mark as refunded" did; a partial one is netted.
  */
@@ -146,7 +146,7 @@ export function linkedIncomesMap(txs: Transaction[]): Map<string, LinkedIncome[]
 }
 
 /**
- * Money back for a whole set of transactions — what `TransactionService`
+ * Money back for a whole set of transactions: what `TransactionService`
  * (and the test fakes) answer every "how much came back on this?" with.
  *
  * A base class rather than service methods so the logic lives in exactly one
@@ -195,14 +195,14 @@ export abstract class MoneyBackLedger {
   }
 
   /** When money back exceeds the original expense (e.g. split evenly but one
-   *  side rounded up), the excess is real profit, not spending — it belongs in
+   *  side rounded up), the excess is real profit, not spending. It belongs in
    *  income, not silently floored away by `effectiveExpenseAmount`. */
   reimbursementSurplus(t: Transaction): number {
     if (t.type !== 'expense') return 0;
     return fromCents(surplusCents(toCents(t.amount), this.moneyBackEntriesFor(t)));
   }
 
-  /** Refunded in full, in part, or not at all — counting refund incomes linked from the bank. */
+  /** Refunded in full, in part, or not at all, counting refund incomes linked from the bank. */
   refundState(t: Transaction): RefundState {
     const linkedRefunds = this.linksFor(t).map(l => linkedEntry(l.income, l.amountCents)).filter(e => e.source === 'refund');
     return refundState(t, moneyBackTotalCents(linkedRefunds));
@@ -230,7 +230,7 @@ export abstract class MoneyBackLedger {
 
   /** For an income that pays back an expense: that expense's surplus, if any. Surplus
    *  belongs to the expense as a whole (it can come from one or several linked
-   *  incomes together), not to any single payment — this just lets a linked
+   *  incomes together), not to any single payment; this just lets a linked
    *  income's own row indicate "this is part of a package that came out ahead." */
   reimbursementSurplusForIncome(income: Transaction): number {
     const ids = new Set(incomeLinks(income).map(l => l.expenseId));

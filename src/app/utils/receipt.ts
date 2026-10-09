@@ -35,9 +35,9 @@ export interface ReceiptScan {
   date: string | null;
   items: ScannedItem[];
   subtotalCents: number | null;
-  /** Delivery, service and other fees — everything that isn't an item, tax or tip. */
+  /** Delivery, service and other fees: everything that isn't an item, tax or tip. */
   fees: NamedAmount[];
-  /** Discounts, promotions, credits and gift cards — everything that lowers the total. */
+  /** Discounts, promotions, credits and gift cards: everything that lowers the total. */
   discounts: NamedAmount[];
   taxCents: number;
   tipCents: number;
@@ -47,7 +47,7 @@ export interface ReceiptScan {
   confidence: number;
 }
 
-const MAX_CENTS = 10_000_000; // $100,000 — no receipt line is bigger
+const MAX_CENTS = 10_000_000; // $100,000; no receipt line is bigger
 const MAX_ITEMS = 60;
 
 const cents = (v: unknown): number => {
@@ -111,7 +111,7 @@ export function scanItemsCents(scan: ReceiptScan): number {
 
 /**
  * What goes in "Tax & fees": tax, plus every fee, less every discount and
- * credit. Negative when the discounts are bigger — it then takes money off
+ * credit. Negative when the discounts are bigger; it then takes money off
  * everyone's share, in proportion, exactly as a discount would. Never more
  * negative than the items themselves.
  */
@@ -155,8 +155,8 @@ export function scanTaxParts(scan: ReceiptScan): TaxPart[] {
  * replaces the items, tax and tip.
  *
  * - Items are exactly as printed, so the editor can be checked line by line
- *   against the receipt — "3 × Biryani at $13.99" stays one line of three.
- * - Lines start unclaimed — tapping who had what is the point of splitting by item.
+ *   against the receipt: "3 × Biryani at $13.99" stays one line of three.
+ * - Lines start unclaimed, since tapping who had what is the point of splitting by item.
  * - Fees, discounts and credits go into "Tax & fees" with the tax (the model
  *   has only tax and tip), so they're shared like tax: in proportion to what
  *   each person had. A delivery-app order with big credits can make it negative.

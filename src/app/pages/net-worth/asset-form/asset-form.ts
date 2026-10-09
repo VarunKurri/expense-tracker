@@ -31,7 +31,7 @@ const TERMS = [12, 24, 36, 48, 60, 72, 84, 120, 180, 240, 360];
  * Plain entries (a house, a watch) take a value and an "as of" date; changing
  * the value adds to its history rather than overwriting it.
  *
- * Loans take their terms instead — amount, interest method, rate, term — and
+ * Loans take their terms instead (amount, interest method, rate, term), and
  * the balance then follows the payments that actually happen. A car bought on
  * finance can add the car in the same step, so net worth sees both sides.
  */
@@ -191,7 +191,7 @@ export class AssetForm implements OnChanges {
     return this.method !== 'none' && Number(this.rate) > 0;
   }
 
-  /** The first payment has already come round — so there's a past to account for. */
+  /** The first payment has already come round, so there's a past to account for. */
   get startedInPast(): boolean {
     return !!this.firstPaymentDate && this.firstPaymentDate < this.today;
   }
@@ -241,7 +241,7 @@ export class AssetForm implements OnChanges {
   // ── Recognising payments ───────────────────────────────────
   accounts() { return this.accountService.accounts().filter(a => !a.archived); }
 
-  /** What the matching rule would pick up right now — so you can see it work before saving. */
+  /** What the matching rule would pick up right now, so you can see it work before saving. */
   get matchPreview() {
     const terms = this.draftTerms();
     if (!terms || !this.matchText.trim()) return null;

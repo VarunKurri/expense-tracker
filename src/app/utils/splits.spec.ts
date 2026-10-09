@@ -54,7 +54,7 @@ describe('scenario 1: even split, you paid', () => {
   });
 });
 
-describe('scenario 2: partly paid — you paid $180 of a $240 bill, Alex paid $60', () => {
+describe('scenario 2: partly paid (you paid $180 of a $240 bill, Alex paid $60)', () => {
   const split: TransactionSplit = {
     ...quickSplit(24000, [ME, 'alex', 'ben', 'cara']),
     payments: [{ personId: ME, amountCents: 18000 }, { personId: 'alex', amountCents: 6000 }],

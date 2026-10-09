@@ -402,7 +402,7 @@
   &.neg { color: var(--red); }
 }
 
-/* Card wrapping transactions for a day — Tally style */
+/* Card wrapping transactions for a day (Tally style) */
 .tx-card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -557,9 +557,9 @@
   &.pos { color: var(--teal); }
   &.neg { color: var(--fg); }
   &.neu { color: var(--fg-3); }
-  // Analysis view: this raw figure isn't what counts — the net amount next to the
+  // Analysis view: this raw figure isn't what counts; the net amount next to the
   // reimbursement badge below is. Struck, not recolored, since the number itself
-  // (what was actually charged) is still true — it just isn't the analysis total.
+  // (what was actually charged) is still true. It just isn't the analysis total.
   &.struck { text-decoration: line-through; opacity: 0.6; }
 }
 
@@ -572,11 +572,11 @@
   font-weight: 600;
 
   // Analysis view: this specific figure isn't what counts (see the net amount next
-  // to it) — struck, not recolored, since it's still genuinely a reimbursement.
+  // to it). Struck, not recolored, since it's still genuinely a reimbursement.
   &.struck { text-decoration: line-through; opacity: 0.6; }
 }
 
-// Row for the expense-side reimbursement badge — in analysis view the badge is
+// Row for the expense-side reimbursement badge. In analysis view the badge is
 // struck through and the actual net effect (still an expense, or a surplus) sits
 // right next to it.
 .reimburse-net-row {
@@ -732,7 +732,7 @@
 }
 
 /* The transaction view panel and its reimbursement linking now live in
-   components/transaction-view/ — their styles moved with them. */
+   components/transaction-view/, and their styles moved with them. */
 /* ── ANIMATIONS ────────────────────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; }

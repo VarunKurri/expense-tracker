@@ -67,7 +67,7 @@ export class BudgetDetail {
 
   private rules: MoneyRules = this.txService.moneyRules(this.excludeRefunded);
 
-  /** Every expense in this category and month, newest first — refunded ones included, shown dimmed. */
+  /** Every expense in this category and month, newest first. Refunded ones are included, shown dimmed. */
   transactions = computed(() =>
     this.txService.transactions()
       .filter(t =>
@@ -118,7 +118,7 @@ export class BudgetDetail {
 
   largest = computed(() => this.counted().reduce((m, t) => Math.max(m, this.amountOf(t)), 0));
 
-  /** Money paid back on this month's purchases — explains why the total is net. */
+  /** Money paid back on this month's purchases. It explains why the total is net. */
   reimbursedTotal = computed(() =>
     this.excludeRefunded
       ? Math.round(this.counted().reduce((s, t) => s + Math.min(t.amount, this.reimbursedOf(t)), 0) * 100) / 100
@@ -129,7 +129,7 @@ export class BudgetDetail {
     if (!this.excludeRefunded) return 'Every purchase at its full amount, including refunded ones.';
     const back = this.reimbursedTotal();
     return back > 0
-      ? `Net of refunds and reimbursements — ${this.formatCurrency(back)} was paid back to you.`
+      ? `Net of refunds and reimbursements: ${this.formatCurrency(back)} was paid back to you.`
       : 'Net of refunds and reimbursements.';
   });
 
@@ -187,9 +187,9 @@ export class BudgetDetail {
 
   // ── Helpers ────────────────────────────────────────────────
   accountName(id?: string): string {
-    if (!id) return '—';
+    if (!id) return 'None';
     const a = this.accountService.accounts().find(a => a.id === id);
-    return a ? `${a.icon} ${a.name}` : '—';
+    return a ? `${a.icon} ${a.name}` : 'None';
   }
 
   formatCurrency(n: number): string {

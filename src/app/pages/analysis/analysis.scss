@@ -188,7 +188,7 @@
   }
 }
 
-// Deliberately its own class, not a reuse of .filter-select — that class sets
+// Deliberately its own class, not a reuse of .filter-select: that class sets
 // `appearance: none` plus a custom dropdown-chevron background-image meant for
 // <select>, which fights with iOS Safari's native date-picker chrome on
 // <input type="date"> (can suppress the calendar affordance / look doubled-up).
@@ -278,7 +278,7 @@
   overflow: hidden;
 }
 
-/* ── LEGEND — fixed with actual colored swatches ───────────── */
+/* ── LEGEND: fixed with actual colored swatches ───────────── */
 .chart-legend {
   display: flex;
   gap: 16px;
@@ -293,7 +293,7 @@
   color: var(--fg-3);
 }
 
-/* Actual color swatches — rounded squares, not just dots */
+/* Actual color swatches: rounded squares, not just dots */
 .legend-swatch {
   width: 12px;
   height: 12px;
@@ -326,8 +326,8 @@
   overflow: hidden;
 }
 
-/* Every card's head: the eyebrow and, on the right, its link or legend —
-   nothing else above the hairline, as on Spending and the Dashboard. */
+/* Every card's head: the eyebrow and, on the right, its link or legend.
+   Nothing else above the hairline, as on Spending and the Dashboard. */
 .panel-head {
   display: flex;
   align-items: center;
@@ -473,7 +473,7 @@
   text-align: right;
 }
 
-/* The original charge, under the net figure — smaller and quieter, because the
+/* The original charge, under the net figure, smaller and quieter because the
    net is the number this page is actually counting. */
 .merchant-tx-net {
   display: block;
@@ -483,7 +483,7 @@
   color: var(--fg-3);
 }
 
-/* ── SPLIT BILLS — "Owed to you" ─────────────────────────────
+/* ── SPLIT BILLS: "Owed to you" ─────────────────────────────
    The figure and its sentence on the left, the four figures behind it on the
    right; stacked on a phone. */
 .split-card {

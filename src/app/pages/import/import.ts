@@ -76,7 +76,7 @@ export class Import {
     const d = new Date(cell.trim());
     if (isNaN(d.getTime())) return '';
     // `new Date("February 21, 2026")` is local midnight; format it in local time
-    // too — toISOString() is UTC and gave the day before east of UTC.
+    // too, because toISOString() is UTC and gave the day before east of UTC.
     return localDateString(d);
   }
 

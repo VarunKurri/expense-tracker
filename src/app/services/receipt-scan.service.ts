@@ -8,7 +8,7 @@ import { fitImage } from '../utils/image';
  * asks OpenAI) and returns what was read.
  *
  * OpenAI doesn't keep the photo, and neither does the function. When a photo
- * is attached to a transaction, that copy is the one in ReceiptService —
+ * is attached to a transaction, that copy is the one in ReceiptService:
  * encrypted, in your own Firestore.
  */
 @Injectable({ providedIn: 'root' })
@@ -22,7 +22,7 @@ export class ReceiptScanService {
     return this.scanImage((await fitImage(file)).dataUrl);
   }
 
-  /** Read a photo that's already a JPEG data URL — e.g. one attached to the transaction. */
+  /** Read a photo that's already a JPEG data URL, e.g. one attached to the transaction. */
   async scanImage(image: string): Promise<ReceiptScan> {
     const call = runInInjectionContext(this.injector, () =>
       httpsCallable<{ image: string }, unknown>(inject(Functions), 'scanReceipt', { timeout: 100_000 }));

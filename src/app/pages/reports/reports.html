@@ -25,7 +25,7 @@
       </label>
     </div>
 
-    <!-- Report type — underline tabs, as Origin does -->
+    <!-- Report type: underline tabs, as Origin does -->
     <div class="tabs" role="tablist">
       @for (r of reports; track r.value) {
         <button class="tab"
@@ -211,7 +211,7 @@
       </table>
       <p class="table-note">
         Transfers between your own accounts. These are deliberately left out of the
-        income and spending reports — moving money is not earning or spending it.
+        income and spending reports, because moving money is not earning or spending it.
       </p>
     } @else {
       <table class="report-table">
@@ -242,7 +242,7 @@
     }
   </section>
 
-  <!-- SPLIT BILLS — its own question: how much of the expenses above is other
+  <!-- SPLIT BILLS. Its own question: how much of the expenses above is other
        people's share, and how much of that has come back. -->
   @if (showSplits()) {
     <section class="card split-card">

@@ -150,7 +150,7 @@
 }
 
 // The pre-refund statement figure, kept visible (struck through) so it's clear the
-// number moved and why — not just silently swapped out.
+// number moved and why, rather than silently swapped out.
 .cc-item-amount-original {
   font-size: 11.5px;
   color: var(--fg-4);

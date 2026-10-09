@@ -3,7 +3,7 @@
  * The percentages differ per theme on purpose. Light mode blends the accent
  * toward white, so it can run all the way to full --blue and still carry the
  * normal --fg ink. Dark mode blends toward near-black, so the same ramp would
- * cross into a bright blue that light ink cannot sit on — it stops at 72%.
+ * cross into a bright blue that light ink cannot sit on, so it stops at 72%.
  * Measured with --fg as the ink, every level clears 4.5:1 in both themes
  * (light 16.0 / 12.8 / 9.2 / 5.8, dark 14.0 / 10.5 / 7.4 / 5.0), which is why
  * the text colour never changes with the heat. */
@@ -116,7 +116,7 @@
   line-height: 1;
 }
 
-/* A day with nothing spent stays quiet — the figure is there if you look for
+/* A day with nothing spent stays quiet. The figure is there if you look for
    it, but it does not compete with the days that cost something. */
 .cal-day.heat-0:not(.future) .cal-amt { color: var(--fg-4); }
 

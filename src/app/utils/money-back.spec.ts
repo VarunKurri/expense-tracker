@@ -94,7 +94,7 @@ describe('scenario 9: legacy "Mark as refunded" keeps its totals', () => {
     const l = ledgerOf(txs);
 
     // Counting money back: the refunded purchase drops out, the dinner is netted,
-    // and the payback is not income — exactly the old "Excluding refunded" result.
+    // and the payback is not income: exactly the old "Excluding refunded" result.
     const counted = filterForAnalysis(txs, { excludeRefunded: true, isRefunded: t => l.isFullyRefunded(t) });
     expect(counted).not.toContain(old);
     expect(totalExpenses(counted, l.moneyRules(true))).toBe(40);
@@ -123,7 +123,7 @@ describe('scenario 10: a refund income from the bank, linked', () => {
     const l = ledgerOf(txs);
 
     expect(l.isFullyRefunded(order)).toBe(true);
-    // The pure check can't see linked incomes — which is why pages use the ledger's.
+    // The pure check can't see linked incomes, which is why pages use the ledger's.
     expect(isFullyRefunded(order)).toBe(false);
 
     const counted = filterForAnalysis(txs, { excludeRefunded: true, isRefunded: t => l.isFullyRefunded(t) });
@@ -190,7 +190,7 @@ describe('one payment spread over several bills', () => {
     expect(l.moneyBackEntriesFor(d2)[0]).toMatchObject({ source: 'repayment', amountCents: 2500, fromPersonId: 'm' });
   });
 
-  it('is money back, not income — once', () => {
+  it('is money back, not income, once', () => {
     expect(isMoneyBackIncome(zelle)).toBe(true);
     expect(incomeLinks(zelle)).toHaveLength(3);
     const counted = filterForAnalysis(txs, { excludeRefunded: true, isRefunded: t => l.isFullyRefunded(t) });

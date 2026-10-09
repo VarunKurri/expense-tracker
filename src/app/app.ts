@@ -108,14 +108,14 @@ export class App {
   });
 
   // Show a neutral boot splash until auth resolves and (if this device is
-  // remembered) the auto-unlock attempt finishes — avoids flashing login/unlock.
+  // remembered) the auto-unlock attempt finishes, to avoid flashing login/unlock.
   showSplash = computed(() =>
     !this.auth.resolved()
     || (!!this.auth.user() && !this.encryption.unlocked() && this.encryption.booting())
   );
 
   // Password reset / email verify / email change links land here directly from
-  // an email, with no session yet — read once from the real URL (not the
+  // an email, with no session yet. Read once from the real URL (not the
   // router) so it renders before auth/encryption even resolve.
   isAuthActionRoute = window.location.pathname.startsWith('/auth/action');
   commandPaletteOpen = signal(false);
@@ -123,7 +123,7 @@ export class App {
   activeCommandIndex = signal(0);
 
   // Soft, non-blocking email-verification reminder. Dismissed for the current
-  // session only — a still-unverified address prompts again next sign-in rather
+  // session only: a still-unverified address prompts again next sign-in rather
   // than nagging forever silently.
   verifyBannerDismissed = signal(false);
   verifySending = signal(false);
@@ -138,7 +138,7 @@ export class App {
     { path: '/net-worth',    label: 'Net worth',    iconName: 'networth' },
     { path: '/transactions', label: 'Transactions', iconName: 'tx' },
     { path: '/bills',        label: 'Bills',        iconName: 'bills',
-      // Overdue always counts; "upcoming" only counts a bill due today/tomorrow —
+      // Overdue always counts; "upcoming" only counts a bill due today/tomorrow,
       // narrowed from 7 days so the badge means "needs attention very soon," not
       // just "something's due sometime this week."
       badge: (this.billService.overdueBills().length + this.billService.upcomingBills(1).length) || null },
@@ -270,7 +270,7 @@ export class App {
     });
 
     // Autopay: fires when user, bills, AND accounts are all populated. Accounts must
-    // be loaded too — autopay's Plaid-linked check reads accountService.accounts(),
+    // be loaded too: autopay's Plaid-linked check reads accountService.accounts(),
     // and that signal starts at [] until its first snapshot resolves; running before
     // it's ready would see every account as "not Plaid-linked" and fabricate a
     // duplicate transaction for one that actually is.
@@ -294,7 +294,7 @@ export class App {
   /**
    * Switch between sign in / sign up / reset within the same session. Email is
    * intentionally kept (so a failed sign-in flows into "Forgot password?" with
-   * the address already there); the password is always cleared — carrying a
+   * the address already there); the password is always cleared. Carrying a
    * typed password across modes, or across a logout, is the security issue we
    * want to avoid.
    */
@@ -627,7 +627,7 @@ export class App {
     }
   }
 
-  /** Single entry point for the auth <form>'s (ngSubmit) — Enter now submits
+  /** Single entry point for the auth <form>'s (ngSubmit). Enter now submits
    *  from any field, dispatched to whichever action the current mode needs. */
   onAuthSubmit() {
     if (!this.authFormValid()) return;
@@ -641,7 +641,7 @@ export class App {
   /**
    * Explicitly offer the credential to the browser's password manager via the
    * Credential Management API. Chrome/Edge/Safari support this; unsupported
-   * browsers (e.g. Firefox) just no-op — the native "Save password?" prompt
+   * browsers (e.g. Firefox) just no-op. The native "Save password?" prompt
    * relies on this rather than guessing from our SPA's fetch-based sign-in.
    */
   private async offerToSaveCredential(email: string, password: string) {
@@ -759,7 +759,7 @@ export class App {
       if (verified) {
         this.toastService.success('Email verified. Thanks!');
       } else {
-        this.toastService.info('Not verified yet — click the link in the email first.');
+        this.toastService.info('Not verified yet. Click the link in the email first.');
       }
     } catch (err: any) {
       this.toastService.error(err?.message || 'Could not check verification status.');

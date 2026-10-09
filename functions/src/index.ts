@@ -121,7 +121,7 @@ export const exchangePublicToken = onCall(
  * Mint a Link token in Plaid's "update mode" for an item that needs re-auth
  * (expired/revoked login). Passing the item's existing access_token instead of
  * `products` puts Link into update mode: same item_id, same access_token stays
- * valid — the user just re-authenticates at their bank. No new exchange needed;
+ * valid; the user just re-authenticates at their bank. No new exchange needed;
  * Plaid clears the item's error state once update-mode Link completes.
  */
 export const createReauthLinkToken = onCall(
@@ -204,7 +204,7 @@ function mapPlaidTransaction(t: PlaidTransaction, itemId: string): Record<string
     amount: Math.abs(t.amount),
     // authorized_date is the day the purchase actually happened; date is when it
     // posted (can lag by a few days, or a purchase could still be cancelled before
-    // posting). Prefer authorized_date — falls back to date when Plaid doesn't
+    // posting). Prefer authorized_date, falling back to date when Plaid doesn't
     // supply one (common for some institutions/pending rows).
     date: t.authorized_date ?? t.date, // YYYY-MM-DD
     merchant: t.merchant_name || t.name || 'Unknown',
@@ -264,7 +264,7 @@ function statusForErrorCode(code: string | undefined): 'login_required' | 'error
 /**
  * Sync one Plaid item: page through `transactionsSync` from the stored cursor,
  * envelope-encrypt each transaction to the user's public key, and write it under
- * the Plaid transaction_id (so re-runs and modifications are idempotent — that's
+ * the Plaid transaction_id (so re-runs and modifications are idempotent; that's
  * the dedup). The cursor is advanced in the same batch as the page's writes, so a
  * failure re-fetches rather than skips.
  */
@@ -295,7 +295,7 @@ async function syncItem(
     // the old id. Naively that deletes the old doc and writes a fresh one, silently
     // discarding any edits the user made while it was pending. Check whether the old
     // doc still exists and whether it's still the untouched server-written envelope
-    // (safe to replace) or has become user-edited (must be preserved as-is — the
+    // (safe to replace) or has become user-edited (must be preserved as-is, since the
     // server can't decrypt it to merge fields, by design). This is a doc-ID lookup,
     // not a field query, since plaidTransactionId etc. are only guaranteed plaintext
     // on untouched envelope docs.
@@ -397,12 +397,12 @@ export const syncTransactions = onCall(
 
 /**
  * Ask Plaid to proactively re-poll the institution right now, outside its normal
- * polling cadence. Useful when a user suspects transactions are missing — e.g. an
+ * polling cadence. Useful when a user suspects transactions are missing, e.g. an
  * institution that only just posted data, or as a way to confirm whether a low
  * transaction count is a timing issue vs. a real limit on how much history that
  * institution shares. Plaid fires TRANSACTIONS/DEFAULT_UPDATE (and
  * SYNC_UPDATES_AVAILABLE) via our existing webhook once the refresh completes, so
- * no separate sync call is needed here — just trigger and wait for the webhook.
+ * no separate sync call is needed here: just trigger and wait for the webhook.
  */
 export const refreshPlaidItems = onCall(
   { secrets: [plaidClientId, plaidSecret, tokenEncKey] },
@@ -434,7 +434,7 @@ export const refreshPlaidItems = onCall(
 
 /**
  * Return the accounts held under a linked Plaid item (name, mask, type, balance)
- * so the client can auto-create matching app accounts. Not stored server-side —
+ * so the client can auto-create matching app accounts. Not stored server-side;
  * the client owns (and encrypts) the app accounts.
  */
 export const getPlaidAccounts = onCall(
@@ -457,15 +457,15 @@ export const getPlaidAccounts = onCall(
 
       // Liabilities (min payment, due date, statement date) is a separate call and a
       // separate consent scope. Items linked before Liabilities was requested at Link
-      // time will fail here (e.g. PRODUCT_NOT_READY / no access) — that's expected for
+      // time will fail here (e.g. PRODUCT_NOT_READY / no access). That's expected for
       // not-yet-relinked items, so we degrade gracefully rather than fail the whole call.
       type CreditInfo = {
         min: number | null;
         dueDay: number | null;
         statementDay: number | null;
-        statementBalance: number | null; // last closed statement balance — what's actually due
+        statementBalance: number | null; // last closed statement balance: what's actually due
         dueDate: string | null;          // exact next payment due date (YYYY-MM-DD)
-        statementIssueDate: string | null; // last statement close date — for paid detection
+        statementIssueDate: string | null; // last statement close date, for paid detection
         lastPaymentDate: string | null;    // when the last payment posted
         lastPaymentAmount: number | null;  // how much the last payment was
         isOverdue: boolean | null;         // Plaid's own overdue flag (authoritative)
@@ -475,7 +475,7 @@ export const getPlaidAccounts = onCall(
         const liab = await client.liabilitiesGet({ access_token: accessToken });
         const creditList = liab.data.liabilities?.credit ?? [];
         // Diagnostic: shows exactly what statement/cycle data each institution returns
-        // (e.g. confirms whether Discover ever provides Liabilities). Safe — no amounts
+        // (e.g. confirms whether Discover ever provides Liabilities). Safe: no amounts
         // of user spending, just statement metadata for the linked cards.
         console.log(`liabilitiesGet item ${itemId}: ${creditList.length} credit account(s):`,
           JSON.stringify(creditList.map(c => ({
@@ -537,7 +537,7 @@ export const getPlaidAccounts = onCall(
 
 /**
  * Disconnect a linked bank: remove the item at Plaid (stops billing/syncs), then
- * delete its stored data — the plaidItems doc, the reverse index, and every
+ * delete its stored data: the plaidItems doc, the reverse index, and every
  * transaction tagged with this item_id.
  */
 export const disconnectPlaidItem = onCall(
@@ -558,7 +558,7 @@ export const disconnectPlaidItem = onCall(
     const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
     const accessToken = decryptToken(itemSnap.data()!.accessToken as EncryptedValue, tokenEncKey.value());
 
-    // Look up this item's Plaid account_ids *before* removing the item — the
+    // Look up this item's Plaid account_ids *before* removing the item, because the
     // access token stops working right after itemRemove. These back up the
     // plaidItemId filter below in case any transaction is missing that field.
     let accountIds: string[] = [];
@@ -649,8 +649,8 @@ async function verifyPlaidWebhook(
 
 /**
  * Plaid calls this when new transaction data is available. We verify the request,
- * find the owning user, and run the same envelope-encrypting sync unattended —
- * no browser required. PLAID_WEBHOOK_URL must point here and be registered on the
+ * find the owning user, and run the same envelope-encrypting sync unattended,
+ * with no browser required. PLAID_WEBHOOK_URL must point here and be registered on the
  * item (createLinkToken sets it on new links).
  */
 export const plaidWebhook = onRequest(
@@ -696,13 +696,13 @@ export const plaidWebhook = onRequest(
           await getFirestore().doc(`users/${uid}/plaidItems/${item_id}`).set(
             { status: statusForErrorCode(code), lastError: code || 'sync_failed', updatedAt: Date.now() },
             { merge: true },
-          ).catch(() => {}); // best-effort — don't let a status-flag failure break the ack
+          ).catch(() => {}); // best-effort: don't let a status-flag failure break the ack
         }
       }
     }
 
     // ITEM webhooks report the item's health directly, independent of any sync
-    // attempt — this is how Plaid tells us proactively that re-auth is needed
+    // attempt. This is how Plaid tells us proactively that re-auth is needed
     // (or that it recovered) rather than us only discovering it on next sync.
     if (webhook_type === 'ITEM' && item_id) {
       try {
@@ -735,5 +735,5 @@ export const plaidWebhook = onRequest(
   },
 );
 
-// Receipt scanning (OpenAI) — see receipt.ts.
+// Receipt scanning (OpenAI): see receipt.ts.
 export { scanReceipt } from './receipt';

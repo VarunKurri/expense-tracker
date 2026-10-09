@@ -1,5 +1,5 @@
 /* Only what is unique to this form. Fields, labels, segmented controls,
-   toggles, sections and the footer are shared — styles.scss → FORMS. */
+   toggles, sections and the footer are shared (styles.scss → FORMS). */
 
 /* ── Templates ─────────────────────────────────────────────── */
 .template-strip { gap: 8px; }
@@ -53,7 +53,7 @@
   &:hover { color: var(--red); }
 }
 
-/* ── Amount — the one large figure on the form ─────────────── */
+/* ── Amount: the one large figure on the form ─────────────── */
 .amount-field {
   display: flex;
   align-items: baseline;
@@ -94,7 +94,7 @@
   line-height: 1.55;
 }
 
-/* ── Recurring bill — slides in when Subscriptions is picked ─ */
+/* ── Recurring bill: slides in when Subscriptions is picked ─ */
 .recurring { animation: slideDown 0.2s ease; }
 
 @keyframes slideDown {
@@ -113,5 +113,5 @@
   .recurring { animation: none; }
 }
 
-/* ── Receipt scan — what was read, and anything to check ───── */
+/* ── Receipt scan: what was read, and anything to check ───── */
 .scan-note { display: flex; flex-direction: column; gap: 4px; }

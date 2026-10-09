@@ -58,7 +58,7 @@
       <p class="section-note">
         Hidden from every picker, so you can't file anything new here. Past
         transactions keep their category, and bank transactions Plaid files here
-        still land here — delete it to send those somewhere else.
+        still land here. Delete it to send those somewhere else.
       </p>
       @for (c of archived(); track c.id) {
         <div class="cat-row archived">
@@ -193,7 +193,7 @@
                   @if (d.targetId) {
                     Future bank transactions Plaid files here will go to {{ targetName() }}.
                   } @else {
-                    Future bank transactions Plaid files here will arrive uncategorised —
+                    Future bank transactions Plaid files here will arrive uncategorised, and
                     a rule can file them.
                   }
                 </li>
@@ -206,9 +206,9 @@
                 <li class="warn">
                   <strong>{{ plural(p.budgetDeletes.length, 'budget') }} will be deleted</strong>
                   @if (d.targetId) {
-                    — {{ targetName() }} already has a budget for the same period, and that one is kept.
+                    because {{ targetName() }} already has a budget for the same period, and that one is kept.
                   } @else {
-                    — a budget needs a category.
+                    because a budget needs a category.
                   }
                 </li>
               }
@@ -217,7 +217,7 @@
               }
               @if (p.rulesDisabled) {
                 <li class="warn">
-                  <strong>{{ plural(p.rulesDisabled, 'rule') }} switched off</strong> — {{ p.rulesDisabled === 1 ? 'it only applies' : 'they only apply' }} to
+                  <strong>{{ plural(p.rulesDisabled, 'rule') }} switched off</strong> because {{ p.rulesDisabled === 1 ? 'it only applies' : 'they only apply' }} to
                   transactions in this category, and removing that condition would make
                   {{ p.rulesDisabled === 1 ? 'it' : 'them' }} match far more.
                 </li>

@@ -78,7 +78,7 @@ describe('heatScale', () => {
 
   it('does not divide by zero when every day cost the same', () => {
     // Every day counts as an outlier here, so the ranked bucket is never
-    // reached — the guard matters because reaching it would divide by zero.
+    // reached. The guard matters because reaching it would divide by zero.
     const scale = heatScale([50, 50, 50]);
     expect([50, 50, 50].map(scale)).toEqual([4, 4, 4]);
     expect(scale(0)).toBe(0);
@@ -105,7 +105,7 @@ describe('heatScale', () => {
     expect(forTwenty).toBeGreaterThanOrEqual(1);
   });
 
-  it('is monotonic — a bigger day is never a paler day', () => {
+  it('is monotonic: a bigger day is never a paler day', () => {
     const amounts = [5, 18, 40, 41, 77, 120, 300, 301, 900];
     const scale = heatScale(amounts);
     const levels = amounts.map(scale);
@@ -190,7 +190,7 @@ describe('buildMonthGrid', () => {
     expect(cell(23).future).toBe(false);
     expect(cell(23).isToday).toBe(true);
     expect(cell(24).future).toBe(true);
-    // A past day with no transactions is genuinely $0 — not the same as unknown.
+    // A past day with no transactions is genuinely $0, not the same as unknown.
     expect(cell(22).future).toBe(false);
     expect(cell(22).amount).toBe(0);
   });

@@ -26,7 +26,7 @@
       <span class="card-label">Needs a category</span>
       <p class="orphan-head">
         {{ orphanedBudgets().length === 1 ? 'This budget points' : 'These budgets point' }} to a
-        category that no longer exists. Move each to a current category — the amount is kept — or delete it.
+        category that no longer exists. Move each to a current category (the amount is kept), or delete it.
       </p>
       @for (b of orphanedBudgets(); track b.id) {
         <div class="orphan-row">

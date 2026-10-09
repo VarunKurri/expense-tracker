@@ -58,7 +58,7 @@
           </div>
           @if (itemNote(item)) { <p class="field-error">{{ itemNote(item) }}</p> }
         }
-        @if (isUnclaimed(item)) { <p class="field-hint">Nobody yet — tap who had it.</p> }
+        @if (isUnclaimed(item)) { <p class="field-hint">Nobody yet. Tap who had it.</p> }
       </div>
     }
   </div>
@@ -68,7 +68,7 @@
   }
 </div>
 
-<!-- TAX & FEES AND TIP — each one row: the number, then whether it's % or $.
+<!-- TAX & FEES AND TIP: each one row, the number, then whether it's % or $.
      Fees, discounts and credits ride in "Tax & fees": the split has only tax and tip. -->
 <div class="form-grid">
   <div class="field">
@@ -112,7 +112,7 @@
   </div>
 }
 
-<!-- HOW MUCH IS LEFT — always on screen, so tax and tip show what's still missing -->
+<!-- HOW MUCH IS LEFT: always on screen, so tax and tip show what's still missing -->
 <div class="field">
   <app-split-progress [totalCents]="billCents()" [addedCents]="result().totalCents" />
   <p class="field-hint">

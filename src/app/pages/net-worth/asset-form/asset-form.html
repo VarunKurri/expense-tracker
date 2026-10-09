@@ -34,7 +34,7 @@
           <div class="choice-grid">
             <button type="button" class="choice" [class.active]="owedTo === 'me'" (click)="owedTo = 'me'">
               <div class="choice-title">Me</div>
-              <div class="choice-sub">I lent it — it counts in my net worth</div>
+              <div class="choice-sub">I lent it, so it counts in my net worth</div>
             </button>
             <button type="button" class="choice" [class.active]="owedTo === 'someone-else'" (click)="owedTo = 'someone-else'">
               <div class="choice-title">Someone else</div>
@@ -42,7 +42,7 @@
             </button>
           </div>
           @if (owedTo === 'someone-else') {
-            <p class="field-hint">Tracked so you can see the payments come in, but left out of your net worth — the money isn't yours. Payments you receive still count as income.</p>
+            <p class="field-hint">Tracked so you can see the payments come in, but left out of your net worth because the money isn't yours. Payments you receive still count as income.</p>
           }
         </div>
       }
@@ -93,7 +93,7 @@
           </div>
           <p class="field-hint">
             @switch (method) {
-              @case ('reducing') { Interest on what's still owed — how banks, car loans and mortgages work. }
+              @case ('reducing') { Interest on what's still owed. This is how banks, car loans and mortgages work. }
               @case ('flat') { Interest on the original amount for the whole term. Common for personal and dealer loans. }
               @case ('none') { An interest-free loan, e.g. from family or friends. }
             }
@@ -136,7 +136,7 @@
           <p class="field-hint">
             @switch (dueMode) {
               @case ('exact') { Paid on the same day each month, like bank autopay. }
-              @case ('flexible') { Usually around one day, sometimes a little later — e.g. around the 25th, sometimes the 2nd of next month. }
+              @case ('flexible') { Usually around one day, sometimes a little later (e.g. around the 25th, sometimes the 2nd of next month). }
               @case ('none') { Roughly monthly, whenever it suits. Trackr won't flag a payment as missed. }
             }
           </p>
@@ -201,7 +201,7 @@
             <input class="input-field" type="number" step="0.01" min="0" [ngModel]="payment" (ngModelChange)="onPaymentInput($event)" name="payment" [placeholder]="calculatedPayment ? calculatedPayment.toFixed(2) : '0.00'" />
           </div>
           @if (paymentEdited) {
-            <p class="field-hint">Your figure — calculated is {{ money(calculatedPayment) }}. <button type="button" class="link-btn" (click)="resetPayment()">Use calculated</button></p>
+            <p class="field-hint">This is your own figure; the calculated one is {{ money(calculatedPayment) }}. <button type="button" class="link-btn" (click)="resetPayment()">Use calculated</button></p>
           } @else {
             <p class="field-hint">Calculated from the terms. Change it if your {{ isLent ? 'agreement' : 'lender' }} says a slightly different amount.</p>
           }
@@ -220,7 +220,7 @@
 
       <div class="form-section">
         <span class="form-section-title">How payments show up</span>
-        <p class="field-hint">Payments are recognised from your transactions — anything whose name contains this text and is close to {{ money(effectivePayment || 0) }}. Others can be linked by hand on the loan's page.</p>
+        <p class="field-hint">Payments are recognised from your transactions: anything whose name contains this text and is close to {{ money(effectivePayment || 0) }}. Others can be linked by hand on the loan's page.</p>
         <div class="form-grid">
           <div class="field">
             <label class="label-sm">Name contains</label>
@@ -286,7 +286,7 @@
         <div class="toggle-row">
           <div>
             <div class="toggle-label">Estimate its value as it ages</div>
-            <div class="toggle-sub">About 15% a year from the price — or from the value below if you don't know the price. A value you enter later takes over from there.</div>
+            <div class="toggle-sub">About 15% a year from the price, or from the value below if you don't know the price. A value you enter later takes over from there.</div>
           </div>
           <button type="button" class="toggle" [class.on]="depreciate" (click)="depreciate = !depreciate"
                   [attr.aria-pressed]="depreciate" aria-label="Estimate value as it ages"></button>

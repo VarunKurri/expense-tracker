@@ -13,7 +13,7 @@ import { personName } from '../utils/splits';
 @Injectable({ providedIn: 'root' })
 /**
  * People you split bills with. Saved once so the same person is recognised
- * across every split — that's what lets the Shared page say "Alex owes you
+ * across every split. That's what lets the Shared page say "Alex owes you
  * $85 across three dinners". Encrypted like every other collection.
  */
 export class PersonService {
@@ -69,7 +69,7 @@ export class PersonService {
 
   people = toSignal(this.people$, { initialValue: [] });
 
-  /** A display name for anyone on a bill — "You" for you. */
+  /** A display name for anyone on a bill ("You" for you). */
   nameOf(id: string): string {
     return personName(this.people(), id);
   }

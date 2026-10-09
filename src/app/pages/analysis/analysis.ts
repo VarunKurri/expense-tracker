@@ -137,7 +137,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
   excludedCategories = signal<Set<string>>(new Set());
   customStart = signal('');
   customEnd = signal('');
-  todayStr = localDateString(); // local, not UTC — UTC is already tomorrow on a US evening
+  todayStr = localDateString(); // local, not UTC (UTC is already tomorrow on a US evening)
 
   ranges: { value: RangeKey; label: string }[] = [
     { value: 'this-month',  label: 'This month' },
@@ -204,11 +204,11 @@ export class Analysis implements AfterViewInit, OnDestroy {
     });
   });
 
-  // Internal transfers (e.g. a credit card payment) are excluded — real money
+  // Internal transfers (e.g. a credit card payment) are excluded. They are real money
   // movement between the user's own accounts, not real spending/earning.
   expenses = computed(() => this.filtered().filter(t => t.type === 'expense' && !t.isInternalTransfer));
 
-  /** An expense's true cost after any linked reimbursements — unless netting is
+  /** An expense's true cost after any linked reimbursements, unless netting is
    *  off ("Include refunded"), in which case every expense counts as recorded.
    *
    *  Public because the drill-down lists have to show the same figure this page
@@ -250,7 +250,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
 
   /**
    * The quiet line under a drill-down row's net figure: the charge itself when
-   * money came back, and your share when the bill was split — so a $49.05
+   * money came back, and your share when the bill was split, so a $49.05
    * pizza reads as "your share $12.27", not as $49.05 of your own spending.
    */
   txNote(t: Transaction): string {
@@ -267,8 +267,8 @@ export class Analysis implements AfterViewInit, OnDestroy {
   // ── KPIs ───────────────────────────────────────────────────
   // The totals are shared with Reports and the category breakdown
   // (utils/reporting.ts), and added up in whole cents. With the toggle on,
-  // reimbursements over the original expense count as income — see
-  // reimbursementSurplus.
+  // reimbursements over the original expense count as income (see
+  // reimbursementSurplus).
   private rules = computed<MoneyRules>(() => this.txService.moneyRules(this.excludeRefunded()));
 
   totalExpenses = computed(() => totalExpenses(this.filtered(), this.rules()));
@@ -335,7 +335,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
       });
   });
 
-  // ── Top merchants — tracks all transactions per merchant for correct latest pick
+  // ── Top merchants: tracks all transactions per merchant for correct latest pick
   topMerchants = computed(() => {
     // amount in cents
     const byMerchant = new Map<string, { amount: number; txs: Transaction[] }>();
@@ -413,7 +413,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
     this.categoryService.categories().filter(c => c.kind === 'expense')
   );
 
-  // Human label for the active range — a real date span for "Custom" instead of
+  // Human label for the active range: a real date span for "Custom" instead of
   // just the word "Custom", since that's the whole point of picking exact dates.
   rangeLabel = computed(() => {
     if (this.range() === 'custom') {
@@ -452,7 +452,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
     return qp;
   });
 
-  // Params for "See all transactions" — same period as above, plus a marker so the
+  // Params for "See all transactions": same period as above, plus a marker so the
   // Transactions page enters an "analysis view" (matches these KPIs exactly: refunded
   // + internal-transfer rows stay visible but greyed out and are left out of totals).
   seeAllTxParams = computed(() => {
@@ -500,9 +500,9 @@ export class Analysis implements AfterViewInit, OnDestroy {
   }
 
   accountName(id?: string): string {
-    if (!id) return '—';
+    if (!id) return 'None';
     const a = this.accountService.accounts().find(a => a.id === id);
-    if (!a) return '—';
+    if (!a) return 'None';
     return a.icon ? `${a.icon} ${a.name}` : a.name;
   }
 

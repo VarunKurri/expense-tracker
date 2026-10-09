@@ -167,9 +167,9 @@ export class AccountDetail {
   }
 
   accountName(id?: string): string {
-    if (!id) return '—';
+    if (!id) return 'None';
     const a = this.accountService.accounts().find(a => a.id === id);
-    return a ? `${a.icon} ${a.name}` : '—';
+    return a ? `${a.icon} ${a.name}` : 'None';
   }
 
   formatCurrency(n: number): string {

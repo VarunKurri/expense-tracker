@@ -182,14 +182,14 @@
           @else { {{ formatCurrency(tx.amount) }} }
         </div>
         @if (txService.isFullyRefunded(tx)) {
-          <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
+          <div class="view-refunded-badge">↩ Refunded and excluded from analysis</div>
         }
       </div>
       <div class="view-details">
         @if (tx.type !== 'transfer') {
           <div class="view-row">
             <span class="view-row-label">{{ tx.type === 'income' ? 'Source' : 'Merchant' }}</span>
-            <span class="view-row-value">{{ tx.merchant || '—' }}</span>
+            <span class="view-row-value">{{ tx.merchant || 'None' }}</span>
           </div>
         }
         <div class="view-row">

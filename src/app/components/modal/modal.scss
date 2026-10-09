@@ -69,6 +69,9 @@
   min-height: 0;
   padding: 18px 20px;
   overflow-y: auto;
+  /* A form only ever scrolls up and down. If something is ever a little too
+     wide (as the iPhone date field was), it mustn't make the form slide sideways. */
+  overflow-x: hidden;
 }
 
 .modal-footer {

@@ -21,7 +21,7 @@ export class ReconciliationService {
   private txService = inject(TransactionService);
   private toast = inject(ToastService);
 
-  /** plaidTransactionIds the user chose to "keep both" — never suggested again. */
+  /** plaidTransactionIds the user chose to "keep both"; they are never suggested again. */
   private ignoreIds = signal<Set<string>>(new Set());
   busy = signal(false);
 
@@ -36,14 +36,14 @@ export class ReconciliationService {
   /**
    * Candidate duplicate pairs, computed live from decrypted transactions. A bank
    * transaction matches a manual entry when they share type + exact amount and their
-   * dates are within MATCH_DAYS — and only when exactly one manual entry qualifies
+   * dates are within MATCH_DAYS, and only when exactly one manual entry qualifies
    * (ambiguous cases are never guessed).
    */
   matches = computed<ReconcileMatch[]>(() => {
     const txs = this.txService.transactions();
     const ignore = this.ignoreIds();
     const serverPlaid = txs.filter(t => t.plaidTransactionId && t.id === t.plaidTransactionId);
-    // Once an entry is merged it's permanently excluded from being reconsidered — a
+    // Once an entry is merged it's permanently excluded from being reconsidered. A
     // looser rule (re-open matching once the original link target is gone, e.g. after
     // a disconnect/relink) was tried and reverted: with no merchant check and only a
     // 3-day/exact-amount match, it let a just-merged entry immediately become

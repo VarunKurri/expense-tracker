@@ -32,10 +32,10 @@ export interface Assignment {
  * resolves to the same weight vector, so `allocate()` stays the only place
  * money is ever divided.
  *
- * - `equal`   — every weight is 1.
- * - `shares`  — whole numbers. "He had two thirds" is `[2, 1]`.
- * - `percent` — percentages, which are weights that add up to 100.
- * - `amount`  — exact cents per person, which are weights that add up to the
+ * - `equal`:   every weight is 1.
+ * - `shares`:  whole numbers. "He had two thirds" is `[2, 1]`.
+ * - `percent`: percentages, which are weights that add up to 100.
+ * - `amount`:  exact cents per person, which are weights that add up to the
  *   item's price. The only mode where the weights carry a unit.
  */
 export type SplitMode = 'equal' | 'shares' | 'percent' | 'amount';
@@ -43,14 +43,14 @@ export type SplitMode = 'equal' | 'shares' | 'percent' | 'amount';
 export interface Item {
   id: ID;
   name: string;
-  /** Line total in integer cents — never a float. */
+  /** Line total in integer cents, never a float. */
   priceCents: number;
   splitMode: SplitMode;
   assignments: Assignment[];
 }
 
 /**
- * Money someone actually handed over — one card at the end, or four people
+ * Money someone actually handed over: one card at the end, or four people
  * chipping in. Separate from what they owe: the gap between the two is the
  * whole point of settling up.
  */
@@ -92,7 +92,7 @@ export interface Bill {
 }
 
 /* ------------------------------------------------------------------ */
-/* Derived — produced by the split engine, never stored               */
+/* Derived: produced by the split engine, never stored               */
 /* ------------------------------------------------------------------ */
 
 export interface PersonLine {

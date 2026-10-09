@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, afterEach } from 'vitest';
 import { ReceiptAttach } from './receipt-attach';
 
-describe('ReceiptAttach — taking a photo vs uploading one', () => {
+describe('ReceiptAttach: taking a photo vs uploading one', () => {
   const realMatchMedia = window.matchMedia;
   afterEach(() => { window.matchMedia = realMatchMedia; });
 
@@ -44,7 +44,7 @@ describe('ReceiptAttach — taking a photo vs uploading one', () => {
     expect([...el.querySelectorAll('.receipt-actions button')].map(b => b.textContent!.trim())).toEqual(['Fill in from it']);
   });
 
-  it('on the details sheet: only the thumbnail — no ✕, no action', () => {
+  it('on the details sheet: only the thumbnail, with no ✕ and no action', () => {
     const f = render(false);
     f.componentRef.setInput('editable', false);
     const el = attached(f);

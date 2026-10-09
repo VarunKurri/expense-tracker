@@ -32,11 +32,11 @@ interface EncryptionMeta {
   version: number;
   createdAt: number;
   // PBKDF2 iteration count used to derive the master key from the passphrase.
-  // Absent on vaults created before this field existed — those fall back to
+  // Absent on vaults created before this field existed; those fall back to
   // LEGACY_KDF_ITERATIONS so they keep unlocking with the exact key they always
   // have. New vaults get CURRENT_KDF_ITERATIONS. The two coexisting is safe
   // because the derived key IS the encryption key (no separate wrapped master
-  // key) — changing iterations for an existing vault would change its key and
+  // key). Changing iterations for an existing vault would change its key and
   // require re-encrypting everything, which belongs to the planned passphrase
   // rotation feature, not a silent bump here.
   kdfIterations?: number;
@@ -48,7 +48,7 @@ interface EncryptionMeta {
 // client can use it. Stored at `users/{uid}/meta/keys`.
 interface KeyMeta {
   publicKey: string; // base64 SPKI DER
-  wrappedPrivateKey: string; // base64 — PKCS8 private key encrypted under the master key
+  wrappedPrivateKey: string; // base64: PKCS8 private key encrypted under the master key
   wrappedPrivateKeyIv: string; // base64
   version: number;
   createdAt: number;
@@ -59,9 +59,9 @@ interface KeyMeta {
 interface RecoveryRecord {
   wrappedMasterKey: string; // base64
   iv: string; // base64
-  salt: string; // base64 — PBKDF2 salt for deriving the KEK from the code
+  salt: string; // base64: PBKDF2 salt for deriving the KEK from the code
   createdAt: number;
-  iterations?: number; // absent on older records — falls back to RECOVERY_ITERATIONS
+  iterations?: number; // absent on older records, which fall back to RECOVERY_ITERATIONS
 }
 
 const RECOVERY_ITERATIONS = 200_000;
@@ -69,7 +69,7 @@ const RECOVERY_ITERATIONS = 200_000;
 // PBKDF2-HMAC-SHA256 iteration counts. 600k matches OWASP's 2023 baseline for
 // browser contexts (WebCrypto has no native Argon2id/scrypt/bcrypt, so PBKDF2
 // is the right primitive; 600k is the recommended floor). 250k is what every
-// vault created before this change already uses — kept only as the fallback
+// vault created before this change already uses, kept only as the fallback
 // for those, never used for anything new.
 const CURRENT_KDF_ITERATIONS = 600_000;
 const LEGACY_KDF_ITERATIONS = 250_000;
@@ -189,13 +189,13 @@ export class EncryptionService {
     this.privateKey = null;
     this.unlocked.set(false);
     this.error.set(null);
-    // deviceRemembered reflects stored state, not session state — leave it.
+    // deviceRemembered reflects stored state, not session state, so leave it.
   }
 
   /**
    * Create (or replace) a recovery code: generate a high-entropy code, wrap the master
    * key under a key derived from it, and store the wrapped key. Returns the code to show
-   * ONCE — it isn't stored, so it can't be shown again. Requires a passphrase-unlocked
+   * ONCE: it isn't stored, so it can't be shown again. Requires a passphrase-unlocked
    * session (needs the raw master key).
    */
   async createRecoveryCode(): Promise<string> {
@@ -294,7 +294,7 @@ export class EncryptionService {
     this.deviceRemembered.set(true);
   }
 
-  /** Forget this device — clears the locally stored key. Passphrase unlock still works. */
+  /** Forget this device: clears the locally stored key. Passphrase unlock still works. */
   async forgetDevice() {
     const user = this.auth.user();
     if (!user) return;
@@ -387,7 +387,7 @@ export class EncryptionService {
    * Ensure the user has an RSA keypair for envelope encryption. First unlock
    * (new or existing user) generates one and stores the public key in plaintext
    * plus the private key wrapped under the master key; later unlocks unwrap the
-   * stored private key. Never blocks unlock of existing symmetric data — a
+   * stored private key. Never blocks unlock of existing symmetric data; a
    * keypair hiccup is logged, not fatal.
    */
   private async ensureKeypair() {
@@ -452,7 +452,7 @@ export class EncryptionService {
 
       for (const item of snap.docs) {
         const data = item.data();
-        // Already encrypted (symmetric) OR a server-written envelope doc — leave it.
+        // Already encrypted (symmetric) OR a server-written envelope doc: leave it.
         if (data['__encrypted'] || data['__envelope']) continue;
         const encrypted = await this.encryptForWrite(data);
         batch.set(item.ref, encrypted);
@@ -496,7 +496,7 @@ export class EncryptionService {
       try {
         inner = JSON.parse(await this.decryptStringWithKey(data['encryptedPayload'], data['iv'], this.key));
       } catch {
-        continue; // can't decrypt with this key — not ours to touch
+        continue; // can't decrypt with this key, so not ours to touch
       }
       if (inner && inner['__envelope'] === true) {
         batch.set(item.ref, inner); // restore the proper envelope doc
@@ -525,7 +525,7 @@ export class EncryptionService {
 
   // Derive the master key from the passphrase, returning both the AES-GCM CryptoKey
   // and the raw bytes (kept so a recovery code can wrap them). The iteration count
-  // is per-vault (see EncryptionMeta.kdfIterations) — callers must pass the value
+  // is per-vault (see EncryptionMeta.kdfIterations), so callers must pass the value
   // that matches how this vault's verifier/data were actually encrypted.
   private async deriveMasterKey(passphrase: string, salt: Uint8Array, iterations: number): Promise<{ key: CryptoKey; raw: Uint8Array }> {
     const material = await crypto.subtle.importKey(

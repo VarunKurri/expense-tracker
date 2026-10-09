@@ -210,7 +210,7 @@ export class PlaidService {
   }
 
   /**
-   * Create an app account for each Plaid account under an item (idempotent — skips
+   * Create an app account for each Plaid account under an item (idempotent: skips
    * any Plaid account already linked to an app account). Runs client-side so the
    * accounts are encrypted with the user's key like all other app data.
    */
@@ -226,7 +226,7 @@ export class PlaidService {
       for (const a of data.accounts) {
         const match = existing.find(acc => acc.plaidAccountId === a.account_id);
         if (match) {
-          // Already created — backfill any credit-card fields Plaid now reports
+          // Already created, so backfill any credit-card fields Plaid now reports
           // that we didn't have yet (covers accounts created before these fields
           // existed, or before Liabilities was granted for this item).
           const patch: Partial<Account> = {};
@@ -234,7 +234,7 @@ export class PlaidService {
           if (!match.statementClosingDay && a.statement_closing_day) patch.statementClosingDay = a.statement_closing_day;
           // Dynamic liability fields change every statement cycle, so always refresh
           // to Plaid's latest (unlike the static fields above, which only backfill).
-          // These come from Plaid for a linked card — a user wouldn't hand-edit them.
+          // These come from Plaid for a linked card; a user wouldn't hand-edit them.
           if (a.minimum_payment != null && a.minimum_payment !== match.minimumPayment) patch.minimumPayment = a.minimum_payment;
           if (a.payment_due_day != null && a.payment_due_day !== match.paymentDueDay) patch.paymentDueDay = a.payment_due_day;
           if (a.statement_balance != null && a.statement_balance !== match.statementBalance) patch.statementBalance = a.statement_balance;
@@ -245,7 +245,7 @@ export class PlaidService {
           if (a.is_overdue != null && a.is_overdue !== match.statementOverdue) patch.statementOverdue = a.is_overdue;
           // One-time opening-balance reconciliation: accounts are auto-created with
           // openingBalance 0, so the locally-computed balance only reflects whatever
-          // history Plaid happened to sync — it's wrong whenever the real account had
+          // history Plaid happened to sync, so it's wrong whenever the real account had
           // activity before that window. Once Plaid reports a real current_balance,
           // back-solve the opening balance that makes our formula land on it exactly,
           // using whatever's already synced locally at that moment. Only ever runs
@@ -323,7 +323,7 @@ export class PlaidService {
       await this.reconcileSvc.cleanupReconciled();
       const changed = data.added + data.modified + data.removed;
       if (changed === 0) {
-        this.toast.info('Already up to date — no new transactions.');
+        this.toast.info('Already up to date. No new transactions.');
       } else {
         this.toast.success(
           `Synced: ${data.added} added, ${data.modified} updated, ${data.removed} removed.`,
@@ -331,7 +331,7 @@ export class PlaidService {
       }
       if (data.failed.length > 0) {
         const names = data.failed.map(f => f.institutionName).join(', ');
-        this.toast.error(`${names} — reconnect needed. See Accounts to fix.`);
+        this.toast.error(`Reconnect needed for ${names}. See Accounts to fix.`);
       }
     } catch (err: any) {
       console.error('syncTransactions failed:', err);
@@ -345,7 +345,7 @@ export class PlaidService {
    * Ask Plaid to proactively re-poll every linked institution right now (outside
    * their normal cadence), rather than waiting for the next scheduled sync. Useful
    * to check whether a low transaction count is a timing issue or a real limit on
-   * how much history that institution shares — if a refresh + resync still shows
+   * how much history that institution shares. If a refresh + resync still shows
    * the same count, the institution itself is capping what it returns.
    * The webhook picks up any new data automatically; wait a few seconds after this
    * resolves, then use "Sync transactions" to pull in whatever Plaid found.
@@ -391,7 +391,7 @@ export class PlaidService {
         if (acc.plaidItemId === item.itemId && acc.id) await this.accountSvc.remove(acc.id);
       }
       this.toast.success(
-        `${item.institutionName} disconnected — ${data.removedTransactions} synced transaction(s) removed.`,
+        `${item.institutionName} disconnected. ${data.removedTransactions} synced transaction(s) removed.`,
       );
     } catch (err: any) {
       console.error('disconnect failed:', err);
@@ -405,7 +405,7 @@ export class PlaidService {
    * Re-authenticate a bank that needs it (expired/revoked login): opens Plaid
    * Link in "update mode" for this exact item, so the user re-logs in at their
    * bank without creating a duplicate item. Update mode doesn't need a fresh
-   * token exchange — the existing access_token stays valid — so on success we
+   * token exchange (the existing access_token stays valid), so on success we
    * just clear the item's error status locally.
    */
   async reconnect(item: PlaidItem): Promise<void> {

@@ -26,7 +26,7 @@
         <span class="card-label">Forecast</span>
         <h2 class="display">A forecast needs <em>a month of history</em>.</h2>
         <p>
-          Once a full month of income and spending is in, Trackr can say where your cash is heading —
+          Once a full month of income and spending is in, Trackr can say where your cash is heading,
           with your bills on their dates and your loan payments on schedule.
         </p>
       </section>
@@ -79,8 +79,8 @@
                     [attr.aria-expanded]="openMonth() === m.month" (click)="toggleOpen(m)">
               <span class="m-name">{{ m.label }}{{ m.partial ? ' (rest)' : '' }}</span>
               <span class="fig" data-label="In">{{ money(m.income + m.repayments) }}</span>
-              <span class="fig" data-label="Bills">{{ m.bills ? '−' + money(m.bills) : '—' }}</span>
-              <span class="fig" data-label="Loans">{{ m.loans ? '−' + money(m.loans) : '—' }}</span>
+              <span class="fig" data-label="Bills">{{ m.bills ? '−' + money(m.bills) : 'None' }}</span>
+              <span class="fig" data-label="Loans">{{ m.loans ? '−' + money(m.loans) : 'None' }}</span>
               <span class="fig" data-label="Everyday">−{{ money(m.everyday) }}</span>
               <span class="fig net" data-label="Net" [class.up]="m.net > 0" [class.down]="m.net < 0">{{ signed(m.net) }}</span>
               <span class="fig cash" data-label="Cash" [class.negative]="m.cash < 0">{{ signedMoney(m.cash) }}</span>
@@ -147,7 +147,7 @@
               </button>
             }
           </div>
-          <p class="field-hint">Click a month to leave it out if it was a one-off — a laptop, a trip — so it doesn't set the pace.</p>
+          <p class="field-hint">Click a month to leave it out if it was a one-off (a laptop, a trip), so it doesn't set the pace.</p>
         </div>
 
         <div class="typical-figures">
@@ -165,7 +165,7 @@
           <p class="everyday-sentence">{{ everydaySentence() }}</p>
           @for (row of everydayRows(); track row.id) {
             <button type="button" class="cat-row" [class.zero]="row.amount === 0" (click)="openCategory(row.id)"
-                    [attr.aria-label]="row.name + ', ' + money(row.amount) + ' a month — see its transactions'">
+                    [attr.aria-label]="row.name + ', ' + money(row.amount) + ' a month. See its transactions'">
               <span class="cat-icon" [style.background]="row.color + '22'" [style.border-color]="row.color + '44'">{{ row.icon }}</span>
               <span class="cat-main">
                 <span class="cat-name">{{ row.name }}</span>
@@ -214,8 +214,8 @@
             <strong>Known money comes in on its dates:</strong> bills and subscriptions when they're due,
             loan payments on their schedule. <strong>The rest is a typical month</strong>, averaged over the
             months chosen above: {{ money(f.basis.income) }} in, and {{ money(f.basis.everyday) }} of everyday
-            spending — what you spent, less what bills cost a month ({{ money(f.basis.billsMonthly) }}) and loan
-            payments, category by category. Investments are held flat; nothing assumes growth.
+            spending (what you spent, less what bills cost a month ({{ money(f.basis.billsMonthly) }}) and loan
+            payments, category by category). Investments are held flat; nothing assumes growth.
           </p>
         </div>
       </section>

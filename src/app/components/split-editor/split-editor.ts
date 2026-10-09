@@ -26,8 +26,8 @@ export const SPLIT_MODES: { value: SplitMode; label: string }[] = [
  * was divided, and who else paid towards it.
  *
  * It holds only the choices (`QuickSplitState`). Every number shown comes from
- * Split's engine through `utils/splits.ts` — this component does no money
- * arithmetic of its own — so what you see is exactly what gets saved.
+ * Split's engine through `utils/splits.ts`. This component does no money
+ * arithmetic of its own, so what you see is exactly what gets saved.
  */
 @Component({
   selector: 'app-split-editor',
@@ -52,7 +52,7 @@ export class SplitEditor {
   problems = computed(() => splitProblems(this.split(), this.myPaidCents()));
   others = computed(() => this.state().participantIds.filter(id => id !== ME));
 
-  /** Percentages or amounts that don't add up — still divided in proportion, but say so. */
+  /** Percentages or amounts that don't add up: still divided in proportion, but say so. */
   balanceNote = computed(() => {
     const item = this.split().items[0];
     return item && !splitIsBalanced(item) ? balanceNote(item.splitMode, item.assignments, amountGapCents(item), 'the bill') : '';

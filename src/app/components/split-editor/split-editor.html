@@ -44,7 +44,7 @@
   }
 }
 
-<!-- HOW MUCH IS LEFT — always on screen -->
+<!-- HOW MUCH IS LEFT: always on screen -->
 <div class="field">
   <app-split-progress [totalCents]="billCents()" [addedCents]="assignedCents()" verb="assigned" />
   @if (balanceNote()) { <p class="field-hint">{{ balanceNote() }}</p> }

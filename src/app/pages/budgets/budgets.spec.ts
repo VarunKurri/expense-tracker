@@ -44,7 +44,7 @@ class FakeBudgets {
 }
 
 /** Just enough of TransactionService. Money back (refunds, reimbursements) is the
- *  real logic, inherited — not a copy that could drift from what the app does. */
+ *  real logic, inherited, not a copy that could drift from what the app does. */
 class FakeTransactions extends MoneyBackLedger {
   transactions = signal<Transaction[]>([]);
   async update() {}
@@ -239,7 +239,7 @@ describe('Budgets', () => {
     const loc = TestBed.inject(Location);
     button('← Budgets').click();
     await settle();
-    // It steps back in history — the same entry the browser's Back returns to.
+    // It steps back in history, to the same entry the browser's Back returns to.
     // (The mock location doesn't fire popstate, so load that entry by hand.)
     expect(loc.path()).toBe(`/budgets?month=${lastMonth}`);
     await harness.navigateByUrl(loc.path());

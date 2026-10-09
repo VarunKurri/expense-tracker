@@ -4,14 +4,14 @@ import { addMonths, monthKeyOf, monthLabel } from '../../utils/calendar';
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
- * `‹ October 2026 ›` — step a month at a time, or click the name to jump
+ * `‹ October 2026 ›`: step a month at a time, or click the name to jump
  * anywhere through a year grid.
  *
  * Budgets used to show a fixed row of nine month pills (five back, three
  * ahead), so anything older simply could not be reached. A stepper has no
  * edge, and the grid makes a long jump two clicks instead of twelve.
  *
- * Months in `marks` get a small dot in the grid — "there is something here" —
+ * Months in `marks` get a small dot in the grid ("there is something here"),
  * so you can find the months that matter without opening each one.
  */
 @Component({

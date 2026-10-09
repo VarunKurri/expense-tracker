@@ -23,20 +23,20 @@ import type { Assignment, Bill, BillSummary, Charges, Item, Payment, SplitMode, 
  * 2. **A repayment pays off the people it covers, in order.** "Alex sent $180
  *    for Alex, Ben and Cara" clears all three; whatever Ben and Cara now owe
  *    Alex is between them. Anything beyond what the covered people owed you is
- *    reported as `unappliedRepaymentCents` — usually a friend covering your
- *    share too — and the out-of-pocket rule in `money-back.ts` takes it from
+ *    reported as `unappliedRepaymentCents` (usually a friend covering your
+ *    share too), and the out-of-pocket rule in `money-back.ts` takes it from
  *    there.
  *
  * Integer cents throughout.
  */
 
-/** A display name for anyone on a bill — "You" for you. */
+/** A display name for anyone on a bill: "You" for you. */
 export function personName(people: SplitPerson[], id: string): string {
   if (id === ME) return 'You';
   return people.find(p => p.id === id)?.name ?? 'Someone';
 }
 
-/** No tax, no tip — the quick "$180, three ways" split. */
+/** No tax, no tip: the quick "$180, three ways" split. */
 export const NO_CHARGES: Charges = {
   taxMode: 'amount', taxPercent: 0, taxCents: 0,
   tipMode: 'amount', tipPercent: 0, tipCents: 0, tipBasis: 'preTax',
@@ -117,7 +117,7 @@ export interface SplitStatus {
   refundedCents: number;
   /** Your part of the bill, after any refund. */
   myShareCents: number;
-  /** What you paid the merchant — equals the transaction amount. */
+  /** What you paid the merchant, which equals the transaction amount. */
   myPaidCents: number;
   /** Everyone except you. */
   people: PersonSplitStatus[];
@@ -363,7 +363,7 @@ export function quickStateFrom(split: TransactionSplit): QuickSplitState {
  * How much of the bill the typed weights account for, for the "$X of $Y
  * assigned · $Z left" line. Equal and shares always cover the whole bill;
  * amounts are what's typed; percentages are that share of the bill. Display
- * only — the split itself always divides the whole bill, in proportion.
+ * only; the split itself always divides the whole bill, in proportion.
  */
 export function quickAssignedCents(state: QuickSplitState, myPaidCents: number): number {
   const bill = quickBillCents(state, myPaidCents);
@@ -407,7 +407,7 @@ export function restateWeights(state: QuickSplitState, mode: SplitMode, billCent
 
 /**
  * What the itemized editor holds: the receipt's lines, tax and tip, and who
- * had what. As with the quick split, the arithmetic is the engine's — the
+ * had what. As with the quick split, the arithmetic is the engine's: the
  * bill total here is whatever `calculateSplit` says items + tax + tip come to.
  */
 export interface ItemizedSplitState {
@@ -434,7 +434,7 @@ export function newItem(assigneeIds: string[] = [], name = '', priceCents = 0, q
   return quantity > 1 ? { ...item, quantity, unitPriceCents: priceCents } : item;
 }
 
-/** How many of an item — 1 unless said otherwise. */
+/** How many of an item: 1 unless said otherwise. */
 export function itemQuantity(item: SplitItem): number {
   return item.quantity && item.quantity > 1 ? item.quantity : 1;
 }
@@ -514,7 +514,7 @@ export function myPaymentToCoverCents(state: ItemizedSplitState): number {
   return Math.max(0, itemizedBillCents(state) - others);
 }
 
-/** Give every item nobody has claimed to one person — "the rest is mine". */
+/** Give every item nobody has claimed to one person ("the rest is mine"). */
 export function assignUnclaimedTo(state: ItemizedSplitState, personId: string): ItemizedSplitState {
   const people = state.participantIds.map(id => ({ id }));
   return {

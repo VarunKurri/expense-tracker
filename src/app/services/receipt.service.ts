@@ -11,7 +11,7 @@ const HARD_LIMIT_CHARS = Math.round(MAX_IMAGE_CHARS * 1.15);
 /**
  * Receipt photos attached to transactions.
  *
- * One encrypted document per photo in `users/{uid}/receipts` — the same
+ * One encrypted document per photo in `users/{uid}/receipts`, with the same
  * encryption and rules as every other collection, so nothing new to set up
  * and nothing readable outside the app. Unlike other services there's no live
  * listener: photos are big, so each is fetched only when it's opened, and kept

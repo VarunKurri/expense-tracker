@@ -39,7 +39,7 @@
   .dot { display: none; }
 }
 
-/* "NET WORTH ›" opens the Net worth page — a link that still reads as the eyebrow. */
+/* "NET WORTH ›" opens the Net worth page: a link that still reads as the eyebrow. */
 .hero-link {
   padding: 0;
   border: 0;
@@ -239,13 +239,13 @@
 /* ── MAIN GRID ─────────────────────────────────────────────── */
 /* Three cards on one baseline.
  *
- * These used to size to their own content, so the row ended in a ragged step —
+ * These used to size to their own content, so the row ended in a ragged step:
  * the donut card runs a good deal taller than a two-bill list, and how far
  * apart they land changes with the data, which is what made it look accidental.
  *
  * Stretching them to a shared height fixes that without inventing content: the
  * cards share a bottom edge, and each one's own content still starts at the
- * top. A sidebar arrangement was the other candidate and was worse — stacking
+ * top. A sidebar arrangement was the other candidate and was worse: stacking
  * two short cards beside the tall one simply moved the overhang to the other
  * column. */
 .main-grid {
@@ -310,7 +310,7 @@
 
 /* The eyebrow is the link into the Spending page, the way Origin's
    "SPENT IN SEPTEMBER ›" is. It is a button, so it gets a pointer and a focus
-   ring — but no fill or border, so it still reads as a label. */
+   ring, but no fill or border, so it still reads as a label. */
 .spend-link {
   display: inline-flex;
   align-items: center;
@@ -356,7 +356,7 @@
 }
 
 /* ── ACTIVITY ──────────────────────────────────────────────── */
-/* A real <button>, so these rows are keyboard-reachable — they open the
+/* A real <button>, so these rows are keyboard-reachable. They open the
    transaction view, which was previously only clickable with a mouse. */
 .activity-row {
   display: grid;
@@ -500,7 +500,7 @@
 
 /* ── TRANSACTION VIEW PANEL ────────────────────────────────── */
 /* The transaction view panel now lives in
-   components/transaction-view/ — its styles moved with it. */
+   components/transaction-view/, and its styles moved with it. */
 
 /* ── RESPONSIVE ────────────────────────────────────────────── */
 @media (max-width: 1024px) {

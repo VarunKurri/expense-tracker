@@ -52,7 +52,7 @@
   &:hover { color: var(--fg-2); }
 }
 
-/* ── Report tabs — underlined, matching Origin's Reports header ── */
+/* ── Report tabs: underlined, matching Origin's Reports header ── */
 .tabs {
   display: flex;
   gap: 4px;
@@ -141,7 +141,7 @@
   .input-field { width: auto; min-width: 160px; }
 }
 
-/* ── Legend — always present for two or more series ───────── */
+/* ── Legend: always present for two or more series ───────── */
 .legend {
   display: flex;
   gap: 18px;

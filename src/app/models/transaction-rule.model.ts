@@ -1,7 +1,7 @@
 import { TransactionType } from './transaction.model';
 
 /**
- * An automatic categorisation rule — Origin's "mark all Lyft transactions as
+ * An automatic categorisation rule, like Origin's "mark all Lyft transactions as
  * Rideshare".
  *
  * Rules are stored encrypted like every other record, which means they can only

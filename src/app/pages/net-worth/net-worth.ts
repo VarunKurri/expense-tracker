@@ -33,10 +33,10 @@ const RANGE_WORDS: Record<Range, string> = {
 };
 
 /**
- * Net worth — what you own minus what you owe, how it has moved, and what it
+ * Net worth: what you own minus what you owe, how it has moved, and what it
  * is made of. Accounts come from AccountService (balances rebuilt from
- * transactions, see utils/net-worth.ts); anything without a bank connection —
- * a home, a car, a loan — is a manual entry with dated valuations.
+ * transactions, see utils/net-worth.ts); anything without a bank connection
+ * (a home, a car, a loan) is a manual entry with dated valuations.
  */
 @Component({
   selector: 'app-net-worth',
@@ -66,7 +66,7 @@ export class NetWorth implements OnDestroy {
   private manual = computed(() => this.manualService.items());
   private txs = computed(() => this.txService.transactions());
 
-  /** Today's holdings, grouped — the two lists under the chart. */
+  /** Today's holdings, grouped: the two lists under the chart. */
   now = computed(() => composition(holdingsOn(this.accounts(), this.manual(), this.txs(), this.today)));
 
   series = computed(() => {
@@ -80,7 +80,7 @@ export class NetWorth implements OnDestroy {
   /** Continue the line six months ahead, on the forecast's numbers. */
   projecting = signal(false);
 
-  /** Net worth at each of the next six month-ends — see utils/forecast.ts for what it assumes. */
+  /** Net worth at each of the next six month-ends. See utils/forecast.ts for what it assumes. */
   projection = computed(() => {
     if (!this.projecting()) return [];
     const f = forecast({
@@ -128,7 +128,7 @@ export class NetWorth implements OnDestroy {
       : `over ${RANGE_WORDS[this.range()]}`;
   });
 
-  /** The plain-English line under the chart — why the number is what it is. */
+  /** The plain-English line under the chart: why the number is what it is. */
   sentence = computed(() => {
     const c = this.now();
     if (c.assets === 0 && c.liabilities === 0) return '';

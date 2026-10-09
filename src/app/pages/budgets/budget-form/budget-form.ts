@@ -17,8 +17,8 @@ import { monthKeyOf, monthLabel } from '../../../utils/calendar';
 /**
  * Add or edit a budget.
  *
- * The form says *what* to save — category, "every month" or "one month", and
- * the amount — and the page works out which document that is. It no longer
+ * The form says *what* to save (category, "every month" or "one month", and
+ * the amount), and the page works out which document that is. It no longer
  * edits whichever budget happened to be on screen: that is how overriding one
  * month used to wipe the every-month budget.
  */

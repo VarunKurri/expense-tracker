@@ -153,7 +153,7 @@ describe('budgetProgress', () => {
   });
 });
 
-describe('planBudgetSave — amounts', () => {
+describe('planBudgetSave: amounts', () => {
   it('stores whole cents, reading 1.005 as $1.01', () => {
     const write = planBudgetSave([], { categoryId: 'gym', amount: 1.005, scope: 'default', month: '2026-10' }).write;
     expect(write.kind === 'add' && write.data.amount).toBe(1.01);

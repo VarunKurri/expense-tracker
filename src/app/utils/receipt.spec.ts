@@ -11,7 +11,7 @@ const scan = (over: Partial<ReceiptScan> = {}): ReceiptScan => ({
   fees: [], discounts: [], taxCents: 0, tipCents: 0, totalCents: null, confidence: 0.9, ...over,
 });
 
-describe('cleanScan — nothing the model says is trusted as given', () => {
+describe('cleanScan: nothing the model says is trusted as given', () => {
   it('keeps a well-formed scan as it is', () => {
     const raw = scan({ items: [{ name: 'Mandi', quantity: 2, unitPriceCents: 2500, totalCents: 5000 }], taxCents: 444, totalCents: 5444 });
     expect(cleanScan(raw)).toEqual(raw);
@@ -112,7 +112,7 @@ describe('Tax & fees: tax, plus fees, less discounts and credits', () => {
   });
 });
 
-describe('itemizedFromScan — the scan as an item-by-item split', () => {
+describe('itemizedFromScan: the scan as an item-by-item split', () => {
   const base = { ...emptyItemizedState(), participantIds: [ME, 'm', 'p'] };
 
   it('items exactly as printed: 3 × $13.99 stays one line of three, discounts and all', () => {

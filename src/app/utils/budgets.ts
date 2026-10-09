@@ -14,7 +14,7 @@ import { fromCents, toCents } from './money';
  * The form used to edit whichever budget document happened to be showing. When
  * you pressed Override on a month with no one-off yet, the one showing was the
  * every-month budget, so saving "Specific month" turned that budget *into* a
- * one-month budget — and every other month lost its limit. The form now
+ * one-month budget, and every other month lost its limit. The form now
  * describes *what* to save (category + scope + month) and `planBudgetSave`
  * picks the document, so editing one scope can never rewrite the other.
  */
@@ -56,7 +56,7 @@ export interface EffectiveBudget {
 
 /**
  * One budget per category for a month. Includes categories that only have a
- * one-off budget for this month — the old list started from every-month budgets
+ * one-off budget for this month. The old list started from every-month budgets
  * only, so a category without one vanished from every screen.
  */
 export function effectiveBudgets(budgets: Budget[], month: string): EffectiveBudget[] {
@@ -82,7 +82,7 @@ export function effectiveBudgets(budgets: Budget[], month: string): EffectiveBud
 
 /**
  * Categories with one-off budgets but no every-month budget, and no budget in
- * `month` — they are invisible while you look at `month`, so the page lists
+ * `month`. They are invisible while you look at `month`, so the page lists
  * where to find them.
  */
 export function budgetsElsewhere(budgets: Budget[], month: string): { categoryId: string; months: string[] }[] {

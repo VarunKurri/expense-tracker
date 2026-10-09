@@ -13,8 +13,8 @@ export interface DateBounds {
  *
  * "Last 30 days" has a start but no end. It means "what has happened
  * recently", and banks sometimes date a transaction a day or two ahead through
- * Plaid — a scheduled or pending payment carrying its settlement date, or a bank
- * dating by its own time zone. Capping it at today hid those, so a payment
+ * Plaid (a scheduled or pending payment carrying its settlement date, or a bank
+ * dating by its own time zone). Capping it at today hid those, so a payment
  * showed under "This month" and "All time" but not "Last 30 days".
  */
 export function transactionRange(

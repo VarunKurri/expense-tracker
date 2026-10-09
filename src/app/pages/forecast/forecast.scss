@@ -1,6 +1,6 @@
 .page {
   padding: 28px 32px 48px;
-  /* Same width as Overview, Spending and Reports — tabs of one screen. */
+  /* Same width as Overview, Spending and Reports, since they are tabs of one screen. */
   max-width: 1320px;
   margin: 0 auto;
   display: flex;
@@ -266,7 +266,7 @@
   gap: 8px;
 }
 
-/* A month counted is a solid tile; one left out is dashed and struck — monochrome, like any selection. */
+/* A month counted is a solid tile; one left out is dashed and struck. Both are monochrome, like any selection. */
 .month-tile {
   display: flex;
   flex-direction: column;

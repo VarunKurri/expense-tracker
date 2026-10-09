@@ -45,7 +45,7 @@ const haircut: Transaction = {
   accountId: 'card', createdAt: 0, updatedAt: 0,
 };
 
-describe('TransactionView — money back', () => {
+describe('TransactionView: money back', () => {
   let txs: FakeTransactions;
   let fixture: ComponentFixture<TransactionView>;
   let el: HTMLElement;
@@ -116,7 +116,7 @@ describe('TransactionView — money back', () => {
     expect(view().textContent).toContain('Refunded in full');
   });
 
-  it('with some already back, it offers "The rest" — never more than is still out of pocket', async () => {
+  it('with some already back, it offers "The rest", never more than is still out of pocket', async () => {
     const venmo: Transaction = { id: 'v', type: 'income', amount: 20, date: '2026-10-05', merchant: 'Venmo', reimbursesId: 'cut', createdAt: 0, updatedAt: 0 };
     await open(haircut, [venmo]);
     button('+ Add money back').click();
@@ -163,7 +163,7 @@ describe('TransactionView — money back', () => {
     expect(view().textContent).toContain('↩ Repayment · +$46.00');
   });
 
-  it('linking an income asks refund or repayment — repayment by default', async () => {
+  it('linking an income asks refund or repayment, with repayment by default', async () => {
     const venmo: Transaction = { id: 'v', type: 'income', amount: 46, date: '2026-10-05', merchant: 'Venmo', createdAt: 0, updatedAt: 0 };
     await open(haircut, [venmo]);
     button('+ Link income').click();
@@ -181,7 +181,7 @@ describe('TransactionView — money back', () => {
   });
 
   describe('on a split bill', () => {
-    // $240 dinner, four ways: you, Alex, Ben, Cara — $60 each.
+    // $240 dinner, four ways: you, Alex, Ben, Cara: $60 each.
     const dinner: Transaction = { ...haircut, id: 'dinner', amount: 240, merchant: 'Ramen Bar', split: quickSplit(24000, [ME, 'alex', 'ben', 'cara']) };
     const rows = () => [...view().querySelectorAll('.split-person')].map(r =>
       [...r.querySelectorAll('.split-person-name, .split-person-status, .split-person-amount')]
@@ -245,7 +245,7 @@ describe('TransactionView — money back', () => {
       expect(view().textContent).toContain('Your share is $50.00.');
     });
 
-    it("\"won't be repaid\" — in the person's dialog — closes a balance but keeps it in your spending", async () => {
+    it("\"won't be repaid\" (in the person's dialog) closes a balance but keeps it in your spending", async () => {
       await open(dinner);
       (view().querySelector('[aria-label="Record a repayment from Cara"]') as HTMLElement).click();
       await settle();
@@ -303,7 +303,7 @@ describe('TransactionView — money back', () => {
       expect(view().querySelector('.receipt-thumb img')!.getAttribute('src')).toBe('data:image/jpeg;base64,NEW');
     });
 
-    it('a saved receipt shows and opens full size — but changing or removing it is in Edit', async () => {
+    it('a saved receipt shows and opens full size, but changing or removing it is in Edit', async () => {
       await open({ ...haircut, receiptId: 'old' });
       await settleLoads();
       expect(view().querySelector('[aria-label="Remove the receipt"]')).toBeNull();

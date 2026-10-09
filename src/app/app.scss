@@ -1,5 +1,5 @@
 /* ============================================
-   LOGIN — FULL SCREEN SPLIT LAYOUT
+   LOGIN: FULL SCREEN SPLIT LAYOUT
    ============================================ */
 .login-shell {
   min-height: 100vh;
@@ -132,7 +132,7 @@
 }
 
 .login-card-logo {
-  /* Just the icon, no text — wordmark is in the left panel */
+  /* Just the icon, no text; the wordmark is in the left panel */
   display: inline-flex;
   align-self: flex-start;
   padding: 0;
@@ -236,7 +236,7 @@
     gap: 7px;
   }
 
-  // Field labels only — never the button's text span.
+  // Field labels only, never the button's text span.
   label > span {
     color: var(--fg-3);
     font-size: 12px;
@@ -523,8 +523,8 @@
    sizes theirs (cap height is 0.74em in Newsreader, so font-size is roughly
    0.88 × mark height).
 
-   These are logos, not buttons — no hover or active state. */
-/* --wordmark-nudge is defined in src/styles.scss — a `:root` rule inside a
+   These are logos, not buttons, so no hover or active state. */
+/* --wordmark-nudge is defined in src/styles.scss because a `:root` rule inside a
    component stylesheet gets scoped to `[_ngcontent-…]:root`, which matches
    nothing, so the token would never be defined. */
 
@@ -737,8 +737,8 @@
   // visible button row, so absolutely-centering the brand against the *whole* box
   // (padding included) pulled it above the row's actual visual center. A 3-column
   // grid (auto-sized outer columns get equal 1fr space either side) centers the
-  // middle column against the row itself, and — since grid items aren't pulled out
-  // of flow the way an absolutely-positioned element is — align-items: center
+  // middle column against the row itself. And since grid items aren't pulled out
+  // of flow the way an absolutely-positioned element is, align-items: center
   // vertically aligns it with its siblings for free, no offset math needed.
   display: none;
   grid-template-columns: 1fr auto 1fr;
@@ -1328,7 +1328,7 @@
 
     em {
       font-style: italic;
-      // A gradient-filled accent phrase — the one place the brand colours
+      // A gradient-filled accent phrase: the one place the brand colours
       // appear in type.
       background: linear-gradient(100deg, var(--blue) 0%, var(--teal) 70%);
       -webkit-background-clip: text;
@@ -1446,7 +1446,7 @@
 }
 
 @media (max-width: 640px) {
-  // Not just `padding-top: 16px` — that flat value was clobbering the safe-area
+  // Not just `padding-top: 16px`: that flat value was clobbering the safe-area
   // rule above (later in the cascade, same specificity, wins), which is exactly
   // why phones (always ≤640px wide) never actually got the inset.
   .landing-nav { padding-top: calc(16px + env(safe-area-inset-top)); }

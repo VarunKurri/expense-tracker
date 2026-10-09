@@ -94,7 +94,7 @@ export class TransactionForm implements OnChanges {
 
   // ── Receipt (expenses) ─────────────────────────────────────
   // A photo of the receipt, kept with the transaction (ReceiptService). It can
-  // also be read to fill in the form (ReceiptScanService) — but attaching one
+  // also be read to fill in the form (ReceiptScanService), but attaching one
   // and reading it are separate: a receipt is worth keeping either way.
 
   /** The photo shown: a newly picked one, or the one already saved. */
@@ -105,12 +105,12 @@ export class TransactionForm implements OnChanges {
   private receiptRemoved = false;
   receiptLoading = signal(false);
   scanning = signal(false);
-  /** The last receipt read into this form — kept for the note and saved as aiExtracted. */
+  /** The last receipt read into this form, kept for the note and saved as aiExtracted. */
   scanned = signal<ReceiptScan | null>(null);
 
   /**
-   * A photo was taken or picked. It's attached; and on a blank new expense —
-   * the "snap the receipt to log it" case — it's read straight away too.
+   * A photo was taken or picked. It's attached; and on a blank new expense
+   * (the "snap the receipt to log it" case) it's read straight away too.
    */
   async attachReceipt(file: File) {
     try {
@@ -207,12 +207,12 @@ export class TransactionForm implements OnChanges {
     return cents < 0 ? `−${formatCurrency(fromCents(-cents))}` : formatCurrency(fromCents(cents));
   }
 
-  /** When the lines and the printed total disagree, say so — a line was probably misread. */
+  /** When the lines and the printed total disagree, say so: a line was probably misread. */
   scanWarning(scan: ReceiptScan): string {
     const gap = scanMismatchCents(scan);
     if (gap !== 0) {
       return `The lines add up to ${formatCurrency(fromCents(scanBillCents(scan)))}, but the receipt's total is `
-        + `${formatCurrency(fromCents(scan.totalCents ?? 0))}. A line may have been misread — check the items before saving.`;
+        + `${formatCurrency(fromCents(scan.totalCents ?? 0))}. A line may have been misread. Check the items before saving.`;
     }
     if (scan.confidence < 0.6) return 'Parts of this receipt were hard to read. Check the numbers before saving.';
     return '';
@@ -233,7 +233,7 @@ export class TransactionForm implements OnChanges {
     return this.transaction?.type === 'expense' ? this.transactionService.moneyBackFor(this.transaction) : 0;
   }
 
-  // Returns today's date as YYYY-MM-DD in LOCAL time — never UTC
+  // Returns today's date as YYYY-MM-DD in LOCAL time, never UTC
   private localDateString(d: Date = new Date()): string {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -241,7 +241,7 @@ export class TransactionForm implements OnChanges {
     return `${y}-${m}-${day}`;
   }
 
-  // Bill fields — shown when Subscriptions category is selected
+  // Bill fields, shown when Subscriptions category is selected
   billFrequency: BillFrequency = 'monthly';
   billFrequencies = BILL_FREQUENCIES;
   billNextDueDate: string = '';
@@ -287,8 +287,8 @@ export class TransactionForm implements OnChanges {
 
   /**
    * The transaction being edited, as it stands now. The page hands the form the
-   * copy it had when the details sheet opened; anything changed since — a
-   * receipt attached from the sheet, money back recorded — is only in the live
+   * copy it had when the details sheet opened; anything changed since (a
+   * receipt attached from the sheet, money back recorded) is only in the live
    * list. Reading the live one means Edit always starts from the truth.
    */
   private editing: Transaction | null = null;
@@ -558,12 +558,12 @@ export class TransactionForm implements OnChanges {
       return;
     }
     // Snapshot every field into locals up front. save() awaits saveCurrentAsTemplate()
-    // and billService.add() below — if the modal gets closed/reopened for another add
+    // and billService.add() below. If the modal gets closed/reopened for another add
     // while those are in flight (easy to trigger on a slow mobile connection: tap Save,
     // nothing visibly happens, tap Cancel, tap +Add again), ngOnChanges' load() resets
     // this.amount/fromAccountId/toAccountId/etc. Reading `this.x` again after an await
     // would then emit whatever the form was reset to, not what the user actually
-    // entered — producing a stray blank transaction. Locals make that impossible.
+    // entered, producing a stray blank transaction. Locals make that impossible.
     const type = this.type;
     const amount = Number(this.amount);
     const date = this.date;

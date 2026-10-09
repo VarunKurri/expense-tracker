@@ -7,9 +7,9 @@ import { canTakePhoto } from '../../utils/device';
  * A transaction's receipt photo: attach one, see it, replace or remove it.
  * Used by the transaction form and the transaction view, so the two can't drift.
  *
- * - No photo: "Take photo" (phones and tablets — opens the camera) and "Upload".
+ * - No photo: "Take photo" (phones and tablets; it opens the camera) and "Upload".
  *   On a phone, "Upload" also offers the camera or the photo library.
- * - A photo: its thumbnail — tap for full size. Where it can be changed (the
+ * - A photo: its thumbnail; tap for full size. Where it can be changed (the
  *   form), a ✕ on the thumbnail removes it and the host may add one action
  *   ("Fill in from it"). To replace a photo, remove it and add the new one.
  *   Where it can't (the details sheet), it's only shown.
@@ -28,7 +28,7 @@ export class ReceiptAttach {
   image = input<string | null>(null);
   /** An attached photo is still being fetched. */
   loading = input(false);
-  /** Something is in progress (saving, reading) — buttons wait. */
+  /** Something is in progress (saving, reading), so buttons wait. */
   busy = input(false);
   /** Under "Receipt" when there's no photo yet. */
   hint = input('Attach a photo of the receipt.');

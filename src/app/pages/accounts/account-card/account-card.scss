@@ -19,7 +19,7 @@
   transition: border-color 0.18s ease;
   box-sizing: border-box;
 
-  // Origin's cards don't lift or glow — the border does the work.
+  // Origin's cards don't lift or glow; the border does the work.
   &:hover { border-color: var(--line-strong); }
 }
 

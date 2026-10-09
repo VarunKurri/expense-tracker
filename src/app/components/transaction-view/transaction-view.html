@@ -20,10 +20,10 @@
           @else { {{ formatCurrency(tx.amount) }} }
         </div>
         @if (txService.isFullyRefunded(tx)) {
-          <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
+          <div class="view-refunded-badge">↩ Refunded and excluded from analysis</div>
         }
         @if (tx.isInternalTransfer) {
-          <div class="view-refunded-badge">↔ Internal transfer — excluded from analysis</div>
+          <div class="view-refunded-badge">↔ Internal transfer, not counted in analysis</div>
         }
       </div>
 
@@ -31,7 +31,7 @@
         @if (tx.type !== 'transfer') {
           <div class="view-row">
             <span class="view-row-label">{{ tx.type === 'income' ? 'Source' : 'Merchant' }}</span>
-            <span class="view-row-value">{{ tx.merchant || '—' }}</span>
+            <span class="view-row-value">{{ tx.merchant || 'None' }}</span>
           </div>
         }
         <div class="view-row">
@@ -73,7 +73,7 @@
         </div>
       </div>
 
-      <!-- RECEIPT — a photo kept with the expense -->
+      <!-- RECEIPT: a photo kept with the expense -->
       @if (tx.type === 'expense') {
         <div class="view-receipt">
           <!-- Read-only once attached: replacing or removing it is in Edit. -->
@@ -85,14 +85,14 @@
         </div>
       }
 
-      <!-- MONEY BACK — refunds and repayments in one place, on every expense
+      <!-- MONEY BACK: refunds and repayments in one place, on every expense
            whether or not anything has come back yet, so the same transaction reads
            the same way opened from anywhere. -->
       @if (tx.type === 'expense') {
         <div class="view-reimburse">
           <div class="view-reimburse-head">Money back</div>
           @if (split(); as s) {
-            <!-- SPLIT — one row per person; tap to record what they paid back -->
+            <!-- SPLIT: one row per person; tap to record what they paid back -->
             <div class="split-people">
               @for (p of s.people; track p.personId) {
                 <button type="button" class="split-person" [class.settled]="p.state !== 'owed' && p.state !== 'partial'"
@@ -108,7 +108,7 @@
             <p class="reimburse-hint split-hint">
               Your share is <span class="fig">{{ formatCents(s.myShareCents) }}</span>.
               @if (s.owedToMeCents > 0) {
-                <span class="fig">{{ formatCents(s.owedToMeCents) }}</span> is still owed to you — tap someone to record what they paid back.
+                <span class="fig">{{ formatCents(s.owedToMeCents) }}</span> is still owed to you. Tap someone to record what they paid back.
               } @else {
                 Nobody owes you anything on this.
               }
@@ -156,7 +156,7 @@
             }
           } @else {
             <p class="reimburse-hint">
-              Got money back on this — a refund, or a friend paying you back? Add it, and analysis
+              Got money back on this, like a refund or a friend paying you back? Add it, and analysis
               counts only what it really cost you.
             </p>
           }
@@ -198,7 +198,7 @@
             <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink</button>
           } @else {
             <p class="reimburse-hint">
-              Is this money back on a purchase — a refund, or a friend paying you back?
+              Is this money back on a purchase, like a refund or a friend paying you back?
               Link it so it isn't counted as income.
             </p>
             <button class="btn-add reimburse-add" (click)="openLinkPicker(tx)">+ Link to a purchase</button>
@@ -206,7 +206,7 @@
         </div>
       }
 
-      <!-- LOAN — a payment on a loan (or money lent / repaid), on any page. -->
+      <!-- LOAN: a payment on a loan (or money lent / repaid), on any page. -->
       @if (loanLink(); as link) {
         <div class="view-reimburse view-loan">
           <div class="view-reimburse-head">Loan</div>
@@ -290,7 +290,7 @@
   </div>
 </app-modal>
 
-<!-- ADD MONEY BACK — a refund, a friend paying you back, cash, store credit:
+<!-- ADD MONEY BACK: a refund, a friend paying you back, cash, store credit:
      anything that came back without landing in an account Trackr tracks -->
 <app-modal [open]="draftOpen()" [title]="draftPersonId() ? 'Repayment from ' + people.nameOf(draftPersonId()!) : 'Add money back'"
            size="sm" (closed)="closeDraft()">
@@ -363,7 +363,7 @@
   </div>
 </app-modal>
 
-<!-- WHO — on a split bill, a repayment says who it's from and whose shares it covers -->
+<!-- WHO: on a split bill, a repayment says who it's from and whose shares it covers -->
 <ng-template #who>
   <div class="field">
     <label class="label-sm" for="mb-from">From</label>
@@ -381,7 +381,7 @@
       <button type="button" class="chip name" [class.active]="draftCovers().includes(ME)"
               [attr.aria-pressed]="draftCovers().includes(ME)" (click)="toggleCover(ME)">You</button>
     </div>
-    <p class="field-hint">Whose share this pays off. One friend can pay for several — even for you.</p>
+    <p class="field-hint">Whose share this pays off. One friend can pay for several, even for you.</p>
   </div>
 </ng-template>
 

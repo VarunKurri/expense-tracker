@@ -29,7 +29,7 @@ export interface DayCell {
   amount: number;
   count: number;
   inMonth: boolean;
-  /** Later than today — renders as a dash, never as $0. */
+  /** Later than today, so it renders as a dash, never as $0. */
   future: boolean;
   isToday: boolean;
   /** 0 (no spend) to 4 (the month's heaviest day). */
@@ -45,7 +45,7 @@ export interface MonthGrid {
   total: number;
   /** The single heaviest day's spend, which sets the heat scale. */
   max: number;
-  /** Days with any spending — used for the "you spent on N of M days" line. */
+  /** Days with any spending, used for the "you spent on N of M days" line. */
   activeDays: number;
   /** Days that have actually happened, so an average can be honest. */
   elapsedDays: number;
@@ -69,7 +69,7 @@ export function localDate(dateStr: string): Date {
 }
 
 /**
- * Steps a month key by `n` months. Uses day 1 so it cannot roll over — stepping
+ * Steps a month key by `n` months. Uses day 1 so it cannot roll over: stepping
  * back from 31 March with a naive Date would land in March again.
  */
 export function addMonths(monthKey: string, n: number): string {
@@ -87,7 +87,7 @@ export function monthLabel(monthKey: string, withYear = true): string {
  * Builds the month's heat scale: a function from a day's spend to a shade 0–4.
  *
  * Shading is by **rank within the month**, not by share of the largest day. A
- * straight `amount / max` ramp collapses under one big day — a single $460
+ * straight `amount / max` ramp collapses under one big day. A single $460
  * rent payment drops a $113 day and a $19 day into the same faintest shade, and
  * the calendar stops distinguishing anything below the outlier. Ranking keeps
  * the scale usable whatever the month looks like.
@@ -96,7 +96,7 @@ export function monthLabel(monthKey: string, withYear = true): string {
  * heaviest day) rather than handed to the top third, so "the expensive day"
  * stays visually singular the way it is in life.
  *
- * Shade encodes *order*, not magnitude — a level 3 day is not three times a
+ * Shade encodes *order*, not magnitude: a level 3 day is not three times a
  * level 1 day. That is why every cell also prints its actual figure: the number
  * is the claim, the shade is only a way of finding it.
  *
@@ -146,7 +146,7 @@ export function dailyTotals(
  * Builds the Sunday-first grid for a month.
  *
  * `txs` should already be narrowed to the transactions that count as spending
- * (see `reporting.spendingTransactions`) and filtered for refunds — this does
+ * (see `reporting.spendingTransactions`) and filtered for refunds. This does
  * not re-apply money rules, so the calendar can never disagree with the totals
  * the rest of the app shows for the same period.
  */
@@ -239,7 +239,7 @@ export function cumulativeSeries(
   return out;
 }
 
-/** Transactions on one day, newest-entered first — what the day popup lists. */
+/** Transactions on one day, newest-entered first: what the day popup lists. */
 export function transactionsOn(txs: Transaction[], date: string): Transaction[] {
   return txs
     .filter(t => t.date === date)

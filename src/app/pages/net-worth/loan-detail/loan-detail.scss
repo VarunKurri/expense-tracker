@@ -76,7 +76,7 @@
   .hero-of { font-size: 15px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
 }
 
-/* Repaid so far — positive progress, one hue. */
+/* Repaid so far: positive progress, one hue. */
 .bar {
   height: 8px;
   border-radius: var(--radius-pill);
@@ -196,7 +196,7 @@
   &.correction .row-name { color: var(--fg-2); }
 }
 
-/* "These months aren't linked — were they paid on schedule?" */
+/* "These months aren't linked. Were they paid on schedule?" */
 .settle-prompt {
   display: flex;
   align-items: center;

@@ -23,7 +23,7 @@
       <div class="hero-figure"><span class="num-display">{{ money(totalOwedCents()) }}</span></div>
       <p class="hero-sentence">
         @if (owing().length) {
-          {{ headline() }} Until it comes back, it counts in your spending — record repayments here as they arrive.
+          {{ headline() }} Until it comes back, it counts in your spending. Record repayments here as they arrive.
         } @else {
           Everyone's square. Nothing you've split is waiting to be paid back.
         }
@@ -80,7 +80,7 @@
           @for (b of square(); track b.personId; let last = $last) {
             {{ people.nameOf(b.personId) }}{{ last ? '' : ', ' }}
           }
-          — nothing owed on {{ square().length === 1 ? 'any bill' : 'any of their bills' }}.
+          (nothing owed on {{ square().length === 1 ? 'any bill' : 'any of their bills' }}).
         </p>
       </section>
     }
@@ -149,7 +149,7 @@
             }
           </div>
           @if (extraCents() > 0) {
-            <p class="field-hint">That's {{ money(extraCents()) }} more than {{ people.nameOf(b.personId) }} owes — it counts as extra (income) on the newest bill.</p>
+            <p class="field-hint">That's {{ money(extraCents()) }} more than {{ people.nameOf(b.personId) }} owes, so it counts as extra (income) on the newest bill.</p>
           }
         </div>
       }

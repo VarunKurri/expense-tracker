@@ -26,7 +26,7 @@ const EXCLUDED_KEY = 'trackr.forecast.excluded';
 interface ChartPoint { date: string; cash: number; projected: boolean }
 
 /**
- * Forecast — where your cash is heading if the coming months look like the
+ * Forecast: where your cash is heading if the coming months look like the
  * last few. Known money (bills on their dates, loan payments) plus typical
  * money (average income and everyday spending), month by month. The maths is
  * in utils/forecast.ts; this page only shows it and says what it assumes.
@@ -157,7 +157,7 @@ export class Forecast implements OnDestroy {
         const names = c.billNames.length > 2 ? `${c.billNames.slice(0, 2).join(', ')} +${c.billNames.length - 2}` : c.billNames.join(', ');
         sub = c.everyday > 0
           ? `${this.money(c.spent)} spent, less ${this.money(c.bills)} in bills (${names})`
-          : `All bills (${names}) — forecast on their dates`;
+          : `All bills (${names}), forecast on their dates`;
       }
       return {
         id: c.categoryId,
@@ -172,7 +172,7 @@ export class Forecast implements OnDestroy {
     return this.showAllCategories() ? rows : rows.slice(0, 8);
   });
 
-  /** "Groceries is the biggest part, at $520 (37%)." — the total sits right above, so not repeated. */
+  /** "Groceries is the biggest part, at $520 (37%)." The total sits right above, so it is not repeated. */
   everydaySentence = computed(() => {
     const b = this.f().basis;
     const top = b.categories.find(c => c.everyday > 0);

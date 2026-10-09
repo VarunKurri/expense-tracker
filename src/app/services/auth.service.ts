@@ -17,7 +17,7 @@ export class AuthService {
   // splash instead of flashing the login page while the session is restoring).
   resolved = signal(false);
 
-  // Firebase's User object doesn't push emailVerified updates on its own — we
+  // Firebase's User object doesn't push emailVerified updates on its own; we
   // have to call reload() and re-read it. This override lets the "I've verified"
   // check flip the banner off immediately without waiting for a token refresh.
   private emailVerifiedOverride = signal<boolean | null>(null);
@@ -38,12 +38,12 @@ export class AuthService {
       sub.unsubscribe();
     });
     // A fresh user (sign-in, sign-out, or a different account) invalidates any
-    // previous override — start reading emailVerified from the user object again.
+    // previous override, so start reading emailVerified from the user object again.
     user(this.auth).subscribe(() => this.emailVerifiedOverride.set(null));
 
     // Pick up the result when returning from a redirect sign-in
     getRedirectResult(this.auth).catch(() => {
-      // Ignore errors here — they surface through the user signal
+      // Ignore errors here; they surface through the user signal
     });
   }
 
@@ -52,24 +52,24 @@ export class AuthService {
     provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
-      // Try popup first — better UX (no full page reload)
+      // Try popup first: better UX (no full page reload)
       return await signInWithPopup(this.auth, provider);
     } catch (err: any) {
       const code = err?.code || '';
 
-      // User deliberately closed the popup — not an error, return silently
+      // User deliberately closed the popup. Not an error, so return silently
       if (code === 'auth/popup-closed-by-user' ||
           code === 'auth/cancelled-popup-request') {
         return null;
       }
 
-      // Popup blocked by COOP/browser policy — fall back to redirect
+      // Popup blocked by COOP/browser policy, so fall back to redirect
       if (code === 'auth/popup-blocked' ||
           err?.message?.includes('Cross-Origin-Opener-Policy')) {
         return signInWithRedirect(this.auth, provider);
       }
 
-      // Any other real error — rethrow so app.ts shows a toast
+      // Any other real error: rethrow so app.ts shows a toast
       throw err;
     }
   }
@@ -130,7 +130,7 @@ export class AuthService {
    * Change the account email. Requires the current password to re-authenticate
    * (Firebase rejects sensitive changes without a recent sign-in). Uses
    * verifyBeforeUpdateEmail, so the address only takes effect once the user
-   * clicks the confirmation link sent to the NEW address — nothing changes here
+   * clicks the confirmation link sent to the NEW address; nothing changes here
    * until then.
    */
   async changeEmail(currentPassword: string, newEmail: string) {

@@ -19,8 +19,8 @@ const COUNT_WORDS = ['No one', 'One friend', 'Two friends', 'Three friends', 'Fo
 
 /**
  * Shared: everyone you've split a bill with, and what they still owe you,
- * across every bill. One repayment can cover several bills — it's spread
- * over them oldest first — whether it came as cash or as a bank payment.
+ * across every bill. One repayment can cover several bills (it's spread
+ * over them oldest first), whether it came as cash or as a bank payment.
  *
  * Figures come from `utils/shared.ts` and `utils/splits.ts`; nothing here
  * adds money up.

@@ -148,7 +148,7 @@ describe('SplitEditor (quick split)', () => {
     await typeInto(el.querySelector('input[aria-label="How much they paid"]') as HTMLInputElement, '120');
     // A $300 bill, $100 each: Ben owes you $80 and Alex $20.
     expect(saved().owedToMeCents).toBe(8000);
-    expect(el.textContent).toContain('Ben owes Alex $20.00 — between them.');
+    expect(el.textContent).toContain('Ben owes Alex $20.00 (between them).');
   });
 
   it('removing a person also removes them as a payer', async () => {

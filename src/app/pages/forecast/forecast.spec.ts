@@ -98,7 +98,7 @@ describe('Forecast page', () => {
     expect(el.querySelector('.month-row:not(.head)')!.textContent).toContain('(rest)');
   });
 
-  it('leaving out the one-off month changes the pace — on the same card as what it changes', async () => {
+  it('leaving out the one-off month changes the pace, on the same card as what it changes', async () => {
     await setup(history());
     const card = el.querySelector('.typical')!;
     // The months, the choice of how many, and the figures they make are one card.

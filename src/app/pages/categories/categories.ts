@@ -34,7 +34,7 @@ interface Editing {
  * Settings → Categories: create, rename, archive and delete categories.
  *
  * Deleting is the part that needs care, since transactions, budgets, rules,
- * bills and templates can all point at a category — and bank transactions
+ * bills and templates can all point at a category, and bank transactions
  * find theirs by name. The decisions are in `utils/categories.ts` (tested); the
  * writes are in `CategoryAdminService`. This page shows the user exactly what a
  * delete will do before they confirm it, and offers archiving as the
@@ -84,7 +84,7 @@ export class Categories {
 
   count(c: Category): number { return this.counts().get(c.id!) ?? 0; }
   hasBudget(c: Category): boolean { return this.budgeted().has(c.id!); }
-  /** Whether bank transactions are matched to this one — worth knowing before renaming. */
+  /** Whether bank transactions are matched to this one. Worth knowing before renaming. */
   receivesBank(c: Category): boolean { return plaidNamesFor(c).length > 0; }
 
   // ── Create / edit ──────────────────────────────────────────
@@ -218,7 +218,7 @@ export class Categories {
     } catch {
       // The category is deleted last, so a failure here leaves it in place
       // with nothing pointing at a missing id. Retrying picks up where it left off.
-      this.toast.error('Could not finish deleting. Nothing was lost — try again to complete it.');
+      this.toast.error('Could not finish deleting. Nothing was lost, so try again to complete it.');
     } finally {
       this.busy.set(false);
     }

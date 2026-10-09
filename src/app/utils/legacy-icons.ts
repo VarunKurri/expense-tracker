@@ -1,5 +1,5 @@
 // Early seeds stored icon *names* (e.g. "Cash", "Bank", "Dining") instead of emoji,
-// and templates render the raw value — so those accounts/categories showed literal
+// and templates render the raw value, so those accounts/categories showed literal
 // text. Map known legacy names to emoji at read time; real emoji pass through.
 const LEGACY_ICON_MAP: Record<string, string> = {
   // Accounts

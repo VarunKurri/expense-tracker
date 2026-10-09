@@ -22,7 +22,7 @@ import type {
  * whether the answer feels fair at the table:
  *
  * 1. Items are split by weight, then by whole cents via largest-remainder
- *    allocation — so a $10 plate shared three ways is 3.34 / 3.33 / 3.33 and
+ *    allocation, so a $10 plate shared three ways is 3.34 / 3.33 / 3.33 and
  *    never 3.33 x 3 with a cent quietly vanishing.
  *
  * 2. Tax and tip are allocated in proportion to each person's item subtotal,
@@ -30,7 +30,7 @@ import type {
  *
  * 3. Unassigned items participate in that proportional allocation as a
  *    phantom claimant. Their tax and tip stay unclaimed rather than being
- *    silently redistributed onto the people who have already been assigned —
+ *    silently redistributed onto the people who have already been assigned,
  *    so nobody is quietly overcharged for a plate nobody has owned up to.
  *
  * An item's split mode (equal, shares, percent) does not appear here on
@@ -163,7 +163,7 @@ export function calculateSplit(bill: Bill): BillSummary {
  *
  * Percent mode reports the *effective* percentage rather than the number that
  * was typed. When the entered percentages don't add up to 100 the money is
- * still divided proportionally — so saying "40%" when the split actually works
+ * still divided proportionally, so saying "40%" when the split actually works
  * out to 44.4% would be a lie about where the money went.
  */
 function shareLabel(
@@ -234,7 +234,7 @@ export function weightTotal(item: Item): number {
 }
 
 /**
- * Whether the numbers the user typed actually add up — to 100 for percentages,
+ * Whether the numbers the user typed actually add up: to 100 for percentages,
  * to the item's price for amounts.
  *
  * When they don't, the money is still divided proportionally and the item is

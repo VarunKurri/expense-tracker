@@ -52,7 +52,7 @@ function bill(
   };
 }
 
-describe('calculateSplit — item assignment', () => {
+describe('calculateSplit: item assignment', () => {
   it('gives a solely-owned item entirely to its owner', () => {
     const result = calculateSplit(
       bill([person('a', 'Alex'), person('b', 'Bri')], [item('i1', 'Steak', 4200, 'a')]),
@@ -96,7 +96,7 @@ describe('calculateSplit — item assignment', () => {
   });
 });
 
-describe('calculateSplit — the friend who only had a salad', () => {
+describe('calculateSplit: the friend who only had a salad', () => {
   it('charges tax and tip in proportion to what each person ordered', () => {
     // Alex: $60 steak. Bri: $12 salad. 10% tax, 20% tip on pre-tax subtotal.
     const charges: Charges = {
@@ -143,7 +143,7 @@ describe('calculateSplit — the friend who only had a salad', () => {
   });
 });
 
-describe('calculateSplit — tax and tip', () => {
+describe('calculateSplit: tax and tip', () => {
   it('supports a flat tax amount instead of a percentage', () => {
     const charges: Charges = { ...NO_CHARGES, taxMode: 'amount', taxCents: 513 };
     const result = calculateSplit(
@@ -175,7 +175,7 @@ describe('calculateSplit — tax and tip', () => {
   });
 });
 
-describe('calculateSplit — unassigned items', () => {
+describe('calculateSplit: unassigned items', () => {
   it('reports unassigned value instead of spreading it silently', () => {
     const result = calculateSplit(
       bill(
@@ -197,7 +197,7 @@ describe('calculateSplit — unassigned items', () => {
         charges,
       ),
     );
-    // Alex ordered 60% of the food and is charged 60% of the charges — not 100%.
+    // Alex ordered 60% of the food and is charged 60% of the charges, not 100%.
     expect(result.perPerson[0].taxCents).toBe(600);
     expect(result.perPerson[0].tipCents).toBe(1200);
     expect(result.unclaimedChargesCents).toBe(400 + 800);
@@ -205,7 +205,7 @@ describe('calculateSplit — unassigned items', () => {
   });
 });
 
-describe('calculateSplit — reconciliation', () => {
+describe('calculateSplit: reconciliation', () => {
   const charges: Charges = { ...NO_CHARGES, taxPercent: 8.5, tipPercent: 18 };
 
   it('always adds back up to the bill total', () => {
@@ -257,7 +257,7 @@ describe('calculateSplit — reconciliation', () => {
   });
 });
 
-describe('calculateSplit — degenerate input', () => {
+describe('calculateSplit: degenerate input', () => {
   it.each(['empty', 'people only', 'free assigned item', 'free unassigned item'])(
     'keeps flat charges unclaimed with a zero subtotal: %s',
     (scenario) => {
@@ -401,7 +401,7 @@ function percentItem(priceCents: number, percents: Record<string, number>, id = 
   };
 }
 
-describe('calculateSplit — percent splits', () => {
+describe('calculateSplit: percent splits', () => {
   const three = [person('a', 'Alex'), person('b', 'Bri'), person('c', 'Chidi')];
 
   it('divides by the percentages given', () => {
@@ -450,7 +450,7 @@ describe('calculateSplit — percent splits', () => {
   });
 });
 
-describe('calculateSplit — amount splits', () => {
+describe('calculateSplit: amount splits', () => {
   const three = [person('a', 'Alex'), person('b', 'Bri'), person('c', 'Chidi')];
 
   function amountItem(priceCents: number, cents: Record<string, number>): Item {
@@ -497,7 +497,7 @@ describe('calculateSplit — amount splits', () => {
 /* Payments and settling up                                            */
 /* ------------------------------------------------------------------ */
 
-describe('calculateSplit — payments', () => {
+describe('calculateSplit: payments', () => {
   const two = [person('a', 'Alex'), person('b', 'Bri')];
   const items = [item('i1', 'Steak', 4000, 'a'), item('i2', 'Pasta', 2000, 'b')];
 

@@ -8,7 +8,7 @@ import { splitStatus } from '../../../utils/splits';
 /**
  * What a split comes to: the bill, each person's share (and, item by item,
  * what's in it), and who owes you what. Every figure is read off the engine's
- * result — nothing here adds money up.
+ * result; nothing here adds money up.
  */
 @Component({
   selector: 'app-split-summary',
@@ -38,7 +38,7 @@ import { splitStatus } from '../../../utils/splits';
         </p>
       }
       @for (t of otherTransfers(); track t.fromPersonId + t.toPersonId) {
-        <p class="summary-total">{{ people.nameOf(t.fromPersonId) }} owes {{ people.nameOf(t.toPersonId) }} {{ money(t.amountCents) }} — between them.</p>
+        <p class="summary-total">{{ people.nameOf(t.fromPersonId) }} owes {{ people.nameOf(t.toPersonId) }} {{ money(t.amountCents) }} (between them).</p>
       }
     </div>
   `,
@@ -57,7 +57,7 @@ export class SplitSummary {
   rows = computed(() => {
     const s = this.status();
     const itemized = this.split().mode === 'itemized';
-    // Item by item, what the share is made of — counted, not listed, so a long
+    // Item by item, what the share is made of: counted, not listed, so a long
     // dish name doesn't repeat down every row.
     const made = (personId: string): string[] => {
       if (!itemized) return [];

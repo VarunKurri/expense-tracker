@@ -9,13 +9,13 @@ import { MoneyRules, expenseAmount, monthlySeries, refundedOut, spendingTransact
  * The forecast: where your cash and net worth are heading if the next months
  * look like the last few.
  *
- * Deliberately simple and explainable — no simulations. Three kinds of money:
+ * Deliberately simple and explainable, with no simulations. Three kinds of money:
  *
  *  - **Known and dated**: bills and subscriptions on their real due dates (a
  *    yearly insurance bill is a spike in its month, not smeared across the
  *    year), and every loan payment still to come, in either direction.
  *  - **Typical**: income and everyday spending, averaged over past months you
- *    choose — using the same rules as Analysis (no internal transfers,
+ *    choose, using the same rules as Analysis (no internal transfers,
  *    reimbursements netted, refunded expenses left out).
  *  - **Not assumed**: investments don't grow, nothing else changes value
  *    except things that depreciate.
@@ -81,7 +81,7 @@ export interface ForecastItem {
   amount: number;
   /** For a loan payment: the interest part (what changes net worth). */
   interest?: number;
-  /** Was due before today and is still outstanding — counted today. */
+  /** Was due before today and is still outstanding, so it's counted today. */
   overdue?: boolean;
   /** The bill or loan it came from. */
   sourceId?: string;
@@ -103,7 +103,7 @@ export function billIsLoanPayment(bill: Bill, loans: ManualAsset[]): boolean {
 
 /**
  * Every bill payment from today to `end`. A bill already past due counts once,
- * today — it's still to be paid — and then carries on from its next date.
+ * today (it's still to be paid) and then carries on from its next date.
  */
 export function billItems(bills: Bill[], loans: ManualAsset[], today: string, end: string): ForecastItem[] {
   const out: ForecastItem[] = [];
@@ -126,7 +126,7 @@ export function billItems(bills: Bill[], loans: ManualAsset[], today: string, en
 
 /**
  * Every loan payment still to come, to `end`: out for a loan you took, in for
- * money you lent (including someone else's loan repaid to you — the money
+ * money you lent (including someone else's loan repaid to you: the money
  * reaches your account even though the balance isn't yours). A payment whose
  * date has passed but is still expected comes in today.
  */
@@ -168,7 +168,7 @@ export interface EverydayCategory {
   categoryId: string;
   /** Average a month spent in it, over the months counted. */
   spent: number;
-  /** Bills filed under it, per month — they're forecast on their dates instead. */
+  /** Bills filed under it, per month. They're forecast on their dates instead. */
   bills: number;
   /** Their names, so "less $100 in bills" can say which. */
   billNames: string[];
@@ -181,7 +181,7 @@ export interface ForecastBasis {
   income: number;
   /** Everyday spending per month: the categories, less any bills no category could be found for. */
   everyday: number;
-  /** What the bills cost per month, on average — taken out of spending to leave "everyday". */
+  /** What the bills cost per month, on average, taken out of spending to leave "everyday". */
   billsMonthly: number;
   /** Everyday spending by category, largest first. Adds up to `everyday` with `unfiledBills`. */
   categories: EverydayCategory[];
@@ -290,7 +290,7 @@ export interface ForecastMonth {
   label: string;
   /** The month in progress: only what's left of it is forecast. */
   partial: boolean;
-  /** The last day of the month — where the cash figure is read. */
+  /** The last day of the month, where the cash figure is read. */
   end: string;
   income: number;
   repayments: number;
@@ -309,7 +309,7 @@ export interface Forecast {
   months: ForecastMonth[];
   /** Cash at the end of the window. */
   endCash: number;
-  /** Average monthly net over the full months — "you put away about $X a month". */
+  /** Average monthly net over the full months: "you put away about $X a month". */
   monthlyNet: number;
   /** The biggest single known payment ahead, for the headline. */
   biggest: ForecastItem | null;
@@ -384,8 +384,8 @@ export interface ProjectedPoint { date: string; net: number }
  * Net worth at the end of each forecast month, starting from today's.
  *
  * Cash moves by each month's net. A loan payment moves cash by the whole
- * payment, but only its interest changes net worth — the rest swaps cash for
- * less debt — so the principal is added back. For money you lent the other
+ * payment, but only its interest changes net worth (the rest swaps cash for
+ * less debt), so the principal is added back. For money you lent the other
  * way round: the principal coming in was already yours (as what you're owed),
  * so it's taken back out. Someone else's loan repaid to you isn't in your net
  * worth at all, so all of that money is a gain. Things that depreciate keep

@@ -21,7 +21,7 @@ type CardDueStatus = 'paid' | 'settled' | 'overdue' | 'due' | 'no-date';
 interface CardDue {
   account: Account;
   amount: number;
-  // Set only when it differs from `amount` — the pre-refund statement balance Plaid
+  // Set only when it differs from `amount`: the pre-refund statement balance Plaid
   // originally reported, kept around so the UI can show why the number moved.
   originalAmount?: number;
   status: CardDueStatus;
@@ -33,7 +33,7 @@ interface CardDue {
   //                statement-closing day + the due day after it,
   //  'balance'   = fallback: current balance owed + next due day.
   source: 'statement' | 'computed' | 'balance';
-  // Autopay is manual-only today — Plaid's Liabilities schema has no autopay
+  // Autopay is manual-only today, since Plaid's Liabilities schema has no autopay
   // flag/date for any institution we've linked. `undefined` = never set (don't
   // fabricate a date); `false` = user explicitly said autopay is off.
   autopayEnabled?: boolean;
@@ -77,7 +77,7 @@ export class Accounts {
   connectChooserOpen = signal(false);
   historyChoice = signal<'30' | '90' | '180' | '365' | '730' | 'custom'>('90');
   customStartDate = signal('');
-  todayStr = localDateString(); // local, not UTC — UTC is already tomorrow on a US evening
+  todayStr = localDateString(); // local, not UTC (UTC is already tomorrow on a US evening)
 
   activeAccounts = computed(() =>
     this.accountSvc.accounts().filter(a => !a.archived)
@@ -134,11 +134,11 @@ export class Accounts {
   formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-US', {
       style: 'currency', currency: 'USD',
-      maximumFractionDigits: 0   // no cents in the subtitle — cleaner
+      maximumFractionDigits: 0   // no cents in the subtitle; it reads cleaner
     }).format(Math.abs(n));
   }
 
-  /** Exact currency (with cents) — for the credit-card payment amounts. */
+  /** Exact currency (with cents), for the credit-card payment amounts. */
   formatMoney(n: number): string {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.abs(n));
   }
@@ -161,7 +161,7 @@ export class Accounts {
 
   private toCardDue(a: Account): CardDue | null {
     const autopay = this.autopayInfoFor(a);
-    // Tier 1 — Plaid Liabilities available.
+    // Tier 1: Plaid Liabilities available.
     if (a.statementBalance != null && a.statementBalance > 0 && a.paymentDueDate) {
       const paid = this.isStatementPaid(a);
       const status: CardDueStatus = paid ? 'paid'
@@ -169,7 +169,7 @@ export class Accounts {
         : a.statementOverdue === false ? 'due'
         : this.daysUntil(a.paymentDueDate) < 0 ? 'overdue' : 'due';
       // A refund posted after the statement closed reduces what the bank actually
-      // collects — Plaid's own last_statement_balance may not reflect that until the
+      // collects. Plaid's own last_statement_balance may not reflect that until the
       // *next* cycle, so back it out ourselves in the meantime. Once paid, show the
       // real amount Plaid says was paid rather than the (possibly stale) statement figure.
       const effective = this.effectiveStatementAmount(a);
@@ -181,10 +181,10 @@ export class Accounts {
         ...autopay,
       };
     }
-    // Tier 2a — no Liabilities, but the user set the statement cycle (e.g. Discover):
+    // Tier 2a: no Liabilities, but the user set the statement cycle (e.g. Discover):
     // the statement balance is the running balance as of the last close date, and the
     // payment is due on the first due-day after that close. A $0 statement is valid.
-    // (No refund-adjustment here — unlike tier 1 there's no bank-reported statement
+    // (No refund-adjustment here. Unlike tier 1, there's no bank-reported statement
     // figure to reconcile against; this is already a live running balance.)
     if (a.statementClosingDay && a.paymentDueDay) {
       const closeDate = this.lastStatementClose(a.statementClosingDay);
@@ -194,7 +194,7 @@ export class Accounts {
         : this.daysUntil(dueDate) < 0 ? 'overdue' : 'due';
       return { account: a, amount, dueDate, status, paidDate: null, source: 'computed', ...autopay };
     }
-    // Tier 2b — fallback: current balance owed + next due day, or prompt to set dates.
+    // Tier 2b (fallback): current balance owed + next due day, or prompt to set dates.
     const owed = this.balanceFor(a); // credit: positive = owed
     if (owed <= 0) return null;
     const dueDate = a.paymentDueDay ? this.nextDueFromDay(a.paymentDueDay) : null;
@@ -204,7 +204,7 @@ export class Accounts {
     };
   }
 
-  /** Manual autopay metadata for a card — Plaid's Liabilities schema has no autopay
+  /** Manual autopay metadata for a card. Plaid's Liabilities schema has no autopay
    *  flag/date for any institution we've seen, so this is entirely user-set on the
    *  account (mirrors paymentDueDay). Never fabricates a date: only returns one when
    *  the user has both turned autopay on and picked a day. */
@@ -214,7 +214,7 @@ export class Accounts {
   }
 
   /** last_statement_balance minus refunds/credits posted to the account after the
-   *  statement closed — Plaid's own figure can lag a mid-cycle refund by a full
+   *  statement closed. Plaid's own figure can lag a mid-cycle refund by a full
    *  statement, so this keeps the shown amount matching what the bank will actually
    *  collect. Reuses the same account-history approach as balanceOwedAsOf/tier 2,
    *  just isolated to the credit side within one date window. */
@@ -286,7 +286,7 @@ export class Accounts {
     return Math.round((new Date(date + 'T00:00:00').getTime() - today.getTime()) / 86_400_000);
   }
 
-  /** Short date, e.g. "Jul 22" — for the "Paid <date>" pill. */
+  /** Short date, e.g. "Jul 22", for the "Paid <date>" pill. */
   formatShort(date: string): string {
     return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
@@ -302,7 +302,7 @@ export class Accounts {
   }
 
   /** Primary countdown pill for an unpaid card: counts down to autopay (when known)
-   *  rather than the due date — autopay is when money actually leaves the linked
+   *  rather than the due date, because autopay is when money actually leaves the linked
    *  account, which is what you need lead time for. The due date itself stays a
    *  plain, static label elsewhere (never a second countdown). Falls back to the
    *  due-date countdown when autopay isn't known. */
@@ -435,7 +435,7 @@ export class Accounts {
     this.activeAccounts().filter(a => a.id !== this.accountToDelete()?.id)
   );
 
-  // Every transaction that touches the account being deleted — as its account, or
+  // Every transaction that touches the account being deleted, either as its account or
   // as either side of a transfer. Shown for review and removed if the user opts in.
   accountTransactions = computed(() => {
     const id = this.accountToDelete()?.id;
@@ -448,7 +448,7 @@ export class Accounts {
   async confirmDelete() {
     const account = this.accountToDelete();
     if (!account?.id) return;
-    // Snapshot before the awaited bill-reassignment loop below — these are computed()s
+    // Snapshot before the awaited bill-reassignment loop below. These are computed()s
     // over live data, so re-reading them afterward could pick up transactions/settings
     // that changed (e.g. a sync landing) while the loop was in flight.
     const bills = this.affectedBills();

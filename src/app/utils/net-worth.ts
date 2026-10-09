@@ -14,7 +14,7 @@ import { LoanPayment, countsInNetWorth, estimatedValue, loanOwedOn, loanPayments
  * back as the transaction history goes, and flat before that.)
  *
  * Manual assets and debts carry dated valuations, and count from their first
- * valuation onwards — a house added today does not appear in last year's
+ * valuation onwards. A house added today does not appear in last year's
  * figure as if you had always owned it.
  *
  * Pure functions, so the page and the tests share one implementation.
@@ -175,8 +175,8 @@ export interface Holding {
 
 /**
  * Everything counted in net worth on `date`. Accounts land on the side their
- * balance puts them — an overpaid card is an asset, an overdrawn checking
- * account a debt — which is how the Accounts page already counts them.
+ * balance puts them (an overpaid card is an asset, an overdrawn checking
+ * account a debt), which is how the Accounts page already counts them.
  */
 export function holdingsOn(
   accounts: Account[], manual: ManualAsset[], txs: Transaction[], date: string,
@@ -265,7 +265,7 @@ export interface NetWorthPoint {
 /**
  * Net worth on each of `dates` (ascending). One pass over the transactions
  * rather than a full recount per date, so a year of history stays cheap.
- * Agrees with `holdingsOn` for any single date — the tests hold it to that.
+ * Agrees with `holdingsOn` for any single date; the tests hold it to that.
  */
 export function netWorthSeries(
   accounts: Account[], manual: ManualAsset[], txs: Transaction[], dates: string[],

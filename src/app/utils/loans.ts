@@ -16,7 +16,7 @@ import { fromCents, toCents } from './money';
  *  - **Flat rate.** Interest on the original amount for the whole term,
  *      interest = P × rate × years,   EMI = (P + interest) ÷ n
  *    Every payment carries the same interest. A flat rate costs far more than
- *    the same number as a reducing rate — `equivalentReducingRate` says how much.
+ *    the same number as a reducing rate; `equivalentReducingRate` says how much.
  *
  * Plus interest-free loans (family, friends): EMI = P ÷ n.
  *
@@ -24,13 +24,13 @@ import { fromCents, toCents } from './money';
  * the schedule was followed. Interest builds up on each due date; a payment
  * clears that interest first and the rest reduces the principal. So a missed
  * month leaves interest owing, a double payment catches up, and an extra
- * payment goes straight to principal — whichever method the loan uses. A
+ * payment goes straight to principal, whichever method the loan uses. A
  * payment that arrives before its due date finds no interest owing yet, so all
  * of it is principal (and that month's interest is then charged on less).
  *
  * Two choices change that:
  *  - **Penalty waiver** (`onSchedule`): every payment counts as made on its due
- *    date, so payment N splits exactly like row N of the EMI table — early or
+ *    date, so payment N splits exactly like row N of the EMI table. Early or
  *    late makes no difference, and nothing builds up between payments.
  *  - **Lump sums**: a payment you mark pays down principal early, then either
  *    lowers the monthly payment (same end date) or keeps it (ends sooner).
@@ -38,8 +38,8 @@ import { fromCents, toCents } from './money';
  * Pure functions: the Net worth page, the loan page and the tests share them.
  *
  * **Money is integer cents inside.** Every running balance (principal left,
- * interest due, totals paid) is whole cents, and a formula's result — the EMI,
- * a month's interest — is rounded to a cent exactly once, where it becomes
+ * interest due, totals paid) is whole cents, and a formula's result (the EMI,
+ * a month's interest) is rounded to a cent exactly once, where it becomes
  * money. The exported functions still take and return dollars, so callers
  * don't change; but 360 months of payments add up to the cent instead of
  * collecting float dust from re-rounding dollars at every step.
@@ -95,7 +95,7 @@ function flatInterestCents(principal: number, ratePct: number, months: number): 
 }
 
 /**
- * The reducing-balance rate that costs the same as a flat rate — the honest
+ * The reducing-balance rate that costs the same as a flat rate: the honest
  * number. 4.2% flat over 5 years is about 7.8% the way banks quote it.
  */
 export function equivalentReducingRate(flatRatePct: number, months: number): number {
@@ -203,7 +203,7 @@ function rightDirection(asset: ManualAsset, t: Transaction): boolean {
 }
 
 /**
- * What's left after the last scheduled payment that is just rounding — the
+ * What's left after the last scheduled payment that is just rounding. The
  * EMI is rounded to the cent, which over 30 years can leave a few dollars. It
  * rides along with the last payment, as lenders do. A real backlog (a missed
  * month) is far bigger and carries on at the regular amount instead.
@@ -222,7 +222,7 @@ interface RegularPayment { from: string; payment: number }
 
 /**
  * The loan's payments, oldest first: everything linked by hand, plus every
- * transaction the matching rule recognises — right direction, on or after the
+ * transaction the matching rule recognises: right direction, on or after the
  * start, merchant/notes containing the text, close to the regular payment, and
  * not one you un-linked.
  */
@@ -232,7 +232,7 @@ export function loanPayments(asset: ManualAsset, txs: Transaction[]): LoanPaymen
   let regular: RegularPayment[] = [{ from: '', payment: terms.payment }];
   let out = matchPayments(asset, txs, regular);
   // After a lump sum lowers the monthly payment, later payments are the new
-  // amount — recognise those too. Each pass can only find more; it settles fast.
+  // amount, so recognise those too. Each pass can only find more; it settles fast.
   if ((terms.lumpSums ?? []).some(l => l.mode === 'reduce-emi')) {
     for (let pass = 0; pass < 3; pass++) {
       const next = regularPayments(loanState(asset, txs, '9999-12-31', out), terms.payment);
@@ -252,7 +252,7 @@ function matchPayments(asset: ManualAsset, txs: Transaction[], regular: RegularP
   const out: LoanPayment[] = [];
   for (const t of txs) {
     // A refunded payment isn't a payment. (Pure check: a refund *income* linked
-    // from the bank isn't visible here — rare enough for a loan payment.)
+    // from the bank isn't visible here, but that's rare enough for a loan payment.)
     if (!t.id || isFullyRefunded(t)) continue;
     if (t.id === terms.downPaymentId) { out.push({ tx: t, kind: 'down', how: 'linked' }); continue; }
     if (linked.has(t.id)) { out.push({ tx: t, kind: 'payment', how: 'linked' }); continue; }
@@ -266,7 +266,7 @@ function matchPayments(asset: ManualAsset, txs: Transaction[], regular: RegularP
   return out.sort((a, b) => a.tx.date.localeCompare(b.tx.date) || (a.tx.createdAt ?? 0) - (b.tx.createdAt ?? 0));
 }
 
-/** Close to the payment in force on its date — or to the original, if the payer never changed. */
+/** Close to the payment in force on its date, or to the original if the payer never changed. */
 function closeToRegular(t: Transaction, regular: RegularPayment[], widen = 1): boolean {
   const inForce = [...regular].reverse().find(r => r.from <= t.date) ?? regular[0];
   return [inForce.payment, regular[0].payment].some(p => Math.abs(t.amount - p) <= matchTolerance(p) * widen);
@@ -281,7 +281,7 @@ function regularPayments(state: LoanState, original: number): RegularPayment[] {
   return out;
 }
 
-/** Unlinked transactions that look like they could be payments — for one-click linking. */
+/** Unlinked transactions that look like they could be payments, for one-click linking. */
 export function candidatePayments(asset: ManualAsset, txs: Transaction[], limit = 20): Transaction[] {
   const terms = asset.loan;
   if (!terms) return [];
@@ -307,7 +307,7 @@ export interface PaymentSplit {
   installment: boolean;
   interest: number;
   principal: number;
-  /** Paid beyond what was owed — nothing left to pay it against. */
+  /** Paid beyond what was owed, with nothing left to pay it against. */
   surplus: number;
   principalLeft: number;
   /** Marked as a lump sum: what the regular payment and the term became after it. */
@@ -321,7 +321,7 @@ export interface LoanState {
   interestDue: number;
   /** What you'd need to clear it today: principal + interest due. */
   owed: number;
-  /** Payments counted so far — real ones, plus any assumed made on schedule. */
+  /** Payments counted so far: real ones, plus any assumed made on schedule. */
   paymentsMade: number;
   /** How many of those were assumed (paid on schedule before tracking began). */
   assumedPayments: number;
@@ -332,9 +332,9 @@ export interface LoanState {
   covered: number;
   /** Due dates reached so far. In the standard model their interest is already charged. */
   duesPassed: number;
-  /** The regular payment now — the original, or what a lump sum lowered it to. */
+  /** The regular payment now: the original, or what a lump sum lowered it to. */
   payment: number;
-  /** How many monthly payments the loan runs for now — fewer after a lump sum that shortened it. */
+  /** How many monthly payments the loan runs for now (fewer after a lump sum that shortened it). */
   termMonths: number;
   principalPaid: number;
   interestPaid: number;
@@ -401,7 +401,7 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
   events.sort((a, b) => a.date.localeCompare(b.date) || a.order - b.order);
 
   const splits: PaymentSplit[] = [];
-  // The latest point where the balance was known for sure — after it, only
+  // The latest point where the balance was known for sure. After it, only
   // real payments count towards covering due dates.
   let settlePoint = startAt && assumed > 0 ? startAt : null;
   let paymentsSinceSettle = 0;
@@ -429,7 +429,7 @@ export function loanState(asset: ManualAsset, txs: Transaction[], asOf: string, 
     } else if (e.kind === 'pay') {
       const lump = lumps.get(e.tx.id!);
       const installment = !lump?.onTop;
-      // Waived: as if it arrived on its due date — its own installment's interest, no more, no less.
+      // Waived: as if it arrived on its due date, with its own installment's interest, no more, no less.
       if (waived && installment) accrue(installments);
       const amount = toCents(e.tx.amount);
       const toInterest = Math.min(amount, interestDue);
@@ -517,7 +517,7 @@ export interface LoanOutlook {
   nextDue: string | null;
   /** The last day that payment still counts as on time; null with no set day. */
   nextDueBy: string | null;
-  /** That due date has passed but its window hasn't — the payment is on its way. */
+  /** That due date has passed but its window hasn't, so the payment is on its way. */
   nextIsLate: boolean;
   /** The payments still to come, if you keep paying the regular amount. */
   upcoming: ScheduleRow[];
@@ -570,8 +570,8 @@ export function loanOutlook(asset: ManualAsset, txs: Transaction[], today: strin
     for (let i = now.duesPassed; i < nextIndex; i++) if (accrues(i)) charge();
   }
 
-  // From the next payment expected — which may be one whose due date has passed
-  // but is still within its window — paying the regular amount each time.
+  // From the next payment expected (which may be one whose due date has passed
+  // but is still within its window), paying the regular amount each time.
   // Anything missed is folded into what's owed and paid off along the way.
   let due = nextIndex;
   while ((principalLeft > 0 || interestDue > 0) && due < terms.termMonths * 3) {
@@ -622,8 +622,8 @@ export function defaultDepreciation(type: ManualAssetType): number {
 }
 
 /**
- * Estimated value on a date: starting from the purchase price — or from the
- * latest real value you entered, which takes over — and losing
+ * Estimated value on a date: starting from the purchase price (or from the
+ * latest real value you entered, which takes over) and losing
  * `depreciationRate` a year from there. Null before it was bought.
  */
 export function estimatedValue(asset: ManualAsset, date: string): number | null {

@@ -47,7 +47,7 @@
 .bills:last-child { margin-bottom: calc(-1 * var(--pad-y)); }
 .bills:last-child .bill:last-child { border-radius: 0 0 var(--radius) var(--radius); }
 
-/* A bill they're on: tap to open it. Reads like a transaction row — the row
+/* A bill they're on: tap to open it. Reads like a transaction row: the row
    runs to the card's edges and highlights on hover. */
 .bill {
   display: flex;

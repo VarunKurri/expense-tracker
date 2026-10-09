@@ -42,14 +42,14 @@
             @if (p.diff > 0) {
               You are <strong class="up">{{ formatCurrency(p.diff) }} ahead</strong> of that pace.
             } @else if (p.diff < 0) {
-              You are <strong class="down">{{ formatCurrency(p.diff) }} behind</strong> it — a slower month so far.
+              You are <strong class="down">{{ formatCurrency(p.diff) }} behind</strong> it, so it's a slower month so far.
             } @else {
               You are running at exactly the same pace.
             }
           </p>
         } @else if (delta(); as d) {
           <p class="hero-note">
-            {{ prevLabel() }} came to {{ formatCurrency(prevTotal()) }} —
+            {{ prevLabel() }} came to {{ formatCurrency(prevTotal()) }}, and you have spent
             @if (d.diff > 0) {
               <strong class="up">{{ formatCurrency(d.diff) }} more</strong> this month ({{ d.pct }}%).
             } @else if (d.diff < 0) {

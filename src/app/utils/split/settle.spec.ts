@@ -70,7 +70,7 @@ describe('settle', () => {
     expect(transfers.length).toBeLessThanOrEqual(4);
   });
 
-  it('invents no money — what leaves the debtors arrives at the creditors', () => {
+  it('invents no money: what leaves the debtors arrives at the creditors', () => {
     const transfers = settle([net('a', 1234), net('b', -567), net('c', -667)]);
     expect(sum(transfers.map((t) => t.amountCents))).toBe(1234);
   });

@@ -242,7 +242,7 @@ describe('the rows ahead', () => {
     const o = loanOutlook(m, [], '2026-07-10');
     expect(o.paymentsLeft).toBe(360);
     expect(o.upcoming[359].balance).toBe(0);
-    // The last one carries the few dollars the rounded EMI left behind — like the plan.
+    // The last one carries the few dollars the rounded EMI left behind, like the plan.
     expect(o.upcoming[359].payment).toBe(schedule(m.loan!)[359].payment);
     // Same when a month was missed on a loan with the penalty waived.
     const waived = loan({ ...m.loan!, onSchedule: true }, 'mortgage');
@@ -266,7 +266,7 @@ describe('the rows ahead', () => {
 });
 
 describe('payments that don\'t arrive on a fixed day', () => {
-  // Lent $2,400, no interest, $100 a month "around the 25th" — sometimes the 24th,
+  // Lent $2,400, no interest, $100 a month "around the 25th": sometimes the 24th,
   // sometimes the 26th, sometimes the 1st or 2nd of the next month.
   const lending = (over: Partial<LoanTerms> = {}) => loan({
     method: 'none', rate: 0, amountFinanced: 2400, termMonths: 24, payment: 100,
@@ -341,7 +341,7 @@ describe('payments that don\'t arrive on a fixed day', () => {
     const onTime = loanOutlook(l, txs.slice(0, 3), '2026-10-31');
     expect(ahead.nextDue).toBe('2026-12-05');
     expect(ahead.paymentsLeft).toBe(onTime.paymentsLeft - 1);
-    // Same loan, same payments in the end — the lifetime interest barely moves.
+    // Same loan, same payments in the end, so the lifetime interest barely moves.
     expect(Math.abs(ahead.lifetimeInterest - onTime.lifetimeInterest)).toBeLessThan(5);
   });
 });
@@ -445,7 +445,7 @@ describe('early, late and on-time payments', () => {
   // Same months, some early (22nd, 23rd) and some late (26th, 2nd of next month).
   const mixed = ['2026-01-22', '2026-02-26', '2026-03-23', '2026-05-02', '2026-05-24', '2026-06-21', '2026-07-26', '2026-08-23', '2026-09-28'];
 
-  it('on time: matches the table — $7,330.92 after 14 (Gemini: $7,330.95)', () => {
+  it('on time: matches the table, $7,330.92 after 14 (Gemini: $7,330.95)', () => {
     for (const l of [vishal(), waived()]) {
       const s = loanState(l, onTime.map(pay), '2026-10-04');
       expect(s.paymentsMade).toBe(14);
@@ -474,7 +474,7 @@ describe('early, late and on-time payments', () => {
     expect(s.principalLeft).toBeGreaterThan(7330.92);
   });
 
-  it('penalty waiver: early or late changes nothing — every payment splits like its row', () => {
+  it('penalty waiver: early or late changes nothing, every payment splits like its row', () => {
     const a = loanState(waived(), onTime.map(pay), '2026-10-04');
     const b = loanState(waived(), mixed.map(pay), '2026-10-04');
     expect(b.principalLeft).toBe(a.principalLeft);
@@ -490,7 +490,7 @@ describe('early, late and on-time payments', () => {
     expect(behind.principalLeft).toBe(table(8).balance); // 5 on schedule + Jan, Feb, Apr
     const caughtUp = loanState(waived(), [...missed, '2026-04-28'].map(pay), '2026-10-04');
     expect(caughtUp.principalLeft).toBe(7330.92);
-    // Still flagged as late on the page — the waiver is about money, not dates.
+    // Still flagged as late on the page. The waiver is about money, not dates.
     // (April's payment covered March; April's own window closes May 4.)
     expect(loanOutlook(waived(), missed.filter(d => d <= '2026-05-05').map(pay), '2026-05-05').behindBy).toBe(1);
   });
@@ -529,7 +529,7 @@ describe('lump sums', () => {
     const plain = loanOutlook(loan(), regular(), '2026-10-21');
     expect(s.paymentsMade).toBe(3);   // on top: not one of the monthly payments
     expect(s.termMonths).toBe(60);
-    // The 57 payments left clear what's left — the textbook EMI on it.
+    // The 57 payments left clear what's left: the textbook EMI on it.
     expect(s.payment).toBe(monthlyPayment(s.principalLeft, 4.2, 57, 'reducing'));
     expect(s.payment).toBeLessThan(333.12);
     expect(o.paymentsLeft).toBe(57);
@@ -591,7 +591,7 @@ describe('integer cents: every figure adds up to the cent', () => {
   const cents = (dollars: number) => Math.round(dollars * 100);
   const sumCents = (xs: number[]) => xs.reduce((s, x) => s + cents(x), 0);
 
-  it('half a cent rounds up, as money should — floats had $1.005 as $1.00', () => {
+  it('half a cent rounds up, as money should (floats had $1.005 as $1.00)', () => {
     // $2.01 over 2 months is $1.005 a month: a whole cent can only be $1.01.
     // (Math.round(1.005 * 100) is 100, because 1.005 is really 1.00499999…)
     expect(monthlyPayment(2.01, 0, 2, 'none')).toBe(1.01);
@@ -604,7 +604,7 @@ describe('integer cents: every figure adds up to the cent', () => {
     expect(sumCents(rows.map(r => r.principal))).toBe(30_000_000);
     for (const r of rows) expect(cents(r.payment)).toBe(cents(r.interest) + cents(r.principal));
     expect(rows[359].balance).toBe(0);
-    // Every figure is a whole number of cents — no float dust like 1798.6499999.
+    // Every figure is a whole number of cents, with no float dust like 1798.6499999.
     for (const r of rows) for (const v of [r.payment, r.interest, r.principal, r.balance]) expect(v * 100).toBeCloseTo(cents(v), 6);
   });
 

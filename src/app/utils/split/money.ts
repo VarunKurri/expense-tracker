@@ -66,7 +66,7 @@ export function percentOf(cents: number, percent: number): number {
  * Split `total` cents across `weights` proportionally, using the
  * largest-remainder (Hamilton) method.
  *
- * Guarantees the result sums to exactly `total` — no cent is created or lost.
+ * Guarantees the result sums to exactly `total`: no cent is created or lost.
  * The leftover cents go to the entries with the largest fractional remainders,
  * which is the allocation people intuitively agree is fairest, and ties break
  * by index so the result is deterministic across renders.

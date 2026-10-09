@@ -131,6 +131,14 @@ The app is what we copy. Do not "correct" this back to dark.
 - Desktop-first, responsive down to mobile.
 - Microcopy follows Origin: mono uppercase eyebrow → plain-English sentence
   headline → a calm sentence explaining *why it matters*. Never just a number.
+- **No em dashes (U+2014) anywhere in the code**: not in UI copy, aria-labels,
+  toasts, comments or tests. Rewrite the sentence with a comma, colon, full stop
+  or parentheses rather than swapping in another dash. An empty value is a word
+  ("None", "Not set"), never a dash. En dash ranges ("Oct 1 – Oct 31") and the
+  minus sign "−" are fine.
+- Forms scroll up and down only (`.modal-body` is `overflow-x: hidden`). iPhone
+  Safari draws `<input type="date">` wider than its box; `styles.scss` drops
+  the native look on iOS so it fits. Don't give a date field its own width.
 - `tally-design-system.md` and `expense_tracker_design/tally/` describe the
   **previous** (Tally) design and are kept for reference only — they are not the
   current target.
