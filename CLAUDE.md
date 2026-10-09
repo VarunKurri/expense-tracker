@@ -137,8 +137,10 @@ The app is what we copy. Do not "correct" this back to dark.
   ("None", "Not set"), never a dash. En dash ranges ("Oct 1 – Oct 31") and the
   minus sign "−" are fine.
 - Forms scroll up and down only (`.modal-body` is `overflow-x: hidden`). iPhone
-  Safari draws `<input type="date">` wider than its box; `styles.scss` drops
-  the native look on iOS so it fits. Don't give a date field its own width.
+  Safari draws `<input type="date">` wider than its box and centred;
+  `styles.scss` drops the native look on every date field (Chrome keeps its
+  calendar button) so it fits and reads left. Don't give a date field its own
+  width, and check a built selector when nesting SCSS near it.
 - `tally-design-system.md` and `expense_tracker_design/tally/` describe the
   **previous** (Tally) design and are kept for reference only — they are not the
   current target.

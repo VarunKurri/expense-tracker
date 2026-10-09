@@ -544,26 +544,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
   opacity: 0.7;
   &:hover { opacity: 1; }
-
-/* Date fields on iPhone and iPad. Safari draws a date field at its own
-   minimum width with the date centred, so on a phone `width: 100%` lost: the
-   field ran past the form's right edge and the whole form scrolled sideways.
-   Without the native look it takes the width it's given and reads left, like
-   every other field. (Only iOS needs this; elsewhere the field already fits.) */
-input[type="date"] { min-width: 0; max-width: 100%; }
-
-@supports (-webkit-touch-callout: none) {
-  input[type="date"] {
-    -webkit-appearance: none;
-    appearance: none;
-  }
-  input[type="date"]::-webkit-date-and-time-value {
-    margin: 0;
-    text-align: left;
-    /* An empty date field would otherwise collapse shorter than a filled one. */
-    min-height: 1.4em;
-  }
 }
+
+/* Date fields. iPhone Safari (and the home-screen app) draws a date field at
+   its own minimum width with the date centred, so on a phone `width: 100%`
+   lost: the field ran past the form's right edge. Without the native look it
+   takes the width it's given and reads left, like every other field. Chrome
+   and Firefox keep their calendar button either way. */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  margin: 0;
+  text-align: left;
+  /* An empty date field would otherwise collapse shorter than a filled one. */
+  min-height: 1.25em;
 }
 
 /* ============================================
