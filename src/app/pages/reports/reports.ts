@@ -25,7 +25,7 @@ import {
 } from '../../utils/reporting';
 import { splitStatus } from '../../utils/splits';
 import { splitSentence } from '../../utils/shared';
-import { fromCents } from '../../utils/money';
+import { fromCents, toCents } from '../../utils/money';
 import { localDateString } from '../../utils/date';
 
 Chart.register(
@@ -184,10 +184,10 @@ export class Reports implements AfterViewInit, OnDestroy {
 
   totalIn = computed(() => totalIncome(this.filtered(), this.rules()));
   totalOut = computed(() => totalExpenses(this.filtered(), this.rules()));
-  netFlow = computed(() => Math.round((this.totalIn() - this.totalOut()) * 100) / 100);
+  netFlow = computed(() => fromCents(toCents(this.totalIn()) - toCents(this.totalOut())));
   avgPerMonth = computed(() => {
     const n = this.months().length || 1;
-    return Math.round((this.netFlow() / n) * 100) / 100;
+    return fromCents(Math.round(toCents(this.netFlow()) / n));
   });
 
   transfers = computed(() => transferTotals(this.filtered()));
@@ -211,7 +211,7 @@ export class Reports implements AfterViewInit, OnDestroy {
     const raw = this.report() === 'income'
       ? incomeTotals(this.filtered(), this.rules())
       : categoryTotals(this.filtered(), this.rules());
-    const total = raw.reduce((s, r) => s + r.amount, 0);
+    const total = fromCents(raw.reduce((s, r) => s + toCents(r.amount), 0));
     const palette = categoryPalette();
 
     const head = raw.slice(0, this.MAX_SLICES).map((r, i) => ({
@@ -223,7 +223,7 @@ export class Reports implements AfterViewInit, OnDestroy {
 
     const tail = raw.slice(this.MAX_SLICES);
     if (tail.length) {
-      const amount = Math.round(tail.reduce((s, r) => s + r.amount, 0) * 100) / 100;
+      const amount = fromCents(tail.reduce((s, r) => s + toCents(r.amount), 0));
       head.push({
         name: `Other (${tail.length})`,
         amount,
@@ -313,9 +313,8 @@ export class Reports implements AfterViewInit, OnDestroy {
       }));
   });
 
-  drillTotal = computed(() =>
-    Math.round(this.drillTransactions().reduce(
-      (s, t) => s + (t.type === 'expense' ? t.amount : -t.amount), 0) * -100) / -100);
+  drillTotal = computed(() => fromCents(this.drillTransactions().reduce(
+    (s, t) => s + (t.type === 'expense' ? toCents(t.amount) : -toCents(t.amount)), 0)));
 
   drillTitle = computed(() => {
     const d = this.drill();

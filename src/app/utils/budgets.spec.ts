@@ -145,6 +145,19 @@ describe('budgetProgress', () => {
     expect(budgetProgress(100, 100).status).toBe('over');
     expect(budgetProgress(12.345, 0).pct).toBe(0);
   });
+
+  it('what is left is exact to the cent', () => {
+    expect(budgetProgress(0.1, 0.3).remaining).toBe(0.2);
+    expect(budgetProgress(399.99, 400).remaining).toBe(0.01);
+    expect(budgetProgress(410.1, 400).remaining).toBe(-10.1);
+  });
+});
+
+describe('planBudgetSave — amounts', () => {
+  it('stores whole cents, reading 1.005 as $1.01', () => {
+    const write = planBudgetSave([], { categoryId: 'gym', amount: 1.005, scope: 'default', month: '2026-10' }).write;
+    expect(write.kind === 'add' && write.data.amount).toBe(1.01);
+  });
 });
 
 describe('budgetSpent', () => {
@@ -169,6 +182,11 @@ describe('budgetSpent', () => {
 
   it('counts everything as recorded with the toggle off', () => {
     expect(budgetSpent(txs, 'subs', '2026-10', rules(false))).toBe(70);
+  });
+
+  it('adds up in whole cents', () => {
+    const coffees = Array.from({ length: 30 }, () => tx({ amount: 4.1 }));
+    expect(budgetSpent(coffees, 'subs', '2026-10', rules(true))).toBe(123);
   });
 });
 

@@ -1,6 +1,7 @@
 import { Budget, Transaction } from '../models';
 import { MoneyRules, refundedOut, totalExpenses } from './reporting';
 import { addMonths, monthLabel } from './calendar';
+import { fromCents, toCents } from './money';
 
 /**
  * Budget rules, kept pure so they can be tested without Firestore.
@@ -123,7 +124,7 @@ export interface BudgetSavePlan {
  * budget the old bug turned into a one-off gets put back.
  */
 export function planBudgetSave(budgets: Budget[], draft: BudgetDraft): BudgetSavePlan {
-  const amount = Math.round(Number(draft.amount) * 100) / 100;
+  const amount = fromCents(toCents(Number(draft.amount)));
   const sameScope = budgets.filter(b =>
     b.categoryId === draft.categoryId && b.id &&
     (draft.scope === 'default' ? b.isDefault : !b.isDefault && b.month === draft.month));
@@ -178,7 +179,7 @@ export type BudgetStatus = 'ok' | 'warn' | 'over';
 export function budgetProgress(spent: number, amount: number) {
   const pct = amount > 0 ? Math.round((spent / amount) * 100) : 0;
   const status: BudgetStatus = pct >= 100 ? 'over' : pct >= 75 ? 'warn' : 'ok';
-  return { pct, status, remaining: Math.round((amount - spent) * 100) / 100 };
+  return { pct, status, remaining: fromCents(toCents(amount) - toCents(spent)) };
 }
 
 /**

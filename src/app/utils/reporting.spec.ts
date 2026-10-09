@@ -167,6 +167,64 @@ describe('reporting — transfers', () => {
   });
 });
 
+describe('reporting — totals in whole cents', () => {
+  it('a thousand 10¢ coffees are exactly $100', () => {
+    const txs = Array.from({ length: 1000 }, () => tx({ type: 'expense', amount: 0.1, categoryId: 'coffee' }));
+    const r = rulesWith(true);
+    expect(totalExpenses(txs, r)).toBe(100);
+    expect(categoryTotals(txs, r)).toEqual([{ categoryId: 'coffee', amount: 100 }]);
+    expect(monthlySeries(txs, r, ['2026-09'])[0].expenses).toBe(100);
+  });
+
+  it('0.1 + 0.2 is 0.3, on every side', () => {
+    const txs = [
+      tx({ type: 'income', amount: 0.1 }), tx({ type: 'income', amount: 0.2 }),
+      tx({ type: 'expense', amount: 0.1 }), tx({ type: 'expense', amount: 0.2 }),
+      tx({ type: 'transfer', amount: 0.1, toAccountId: 'b' }), tx({ type: 'transfer', amount: 0.2, toAccountId: 'b' }),
+    ];
+    const r = rulesWith(true);
+    expect(totalIncome(txs, r)).toBe(0.3);
+    expect(totalExpenses(txs, r)).toBe(0.3);
+    expect(transferTotals(txs).movedIn).toBe(0.3);
+    expect(monthlySeries(txs, r, ['2026-09'])[0]).toMatchObject({ income: 0.3, expenses: 0.3, net: 0 });
+  });
+
+  it('a total is the sum of its rows as shown, to the cent', () => {
+    // An amount with a stray third decimal (an old import) shows as $0.13. Two
+    // of them are $0.26 — not $0.25, which adding first and rounding after gives.
+    const txs = [
+      tx({ type: 'expense', amount: 0.125, categoryId: 'a' }),
+      tx({ type: 'expense', amount: 0.125, categoryId: 'b' }),
+    ];
+    const r = rulesWith(false); // raw amounts (rulesWith's netting rounds them itself)
+    expect(categoryTotals(txs, r).map(c => c.amount)).toEqual([0.13, 0.13]);
+    expect(totalExpenses(txs, r)).toBe(0.26);
+  });
+
+  it('reads 1.005 as $1.01, the way it is shown', () => {
+    const txs = [tx({ type: 'income', amount: 1.005 })];
+    expect(totalIncome(txs, rulesWith(true))).toBe(1.01);
+  });
+
+  it('many small amounts, category rows and months reconcile exactly with the totals', () => {
+    const cats = ['a', 'b', 'c', 'd', 'e'];
+    const txs = Array.from({ length: 997 }, (_, i) => tx({
+      type: i % 7 === 0 ? 'income' : 'expense',
+      amount: ((i * 37) % 1000) / 100 + 0.01,
+      categoryId: cats[i % cats.length],
+      date: `2026-0${7 + (i % 3)}-15`,
+    }));
+    const r = rulesWith(true);
+    const cents = (n: number) => Math.round(n * 100);
+    const total = totalExpenses(txs, r);
+    expect(categoryTotals(txs, r).reduce((s, c) => s + cents(c.amount), 0)).toBe(cents(total));
+    const rows = monthlySeries(txs, r, ['2026-07', '2026-08', '2026-09']);
+    expect(rows.reduce((s, m) => s + cents(m.expenses), 0)).toBe(cents(total));
+    expect(rows.reduce((s, m) => s + cents(m.income), 0)).toBe(cents(totalIncome(txs, r)));
+    for (const m of rows) expect(cents(m.net)).toBe(cents(m.income) - cents(m.expenses));
+  });
+});
+
 describe('reporting — sankey', () => {
   it('routes sources through a single pool to categories', () => {
     const links = sankeyLinks(

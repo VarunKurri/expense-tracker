@@ -1,6 +1,7 @@
 import { MoneyBackEntry, Transaction } from '../models';
 import { isFullyRefunded, isMoneyBackIncome } from './money-back';
 import { splitStatus } from './splits';
+import { fromCents, toCents } from './money';
 
 /**
  * Shared money aggregation for the Analysis and Reports pages.
@@ -24,6 +25,10 @@ import { splitStatus } from './splits';
  *
  * `effectiveExpense` and `reimbursementSurplus` are injected rather than imported
  * so these stay pure and unit-testable without a Firestore-backed service.
+ *
+ * Every sum runs in integer cents (`toCents` on each amount, `fromCents` once
+ * at the end) so a month of $0.10 coffees adds up to exactly what it says,
+ * rather than to whatever a float drifts to. The results are still in dollars.
  */
 export interface MoneyRules {
   /** The "Count money back" toggle: on, refunds and repayments are netted off. */
@@ -45,8 +50,6 @@ export function refundedOut(t: Transaction, rules: MoneyRules): boolean {
   return rules.netting && (rules.fullyRefunded ?? isFullyRefunded)(t);
 }
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
 /** Expenses that count as spending. */
 export function spendingTransactions(txs: Transaction[]): Transaction[] {
   return txs.filter(t => t.type === 'expense' && !t.isInternalTransfer);
@@ -64,16 +67,20 @@ export function expenseAmount(t: Transaction, rules: MoneyRules): number {
   return rules.netting ? rules.effectiveExpense(t) : t.amount;
 }
 
+/** Add up dollar amounts in whole cents. */
+function sumToCents<T>(items: T[], amount: (item: T) => number): number {
+  return items.reduce((total, item) => total + toCents(amount(item)), 0);
+}
+
 export function totalExpenses(txs: Transaction[], rules: MoneyRules): number {
-  return round2(spendingTransactions(txs).reduce((s, t) => s + expenseAmount(t, rules), 0));
+  return fromCents(sumToCents(spendingTransactions(txs), t => expenseAmount(t, rules)));
 }
 
 export function totalIncome(txs: Transaction[], rules: MoneyRules): number {
-  const direct = incomeTransactions(txs, rules).reduce((s, t) => s + t.amount, 0);
-  if (!rules.netting) return round2(direct);
-  const surplus = spendingTransactions(txs)
-    .reduce((s, t) => s + rules.reimbursementSurplus(t), 0);
-  return round2(direct + surplus);
+  const direct = sumToCents(incomeTransactions(txs, rules), t => t.amount);
+  if (!rules.netting) return fromCents(direct);
+  const surplus = sumToCents(spendingTransactions(txs), t => rules.reimbursementSurplus(t));
+  return fromCents(direct + surplus);
 }
 
 export interface CategoryTotal { categoryId: string; amount: number; }
@@ -87,10 +94,10 @@ export function categoryTotals(txs: Transaction[], rules: MoneyRules): CategoryT
   const byCat = new Map<string, number>();
   for (const t of spendingTransactions(txs)) {
     const key = t.categoryId || '__none__';
-    byCat.set(key, (byCat.get(key) || 0) + expenseAmount(t, rules));
+    byCat.set(key, (byCat.get(key) || 0) + toCents(expenseAmount(t, rules)));
   }
   return [...byCat.entries()]
-    .map(([categoryId, amount]) => ({ categoryId, amount: round2(amount) }))
+    .map(([categoryId, cents]) => ({ categoryId, amount: fromCents(cents) }))
     .sort((a, b) => b.amount - a.amount);
 }
 
@@ -99,10 +106,10 @@ export function incomeTotals(txs: Transaction[], rules: MoneyRules): CategoryTot
   const byCat = new Map<string, number>();
   for (const t of incomeTransactions(txs, rules)) {
     const key = t.categoryId || '__none__';
-    byCat.set(key, (byCat.get(key) || 0) + t.amount);
+    byCat.set(key, (byCat.get(key) || 0) + toCents(t.amount));
   }
   return [...byCat.entries()]
-    .map(([categoryId, amount]) => ({ categoryId, amount: round2(amount) }))
+    .map(([categoryId, cents]) => ({ categoryId, amount: fromCents(cents) }))
     .sort((a, b) => b.amount - a.amount);
 }
 
@@ -124,6 +131,7 @@ export interface MonthRow {
 export function monthlySeries(
   txs: Transaction[], rules: MoneyRules, months: string[]
 ): MonthRow[] {
+  // In cents.
   const acc = new Map<string, { income: number; expenses: number }>();
   for (const m of months) acc.set(m, { income: 0, expenses: 0 });
 
@@ -133,23 +141,23 @@ export function monthlySeries(
     const entry = acc.get(key);
     if (!entry) continue;
     if (t.type === 'income' && (!rules.netting || !isMoneyBackIncome(t))) {
-      entry.income += t.amount;
+      entry.income += toCents(t.amount);
     }
     if (t.type === 'expense') {
-      entry.expenses += expenseAmount(t, rules);
-      if (rules.netting) entry.income += rules.reimbursementSurplus(t);
+      entry.expenses += toCents(expenseAmount(t, rules));
+      if (rules.netting) entry.income += toCents(rules.reimbursementSurplus(t));
     }
   }
 
   return months.map(month => {
     const d = acc.get(month)!;
     const [y, m] = month.split('-').map(Number);
-    const income = round2(d.income), expenses = round2(d.expenses);
     return {
       month,
       label: new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short' }),
-      income, expenses,
-      net: round2(income - expenses),
+      income: fromCents(d.income),
+      expenses: fromCents(d.expenses),
+      net: fromCents(d.income - d.expenses),
     };
   });
 }
@@ -178,15 +186,15 @@ export interface TransferTotals { movedIn: number; movedOut: number; count: numb
  * merely missing.
  */
 export function transferTotals(txs: Transaction[]): TransferTotals {
-  let movedIn = 0, movedOut = 0, count = 0;
+  let movedIn = 0, movedOut = 0, count = 0; // in cents
   for (const t of txs) {
     const isTransfer = t.type === 'transfer' || t.isInternalTransfer;
     if (!isTransfer) continue;
     count++;
-    if (t.type === 'income' || t.toAccountId) movedIn += t.amount;
-    else movedOut += t.amount;
+    if (t.type === 'income' || t.toAccountId) movedIn += toCents(t.amount);
+    else movedOut += toCents(t.amount);
   }
-  return { movedIn: round2(movedIn), movedOut: round2(movedOut), count };
+  return { movedIn: fromCents(movedIn), movedOut: fromCents(movedOut), count };
 }
 
 /**

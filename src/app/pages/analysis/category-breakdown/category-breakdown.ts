@@ -4,6 +4,7 @@ import { RouterLink, ActivatedRoute } from '@angular/router';
 import { TransactionService } from '../../../services/transaction.service';
 import { CategoryService } from '../../../services/category.service';
 import { filterForAnalysis } from '../../../utils/analysis-filter';
+import { MoneyRules, categoryTotals, totalExpenses } from '../../../utils/reporting';
 import { Transaction } from '../../../models';
 
 @Component({
@@ -45,47 +46,30 @@ export class CategoryBreakdown {
     excludedCategoryIds: this.excludedCategoryIds(),
   }));
 
-  // Internal transfers are excluded here too — same rule as the Analysis page
-  // this view is drilling in from.
-  private expenses = computed(() =>
-    this.filtered().filter(t => t.type === 'expense' && !t.isInternalTransfer)
-  );
+  // The same totals as the Analysis page this view drills in from (shared in
+  // utils/reporting.ts, added up in whole cents), with the same "Count money
+  // back" toggle. Internal transfers never count.
+  private rules = computed<MoneyRules>(() => this.txService.moneyRules(this.excludeRefunded()));
 
-  /** An expense's true cost after any linked reimbursements — matches the Analysis
-   *  page's own netting rule, gated by the same "Excluding refunded" toggle. */
-  private eff(t: Transaction): number {
-    if (!this.excludeRefunded()) return t.amount;
-    return this.txService.effectiveExpenseAmount(t);
-  }
-
-  totalExpenses = computed(() =>
-    Math.round(this.expenses().reduce((s, t) => s + this.eff(t), 0) * 100) / 100
-  );
+  totalExpenses = computed(() => totalExpenses(this.filtered(), this.rules()));
 
   // Every category with spend in the period — no top-8 cap, unlike the Analysis
   // donut this page is drilling in from.
   categories = computed(() => {
-    const byCat = new Map<string, number>();
     const total = this.totalExpenses();
-    for (const t of this.expenses()) {
-      const key = t.categoryId || '__none__';
-      byCat.set(key, (byCat.get(key) || 0) + this.eff(t));
-    }
-    return [...byCat.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([id, amount]) => {
-        const cat = id === '__none__'
-          ? undefined
-          : this.categoryService.categories().find(c => c.id === id);
-        return {
-          id,
-          name: cat?.name ?? 'Uncategorized',
-          icon: cat?.icon ?? '📦',
-          color: cat?.color ?? '#6366f1',
-          amount: Math.round(amount * 100) / 100,
-          pct: total > 0 ? Math.round((amount / total) * 100) : 0,
-        };
-      });
+    return categoryTotals(this.filtered(), this.rules()).map(({ categoryId: id, amount }) => {
+      const cat = id === '__none__'
+        ? undefined
+        : this.categoryService.categories().find(c => c.id === id);
+      return {
+        id,
+        name: cat?.name ?? 'Uncategorized',
+        icon: cat?.icon ?? '📦',
+        color: cat?.color ?? '#6366f1',
+        amount,
+        pct: total > 0 ? Math.round((amount / total) * 100) : 0,
+      };
+    });
   });
 
   rangeLabel = computed(() => {

@@ -567,5 +567,6 @@ Three-part follow-up request building on Phase 10's credit-card strip and reimbu
 - Add a `[disabled]`/busy guard to the shared `Confirm` component so a double-tap on a slow connection can't fire its action twice.
 - Visually verify authenticated pages on iOS WebKit/iPhone viewport once there's a way to get a logged-in session in this environment (test credentials, or a scripted sign-in).
 - Analysis page has no UI to *create* a reimbursement link itself (only Transactions does) — noted as a possible follow-up in part 42, not committed to.
+- **Integer cents, the rest of the app.** Loans (part 100) and the Analysis, Reports, Budgets and category-breakdown totals (part 101, via `utils/reporting.ts`) now add up in whole cents (`toCents` → integer sums → `fromCents`). Still summing dollar floats: `utils/forecast.ts` (cash ahead), the Net worth page (account + manual asset totals), and the Dashboard's own totals. Same treatment, with their specs as the regression net; stored amounts stay in dollars.
 
 ---

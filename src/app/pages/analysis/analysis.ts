@@ -15,10 +15,10 @@ import { Transaction } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { filterForAnalysis } from '../../utils/analysis-filter';
 import { isMoneyBackIncome } from '../../utils/money-back';
-import { splitTotals } from '../../utils/reporting';
+import { MoneyRules, categoryTotals, splitTotals, totalExpenses, totalIncome } from '../../utils/reporting';
 import { splitSentence } from '../../utils/shared';
 import { splitStatus } from '../../utils/splits';
-import { fromCents } from '../../utils/money';
+import { fromCents, toCents } from '../../utils/money';
 import { categoryPalette, chartColors } from '../../utils/theme-colors';
 import { ThemeService } from '../../services/theme.service';
 import {
@@ -207,16 +207,6 @@ export class Analysis implements AfterViewInit, OnDestroy {
   // Internal transfers (e.g. a credit card payment) are excluded — real money
   // movement between the user's own accounts, not real spending/earning.
   expenses = computed(() => this.filtered().filter(t => t.type === 'expense' && !t.isInternalTransfer));
-  // "Excluding refunded" also governs reimbursement netting — same "count things as
-  // originally recorded" toggle. On: a reimbursing income isn't real income, it's
-  // folded into the expense's true cost. Off: everything counts as recorded, so the
-  // reimbursing income counts as ordinary income instead.
-  income = computed(() => {
-    const netting = this.excludeRefunded();
-    return this.filtered().filter(t =>
-      t.type === 'income' && !t.isInternalTransfer && (!netting || !isMoneyBackIncome(t))
-    );
-  });
 
   /** An expense's true cost after any linked reimbursements — unless netting is
    *  off ("Include refunded"), in which case every expense counts as recorded.
@@ -275,23 +265,24 @@ export class Analysis implements AfterViewInit, OnDestroy {
   }
 
   // ── KPIs ───────────────────────────────────────────────────
-  totalExpenses = computed(() =>
-    Math.round(this.expenses().reduce((s, t) => s + this.eff(t), 0) * 100) / 100
-  );
+  // The totals are shared with Reports and the category breakdown
+  // (utils/reporting.ts), and added up in whole cents. With the toggle on,
+  // reimbursements over the original expense count as income — see
+  // reimbursementSurplus.
+  private rules = computed<MoneyRules>(() => this.txService.moneyRules(this.excludeRefunded()));
 
-  totalIncome = computed(() => {
-    const direct = this.income().reduce((s, t) => s + t.amount, 0);
-    if (!this.excludeRefunded()) return Math.round(direct * 100) / 100;
-    // Reimbursements over the original expense are real profit — see reimbursementSurplus.
-    const surplus = this.expenses().reduce((s, t) => s + this.txService.reimbursementSurplus(t), 0);
-    return Math.round((direct + surplus) * 100) / 100;
-  });
+  totalExpenses = computed(() => totalExpenses(this.filtered(), this.rules()));
+
+  totalIncome = computed(() => totalIncome(this.filtered(), this.rules()));
+
+  /** Spending per category, largest first, in dollars. */
+  private categoryTotals = computed(() => categoryTotals(this.filtered(), this.rules()));
 
   avgMonthlySpend = computed(() => {
     const txs = this.expenses();
     if (!txs.length) return 0;
     const months = new Set(txs.map(t => t.date.slice(0, 7))).size || 1;
-    return Math.round((this.totalExpenses() / months) * 100) / 100;
+    return fromCents(Math.round(toCents(this.totalExpenses()) / months));
   });
 
   savingsRate = computed(() => {
@@ -310,15 +301,10 @@ export class Analysis implements AfterViewInit, OnDestroy {
   });
 
   topCategory = computed(() => {
-    const byCat = new Map<string, number>();
-    for (const t of this.expenses()) {
-      if (!t.categoryId) continue;
-      byCat.set(t.categoryId, (byCat.get(t.categoryId) || 0) + this.eff(t));
-    }
-    if (!byCat.size) return null;
-    const [id, amount] = [...byCat.entries()].sort((a, b) => b[1] - a[1])[0];
-    const cat = this.categoryService.categories().find(c => c.id === id);
-    return cat ? { name: cat.name, icon: cat.icon, amount } : null;
+    const top = this.categoryTotals().find(c => c.categoryId !== '__none__');
+    if (!top) return null;
+    const cat = this.categoryService.categories().find(c => c.id === top.categoryId);
+    return cat ? { name: cat.name, icon: cat.icon, amount: top.amount } : null;
   });
 
   largestExpense = computed(() => {
@@ -329,16 +315,10 @@ export class Analysis implements AfterViewInit, OnDestroy {
 
   // ── Spending by category ───────────────────────────────────
   categoryBreakdown = computed(() => {
-    const byCat = new Map<string, number>();
     const total = this.totalExpenses();
-    for (const t of this.expenses()) {
-      const key = t.categoryId || '__none__';
-      byCat.set(key, (byCat.get(key) || 0) + this.eff(t));
-    }
-    return [...byCat.entries()]
-      .sort((a, b) => b[1] - a[1])
+    return this.categoryTotals()
       .slice(0, 8)
-      .map(([id, amount], i) => {
+      .map(({ categoryId: id, amount }, i) => {
         const cat = id === '__none__'
           ? { name: 'Uncategorized', icon: '📦', color: '#9ca3af' }
           : this.categoryService.categories().find(c => c.id === id);
@@ -349,7 +329,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
           // A category without its own colour takes the next palette hue, so
           // slices stay apart rather than all falling back to one purple.
           color: (cat as any)?.color || categoryPalette()[i % 8],
-          amount: Math.round(amount * 100) / 100,
+          amount,
           pct: total > 0 ? Math.round((amount / total) * 100) : 0
         };
       });
@@ -357,10 +337,11 @@ export class Analysis implements AfterViewInit, OnDestroy {
 
   // ── Top merchants — tracks all transactions per merchant for correct latest pick
   topMerchants = computed(() => {
+    // amount in cents
     const byMerchant = new Map<string, { amount: number; txs: Transaction[] }>();
     for (const t of this.expenses()) {
       const key = t.merchant || 'Unknown';
-      const amt = this.eff(t);
+      const amt = toCents(this.eff(t));
       const existing = byMerchant.get(key);
       if (!existing) {
         byMerchant.set(key, { amount: amt, txs: [t] });
@@ -381,7 +362,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
         return {
           rank: i + 1,
           name,
-          amount: Math.round(data.amount * 100) / 100,
+          amount: fromCents(data.amount),
           count: data.txs.length,
           lastTx: sorted[0],
           txs: sorted   // all transactions, newest first
@@ -392,7 +373,7 @@ export class Analysis implements AfterViewInit, OnDestroy {
   // ── Monthly trend data ─────────────────────────────────────
   monthlyTrend = computed(() => {
     const now = new Date();
-    const months = new Map<string, { income: number; expenses: number }>();
+    const months = new Map<string, { income: number; expenses: number }>(); // in cents
     let numMonths = 6;
     if (this.range() === 'this-year') numMonths = 12;
     if (this.range() === 'all') numMonths = 12;
@@ -410,10 +391,10 @@ export class Analysis implements AfterViewInit, OnDestroy {
       const key = t.date.slice(0, 7);
       if (!months.has(key)) continue;
       const entry = months.get(key)!;
-      if (t.type === 'income' && (!netting || !isMoneyBackIncome(t))) entry.income += t.amount;
+      if (t.type === 'income' && (!netting || !isMoneyBackIncome(t))) entry.income += toCents(t.amount);
       if (t.type === 'expense' && !this.txService.isFullyRefunded(t)) {
-        entry.expenses += this.eff(t);
-        if (netting) entry.income += this.txService.reimbursementSurplus(t);
+        entry.expenses += toCents(this.eff(t));
+        if (netting) entry.income += toCents(this.txService.reimbursementSurplus(t));
       }
     }
 
@@ -422,8 +403,8 @@ export class Analysis implements AfterViewInit, OnDestroy {
       const label = new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short' });
       return {
         month, label,
-        income: Math.round(data.income * 100) / 100,
-        expenses: Math.round(data.expenses * 100) / 100,
+        income: fromCents(data.income),
+        expenses: fromCents(data.expenses),
       };
     });
   });
