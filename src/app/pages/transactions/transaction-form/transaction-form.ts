@@ -25,7 +25,9 @@ import { TransactionTemplate } from '../../../models';
 import { QuickAddService } from '../../../services/quick-add.service';
 import { ToastService } from '../../../services/toast.service';
 import { ReceiptScanService } from '../../../services/receipt-scan.service';
-import { ReceiptScan, itemizedFromScan, scanAmountCents, scanBillCents, scanMismatchCents } from '../../../utils/receipt';
+import {
+  ReceiptScan, itemizedFromScan, scanAmountCents, scanBillCents, scanMismatchCents, scanTaxAndFeesCents, scanTaxParts,
+} from '../../../utils/receipt';
 
 @Component({
   selector: 'app-transaction-form',
@@ -127,12 +129,26 @@ export class TransactionForm implements OnChanges {
     this.scanned.set(scan);
   }
 
-  /** "4 items · tax $6.16 · tip $0.00 · total $56.87" */
+  /** "1 item · tax & fees −$4.71 · tip $0.00 · total $37.26" */
   scanSummary(scan: ReceiptScan): string {
     const n = scan.items.length;
-    const parts = [`${n} item${n === 1 ? '' : 's'}`, `tax ${formatCurrency(fromCents(scan.taxCents))}`, `tip ${formatCurrency(fromCents(scan.tipCents))}`];
-    if (scan.totalCents !== null) parts.push(`total ${formatCurrency(fromCents(scan.totalCents))}`);
+    const parts = [`${n} item${n === 1 ? '' : 's'}`, `tax & fees ${this.signedMoney(scanTaxAndFeesCents(scan))}`, `tip ${this.signedMoney(scan.tipCents)}`];
+    if (scan.totalCents !== null) parts.push(`total ${this.signedMoney(scan.totalCents)}`);
     return parts.join(' · ');
+  }
+
+  /**
+   * What "Tax & fees" is made of, when it's more than the tax alone:
+   * "Tax $3.64 · Discount −$2.10 · DoorDash Credits −$6.25". Empty otherwise.
+   */
+  scanTaxBreakdown(scan: ReceiptScan): string {
+    if (!scan.fees.length && !scan.discounts.length) return '';
+    return scanTaxParts(scan).map(p => `${p.name} ${this.signedMoney(p.cents)}`).join(' · ');
+  }
+
+  /** Cents as "$3.64" or "−$2.10". */
+  private signedMoney(cents: number): string {
+    return cents < 0 ? `−${formatCurrency(fromCents(-cents))}` : formatCurrency(fromCents(cents));
   }
 
   /** When the lines and the printed total disagree, say so — a line was probably misread. */

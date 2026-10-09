@@ -173,13 +173,24 @@ export class ItemizedSplitEditor {
     this.state.update(s => {
       const c = { ...s.charges };
       const mode = which === 'tax' ? c.taxMode : c.tipMode;
-      if (which === 'tax') { if (mode === 'percent') c.taxPercent = Math.min(100, v); else c.taxCents = toCents(v); }
+      if (which === 'tax') {
+        if (mode === 'percent') c.taxPercent = Math.min(100, v);
+        // "Tax & fees" as an amount can be negative — discounts and credits bigger
+        // than tax and fees — but never by more than the items themselves.
+        else c.taxCents = Number.isFinite(n) ? Math.max(-itemsCents(s), toCents(n)) : 0;
+      }
       else { if (mode === 'percent') c.tipPercent = Math.min(100, v); else c.tipCents = toCents(v); }
       return { ...s, charges: c };
     });
   }
 
   money(cents: number): string {
-    return formatCurrency(fromCents(cents));
+    // "−$4.71", not "-$4.71": a real minus sign, like the rest of the app's figures.
+    return cents < 0 ? `−${formatCurrency(fromCents(-cents))}` : formatCurrency(fromCents(cents));
   }
+}
+
+/** What the items add up to, before tax, fees and tip. */
+function itemsCents(state: { items: { priceCents: number }[] }): number {
+  return state.items.reduce((total, i) => total + i.priceCents, 0);
 }

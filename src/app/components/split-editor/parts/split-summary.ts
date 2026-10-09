@@ -65,7 +65,7 @@ export class SplitSummary {
       if (!p || p.totalCents === 0) return [];
       return [
         `${p.lines.length} item${p.lines.length === 1 ? '' : 's'}`,
-        p.taxCents ? `tax ${this.money(p.taxCents)}` : '',
+        p.taxCents ? `tax & fees ${this.money(p.taxCents)}` : '',
         p.tipCents ? `tip ${this.money(p.tipCents)}` : '',
       ].filter(Boolean);
     };
@@ -91,6 +91,6 @@ export class SplitSummary {
     this.status().transfers.filter(t => t.toPersonId !== ME && t.fromPersonId !== ME));
 
   money(cents: number): string {
-    return formatCurrency(fromCents(cents));
+    return cents < 0 ? `−${formatCurrency(fromCents(-cents))}` : formatCurrency(fromCents(cents));
   }
 }

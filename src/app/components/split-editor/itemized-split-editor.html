@@ -68,12 +68,13 @@
   }
 </div>
 
-<!-- TAX AND TIP — each one row: the number, then whether it's % or $ -->
+<!-- TAX & FEES AND TIP — each one row: the number, then whether it's % or $.
+     Fees, discounts and credits ride in "Tax & fees": the split has only tax and tip. -->
 <div class="form-grid">
   <div class="field">
-    <span class="label-sm">Tax</span>
+    <span class="label-sm">Tax &amp; fees</span>
     <div class="charge">
-      <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal" name="tax" aria-label="Tax"
+      <input class="input-field" type="number" step="0.01" inputmode="decimal" name="tax" aria-label="Tax and fees"
              [ngModel]="chargeValue('tax')" (ngModelChange)="setCharge('tax', $event)"
              [placeholder]="state().charges.taxMode === 'percent' ? '8.875' : '0.00'" />
       <div class="mini-seg" role="radiogroup" aria-label="Tax as">
@@ -116,9 +117,14 @@
   <app-split-progress [totalCents]="billCents()" [addedCents]="result().totalCents" />
   <p class="field-hint">
     Items <span class="fig">{{ money(result().subtotalCents) }}</span>
-    · tax <span class="fig">{{ money(result().taxCents) }}</span>
+    · tax &amp; fees <span class="fig">{{ money(result().taxCents) }}</span>
     · tip <span class="fig">{{ money(result().tipCents) }}</span>.
-    Tax and tip are shared in proportion to what each person had.
+    @if (result().taxCents < 0) {
+      Discounts and credits are more than tax and fees, so this takes {{ money(-result().taxCents) }} off
+      everyone's share, in proportion to what each person had.
+    } @else {
+      Tax, fees and tip are shared in proportion to what each person had; discounts and credits come off tax &amp; fees.
+    }
   </p>
   @if (mismatch()) {
     <button type="button" class="btn-row use-amount" (click)="useAmount.emit(coverCents())">

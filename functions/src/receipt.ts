@@ -28,24 +28,35 @@ const DAILY_LIMIT = 40;
 /** ~4 MB of image; the browser sends well under 1 MB. */
 const MAX_IMAGE_CHARS = 5_600_000;
 
-const INSTRUCTIONS = `You read photos of shop and restaurant receipts and report exactly what is printed.
-- Money is integer cents: $12.50 is 1250.
-- One entry in items per printed item line. If a line shows a quantity ("2 x Mandi 50.00"), set quantity 2, totalCents to the line total, unitPriceCents to the price of one. Otherwise quantity 1 and unitPriceCents null unless printed.
+const INSTRUCTIONS = `You read photos of receipts — shops, restaurants and delivery apps (DoorDash, Uber Eats, Instacart, Grubhub) — and report exactly what is printed.
+- Money is integer cents: $12.50 is 1250. Every amount you return is positive.
+- items: one entry per printed item line, at its printed price. If a line shows a quantity ("2 x Mandi 50.00", "3× Biryani US$41.97"), set quantity to it, totalCents to the line total, and unitPriceCents to the price of one. Otherwise quantity 1 and unitPriceCents null unless printed. Never take discounts off item prices, except a discount printed directly under one item, which belongs to that item.
 - Never list subtotal, tax, tip, total, payment, card, change or balance lines as items.
-- A discount on one item: subtract it from that item's totalCents. A discount or coupon on the whole order: discountCents, as a positive number.
-- Service charges, delivery and other fees: feesCents. Gratuity or tip (printed or handwritten): tipCents. Ignore suggested-tip tables.
-- taxCents: all tax lines added together.
-- totalCents: the final amount paid, including a handwritten tip.
-- date: YYYY-MM-DD. merchant: the business name as printed.
-- Anything not on the receipt: null (0 for discount, fees, tax and tip).
+- fees: every charge that is not an item, tax or tip, each with its printed name — delivery fee, service fee, small order fee, long distance fee, expanded range fee, regulatory response fee, bag fee, service charge.
+- discounts: everything that lowers the total, each with its printed name — discounts, promotions, coupons, member savings, DashPass/Uber One savings, app credits (e.g. "DoorDash Credits"), gift cards.
+- taxCents: all tax lines added together ("Estimated Tax" counts).
+- tipCents: gratuity or tip, including a Dasher/driver tip or a handwritten tip; 0 if none. Ignore suggested-tip tables.
+- totalCents: the final amount charged, after discounts and credits and including tip.
+- date: YYYY-MM-DD. merchant: the restaurant or store (for a delivery app, the restaurant, not the app).
+- Anything not on the receipt: null, or 0 / an empty list.
 - If the image is not a receipt, set isReceipt false and leave everything else empty.
 - confidence: 0 to 1, how sure you are that every number was read correctly.`;
 
 const nullableCents = { type: ['integer', 'null'] };
+/** A named fee or discount: "Service fee", 315. */
+const NAMED_AMOUNTS = {
+  type: 'array',
+  items: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['name', 'cents'],
+    properties: { name: { type: 'string' }, cents: { type: 'integer' } },
+  },
+};
 const RECEIPT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['isReceipt', 'merchant', 'date', 'items', 'subtotalCents', 'discountCents', 'feesCents', 'taxCents', 'tipCents', 'totalCents', 'confidence'],
+  required: ['isReceipt', 'merchant', 'date', 'items', 'subtotalCents', 'fees', 'discounts', 'taxCents', 'tipCents', 'totalCents', 'confidence'],
   properties: {
     isReceipt: { type: 'boolean' },
     merchant: { type: ['string', 'null'] },
@@ -65,8 +76,8 @@ const RECEIPT_SCHEMA = {
       },
     },
     subtotalCents: nullableCents,
-    discountCents: { type: 'integer' },
-    feesCents: { type: 'integer' },
+    fees: NAMED_AMOUNTS,
+    discounts: NAMED_AMOUNTS,
     taxCents: { type: 'integer' },
     tipCents: { type: 'integer' },
     totalCents: nullableCents,

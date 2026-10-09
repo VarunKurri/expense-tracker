@@ -1,4 +1,4 @@
-import { allocate, sum } from './split/money';
+import { sum } from './split/money';
 import { ItemizedSplitState, newItem } from './splits';
 import { SplitItem } from '../models';
 
@@ -22,6 +22,12 @@ export interface ScannedItem {
   totalCents: number;
 }
 
+/** A fee or a discount, by the name it has on the receipt. Always positive. */
+export interface NamedAmount {
+  name: string;
+  cents: number;
+}
+
 export interface ReceiptScan {
   isReceipt: boolean;
   merchant: string | null;
@@ -29,10 +35,10 @@ export interface ReceiptScan {
   date: string | null;
   items: ScannedItem[];
   subtotalCents: number | null;
-  /** Order-level discounts and coupons, as a positive amount. */
-  discountCents: number;
-  /** Service charges, delivery and other fees. */
-  feesCents: number;
+  /** Delivery, service and other fees — everything that isn't an item, tax or tip. */
+  fees: NamedAmount[];
+  /** Discounts, promotions, credits and gift cards — everything that lowers the total. */
+  discounts: NamedAmount[];
   taxCents: number;
   tipCents: number;
   /** What was paid, as printed (including a written-in tip). */
@@ -57,6 +63,16 @@ function validDate(v: unknown): string | null {
   return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v ? null : v;
 }
 
+function namedAmounts(v: unknown, fallbackName: string): NamedAmount[] {
+  return (Array.isArray(v) ? v : [])
+    .slice(0, 20)
+    .map((a: Record<string, unknown>) => ({ name: text(a?.['name'], 60) || fallbackName, cents: cents(a?.['cents']) }))
+    .filter(a => a.cents > 0);
+}
+
+/** One lump sum from a scan made before fees and discounts were listed by name. */
+const legacy = (v: unknown, name: string): NamedAmount[] => (cents(v) > 0 ? [{ name, cents: cents(v) }] : []);
+
 /** Whatever came back, as a well-formed scan. */
 export function cleanScan(raw: unknown): ReceiptScan {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
@@ -79,8 +95,8 @@ export function cleanScan(raw: unknown): ReceiptScan {
     date: validDate(r['date']),
     items,
     subtotalCents: centsOrNull(r['subtotalCents']),
-    discountCents: cents(r['discountCents']),
-    feesCents: cents(r['feesCents']),
+    fees: Array.isArray(r['fees']) ? namedAmounts(r['fees'], 'Fee') : legacy(r['feesCents'], 'Fees'),
+    discounts: Array.isArray(r['discounts']) ? namedAmounts(r['discounts'], 'Discount') : legacy(r['discountCents'], 'Discount'),
     taxCents: cents(r['taxCents']),
     tipCents: cents(r['tipCents']),
     totalCents: centsOrNull(r['totalCents']),
@@ -88,14 +104,25 @@ export function cleanScan(raw: unknown): ReceiptScan {
   };
 }
 
-/** The items after any order-level discount, plus fees — what tax and tip sit on top of. */
+/** The items as printed. */
 export function scanItemsCents(scan: ReceiptScan): number {
-  return Math.max(0, sum(scan.items.map(i => i.totalCents)) - scan.discountCents) + scan.feesCents;
+  return sum(scan.items.map(i => i.totalCents));
 }
 
-/** The bill as the lines add up: items, less discount, plus fees, tax and tip. */
+/**
+ * What goes in "Tax & fees": tax, plus every fee, less every discount and
+ * credit. Negative when the discounts are bigger — it then takes money off
+ * everyone's share, in proportion, exactly as a discount would. Never more
+ * negative than the items themselves.
+ */
+export function scanTaxAndFeesCents(scan: ReceiptScan): number {
+  const net = scan.taxCents + sum(scan.fees.map(f => f.cents)) - sum(scan.discounts.map(d => d.cents));
+  return Math.max(-scanItemsCents(scan), net);
+}
+
+/** The bill as the lines add up: items, tax and fees less discounts, and tip. */
 export function scanBillCents(scan: ReceiptScan): number {
-  return scanItemsCents(scan) + scan.taxCents + scan.tipCents;
+  return scanItemsCents(scan) + scanTaxAndFeesCents(scan) + scan.tipCents;
 }
 
 /**
@@ -111,40 +138,45 @@ export function scanAmountCents(scan: ReceiptScan): number {
   return scan.totalCents ?? scanBillCents(scan);
 }
 
+/** One part of "Tax & fees", for the note under a scan: "DoorDash Credits", −625. */
+export interface TaxPart { name: string; cents: number; }
+
+/** What "Tax & fees" is made of, in receipt order: tax, then fees, then discounts (negative). */
+export function scanTaxParts(scan: ReceiptScan): TaxPart[] {
+  return [
+    ...(scan.taxCents ? [{ name: 'Tax', cents: scan.taxCents }] : []),
+    ...scan.fees.map(f => ({ name: f.name, cents: f.cents })),
+    ...scan.discounts.map(d => ({ name: d.name, cents: -d.cents })),
+  ];
+}
+
 /**
  * The scan as an item-by-item split. Keeps who's on the bill and who else paid;
  * replaces the items, tax and tip.
  *
+ * - Items are exactly as printed, so the editor can be checked line by line
+ *   against the receipt — "3 × Biryani at $13.99" stays one line of three.
  * - Lines start unclaimed — tapping who had what is the point of splitting by item.
- * - An order-level discount comes off the lines in proportion to their price
- *   (Split's `allocate`, so not a cent goes missing).
- * - "2 × Mandi" stays one line with a quantity when the price divides evenly;
- *   otherwise it's one line, named "2 × Mandi", at its total.
- * - Fees (service charge, delivery) are a line shared by everyone on the bill.
- * - Tax and tip are fixed amounts, exactly as printed.
+ * - Fees, discounts and credits go into "Tax & fees" with the tax (the model
+ *   has only tax and tip), so they're shared like tax: in proportion to what
+ *   each person had. A delivery-app order with big credits can make it negative.
+ * - Tip is the tip, as printed.
  */
 export function itemizedFromScan(scan: ReceiptScan, base: ItemizedSplitState): ItemizedSplitState {
-  const lineTotals = scan.items.map(i => i.totalCents);
-  const linesCents = sum(lineTotals);
-  const discounted = scan.discountCents > 0 && linesCents > 0
-    ? allocate(Math.max(0, linesCents - scan.discountCents), lineTotals)
-    : lineTotals;
-
-  const items: SplitItem[] = scan.items.map((line, i) => {
-    const total = discounted[i];
-    if (line.quantity > 1 && total % line.quantity === 0) {
-      return newItem([], line.name, total / line.quantity, line.quantity);
+  const items: SplitItem[] = scan.items.map(line => {
+    if (line.quantity > 1 && line.totalCents % line.quantity === 0) {
+      return newItem([], line.name, line.totalCents / line.quantity, line.quantity);
     }
-    return newItem([], line.quantity > 1 ? `${line.quantity} × ${line.name}` : line.name, total);
+    // A quantity whose total doesn't divide evenly (a rounded unit price): one line at its total.
+    return newItem([], line.quantity > 1 ? `${line.quantity} × ${line.name}` : line.name, line.totalCents);
   });
-  if (scan.feesCents > 0) items.push(newItem(base.participantIds, 'Service & fees', scan.feesCents));
 
   return {
     ...base,
     items: items.length ? items : [newItem()],
     charges: {
       ...base.charges,
-      taxMode: 'amount', taxCents: scan.taxCents, taxPercent: 0,
+      taxMode: 'amount', taxCents: scanTaxAndFeesCents(scan), taxPercent: 0,
       tipMode: 'amount', tipCents: scan.tipCents, tipPercent: 0,
     },
     source: 'receipt',

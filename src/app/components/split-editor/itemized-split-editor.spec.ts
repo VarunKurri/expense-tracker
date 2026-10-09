@@ -82,17 +82,40 @@ describe('ItemizedSplitEditor', () => {
 
   it('items, tax and tip: shared in proportion to what each person had', async () => {
     await enterDinner();
-    await type(el.querySelector('input[aria-label="Tax"]')!, '10');
+    await type(el.querySelector('input[aria-label="Tax and fees"]')!, '10');
     await type(el.querySelector('input[aria-label="Tip"]')!, '20');
     // $60 of items, $6 tax, $12 tip = $78. Alex had $20 of $60: a third of tax and tip.
     expect(itemizedBillCents(host.state())).toBe(7800);
-    expect(el.textContent).toContain('Items $60.00 · tax $6.00 · tip $12.00');
+    expect(el.textContent).toContain('Items $60.00 · tax & fees $6.00 · tip $12.00');
     host.paid.set(7800); // you paid the $78 bill
     await settle();
     const alex = [...el.querySelectorAll('.summary-row')].find(r => r.textContent!.includes('Alex'))!;
     expect(alex.textContent).toContain('$26.00');
-    expect(alex.textContent).toContain('Owes you · 2 items · tax $2.00 · tip $4.00');
+    expect(alex.textContent).toContain('Owes you · 2 items · tax & fees $2.00 · tip $4.00');
     expect(el.textContent).toContain('✓ Adds up');
+  });
+
+  it('tax & fees can be negative — discounts bigger than tax — and comes off everyone in proportion', async () => {
+    await enterDinner();
+    ([...el.querySelectorAll('[aria-label="Tax as"] button')][1] as HTMLElement).click(); // $
+    await settle();
+    await type(el.querySelector('input[aria-label="Tax and fees"]')!, '-12');
+    expect(itemizedBillCents(host.state())).toBe(4800);
+    expect(el.textContent).toContain('tax & fees −$12.00');
+    expect(el.textContent).toContain("takes $12.00 off everyone's share");
+    host.paid.set(4800);
+    await settle();
+    const alex = [...el.querySelectorAll('.summary-row')].find(r => r.textContent!.includes('Alex'))!;
+    expect(alex.textContent).toContain('$16.00'); // his $20, less a third of $12
+    expect(alex.textContent).toContain('tax & fees −$4.00');
+  });
+
+  it('never takes off more than the items cost', async () => {
+    await enterDinner();
+    ([...el.querySelectorAll('[aria-label="Tax as"] button')][1] as HTMLElement).click();
+    await settle();
+    await type(el.querySelector('input[aria-label="Tax and fees"]')!, '-100');
+    expect(host.state().charges.taxCents).toBe(-6000);
   });
 
   it('when the receipt and the amount disagree, offers to use the receipt total', async () => {
@@ -138,7 +161,7 @@ describe('ItemizedSplitEditor', () => {
 
   it('tip on items + tax uses the larger base', async () => {
     await enterDinner();
-    await type(el.querySelector('input[aria-label="Tax"]')!, '10');
+    await type(el.querySelector('input[aria-label="Tax and fees"]')!, '10');
     await type(el.querySelector('input[aria-label="Tip"]')!, '20');
     button('Items + tax').click();
     await settle();
@@ -158,7 +181,7 @@ describe('ItemizedSplitEditor', () => {
     await settle();
     expect(el.textContent).toContain('$60.00 of $78.00 added');
     expect(el.textContent).toContain('$18.00 left');
-    await type(el.querySelector('input[aria-label="Tax"]')!, '10');
+    await type(el.querySelector('input[aria-label="Tax and fees"]')!, '10');
     expect(el.textContent).toContain('$12.00 left');
     await type(el.querySelector('input[aria-label="Tip"]')!, '20');
     expect(el.textContent).toContain('✓ Adds up');

@@ -24,7 +24,7 @@ const receipt = (over: Partial<ReceiptScan> = {}): ReceiptScan => ({
     { name: 'Nalli Gosht Mandi', quantity: 2, unitPriceCents: 2500, totalCents: 5000 },
     { name: 'Chai', quantity: 1, unitPriceCents: null, totalCents: 300 },
   ],
-  subtotalCents: 5300, discountCents: 0, feesCents: 0, taxCents: 387, tipCents: 0, totalCents: 5687, confidence: 0.95,
+  subtotalCents: 5300, fees: [], discounts: [], taxCents: 387, tipCents: 0, totalCents: 5687, confidence: 0.95,
   ...over,
 });
 
@@ -191,7 +191,7 @@ describe('TransactionForm — splitting a bill', () => {
       expect(form.amount).toBe(56.87);
       expect(form.itemizedState().items.map(i => i.name)).toEqual(['Nalli Gosht Mandi', 'Chai']);
       expect(form.itemizedState().charges.taxCents).toBe(387);
-      expect(el.textContent).toContain('2 items · tax $3.87 · tip $0.00 · total $56.87');
+      expect(el.textContent).toContain('2 items · tax & fees $3.87 · tip $0.00 · total $56.87');
       expect(el.textContent).toContain('turn on Split this bill');
     });
 
@@ -225,6 +225,21 @@ describe('TransactionForm — splitting a bill', () => {
       expect(saved.aiConfidence).toBe(0.95);
       expect(saved.split!.source).toBe('receipt');
       expect(splitStatus(saved.split!).billTotalCents).toBe(5687);
+    });
+
+    it('a delivery order: discounts and credits net into tax & fees, and the note says how', async () => {
+      nextScan = receipt({
+        merchant: 'IGrill Indian Cuisine',
+        items: [{ name: 'Vijayawada Style Chicken Biryani', quantity: 3, unitPriceCents: 1399, totalCents: 4197 }],
+        discounts: [{ name: 'Discount', cents: 210 }, { name: 'DoorDash Credits', cents: 625 }],
+        taxCents: 364, totalCents: 3726,
+      });
+      await openWith(null);
+      await pick();
+      expect(host.form().amount).toBe(37.26);
+      expect(host.form().itemizedState().charges.taxCents).toBe(-471);
+      expect(el.textContent).toContain('Tax & fees is Tax $3.64 · Discount −$2.10 · DoorDash Credits −$6.25.');
+      expect(el.querySelector('.scan-note .field-error')).toBeNull();
     });
 
     it('says when the lines and the printed total disagree', async () => {

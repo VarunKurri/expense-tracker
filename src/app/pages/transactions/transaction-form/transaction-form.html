@@ -62,6 +62,9 @@
       @if (scanned(); as scan) {
         <div class="form-note scan-note">
           <div><strong>{{ scan.merchant || 'Receipt' }}</strong> · {{ scanSummary(scan) }}</div>
+          @if (scanTaxBreakdown(scan); as breakdown) {
+            <div>Tax &amp; fees is {{ breakdown }}.</div>
+          }
           @if (scanWarning(scan); as warning) {
             <div class="field-error">{{ warning }}</div>
           }
