@@ -206,6 +206,29 @@ describe('Shared page', () => {
       expect(card.textContent).toContain('You owe $10.00');
     });
 
+    it('tapping their bill opens a read-only sheet, and Edit opens the form', async () => {
+      await setup([]);
+      sharedBills.bills.set([{
+        id: 'sb', date: '2026-09-25', merchant: 'Tents', notes: 'Two tents', createdAt: 1, updatedAt: 1,
+        split: { ...quickSplit(6000, [ME, 'm']), payments: [{ personId: 'm', amountCents: 6000 }] },
+      }]);
+      await settle();
+      ([...el.querySelectorAll('.bill')].find(b => b.textContent!.includes('Tents')) as HTMLElement).click();
+      await settle();
+
+      const sheet = document.querySelector('app-shared-bill-view')!.textContent!;
+      expect(sheet).toContain('$60.00');
+      expect(sheet).toContain('Paid by Mrunaal');
+      expect(sheet).toContain('Two tents');
+      expect(sheet).toContain('You owe Mrunaal $30.00');
+      expect(document.getElementById('sb-merchant')).toBeNull(); // not the form yet
+
+      (document.querySelector('app-shared-bill-view .view-edit-btn') as HTMLElement).click();
+      await settle();
+      expect(document.body.textContent).toContain('Edit bill');
+      expect((document.getElementById('sb-merchant') as HTMLInputElement).value).toBe('Tents');
+    });
+
     it("won't save without who paid", async () => {
       await setup([]);
       button('Someone else paid').click();

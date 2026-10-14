@@ -3,7 +3,7 @@ import { Group, ME, MoneyBackEntry, SharedBill, Transaction, TransactionSplit } 
 import { MoneyBackLedger } from './money-back';
 import { fromCents } from './money';
 import { sum } from './split/money';
-import { groupLedger, myPlan, spreadReceived } from './groups';
+import { groupLedger, myPlan, spreadReceived, unassignedPayments } from './groups';
 import { quickSplit, splitStatus } from './splits';
 
 class Ledger extends MoneyBackLedger {
@@ -207,6 +207,50 @@ describe('payments recorded on a bill the old way still count', () => {
     const status = splitStatus(food.split!, [entry]);
     for (const p of status.people) expect(balanceOf(ledger, p.personId)).toBe(-3000 + p.repaidCents);
     expect(sum(ledger.balances.map(b => b.netCents))).toBe(0);
+  });
+});
+
+describe('Who paid you? payments that don\'t say who sent them', () => {
+  const income = (cents: number, over: Partial<Transaction> = {}): Transaction => ({
+    id: `i${++n}`, type: 'income', amount: fromCents(cents), date: '2026-09-20', accountId: 'chk',
+    merchant: 'Zelle from VYBHAV J', createdAt: n, updatedAt: n, ...over,
+  } as Transaction);
+
+  it('lists an unnamed bank payment once, however many group expenses it was spread over', () => {
+    const food = expense(12000, { split: inGroup(quickSplit(12000, [ME, 'alex', 'ben'])) });
+    const drinks = expense(6000, { split: inGroup(quickSplit(6000, [ME, 'alex', 'ben'])) });
+    const zelle = income(9986, { moneyBackSplits: [{ expenseId: food.id!, amountCents: 6000 }, { expenseId: drinks.id!, amountCents: 3986 }] });
+    const txs = [food, drinks, zelle];
+    const money = new Ledger(() => txs);
+    const found = unassignedPayments(TRIP, txs, t => money.linksFor(t));
+    expect(found).toHaveLength(1);
+    expect(found[0].income!.id).toBe(zelle.id);
+    expect(found[0].label).toBe('Zelle from VYBHAV J');
+    expect(found[0].amountCents).toBe(9986);
+  });
+
+  it('skips payments that name who sent them, refunds, and other groups', () => {
+    const named = expense(9000, {
+      split: inGroup(quickSplit(9000, [ME, 'alex', 'ben'])),
+      moneyBack: [
+        { id: 'a', source: 'repayment', amountCents: 3000, date: '2026-09-15', fromPersonId: 'alex' },
+        { id: 'b', source: 'repayment', amountCents: 3000, date: '2026-09-15', coversPersonIds: ['ben'] },
+        { id: 'c', source: 'refund', amountCents: 500, date: '2026-09-15' },
+      ],
+    });
+    const elsewhere = expense(9000, {
+      split: { ...quickSplit(9000, [ME, 'alex']), groupId: 'other' },
+      moneyBack: [{ id: 'd', source: 'repayment', amountCents: 4500, date: '2026-09-15' }],
+    });
+    const cash = expense(6000, {
+      merchant: 'BevMo!', split: inGroup(quickSplit(6000, [ME, 'alex', 'ben'])),
+      moneyBack: [{ id: 'e', source: 'repayment', amountCents: 190, date: '2026-09-16', coversPersonIds: ['alex', 'ben'] }],
+    });
+    const txs = [named, elsewhere, cash];
+    const money = new Ledger(() => txs);
+    expect(unassignedPayments(TRIP, txs, t => money.linksFor(t))).toEqual([
+      expect.objectContaining({ expense: cash, entryId: 'e', amountCents: 190, label: 'Cash on BevMo!' }),
+    ]);
   });
 });
 

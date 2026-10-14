@@ -24,7 +24,9 @@ import { personName, quickSplit } from '../../../utils/splits';
 
 class FakeTransactions extends MoneyBackLedger {
   transactions = signal<Transaction[]>([]);
-  async update() {}
+  async update(id: string, patch: Partial<Transaction>) {
+    this.transactions.update(all => all.map(t => (t.id === id ? JSON.parse(JSON.stringify({ ...t, ...patch })) : t)));
+  }
   async remove() {}
 }
 
@@ -104,10 +106,10 @@ describe('Group page', () => {
 
     expect(rows(0)).toEqual(['Alex pays you $40.00', 'Ben pays you $40.00']);
     expect(rows(1)).toEqual(['You You get back $80.00', 'Alex Owes $40.00', 'Ben Owes $40.00']);
-    expect(rows(2)).toEqual(['Safeway Sep 12 You paid $120.00 · your share $40.00']);
+    expect(rows(3)).toEqual(['Safeway Sep 12 You paid $120.00 · your share $40.00']);
   });
 
-  it('a bill someone else paid counts in the group, and opens to edit', async () => {
+  it('a bill someone else paid counts in the group, opens to read, and Edit opens the form', async () => {
     await setup([food]);
     sharedBills.bills.set([{
       id: 'tents', date: '2026-09-13', merchant: 'REI', createdAt: 2, updatedAt: 2,
@@ -116,10 +118,18 @@ describe('Group page', () => {
     await settle();
     // You paid $120 food (share $40), Ben paid $90 tents (share $30 each).
     expect(el.querySelector('.hero')!.textContent).toContain('The group owes you $50.00.');
-    expect(rows(2)).toContain('REI Sep 13 Ben paid $90.00 · your share $30.00');
+    expect(rows(3)).toContain('REI Sep 13 Ben paid $90.00 · your share $30.00');
     expect(rows(1)).toEqual(['You You get back $50.00', 'Alex Owes $70.00', 'Ben Gets back $20.00']);
 
     ([...el.querySelectorAll('.bill')].find(b => b.textContent!.includes('REI')) as HTMLElement).click();
+    await settle();
+    const sheet = document.querySelector('app-shared-bill-view')!.textContent!;
+    expect(sheet).toContain('$90.00');
+    expect(sheet).toContain('Paid by Ben');
+    expect(sheet).toContain('Shares');
+    expect(sheet).toContain('Paid $90.00 · their share');
+    expect(sheet).toContain('This bill is in Tahoe Trip');
+    (document.querySelector('app-shared-bill-view .view-edit-btn') as HTMLElement).click();
     await settle();
     expect(document.body.textContent).toContain('Edit bill');
     expect((document.getElementById('sb-merchant') as HTMLInputElement).value).toBe('REI');
@@ -130,6 +140,71 @@ describe('Group page', () => {
     button('+ Someone else paid').click();
     await settle();
     expect((document.getElementById('sb-group') as HTMLSelectElement).value).toBe('tahoe');
+  });
+
+  describe('payments between friends', () => {
+    const tents = () => ({
+      id: 'tents', date: '2026-09-13', merchant: 'REI', createdAt: 2, updatedAt: 2,
+      split: { ...quickSplit(9000, [ME, 'alex', 'ben']), payments: [{ personId: 'ben', amountCents: 9000 }], groupId: 'tahoe' },
+    });
+
+    it('Mark as paid records what was suggested, and the plan follows', async () => {
+      await setup([]);
+      sharedBills.bills.set([tents()]);
+      await settle();
+      expect(rows(0)).toContain('Alex pays Ben $30.00');
+      button('Mark as paid').click(); // Alex pays Ben (yours aren't markable)
+      await settle();
+      expect((document.getElementById('pay-from') as HTMLSelectElement).value).toBe('alex');
+      expect((document.getElementById('pay-amount') as HTMLInputElement).value).toBe('30');
+      button('Record payment').click();
+      await settle();
+
+      expect(groups.byId('tahoe')!.payments).toEqual([expect.objectContaining({ fromPersonId: 'alex', toPersonId: 'ben', amountCents: 3000 })]);
+      expect(rows(0)).toEqual(['You pay Ben $30.00']);
+      expect(rows(2)).toEqual([expect.stringMatching(/^Alex paid Ben .*\$30\.00/)]);
+    });
+
+    it('a recorded payment can be edited and deleted', async () => {
+      await setup([], [{ ...trip, payments: [{ id: 'p1', fromPersonId: 'alex', toPersonId: 'ben', amountCents: 1000, date: '2026-09-20' }] }]);
+      sharedBills.bills.set([tents()]);
+      await settle();
+      ([...el.querySelectorAll('.list-card')[2].querySelectorAll('.bill')][0] as HTMLElement).click();
+      await settle();
+      const amount = document.getElementById('pay-amount') as HTMLInputElement;
+      expect(amount.value).toBe('10');
+      amount.value = '30';
+      amount.dispatchEvent(new Event('input'));
+      button('Save changes').click();
+      await settle();
+      expect(groups.byId('tahoe')!.payments[0].amountCents).toBe(3000);
+
+      ([...el.querySelectorAll('.list-card')[2].querySelectorAll('.bill')][0] as HTMLElement).click();
+      await settle();
+      button('Delete').click();
+      await settle();
+      lastButton('Delete').click();
+      await settle();
+      expect(groups.byId('tahoe')!.payments).toEqual([]);
+    });
+  });
+
+  it('Who paid you? names a payment linked without a name, and the group credits them', async () => {
+    // A Zelle from before splits existed: it pays back the Safeway bill but doesn't say who sent it.
+    const zelle = { id: 'z', type: 'income', amount: 40, date: '2026-09-15', merchant: 'Zelle from BEN', accountId: 'chk',
+      reimbursesId: 'food', createdAt: 5, updatedAt: 5 } as Transaction;
+    await setup([food, zelle]);
+    expect(el.textContent).toContain('Who paid you?');
+    expect(el.textContent).toContain('a guess: pick who sent it above'); // credited by bill order until named
+    const select = el.querySelector('.assign-select') as HTMLSelectElement;
+    select.value = 'ben';
+    select.dispatchEvent(new Event('change'));
+    await settle();
+
+    expect(txs.transactions().find(t => t.id === 'z')!.moneyBackInfo).toEqual({ source: 'repayment', fromPersonId: 'ben', coversPersonIds: ['ben'] });
+    expect(el.textContent).not.toContain('Who paid you?');
+    expect(el.textContent).not.toContain('a guess');
+    expect(rows(1)).toEqual(['You You get back $40.00', 'Alex Owes $40.00', 'Ben Square']);
   });
 
   it('opening a bill shows it as part of the group', async () => {

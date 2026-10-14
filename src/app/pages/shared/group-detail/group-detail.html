@@ -40,6 +40,31 @@
           <p class="meta label-mono">{{ meta() }}</p>
         </section>
 
+        <!-- WHO PAID YOU? Money back on this group's bills without a name -->
+        @if (unassigned().length) {
+          <section class="card list-card">
+            <div class="list-head"><span class="card-label">Who paid you?</span></div>
+            <p class="list-intro">
+              {{ unassigned().length === 1 ? 'This payment came' : 'These payments came' }} back to you on this group's bills
+              without saying who sent {{ unassigned().length === 1 ? 'it' : 'them' }}, so the group can't credit anyone properly.
+              Pick who each one is from, and the balances will follow.
+            </p>
+            @for (p of unassigned(); track p.income?.id ?? p.entryId) {
+              <div class="row assign-row">
+                <span class="bill-main">
+                  <span class="row-name">{{ p.label }}</span>
+                  <span class="label-mono bill-date">{{ formatDate(p.date) }} · {{ money(p.amountCents) }}</span>
+                </span>
+                <select class="input-field assign-select" [attr.aria-label]="'Who sent ' + p.label"
+                        (change)="assignPayment(p, $any($event.target).value)">
+                  <option value="">Who sent it?</option>
+                  @for (id of g.memberIds; track id) { <option [value]="id">{{ name(id) }}</option> }
+                </select>
+              </div>
+            }
+          </section>
+        }
+
         <!-- SETTLE UP: the suggested payments -->
         <section class="card list-card">
           <div class="list-head"><span class="card-label">Settle up</span></div>
@@ -50,9 +75,14 @@
           </p>
           @if (l.plan.length) {
             @for (t of l.plan; track $index) {
-              <div class="row" [class.mine]="t.fromPersonId === 'me' || t.toPersonId === 'me'">
+              <div class="row" [class.mine]="!canMark(t)">
                 <span class="row-name">{{ transferText(t) }}</span>
-                <span class="row-amount fig">{{ money(t.amountCents) }}</span>
+                <span class="row-end">
+                  <span class="row-amount fig">{{ money(t.amountCents) }}</span>
+                  @if (canMark(t)) {
+                    <button type="button" class="btn-row" (click)="recordPayment(t)">Mark as paid</button>
+                  }
+                </span>
               </div>
             }
           } @else {
@@ -69,6 +99,35 @@
               <span class="row-amount fig" [class.pos]="b.netCents > 0" [class.neg]="b.netCents < 0">{{ balanceText(b.netCents, b.personId) }}</span>
             </div>
           }
+        </section>
+
+        <!-- PAYMENTS: everything paid back so far, newest first -->
+        <section class="card list-card">
+          <div class="list-head"><span class="card-label">Payments · {{ l.moves.length }}</span></div>
+          @for (m of l.moves; track $index) {
+            @if (m.kind === 'between') {
+              <button type="button" class="row bill payment" (click)="editPayment(m)">
+                <span class="bill-main">
+                  <span class="row-name">{{ moveText(m) }}</span>
+                  <span class="label-mono bill-date">{{ formatDate(m.date) }}</span>
+                </span>
+                <span class="bill-note fig">{{ money(m.amountCents) }}</span>
+              </button>
+            } @else {
+              <div class="row payment">
+                <span class="bill-main">
+                  <span class="row-name">{{ moveText(m) }}</span>
+                  <span class="label-mono bill-date">{{ formatDate(m.date) }} · {{ m.guessed ? 'a guess: pick who sent it above' : m.kind === 'received' ? 'money back on your bills' : 'your expense' }}</span>
+                </span>
+                <span class="bill-note fig">{{ money(m.amountCents) }}</span>
+              </div>
+            }
+          } @empty {
+            <p class="list-intro">No payments yet. When someone pays someone back, record it here so everyone's balance follows.</p>
+          }
+          <div class="list-foot">
+            <button type="button" class="btn-add" (click)="recordPayment()">+ Record a payment</button>
+          </div>
         </section>
 
         <!-- BILLS -->
@@ -104,8 +163,72 @@
 <app-group-form [open]="editing()" [group]="group() ?? null"
                 (closed)="editing.set(false)" (saved)="editing.set(false)" (deleted)="onDeleted()" />
 
+<!-- A PAYMENT BETWEEN TWO FRIENDS -->
+<app-modal [open]="paymentOpen()" [title]="editingPayment() ? 'Edit payment' : 'Record a payment'" size="sm" (closed)="paymentOpen.set(false)">
+  @if (group(); as g) {
+    <div class="form">
+      <div class="form-grid">
+        <div class="field">
+          <label class="label-sm" for="pay-from">Who paid</label>
+          <select id="pay-from" class="input-field" [ngModel]="payFrom()" (ngModelChange)="payFrom.set($event)" name="payFrom">
+            <option value="" disabled>Choose</option>
+            @for (id of g.memberIds; track id) { <option [value]="id">{{ name(id) }}</option> }
+          </select>
+        </div>
+        <div class="field">
+          <label class="label-sm" for="pay-to">Paid</label>
+          <select id="pay-to" class="input-field" [ngModel]="payTo()" (ngModelChange)="payTo.set($event)" name="payTo">
+            <option value="" disabled>Choose</option>
+            @for (id of g.memberIds; track id) { @if (id !== payFrom()) { <option [value]="id">{{ name(id) }}</option> } }
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label class="label-sm" for="pay-amount">Amount</label>
+          <div class="input-affix"><span class="affix">$</span>
+            <input id="pay-amount" class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
+                   [ngModel]="payAmount()" (ngModelChange)="payAmount.set($event)" name="payAmount" placeholder="0.00" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label-sm" for="pay-date">Date</label>
+          <input id="pay-date" class="input-field" type="date" [ngModel]="payDate()" (ngModelChange)="payDate.set($event)" name="payDate" />
+        </div>
+      </div>
+      <div class="field">
+        <label class="label-sm" for="pay-note">Note <span class="label-optional">(optional)</span></label>
+        <input id="pay-note" class="input-field" [ngModel]="payNote()" (ngModelChange)="payNote.set($event)" name="payNote" placeholder="Venmo, cash…" />
+      </div>
+      <p class="form-note">
+        Between two friends only. Money you send or receive is recorded on your own transactions,
+        so it counts in your spending.
+      </p>
+    </div>
+  }
+  <div class="modal-actions" modal-footer>
+    @if (editingPayment()) {
+      <button type="button" class="btn-danger" (click)="payConfirm.set(true)">Delete</button>
+    }
+    <div class="actions-right">
+      <button type="button" class="btn-ghost" (click)="paymentOpen.set(false)">Cancel</button>
+      <button type="button" class="btn-primary" (click)="savePayment()">{{ editingPayment() ? 'Save changes' : 'Record payment' }}</button>
+    </div>
+  </div>
+</app-modal>
+
+<app-confirm
+  [open]="payConfirm()"
+  title="Delete this payment?"
+  message="Everyone's balance goes back to before it was paid."
+  confirmText="Delete"
+  (confirmed)="deletePayment()"
+  (cancelled)="payConfirm.set(false)" />
+
 <app-shared-bill-form [open]="billFormOpen()" [bill]="editingBill()" [groupId]="group()?.id ?? null"
                       (closed)="closeBillForm()" (saved)="closeBillForm()" />
+
+<app-shared-bill-view [bill]="viewingBill()" (closed)="viewingBill.set(null)" (editRequested)="editOtherPaid($event)" />
 
 <app-transaction-view
   [transaction]="viewingTx()"

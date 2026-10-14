@@ -116,6 +116,9 @@ The app is what we copy. Do not "correct" this back to dark.
   `app-group-form` (create/edit a group: name, members, dates, simplify debts),
   `app-shared-bill-form` (a bill someone else paid: who paid, split, receipt; not a
   transaction, so not spending until you pay them back),
+  `app-shared-bill-view` (the read-only sheet for one of those bills: tapping it
+  opens this, never the form; Edit top right opens `app-shared-bill-form`. It
+  shows only what the payer's bill says: paid by, shares, what you owe them),
   `app-receipt-attach` (a receipt photo: Take photo on phones/tablets, Upload
   everywhere, thumbnail → full size; in Edit a ✕ on the thumbnail removes it,
   on the details sheet it's read-only — `[editable]="false"`).
@@ -132,6 +135,12 @@ The app is what we copy. Do not "correct" this back to dark.
   the same editors serve your expenses and bills someone else paid (`SharedBill`,
   `users/{uid}/sharedBills`). Outside groups, what you owe on those shows on the
   payer's card on Shared, netted into one balance.
+- A group credits each payment to whoever made it. Money back on a group
+  expense that names nobody (an old reimbursement link) can only be credited
+  by bill order, which is a guess: the group page lists those under "Who paid
+  you?" until they're named, and marks the guessed rows in Payments. Payments
+  between two friends live on the group (`Group.payments`); record them (or
+  "Mark as paid" on a Settle up row) so the balances match Splitwise.
 - Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`, `FakeSharedBills`).
 - Never centre a fixed panel with `transform`: it traps any pop-up inside it
   (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;
@@ -188,7 +197,7 @@ src/app/
     analysis/
     forecast/       Analysis → Forecast tab: cash ahead (maths in utils/forecast.ts)
     shared/         who owes you, across every split bill (maths in utils/shared.ts, utils/splits.ts)
-      group-detail/ one group (a trip, a flat): balances, simplify debts, its bills (maths in utils/groups.ts)
+      group-detail/ one group (a trip, a flat): balances, simplify debts, payments, its bills (maths in utils/groups.ts)
     net-worth/      accounts + manual assets/debts (ManualAsset, dated valuations)
       loan-detail/  one loan: payments made/missed/to come (maths in utils/loans.ts)
   app.ts            shell with sidebar

@@ -13,6 +13,7 @@ import { TransactionView } from '../../components/transaction-view/transaction-v
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
 import { GroupForm } from '../../components/group-form/group-form';
 import { SharedBillForm } from '../../components/shared-bill-form/shared-bill-form';
+import { SharedBillView } from '../../components/shared-bill-view/shared-bill-view';
 import { formatCurrency } from '../../utils/format';
 import { fromCents, toCents } from '../../utils/money';
 import { isMoneyBackIncome, newReturnId } from '../../utils/money-back';
@@ -36,7 +37,7 @@ const COUNT_WORDS = ['No one', 'One friend', 'Two friends', 'Three friends', 'Fo
 @Component({
   selector: 'app-shared',
   standalone: true,
-  imports: [FormsModule, RouterLink, Modal, Confirm, TransactionView, TransactionForm, GroupForm, SharedBillForm],
+  imports: [FormsModule, RouterLink, Modal, Confirm, TransactionView, TransactionForm, GroupForm, SharedBillForm, SharedBillView],
   templateUrl: './shared.html',
   styleUrl: './shared.scss',
 })
@@ -166,7 +167,15 @@ export class Shared {
     this.billFormOpen.set(true);
   }
 
+  /** A bill someone else paid opens read-only; Edit takes it to the form. */
+  viewingBill = signal<SharedBill | null>(null);
+
   openOtherPaid(bill: SharedBill) {
+    this.viewingBill.set(bill);
+  }
+
+  editOtherPaid(bill: SharedBill) {
+    this.viewingBill.set(null);
     this.editingBill.set(bill);
     this.billFormOpen.set(true);
   }

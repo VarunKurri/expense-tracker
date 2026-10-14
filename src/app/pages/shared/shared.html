@@ -215,6 +215,8 @@
 
 <app-shared-bill-form [open]="billFormOpen()" [bill]="editingBill()" (closed)="closeBillForm()" (saved)="closeBillForm()" />
 
+<app-shared-bill-view [bill]="viewingBill()" (closed)="viewingBill.set(null)" (editRequested)="editOtherPaid($event)" />
+
 <app-transaction-view
   [transaction]="viewingTx()"
   (closed)="viewingTx.set(null)"

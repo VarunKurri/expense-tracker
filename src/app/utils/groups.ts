@@ -1,5 +1,5 @@
 import { Group, ME, MoneyBackEntry, SharedBill, Transaction, TransactionSplit } from '../models';
-import type { IncomeLink } from './money-back';
+import type { IncomeLink, LinkedIncome } from './money-back';
 import { toCents } from './money';
 import { sum } from './split/money';
 import { NetPosition, settle } from './split/settle';
@@ -61,6 +61,8 @@ export interface GroupMove {
   txId?: string;
   /** For `between`: its id in `Group.payments`. */
   paymentId?: string;
+  /** Received without saying who sent it, so credited by bill order: a guess until it's named. */
+  guessed?: boolean;
 }
 
 export interface GroupLedger {
@@ -109,6 +111,9 @@ function groupBill(
     positions,
   };
 }
+
+/** A repayment that names nobody (no sender, and not exactly one person covered). */
+const unnamed = (from?: string, covers?: string[]) => !from && (covers?.length ?? 0) !== 1;
 
 /**
  * Who a repayment on one of your expenses came from. Named entries say so.
@@ -164,8 +169,9 @@ export function groupLedger(
     }
     // Repayments on any of your group expenses are money you got from someone.
     for (const entry of moneyBack.filter(e => e.source === 'repayment')) {
+      const guessed = unnamed(entry.fromPersonId, entry.coversPersonIds) || undefined;
       for (const p of payersOf(entry, mine ? tx.split : undefined, tx.settlement?.personId, refunds)) {
-        moves.push({ fromPersonId: p.personId, toPersonId: ME, amountCents: p.amountCents, date: entry.date, kind: 'received', txId: tx.id });
+        moves.push({ fromPersonId: p.personId, toPersonId: ME, amountCents: p.amountCents, date: entry.date, kind: 'received', txId: tx.id, guessed });
       }
     }
   }
@@ -284,4 +290,49 @@ export function spreadReceived(
     else parts.push({ expenseId: last, amountCents: left });
   }
   return parts;
+}
+
+/**
+ * Money that came back to you on a group's expenses without saying who sent
+ * it: usually a payment linked before splits existed ("reimburses this
+ * expense"). A group credits each payment to the person who made it, so these
+ * can only be credited by guessing (bill order); picking who it was fixes it.
+ * A bank payment is listed once, however many expenses it was spread over.
+ */
+export interface UnassignedPayment {
+  /** A bank payment (income) linked to the group's expenses. */
+  income?: Transaction;
+  /** Or cash recorded by hand on one expense: the expense, and the entry's id. */
+  expense?: Transaction;
+  entryId?: string;
+  amountCents: number;
+  date: string;
+  /** "Zelle from VYBHAV J" or "Cash on BevMo!". */
+  label: string;
+}
+
+export function unassignedPayments(
+  groupId: string, txs: Transaction[], linksFor: (t: Transaction) => LinkedIncome[],
+): UnassignedPayment[] {
+  const byIncome = new Map<string, UnassignedPayment>();
+  const cash: UnassignedPayment[] = [];
+  for (const t of txs) {
+    if (!isGroupBill(t, groupId) && !isGroupSettlement(t, groupId)) continue;
+    for (const link of linksFor(t)) {
+      const info = link.income.moneyBackInfo;
+      if ((info?.source ?? 'repayment') !== 'repayment' || !unnamed(info?.fromPersonId, info?.coversPersonIds)) continue;
+      const id = link.income.id!;
+      const existing = byIncome.get(id);
+      if (existing) existing.amountCents += link.amountCents;
+      else byIncome.set(id, {
+        income: link.income, amountCents: link.amountCents, date: link.income.date,
+        label: link.income.merchant || 'A payment',
+      });
+    }
+    for (const e of t.moneyBack ?? []) {
+      if (e.source !== 'repayment' || !unnamed(e.fromPersonId, e.coversPersonIds)) continue;
+      cash.push({ expense: t, entryId: e.id, amountCents: e.amountCents, date: e.date, label: `Cash on ${t.merchant || 'an expense'}` });
+    }
+  }
+  return [...byIncome.values(), ...cash].sort((a, b) => a.date.localeCompare(b.date));
 }
