@@ -5,7 +5,10 @@
       <h1>Shared</h1>
       <p class="sub">Bills you split, and who still owes you</p>
     </div>
-    <button class="btn-primary" (click)="newGroupOpen.set(true)">New group</button>
+    <div class="head-actions">
+      <button class="btn-primary" (click)="addOtherPaid()">Someone else paid</button>
+      <button class="btn-primary" (click)="newGroupOpen.set(true)">New group</button>
+    </div>
   </div>
 
   @if (!balances().length && !groupRows().length) {
@@ -75,6 +78,15 @@
                 <span class="bill-date label-mono">{{ formatDate(bill.tx.date) }}</span>
               </span>
               <span class="bill-note fig">{{ billNote(bill) }}</span>
+            </button>
+          }
+          @for (o of b.owedByMe; track o.bill.id) {
+            <button type="button" class="bill" (click)="openOtherPaid(o.bill)">
+              <span class="bill-main">
+                <span class="bill-name">{{ o.bill.merchant }}</span>
+                <span class="bill-date label-mono">{{ formatDate(o.bill.date) }} · they paid</span>
+              </span>
+              <span class="bill-note fig neg">You owe {{ money(o.cents) }}</span>
             </button>
           }
           @for (g of b.groups; track g.groupId) {
@@ -200,6 +212,8 @@
 </app-modal>
 
 <app-group-form [open]="newGroupOpen()" (closed)="newGroupOpen.set(false)" (saved)="onGroupCreated($event)" />
+
+<app-shared-bill-form [open]="billFormOpen()" [bill]="editingBill()" (closed)="closeBillForm()" (saved)="closeBillForm()" />
 
 <app-transaction-view
   [transaction]="viewingTx()"

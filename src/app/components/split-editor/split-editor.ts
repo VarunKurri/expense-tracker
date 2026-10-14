@@ -39,18 +39,22 @@ export const SPLIT_MODES: { value: SplitMode; label: string }[] = [
 export class SplitEditor {
   people = inject(PersonService);
 
-  /** What you paid: the transaction amount, in cents. */
+  /** What the payer paid: the transaction amount, in cents (the bill's amount when someone else paid). */
   myPaidCents = input.required<number>();
+  /** Who paid it: you (an expense of yours) or a friend (a bill someone else paid). */
+  paidBy = input<string>(ME);
   state = model.required<QuickSplitState>();
 
   readonly modes = SPLIT_MODES;
 
   // ── Derived, all from the engine ───────────────────────────
-  billCents = computed(() => quickBillCents(this.state(), this.myPaidCents()));
-  assignedCents = computed(() => quickAssignedCents(this.state(), this.myPaidCents()));
-  split = computed(() => buildQuickSplit(this.state(), this.myPaidCents()));
-  problems = computed(() => splitProblems(this.split(), this.myPaidCents()));
-  others = computed(() => this.state().participantIds.filter(id => id !== ME));
+  billCents = computed(() => quickBillCents(this.state(), this.myPaidCents(), this.paidBy()));
+  assignedCents = computed(() => quickAssignedCents(this.state(), this.myPaidCents(), this.paidBy()));
+  split = computed(() => buildQuickSplit(this.state(), this.myPaidCents(), null, this.paidBy()));
+  problems = computed(() => splitProblems(this.split(), this.myPaidCents(), this.paidBy()));
+  /** Who else could have paid part: everyone on the bill but you and the payer. */
+  others = computed(() => this.state().participantIds.filter(id => id !== ME && id !== this.paidBy()));
+  payersHint = computed(() => payersHint(this.paidBy(), this.people.nameOf(this.paidBy())));
 
   /** Percentages or amounts that don't add up: still divided in proportion, but say so. */
   balanceNote = computed(() => {
@@ -104,6 +108,13 @@ export class SplitEditor {
     const weight = parseWeight(this.state().mode, value);
     this.state.update(s => ({ ...s, weights: { ...s.weights, [id]: weight } }));
   }
+}
+
+/** The hint under "Someone else paid part of it". */
+export function payersHint(paidBy: string, payerName: string): string {
+  return paidBy === ME
+    ? 'The bill is what you paid plus what they paid.'
+    : `The bill is what ${payerName} paid plus what they paid.`;
 }
 
 /** A typed weight in the engine's terms: cents in amount mode, the number otherwise; never negative. */

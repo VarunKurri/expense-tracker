@@ -2,13 +2,15 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
-import { ME, Transaction } from '../../../models';
+import { ME, SharedBill, Transaction } from '../../../models';
 import { GroupService } from '../../../services/group.service';
+import { SharedBillService } from '../../../services/shared-bill.service';
 import { PersonService } from '../../../services/person.service';
 import { TransactionService } from '../../../services/transaction.service';
 import { ToastService } from '../../../services/toast.service';
 import { Confirm } from '../../../components/confirm/confirm';
 import { GroupForm } from '../../../components/group-form/group-form';
+import { SharedBillForm } from '../../../components/shared-bill-form/shared-bill-form';
 import { TransactionView } from '../../../components/transaction-view/transaction-view';
 import { TransactionForm } from '../../transactions/transaction-form/transaction-form';
 import { formatCurrency } from '../../../utils/format';
@@ -24,7 +26,7 @@ import type { Transfer } from '../../../utils/split/types';
 @Component({
   selector: 'app-group-detail',
   standalone: true,
-  imports: [Confirm, GroupForm, TransactionView, TransactionForm],
+  imports: [Confirm, GroupForm, SharedBillForm, TransactionView, TransactionForm],
   templateUrl: './group-detail.html',
   styleUrl: './group-detail.scss',
 })
@@ -32,6 +34,7 @@ export class GroupDetail {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   groups = inject(GroupService);
+  sharedBills = inject(SharedBillService);
   people = inject(PersonService);
   txService = inject(TransactionService);
   private toast = inject(ToastService);
@@ -41,7 +44,7 @@ export class GroupDetail {
 
   ledger = computed(() => {
     const g = this.group();
-    return g ? groupLedger(g, this.txService.transactions(), [], t => this.txService.moneyBackEntriesFor(t)) : null;
+    return g ? groupLedger(g, this.txService.transactions(), this.sharedBills.bills(), t => this.txService.moneyBackEntriesFor(t)) : null;
   });
 
   /** You, then the members, with where each stands. */
@@ -99,8 +102,29 @@ export class GroupDetail {
   txConfirmOpen = signal(false);
   private txToDelete = signal<Transaction | null>(null);
 
+  /** Your expense opens the details sheet; a bill someone else paid opens to edit. */
   openBill(b: GroupBill) {
     if (b.tx) this.viewingTx.set(b.tx);
+    else if (b.bill) this.openOtherPaid(b.bill);
+  }
+
+  // ── Bills someone else paid ────────────────────────────────
+  billFormOpen = signal(false);
+  editingBill = signal<SharedBill | null>(null);
+
+  addOtherPaid() {
+    this.editingBill.set(null);
+    this.billFormOpen.set(true);
+  }
+
+  openOtherPaid(bill: SharedBill) {
+    this.editingBill.set(bill);
+    this.billFormOpen.set(true);
+  }
+
+  closeBillForm() {
+    this.billFormOpen.set(false);
+    this.editingBill.set(null);
   }
 
   editFromTxView(tx: Transaction) {

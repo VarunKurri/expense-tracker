@@ -1,22 +1,24 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Transaction, UntrackedReturn } from '../../models';
+import { SharedBill, Transaction, UntrackedReturn } from '../../models';
 import { TransactionService } from '../../services/transaction.service';
 import { PersonService } from '../../services/person.service';
 import { GroupService } from '../../services/group.service';
+import { SharedBillService } from '../../services/shared-bill.service';
 import { ToastService } from '../../services/toast.service';
 import { Modal } from '../../components/modal/modal';
 import { Confirm } from '../../components/confirm/confirm';
 import { TransactionView } from '../../components/transaction-view/transaction-view';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
 import { GroupForm } from '../../components/group-form/group-form';
+import { SharedBillForm } from '../../components/shared-bill-form/shared-bill-form';
 import { formatCurrency } from '../../utils/format';
 import { fromCents, toCents } from '../../utils/money';
 import { isMoneyBackIncome, newReturnId } from '../../utils/money-back';
 import { localDateString } from '../../utils/date';
 import {
-  GroupPart, PersonBalance, SharedBill, balancesByPerson, repayableCents, spreadRepayment, totalOwedCents, totalYouOweCents, withGroups,
+  GroupPart, PersonBalance, BillShare, balancesByPerson, repayableCents, spreadRepayment, totalOwedCents, totalYouOweCents, withGroups,
 } from '../../utils/shared';
 import { groupLedger, spreadReceived } from '../../utils/groups';
 
@@ -34,7 +36,7 @@ const COUNT_WORDS = ['No one', 'One friend', 'Two friends', 'Three friends', 'Fo
 @Component({
   selector: 'app-shared',
   standalone: true,
-  imports: [FormsModule, RouterLink, Modal, Confirm, TransactionView, TransactionForm, GroupForm],
+  imports: [FormsModule, RouterLink, Modal, Confirm, TransactionView, TransactionForm, GroupForm, SharedBillForm],
   templateUrl: './shared.html',
   styleUrl: './shared.scss',
 })
@@ -42,6 +44,7 @@ export class Shared {
   txService = inject(TransactionService);
   people = inject(PersonService);
   groups = inject(GroupService);
+  sharedBills = inject(SharedBillService);
   private toast = inject(ToastService);
   private router = inject(Router);
 
@@ -54,7 +57,7 @@ export class Shared {
     .filter(g => g.id)
     .map(g => ({
       group: g,
-      ledger: groupLedger(g as typeof g & { id: string }, this.txService.transactions(), [],
+      ledger: groupLedger(g as typeof g & { id: string }, this.txService.transactions(), this.sharedBills.bills(),
         t => this.txService.moneyBackEntriesFor(t)),
     })));
 
@@ -91,14 +94,15 @@ export class Shared {
    * (or you paying them).
    */
   balances = computed(() => withGroups(
-    balancesByPerson(this.txService.transactions(), t => this.txService.moneyBackEntriesFor(t), this.inGroup),
+    balancesByPerson(this.txService.transactions(), t => this.txService.moneyBackEntriesFor(t), this.inGroup,
+      this.sharedBills.bills().filter(b => !this.groups.byId(b.split.groupId))),
     this.ledgers().map(({ group, ledger }) => ({ groupId: group.id!, name: group.name, plan: ledger.plan })),
   ));
   /** Everyone you're not square with: they owe you, or you owe them. */
-  open = computed(() => this.balances().filter(b => b.netCents !== 0 || b.openBills.length > 0));
+  open = computed(() => this.balances().filter(b => b.netCents !== 0 || b.openBills.length > 0 || b.owedByMe.length > 0));
   owing = computed(() => this.balances().filter(b => b.netCents > 0));
   /** People you've split with who are square with you. */
-  square = computed(() => this.balances().filter(b => b.netCents === 0 && !b.openBills.length));
+  square = computed(() => this.balances().filter(b => b.netCents === 0 && !b.openBills.length && !b.owedByMe.length));
   totalOwedCents = computed(() => totalOwedCents(this.balances()));
   totalYouOweCents = computed(() => totalYouOweCents(this.balances()));
   anythingOwed = computed(() => this.totalOwedCents() > 0);
@@ -114,7 +118,8 @@ export class Shared {
   /** "$57.44 across 4 bills and Tahoe & Cali Trip" */
   personSub(b: PersonBalance): string {
     const where: string[] = [];
-    if (b.openBills.length) where.push(`${b.openBills.length} bill${b.openBills.length === 1 ? '' : 's'}`);
+    const bills = b.openBills.length + b.owedByMe.length;
+    if (bills) where.push(`${bills} bill${bills === 1 ? '' : 's'}`);
     const groups = b.groups.filter(g => g.cents !== 0);
     if (groups.length === 1) where.push(groups[0].name);
     else if (groups.length > 1) where.push(`${groups.length} groups`);
@@ -139,17 +144,36 @@ export class Shared {
       return next;
     });
   }
-  settledBills(b: PersonBalance): SharedBill[] {
+  settledBills(b: PersonBalance): BillShare[] {
     return b.allBills.filter(x => !b.openBills.includes(x));
   }
 
-  billNote(bill: SharedBill): string {
+  billNote(bill: BillShare): string {
     const s = bill.status;
     if (s.state === 'closed') return `Won't be repaid · ${this.money(s.outstandingCents)}`;
     if (s.state === 'repaid') return `Repaid ${this.money(s.repaidCents)}`;
     if (s.dueToMeCents === 0) return `Share ${this.money(s.shareCents)} · paid their way`;
     if (s.repaidCents > 0) return `${this.money(s.repaidCents)} back · owes ${this.money(s.outstandingCents)}`;
     return `Owes ${this.money(s.outstandingCents)}`;
+  }
+
+  // ── Bills someone else paid ────────────────────────────────
+  billFormOpen = signal(false);
+  editingBill = signal<SharedBill | null>(null);
+
+  addOtherPaid() {
+    this.editingBill.set(null);
+    this.billFormOpen.set(true);
+  }
+
+  openOtherPaid(bill: SharedBill) {
+    this.editingBill.set(bill);
+    this.billFormOpen.set(true);
+  }
+
+  closeBillForm() {
+    this.billFormOpen.set(false);
+    this.editingBill.set(null);
   }
 
   // ── Record a repayment, across bills ───────────────────────

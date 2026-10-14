@@ -8,6 +8,8 @@
   gap: 20px;
 }
 
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
 .page-head {
   display: flex;
   justify-content: space-between;

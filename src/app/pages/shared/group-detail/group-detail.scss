@@ -54,6 +54,7 @@
   &:focus-visible { outline: none; box-shadow: inset 0 0 0 3px var(--focus-ring); }
 }
 .bill + .bill { border-top: 1px solid var(--line); }
+.list-foot { padding: 12px var(--pad-x) 16px; border-top: 1px solid var(--line); }
 .bill-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .bill-date { color: var(--fg-3); }
 .bill-note { font-size: 13px; color: var(--fg-2); white-space: nowrap; }

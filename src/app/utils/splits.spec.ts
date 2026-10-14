@@ -508,3 +508,32 @@ describe('repaying from the transaction view', () => {
     expect(setClosed(closed, 'cara', false).closedPersonIds).toEqual([]);
   });
 });
+
+describe('a bill someone else paid (payerId)', () => {
+  it('records them as the payer, and you owe them your share', () => {
+    const state = { ...emptyQuickState(), participantIds: [ME, 'ben', 'cara'] };
+    const split = buildQuickSplit(state, 9000, null, 'ben');
+    expect(split.payments).toEqual([{ personId: 'ben', amountCents: 9000 }]);
+    expect(splitProblems(split, 9000, 'ben')).toEqual([]);
+    const status = splitStatus(split);
+    expect(status.myPaidCents).toBe(0);
+    expect(status.myShareCents).toBe(3000);
+    expect(status.transfers).toContainEqual({ fromPersonId: ME, toPersonId: 'ben', amountCents: 3000 });
+    // Read back, Ben's payment is the main one, not "someone else paid too".
+    expect(quickStateFrom(split, 'ben').otherPayments).toEqual([]);
+  });
+
+  it('nothing to split when the payer is the only one on it', () => {
+    const split = buildQuickSplit({ ...emptyQuickState(), participantIds: ['ben'] }, 5000, null, 'ben');
+    expect(splitProblems(split, 5000, 'ben')).toContain('no-one-else');
+  });
+
+  it('item by item works the same way', () => {
+    const state = { ...emptyItemizedState(), participantIds: [ME, 'ben'],
+      items: [{ ...newItem([ME], 'Tent', 4000) }, { ...newItem(['ben'], 'Stove', 2000) }] };
+    const split = buildItemizedSplit(state, 6000, null, 'ben');
+    expect(splitProblems(split, 6000, 'ben')).toEqual([]);
+    expect(splitStatus(split).transfers).toEqual([{ fromPersonId: ME, toPersonId: 'ben', amountCents: 4000 }]);
+    expect(itemizedStateFrom(split, 'ben').otherPayments).toEqual([]);
+  });
+});

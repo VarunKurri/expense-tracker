@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { ME, Transaction } from '../models';
+import { ME, SharedBill, Transaction } from '../models';
 import { MoneyBackLedger } from './money-back';
-import { balancesByPerson, splitSentence, spreadRepayment, totalOwedCents } from './shared';
+import { balancesByPerson, splitSentence, spreadRepayment, totalOwedCents, totalYouOweCents, withGroups } from './shared';
 import { NO_SPLITS, SplitTotals } from './reporting';
 import { quickSplit, setClosed } from './splits';
 
@@ -102,5 +102,38 @@ describe('splitSentence (the Analysis "Owed to you" card)', () => {
 
   it('split, but nobody owes you (they paid their own way)', () => {
     expect(splitSentence(totals({ bills: 1 }), 'this year')).toBe('Nobody owes you on your 1 split bill this year. Everyone paid their own way.');
+  });
+});
+
+describe('bills someone else paid, outside groups', () => {
+  const benPaid = (cents: number, people: string[], over: Partial<SharedBill> = {}): SharedBill => ({
+    id: `sb${cents}`, date: '2026-09-20', merchant: 'Tents', createdAt: 1, updatedAt: 1,
+    split: { ...quickSplit(cents, people), payments: [{ personId: 'ben', amountCents: cents }] }, ...over,
+  });
+  const ledger = new (class extends MoneyBackLedger { transactions = () => [] as Transaction[]; })();
+
+  it('what you owe the person who paid', () => {
+    const [ben] = balancesByPerson([], t => ledger.moneyBackEntriesFor(t), () => false, [benPaid(6000, [ME, 'ben'])]);
+    expect(ben).toMatchObject({ personId: 'ben', owedCents: 0, iOweCents: 3000, netCents: -3000 });
+    expect(ben.owedByMe.map(o => o.cents)).toEqual([3000]);
+    expect(totalYouOweCents([ben])).toBe(3000);
+    expect(totalOwedCents([ben])).toBe(0);
+  });
+
+  it('one net balance: what they owe you less what you owe them', () => {
+    const lunch: Transaction = {
+      id: 'l', type: 'expense', amount: 80, date: '2026-09-10', accountId: 'a', createdAt: 0, updatedAt: 0,
+      split: quickSplit(8000, [ME, 'ben']),
+    } as Transaction;
+    const [ben] = balancesByPerson([lunch], t => ledger.moneyBackEntriesFor(t), () => false, [benPaid(6000, [ME, 'ben'])]);
+    expect(ben).toMatchObject({ owedCents: 4000, iOweCents: 3000, netCents: 1000 });
+    // ...and groups add to it.
+    const [withTrip] = withGroups([ben], [{ groupId: 'g', name: 'Trip', plan: [{ fromPersonId: ME, toPersonId: 'ben', amountCents: 500 }] }]);
+    expect(withTrip.netCents).toBe(500);
+  });
+
+  it("a bill Ben paid that you weren't on owes him nothing", () => {
+    expect(balancesByPerson([], t => ledger.moneyBackEntriesFor(t), () => false, [benPaid(6000, ['ben', 'cara'])])
+      .find(b => b.personId === 'ben')?.iOweCents ?? 0).toBe(0);
   });
 });

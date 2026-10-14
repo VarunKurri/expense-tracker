@@ -114,6 +114,8 @@ The app is what we copy. Do not "correct" this back to dark.
   any month selection rather than a row of month pills),
   `app-confirm`, `app-modal`, `app-toast`, `app-logo`, `app-icon`,
   `app-group-form` (create/edit a group: name, members, dates, simplify debts),
+  `app-shared-bill-form` (a bill someone else paid: who paid, split, receipt; not a
+  transaction, so not spending until you pay them back),
   `app-receipt-attach` (a receipt photo: Take photo on phones/tablets, Upload
   everywhere, thumbnail → full size; in Edit a ✕ on the thumbnail removes it,
   on the details sheet it's read-only — `[editable]="false"`).
@@ -126,7 +128,11 @@ The app is what we copy. Do not "correct" this back to dark.
   person's total is their bills outside groups plus what each group's settle-up
   plan has them paying you (`withGroups` in utils/shared.ts), shown as a row per
   group on their card; a repayment pays their bills first, then their groups.
-- Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`).
+- The split editors and builders take a payer (`paidBy` / `payerId`, default `ME`):
+  the same editors serve your expenses and bills someone else paid (`SharedBill`,
+  `users/{uid}/sharedBills`). Outside groups, what you owe on those shows on the
+  payer's card on Shared, netted into one balance.
+- Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`, `FakeSharedBills`).
 - Never centre a fixed panel with `transform`: it traps any pop-up inside it
   (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;
   margin: auto; height: fit-content`.

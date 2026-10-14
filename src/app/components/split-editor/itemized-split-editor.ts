@@ -35,8 +35,11 @@ import { SPLIT_MODES, balanceNote, parseWeight } from './split-editor';
 export class ItemizedSplitEditor {
   people = inject(PersonService);
 
-  /** What you paid: the transaction amount, in cents. */
+  /** What the payer paid: the transaction amount, in cents (the bill's amount when someone else paid). */
   myPaidCents = input.required<number>();
+  /** Who paid it: you (an expense of yours) or a friend (a bill someone else paid). */
+  paidBy = input<string>(ME);
+  readonly me = ME;
   state = model.required<ItemizedSplitState>();
   /** "Use $X as the amount": the receipt says you paid something else. */
   useAmount = output<number>();
@@ -44,17 +47,18 @@ export class ItemizedSplitEditor {
   readonly modes = SPLIT_MODES;
 
   // ── Derived, all from the engine ───────────────────────────
-  split = computed(() => buildItemizedSplit(this.state(), this.myPaidCents()));
+  split = computed(() => buildItemizedSplit(this.state(), this.myPaidCents(), null, this.paidBy()));
   result = computed(() => calculateSplit(toBill(this.split())));
-  problems = computed(() => splitProblems(this.split(), this.myPaidCents()));
-  others = computed(() => this.state().participantIds.filter(id => id !== ME));
+  problems = computed(() => splitProblems(this.split(), this.myPaidCents(), this.paidBy()));
+  /** Who else could have paid part: everyone on the bill but you and the payer. */
+  others = computed(() => this.state().participantIds.filter(id => id !== ME && id !== this.paidBy()));
   includesMe = computed(() => this.state().participantIds.includes(ME));
 
   /** The bill being split: what you paid plus what anyone else paid. */
-  billCents = computed(() => paidTowardsBillCents(this.state(), this.myPaidCents()));
+  billCents = computed(() => paidTowardsBillCents(this.state(), this.myPaidCents(), this.paidBy()));
 
   /** What you'd have had to pay for the receipt to add up, given what others paid. */
-  coverCents = computed(() => myPaymentToCoverCents(this.state()));
+  coverCents = computed(() => myPaymentToCoverCents(this.state(), this.paidBy()));
   mismatch = computed(() => this.result().subtotalCents > 0 && this.coverCents() !== this.myPaidCents());
 
   private unclaimed = computed(() => new Set(this.result().unassignedItemIds));

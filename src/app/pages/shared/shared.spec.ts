@@ -7,6 +7,8 @@ import { TransactionService } from '../../services/transaction.service';
 import { PersonService } from '../../services/person.service';
 import { GroupService } from '../../services/group.service';
 import { FakeGroups } from '../../testing/fake-groups';
+import { FakeSharedBills } from '../../testing/fake-shared-bills';
+import { SharedBillService } from '../../services/shared-bill.service';
 import { ToastService } from '../../services/toast.service';
 import { CategoryService } from '../../services/category.service';
 import { AccountService } from '../../services/account.service';
@@ -47,6 +49,7 @@ const bill = (merchant: string, date: string, cents: number, who: string[]): Tra
 describe('Shared page', () => {
   let txs: FakeTransactions;
   let groups: FakeGroups;
+  let sharedBills: FakeSharedBills;
   let fixture: ComponentFixture<Shared>;
   let el: HTMLElement;
 
@@ -69,6 +72,7 @@ describe('Shared page', () => {
     txs = new FakeTransactions();
     txs.transactions.set(list);
     groups = new FakeGroups();
+    sharedBills = new FakeSharedBills();
     TestBed.configureTestingModule({
       imports: [Shared],
       providers: [
@@ -76,6 +80,7 @@ describe('Shared page', () => {
         { provide: TransactionService, useValue: txs },
         { provide: PersonService, useValue: { people, nameOf: (id: string) => personName(people(), id) } },
         { provide: GroupService, useValue: groups },
+        { provide: SharedBillService, useValue: sharedBills },
         { provide: ToastService, useValue: { success() {}, error: (m: string) => errors.push(m) } },
         { provide: CategoryService, useValue: { categories: signal([]) } },
         { provide: AccountService, useValue: { accounts: signal([]) } },
@@ -153,6 +158,63 @@ describe('Shared page', () => {
   it('with nothing split yet, says how to start', async () => {
     await setup([]);
     expect(el.querySelector('.empty .display')!.textContent).toContain('See who owes you what.');
+  });
+
+  describe('someone else paid', () => {
+    it('add one: who paid, how much, and you owe them your share', async () => {
+      await setup([]);
+      button('Someone else paid').click();
+      await settle();
+      const payer = document.getElementById('sb-payer') as HTMLSelectElement;
+      payer.value = 'm';
+      payer.dispatchEvent(new Event('change'));
+      const amount = document.getElementById('sb-amount') as HTMLInputElement;
+      amount.value = '60';
+      amount.dispatchEvent(new Event('input'));
+      const merchant = document.getElementById('sb-merchant') as HTMLInputElement;
+      merchant.value = 'Tents';
+      merchant.dispatchEvent(new Event('input'));
+      await settle();
+      expect(document.body.textContent).toContain('You owe Mrunaal');
+      button('Add bill').click();
+      await settle();
+
+      expect(errors).toEqual([]);
+      const [saved] = sharedBills.bills();
+      expect(saved.merchant).toBe('Tents');
+      expect(saved.split.payments).toEqual([{ personId: 'm', amountCents: 6000 }]);
+      expect(saved.split.participantIds).toEqual([ME, 'm']);
+      // Mrunaal's card: you owe her $30.00, and the hero says so.
+      const card = [...el.querySelectorAll('.person')][0];
+      expect(card.textContent).toContain('You owe $30.00');
+      expect(card.textContent).toContain('Tents');
+      expect(el.querySelector('.hero')!.textContent).toContain('You owe $30.00');
+      // Nothing to repay you: no Record repayment.
+      expect(card.querySelector('.btn-primary')).toBeNull();
+    });
+
+    it('nets against what they owe you, into one balance', async () => {
+      await setup([pizza]); // Mrunaal owes you $25.00
+      sharedBills.bills.set([{
+        id: 'sb', date: '2026-09-25', merchant: 'Tents', createdAt: 1, updatedAt: 1,
+        split: { ...quickSplit(2000, [ME, 'm']), payments: [{ personId: 'm', amountCents: 2000 }] },
+      }]);
+      await settle();
+      expect(el.textContent).toContain('Mrunaal owes you $15.00.');
+      const card = [...el.querySelectorAll('.person')][0];
+      expect(card.textContent).toContain('$15.00 across 2 bills');
+      expect(card.textContent).toContain('You owe $10.00');
+    });
+
+    it("won't save without who paid", async () => {
+      await setup([]);
+      button('Someone else paid').click();
+      await settle();
+      button('Add bill').click();
+      await settle();
+      expect(errors).toContain('Choose who paid.');
+      expect(sharedBills.bills()).toEqual([]);
+    });
   });
 
   describe('groups', () => {

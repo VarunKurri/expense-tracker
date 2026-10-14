@@ -28,6 +28,13 @@ import { splitStatus } from '../../../utils/splits';
           <span class="summary-amount fig">{{ money(r.shareCents) }}</span>
         </div>
       }
+      @for (t of youOwe(); track t.toPersonId) {
+        <div class="summary-foot">
+          <span>You owe {{ people.nameOf(t.toPersonId) }}</span>
+          <span class="fig">{{ money(t.amountCents) }}</span>
+        </div>
+        <p class="summary-total">It counts as your spending when you pay it back.</p>
+      }
       @if (status().owedToMeCents > 0) {
         <div class="summary-foot">
           <span>Owed back to you</span>
@@ -48,8 +55,10 @@ export class SplitSummary {
   people = inject(PersonService);
 
   split = input.required<TransactionSplit>();
-  /** What you paid: the transaction amount, in cents. */
+  /** What the payer paid: the transaction amount, in cents. */
   myPaidCents = input.required<number>();
+  /** Who paid the bill: you, or a friend (a bill someone else paid). */
+  paidBy = input<string>(ME);
 
   status = computed(() => splitStatus(this.split()));
 
@@ -72,8 +81,9 @@ export class SplitSummary {
     const note = (parts: string[]) => parts.filter(Boolean).join(' · ');
 
     const mine = s.summary.perPerson.find(p => p.personId === ME);
+    const iPaid = s.myPaidCents > 0 ? `You paid ${this.money(s.myPaidCents)}` : '';
     const me = this.split().participantIds.includes(ME) || (mine?.paidCents ?? 0) > 0
-      ? [{ id: ME, shareCents: s.myShareCents, note: note([`You paid ${this.money(s.myPaidCents)}`, ...made(ME)]) }]
+      ? [{ id: ME, shareCents: s.myShareCents, note: note([iPaid, ...made(ME)]) }]
       : [];
     return [
       ...me,
@@ -85,6 +95,9 @@ export class SplitSummary {
       }),
     ];
   });
+
+  /** What you owe whoever paid, on a bill someone else paid. */
+  youOwe = computed(() => this.status().transfers.filter(t => t.fromPersonId === ME));
 
   /** Friend-to-friend settling, when someone else paid more than their share. */
   otherTransfers = computed(() =>

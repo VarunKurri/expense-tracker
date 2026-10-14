@@ -134,9 +134,9 @@
 </div>
 
 <app-split-payers [payments]="state().otherPayments" (paymentsChange)="setPayments($event)" [candidates]="others()"
-                  hint="They paid the restaurant directly, alongside you." />
+                  [hint]="paidBy() === me ? 'They paid the restaurant directly, alongside you.' : 'They paid directly, alongside ' + people.nameOf(paidBy()) + '.'" />
 
-<app-split-summary [split]="split()" [myPaidCents]="myPaidCents()" />
+<app-split-summary [split]="split()" [myPaidCents]="myPaidCents()" [paidBy]="paidBy()" />
 
 @if (problems().includes('no-one-else')) {
   <p class="field-hint">Add someone to split with.</p>

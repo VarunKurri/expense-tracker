@@ -16,6 +16,8 @@ import { TransactionTemplateService } from '../../../services/transaction-templa
 import { QuickAddService } from '../../../services/quick-add.service';
 import { ReceiptService } from '../../../services/receipt.service';
 import { FakeGroups } from '../../../testing/fake-groups';
+import { FakeSharedBills } from '../../../testing/fake-shared-bills';
+import { SharedBillService } from '../../../services/shared-bill.service';
 import { Group, ME, Transaction } from '../../../models';
 import { MoneyBackLedger } from '../../../utils/money-back';
 import { personName, quickSplit } from '../../../utils/splits';
@@ -45,6 +47,7 @@ describe('Group page', () => {
   let fixture: ComponentFixture<GroupDetail>;
   let el: HTMLElement;
   let groups: FakeGroups;
+  let sharedBills: FakeSharedBills;
   let txs: FakeTransactions;
 
   async function settle() {
@@ -61,6 +64,7 @@ describe('Group page', () => {
 
   async function setup(list: Transaction[], groupList: Group[] = [trip]) {
     groups = new FakeGroups();
+    sharedBills = new FakeSharedBills();
     groups.groups.set(groupList);
     txs = new FakeTransactions();
     txs.transactions.set(list);
@@ -71,6 +75,7 @@ describe('Group page', () => {
         { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: 'tahoe' })) } },
         { provide: TransactionService, useValue: txs },
         { provide: GroupService, useValue: groups },
+        { provide: SharedBillService, useValue: sharedBills },
         { provide: PersonService, useValue: { people, nameOf: (id: string) => personName(people(), id) } },
         { provide: ToastService, useValue: { success() {}, error() {} } },
         { provide: CategoryService, useValue: { categories: signal([]) } },
@@ -100,6 +105,31 @@ describe('Group page', () => {
     expect(rows(0)).toEqual(['Alex pays you $40.00', 'Ben pays you $40.00']);
     expect(rows(1)).toEqual(['You You get back $80.00', 'Alex Owes $40.00', 'Ben Owes $40.00']);
     expect(rows(2)).toEqual(['Safeway Sep 12 You paid $120.00 · your share $40.00']);
+  });
+
+  it('a bill someone else paid counts in the group, and opens to edit', async () => {
+    await setup([food]);
+    sharedBills.bills.set([{
+      id: 'tents', date: '2026-09-13', merchant: 'REI', createdAt: 2, updatedAt: 2,
+      split: { ...quickSplit(9000, [ME, 'alex', 'ben']), payments: [{ personId: 'ben', amountCents: 9000 }], groupId: 'tahoe' },
+    }]);
+    await settle();
+    // You paid $120 food (share $40), Ben paid $90 tents (share $30 each).
+    expect(el.querySelector('.hero')!.textContent).toContain('The group owes you $50.00.');
+    expect(rows(2)).toContain('REI Sep 13 Ben paid $90.00 · your share $30.00');
+    expect(rows(1)).toEqual(['You You get back $50.00', 'Alex Owes $70.00', 'Ben Gets back $20.00']);
+
+    ([...el.querySelectorAll('.bill')].find(b => b.textContent!.includes('REI')) as HTMLElement).click();
+    await settle();
+    expect(document.body.textContent).toContain('Edit bill');
+    expect((document.getElementById('sb-merchant') as HTMLInputElement).value).toBe('REI');
+  });
+
+  it('+ Someone else paid starts a bill in this group', async () => {
+    await setup([food]);
+    button('+ Someone else paid').click();
+    await settle();
+    expect((document.getElementById('sb-group') as HTMLSelectElement).value).toBe('tahoe');
   });
 
   it('opening a bill shows it as part of the group', async () => {

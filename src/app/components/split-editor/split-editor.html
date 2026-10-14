@@ -50,9 +50,9 @@
   @if (balanceNote()) { <p class="field-hint">{{ balanceNote() }}</p> }
 </div>
 
-<app-split-payers [payments]="state().otherPayments" (paymentsChange)="setPayments($event)" [candidates]="others()" />
+<app-split-payers [payments]="state().otherPayments" (paymentsChange)="setPayments($event)" [candidates]="others()" [hint]="payersHint()" />
 
-<app-split-summary [split]="split()" [myPaidCents]="myPaidCents()" />
+<app-split-summary [split]="split()" [myPaidCents]="myPaidCents()" [paidBy]="paidBy()" />
 
 @if (problems().includes('no-one-else')) {
   <p class="field-hint">Add someone to split with.</p>

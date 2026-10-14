@@ -1,4 +1,6 @@
 import { sum } from './split/money';
+import { formatCurrency } from './format';
+import { fromCents } from './money';
 import { ItemizedSplitState, newItem } from './splits';
 import { SplitItem } from '../models';
 
@@ -181,4 +183,42 @@ export function itemizedFromScan(scan: ReceiptScan, base: ItemizedSplitState): I
     },
     source: 'receipt',
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* What a form says about a scan (the transaction form and the        */
+/* "someone else paid" form share these)                              */
+/* ------------------------------------------------------------------ */
+
+/** Cents as "$3.64" or "−$2.10". */
+function signedMoney(cents: number): string {
+  return cents < 0 ? `−${formatCurrency(fromCents(-cents))}` : formatCurrency(fromCents(cents));
+}
+
+/** "1 item · tax & fees −$4.71 · tip $0.00 · total $37.26" */
+export function scanSummaryText(scan: ReceiptScan): string {
+  const n = scan.items.length;
+  const parts = [`${n} item${n === 1 ? '' : 's'}`, `tax & fees ${signedMoney(scanTaxAndFeesCents(scan))}`, `tip ${signedMoney(scan.tipCents)}`];
+  if (scan.totalCents !== null) parts.push(`total ${signedMoney(scan.totalCents)}`);
+  return parts.join(' · ');
+}
+
+/**
+ * What "Tax & fees" is made of, when it's more than the tax alone:
+ * "Tax $3.64 · Discount −$2.10 · DoorDash Credits −$6.25". Empty otherwise.
+ */
+export function scanTaxBreakdownText(scan: ReceiptScan): string {
+  if (!scan.fees.length && !scan.discounts.length) return '';
+  return scanTaxParts(scan).map(p => `${p.name} ${signedMoney(p.cents)}`).join(' · ');
+}
+
+/** When the lines and the printed total disagree, say so: a line was probably misread. */
+export function scanWarningText(scan: ReceiptScan): string {
+  const gap = scanMismatchCents(scan);
+  if (gap !== 0) {
+    return `The lines add up to ${formatCurrency(fromCents(scanBillCents(scan)))}, but the receipt's total is `
+      + `${formatCurrency(fromCents(scan.totalCents ?? 0))}. A line may have been misread. Check the items before saving.`;
+  }
+  if (scan.confidence < 0.6) return 'Parts of this receipt were hard to read. Check the numbers before saving.';
+  return '';
 }

@@ -27,7 +27,7 @@ import { ReceiptService } from '../../../services/receipt.service';
 import { ReceiptAttach } from '../../../components/receipt-attach/receipt-attach';
 import { FittedImage } from '../../../utils/image';
 import {
-  ReceiptScan, itemizedFromScan, scanAmountCents, scanBillCents, scanMismatchCents, scanTaxAndFeesCents, scanTaxParts,
+  ReceiptScan, itemizedFromScan, scanAmountCents, scanSummaryText, scanTaxBreakdownText, scanWarningText,
 } from '../../../utils/receipt';
 
 @Component({
@@ -209,38 +209,11 @@ export class TransactionForm implements OnChanges {
     this.scanned.set(scan);
   }
 
-  /** "1 item · tax & fees −$4.71 · tip $0.00 · total $37.26" */
-  scanSummary(scan: ReceiptScan): string {
-    const n = scan.items.length;
-    const parts = [`${n} item${n === 1 ? '' : 's'}`, `tax & fees ${this.signedMoney(scanTaxAndFeesCents(scan))}`, `tip ${this.signedMoney(scan.tipCents)}`];
-    if (scan.totalCents !== null) parts.push(`total ${this.signedMoney(scan.totalCents)}`);
-    return parts.join(' · ');
-  }
-
-  /**
-   * What "Tax & fees" is made of, when it's more than the tax alone:
-   * "Tax $3.64 · Discount −$2.10 · DoorDash Credits −$6.25". Empty otherwise.
-   */
-  scanTaxBreakdown(scan: ReceiptScan): string {
-    if (!scan.fees.length && !scan.discounts.length) return '';
-    return scanTaxParts(scan).map(p => `${p.name} ${this.signedMoney(p.cents)}`).join(' · ');
-  }
-
-  /** Cents as "$3.64" or "−$2.10". */
-  private signedMoney(cents: number): string {
-    return cents < 0 ? `−${formatCurrency(fromCents(-cents))}` : formatCurrency(fromCents(cents));
-  }
-
-  /** When the lines and the printed total disagree, say so: a line was probably misread. */
-  scanWarning(scan: ReceiptScan): string {
-    const gap = scanMismatchCents(scan);
-    if (gap !== 0) {
-      return `The lines add up to ${formatCurrency(fromCents(scanBillCents(scan)))}, but the receipt's total is `
-        + `${formatCurrency(fromCents(scan.totalCents ?? 0))}. A line may have been misread. Check the items before saving.`;
-    }
-    if (scan.confidence < 0.6) return 'Parts of this receipt were hard to read. Check the numbers before saving.';
-    return '';
-  }
+  // What the note under a read receipt says (utils/receipt.ts, shared with
+  // the "someone else paid" form).
+  scanSummary = scanSummaryText;
+  scanTaxBreakdown = scanTaxBreakdownText;
+  scanWarning = scanWarningText;
 
   /** "Use $X as the amount" from the itemized editor, when the receipt and the amount disagree. */
   useSplitAmount(cents: number) {

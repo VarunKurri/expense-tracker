@@ -283,7 +283,7 @@ export type SplitProblem =
   | 'no-one-else'         // nobody to split with but you
   | 'unassigned'          // some items (and their tax/tip) belong to nobody
   | 'not-covered'         // payments don't add up to the bill
-  | 'my-payment-mismatch'; // your payment isn't the transaction amount
+  | 'my-payment-mismatch'; // the payer's payment isn't the bill's amount
 
 /**
  * Why a split can't be saved yet. An empty list means it's good to go.
@@ -291,13 +291,14 @@ export type SplitProblem =
  * Saving requires every cent to be accounted for: otherwise "what you're owed"
  * would be built on a bill nobody fully paid or fully claimed.
  */
-export function splitProblems(split: TransactionSplit, transactionAmountCents: number): SplitProblem[] {
+export function splitProblems(split: TransactionSplit, transactionAmountCents: number, payerId: string = ME): SplitProblem[] {
   const problems: SplitProblem[] = [];
   const summary = calculateSplit(toBill(split));
-  if (!split.participantIds.some(id => id !== ME)) problems.push('no-one-else');
+  // Nothing to split if the only person sharing it is whoever paid.
+  if (!split.participantIds.some(id => id !== payerId)) problems.push('no-one-else');
   if (summary.unassignedCents > 0 || summary.unclaimedChargesCents > 0) problems.push('unassigned');
   if (summary.unpaidCents !== 0) problems.push('not-covered');
-  const mine = sum(split.payments.filter(p => p.personId === ME).map(p => p.amountCents));
+  const mine = sum(split.payments.filter(p => p.personId === payerId).map(p => p.amountCents));
   if (mine !== transactionAmountCents) problems.push('my-payment-mismatch');
   return problems;
 }
@@ -329,22 +330,28 @@ export function emptyQuickState(): QuickSplitState {
   return { participantIds: [ME], mode: 'equal', weights: {}, otherPayments: [] };
 }
 
-/** Everyone who paid, you first. Zero and duplicate entries for you are dropped. */
-function payments(state: QuickSplitState, myPaidCents: number): Payment[] {
+/*
+ * `payerId` throughout: who paid the bill's main amount. You, for an expense
+ * of yours (the default); a friend, for a bill someone else paid (a
+ * SharedBill). `otherPayments` are anyone else who chipped in.
+ */
+
+/** Everyone who paid, the payer first. Zero and duplicate entries for the payer are dropped. */
+function payments(state: Pick<QuickSplitState, 'otherPayments'>, paidCents: number, payerId: string = ME): Payment[] {
   return [
-    { personId: ME, amountCents: myPaidCents },
-    ...state.otherPayments.filter(p => p.personId !== ME && p.amountCents > 0),
+    { personId: payerId, amountCents: paidCents },
+    ...state.otherPayments.filter(p => p.personId !== payerId && p.amountCents > 0),
   ];
 }
 
-/** What was paid towards the bill: you, plus anyone else who paid part. */
-export function paidTowardsBillCents(state: Pick<QuickSplitState, 'otherPayments'>, myPaidCents: number): number {
-  return myPaidCents + sum(state.otherPayments.filter(p => p.personId !== ME && p.amountCents > 0).map(p => p.amountCents));
+/** What was paid towards the bill: the payer, plus anyone else who paid part. */
+export function paidTowardsBillCents(state: Pick<QuickSplitState, 'otherPayments'>, paidCents: number, payerId: string = ME): number {
+  return paidCents + sum(state.otherPayments.filter(p => p.personId !== payerId && p.amountCents > 0).map(p => p.amountCents));
 }
 
-/** The bill: what you paid plus what anyone else paid towards it. */
-export function quickBillCents(state: QuickSplitState, myPaidCents: number): number {
-  return paidTowardsBillCents(state, myPaidCents);
+/** The bill: what the payer paid plus what anyone else paid towards it. */
+export function quickBillCents(state: QuickSplitState, paidCents: number, payerId: string = ME): number {
+  return paidTowardsBillCents(state, paidCents, payerId);
 }
 
 /**
@@ -352,22 +359,22 @@ export function quickBillCents(state: QuickSplitState, myPaidCents: number): num
  * "won't be repaid") from the split being edited.
  */
 export function buildQuickSplit(
-  state: QuickSplitState, myPaidCents: number, existing?: TransactionSplit | null,
+  state: QuickSplitState, myPaidCents: number, existing?: TransactionSplit | null, payerId: string = ME,
 ): TransactionSplit {
   const split = quickSplit(
-    quickBillCents(state, myPaidCents),
+    quickBillCents(state, myPaidCents, payerId),
     state.participantIds,
     state.mode,
     state.participantIds.map(id => state.weights[id] ?? 0),
   );
-  split.payments = payments(state, myPaidCents);
+  split.payments = payments(state, myPaidCents, payerId);
   if (existing?.closedPersonIds?.length) split.closedPersonIds = [...existing.closedPersonIds];
   if (existing?.source) split.source = existing.source;
   return split;
 }
 
 /** Read a saved quick split back into the editor. */
-export function quickStateFrom(split: TransactionSplit): QuickSplitState {
+export function quickStateFrom(split: TransactionSplit, payerId: string = ME): QuickSplitState {
   const item = split.items[0];
   const weights: Record<string, number> = {};
   for (const a of item?.assignments ?? []) weights[a.personId] = a.weight;
@@ -375,7 +382,7 @@ export function quickStateFrom(split: TransactionSplit): QuickSplitState {
     participantIds: [...split.participantIds],
     mode: item?.splitMode ?? 'equal',
     weights: item?.splitMode === 'equal' ? {} : weights,
-    otherPayments: split.payments.filter(p => p.personId !== ME).map(p => ({ ...p })),
+    otherPayments: split.payments.filter(p => p.personId !== payerId).map(p => ({ ...p })),
   };
 }
 
@@ -385,8 +392,8 @@ export function quickStateFrom(split: TransactionSplit): QuickSplitState {
  * amounts are what's typed; percentages are that share of the bill. Display
  * only; the split itself always divides the whole bill, in proportion.
  */
-export function quickAssignedCents(state: QuickSplitState, myPaidCents: number): number {
-  const bill = quickBillCents(state, myPaidCents);
+export function quickAssignedCents(state: QuickSplitState, myPaidCents: number, payerId: string = ME): number {
+  const bill = quickBillCents(state, myPaidCents, payerId);
   const typed = sum(state.participantIds.map(id => state.weights[id] ?? 0));
   if (state.mode === 'amount') return typed;
   if (state.mode === 'percent') return Math.round((bill * typed) / 100);
@@ -490,7 +497,7 @@ export function emptyItemizedState(from?: Pick<QuickSplitState, 'participantIds'
 }
 
 export function buildItemizedSplit(
-  state: ItemizedSplitState, myPaidCents: number, existing?: TransactionSplit | null,
+  state: ItemizedSplitState, myPaidCents: number, existing?: TransactionSplit | null, payerId: string = ME,
 ): TransactionSplit {
   const split: TransactionSplit = {
     mode: 'itemized',
@@ -498,22 +505,19 @@ export function buildItemizedSplit(
     // A line with no name and no price is an empty row, not part of the bill.
     items: state.items.filter(i => i.name.trim() || i.priceCents > 0).map(i => ({ ...i, name: i.name.trim() || 'Item' })),
     charges: { ...state.charges },
-    payments: [
-      { personId: ME, amountCents: myPaidCents },
-      ...state.otherPayments.filter(p => p.personId !== ME && p.amountCents > 0),
-    ],
+    payments: payments(state, myPaidCents, payerId),
     source: state.source ?? existing?.source ?? 'manual',
   };
   if (existing?.closedPersonIds?.length) split.closedPersonIds = [...existing.closedPersonIds];
   return split;
 }
 
-export function itemizedStateFrom(split: TransactionSplit): ItemizedSplitState {
+export function itemizedStateFrom(split: TransactionSplit, payerId: string = ME): ItemizedSplitState {
   return {
     participantIds: [...split.participantIds],
     items: split.items.map(i => ({ ...i, assignments: i.assignments.map(a => ({ ...a })) })),
     charges: { ...split.charges },
-    otherPayments: split.payments.filter(p => p.personId !== ME).map(p => ({ ...p })),
+    otherPayments: split.payments.filter(p => p.personId !== payerId).map(p => ({ ...p })),
     // Only a receipt is worth carrying; anything else saves as it was.
     ...(split.source === 'receipt' ? { source: 'receipt' as const } : {}),
   };
@@ -529,8 +533,8 @@ export function itemizedBillCents(state: ItemizedSplitState): number {
  * they put in. What "Use this as the amount" fills in when the receipt and
  * the transaction disagree.
  */
-export function myPaymentToCoverCents(state: ItemizedSplitState): number {
-  const others = sum(state.otherPayments.filter(p => p.personId !== ME).map(p => p.amountCents));
+export function myPaymentToCoverCents(state: ItemizedSplitState, payerId: string = ME): number {
+  const others = sum(state.otherPayments.filter(p => p.personId !== payerId).map(p => p.amountCents));
   return Math.max(0, itemizedBillCents(state) - others);
 }
 
