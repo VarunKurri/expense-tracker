@@ -1,5 +1,6 @@
 import type { MoneyBackInfo, UntrackedReturn } from './money-back.model';
 import type { TransactionSplit } from './split.model';
+import type { Settlement } from './group.model';
 
 export type TransactionType = 'income' | 'expense' | 'transfer';
 
@@ -67,6 +68,9 @@ export interface Transaction {
   // Bill splitting (expenses only): who shared this bill and who paid what.
   // See models/split.model.ts; the maths is utils/splits.ts.
   split?: TransactionSplit;
+  // Settling up (expenses only): money sent to a friend to cover your share of
+  // bills they paid. See models/group.model.ts; the maths is utils/groups.ts.
+  settlement?: Settlement;
 
   // Plaid sync metadata (set for bank-synced transactions)
   plaidTransactionId?: string;            // Plaid transaction_id; also the Firestore doc id, used for dedup

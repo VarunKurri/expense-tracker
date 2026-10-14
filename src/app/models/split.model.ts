@@ -59,6 +59,8 @@ export interface TransactionSplit {
   /** People marked "won't be repaid": still in your spending, no longer "owed to you". */
   closedPersonIds?: string[];
   source: 'manual' | 'receipt';
+  /** The group this bill belongs to (a trip, a flat), if any. See models/group.model.ts. */
+  groupId?: string;
 }
 
 export type { Charges, Item, Payment };

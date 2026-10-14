@@ -1,7 +1,7 @@
 import { ME, MoneyBackEntry, SplitItem, SplitPerson, TransactionSplit } from '../models';
 import { wholeShareWeights } from './split/shareWeights';
 import { allocate, sum } from './split/money';
-import { settle } from './split/settle';
+import { NetPosition, settle } from './split/settle';
 import { activeAssignments, calculateSplit } from './split/split';
 import type { Assignment, Bill, BillSummary, Charges, Item, Payment, SplitMode, Transfer } from './split/types';
 
@@ -129,7 +129,23 @@ export interface SplitStatus {
   transfers: Transfer[];
 }
 
-export function splitStatus(split: TransactionSplit, moneyBack: MoneyBackEntry[] = []): SplitStatus {
+/**
+ * Everyone's part of a bill after refunds, and where each person stands on it
+ * (`paid − share`; positive is owed money back). A refund lands on your card,
+ * so it reduces what you effectively paid. Shared by `splitStatus` and the
+ * group maths (utils/groups.ts), so a bill reads the same in both.
+ */
+export interface BillPositions {
+  /** The engine's answer for the bill as charged, before refunds. */
+  summary: BillSummary;
+  billTotalCents: number;
+  refundedCents: number;
+  /** Each person's share after refunds, in `summary.perPerson` order. */
+  shares: number[];
+  positions: NetPosition[];
+}
+
+export function billPositions(split: TransactionSplit, moneyBack: MoneyBackEntry[] = []): BillPositions {
   const summary = calculateSplit(toBill(split));
   const billTotalCents = summary.totalCents;
 
@@ -146,11 +162,15 @@ export function splitStatus(split: TransactionSplit, moneyBack: MoneyBackEntry[]
     : summary.perPerson.map(p => p.totalCents);
 
   // ---- Who owes whom, after the refund ------------------------------------
-  // The refund came back to you, so it reduces what you effectively paid.
   const positions = summary.perPerson.map((p, i) => ({
     personId: p.personId,
     netCents: (p.personId === ME ? p.paidCents - refundedCents : p.paidCents) - shares[i],
   }));
+  return { summary, billTotalCents, refundedCents, shares, positions };
+}
+
+export function splitStatus(split: TransactionSplit, moneyBack: MoneyBackEntry[] = []): SplitStatus {
+  const { summary, billTotalCents, refundedCents, shares, positions } = billPositions(split, moneyBack);
   const transfers = settle(positions);
   const dueToMe = new Map<string, number>();
   for (const t of transfers) {

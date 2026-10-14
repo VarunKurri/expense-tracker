@@ -1,3 +1,4 @@
+import { onTestFinished, vi } from 'vitest';
 import { Component, input, output, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
@@ -174,6 +175,13 @@ describe('Loans', () => {
   });
 
   it('a missing month shows up, and linking a payment by hand fills it', async () => {
+    // Pinned to the 6th: this month's payment (due the 5th) is still within its
+    // grace days, so last month's is the only one missing whatever today is.
+    // Only Date is faked; timers stay real so the page renders as usual.
+    const now = new Date();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(now.getFullYear(), now.getMonth(), 6, 12));
+    onTestFinished(() => { vi.useRealTimers(); });
     const odd = { ...pay('zelle', monthsAgo(1, 6), 340), merchant: 'Online payment' };
     await setup([carLoan()], [pay('p1', monthsAgo(2)), odd], '/net-worth/loans/loan');
     expect(el.querySelector('.hero-sentence')!.textContent).toContain("hasn't shown up yet");
