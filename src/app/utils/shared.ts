@@ -1,8 +1,9 @@
-import { MoneyBackEntry, Transaction } from '../models';
+import { ME, MoneyBackEntry, Transaction } from '../models';
 import { formatCurrency } from './format';
 import { fromCents } from './money';
 import type { SplitTotals } from './reporting';
 import { sum } from './split/money';
+import type { Transfer } from './split/types';
 import { PersonSplitStatus, splitStatus } from './splits';
 
 /**
@@ -18,10 +19,24 @@ export interface SharedBill {
   status: PersonSplitStatus;
 }
 
+/**
+ * Where someone stands with you in one group: what the group's settle-up plan
+ * has them paying you (positive) or you paying them (negative).
+ */
+export interface GroupPart {
+  groupId: string;
+  name: string;
+  cents: number;
+}
+
 export interface PersonBalance {
   personId: string;
-  /** Still owed to you, across bills not marked "won't be repaid". */
+  /** Still owed to you on bills outside groups, leaving out any marked "won't be repaid". */
   owedCents: number;
+  /** What they owe you (+) or you owe them (−) in each group. Empty until `withGroups`. */
+  groups: GroupPart[];
+  /** Everything together: bills outside groups plus every group. Positive, they owe you. */
+  netCents: number;
   /** Bills they still owe on, oldest first, which is the order a repayment pays them off. */
   openBills: SharedBill[];
   /** Every split bill they were on, newest first. */
@@ -50,14 +65,61 @@ export function balancesByPerson(
       const openBills = bills
         .filter(b => b.status.outstandingCents > 0 && b.status.state !== 'closed')
         .sort(byDate);
+      const owedCents = sum(openBills.map(b => b.status.outstandingCents));
       return {
         personId,
-        owedCents: sum(openBills.map(b => b.status.outstandingCents)),
+        owedCents,
+        groups: [],
+        netCents: owedCents,
         openBills,
         allBills: [...bills].sort(byDate).reverse(),
       };
     })
     .sort((a, b) => b.owedCents - a.owedCents);
+}
+
+/** A group's suggested payments, as `withGroups` needs them. */
+export interface GroupPlan {
+  groupId: string;
+  name: string;
+  plan: Transfer[];
+}
+
+/**
+ * Each person's total with you, groups included, the way Splitwise shows a
+ * friend's balance: bills outside groups, plus whatever each group's settle-up
+ * plan has them paying you (or you paying them). Someone you only share a
+ * group with gets a balance too. Most owed first.
+ */
+export function withGroups(balances: PersonBalance[], plans: GroupPlan[]): PersonBalance[] {
+  const byPerson = new Map(balances.map(b => [b.personId, { ...b, groups: [...b.groups] }]));
+  const get = (personId: string) => {
+    let b = byPerson.get(personId);
+    if (!b) {
+      b = { personId, owedCents: 0, groups: [], netCents: 0, openBills: [], allBills: [] };
+      byPerson.set(personId, b);
+    }
+    return b;
+  };
+  for (const g of plans) {
+    for (const t of g.plan) {
+      const other = t.toPersonId === ME ? t.fromPersonId : t.fromPersonId === ME ? t.toPersonId : null;
+      if (!other) continue;
+      const cents = t.toPersonId === ME ? t.amountCents : -t.amountCents;
+      const b = get(other);
+      const part = b.groups.find(p => p.groupId === g.groupId);
+      if (part) part.cents += cents;
+      else b.groups.push({ groupId: g.groupId, name: g.name, cents });
+    }
+  }
+  return [...byPerson.values()]
+    .map(b => ({ ...b, netCents: b.owedCents + sum(b.groups.map(p => p.cents)) }))
+    .sort((a, b) => b.netCents - a.netCents);
+}
+
+/** What someone owes you that a repayment from them can pay off: bills outside groups, and groups where they owe you. */
+export function repayableCents(b: PersonBalance): number {
+  return b.owedCents + sum(b.groups.filter(g => g.cents > 0).map(g => g.cents));
 }
 
 export interface RepaymentPart {
@@ -90,9 +152,14 @@ export function spreadRepayment(openBills: SharedBill[], amountCents: number): R
   return parts;
 }
 
-/** Everything still owed to you, across everyone. */
+/** Everything owed to you, across everyone (groups included once `withGroups` has run). */
 export function totalOwedCents(balances: PersonBalance[]): number {
-  return sum(balances.map(b => b.owedCents));
+  return sum(balances.filter(b => b.netCents > 0).map(b => b.netCents));
+}
+
+/** Everything you owe, across everyone: a positive number. */
+export function totalYouOweCents(balances: PersonBalance[]): number {
+  return sum(balances.filter(b => b.netCents < 0).map(b => -b.netCents));
 }
 
 const usd = (cents: number) => formatCurrency(fromCents(cents));

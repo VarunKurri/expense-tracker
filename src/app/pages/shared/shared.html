@@ -24,9 +24,12 @@
       <div class="hero-figure"><span class="num-display">{{ money(totalOwedCents()) }}</span></div>
       <p class="hero-sentence">
         @if (anythingOwed()) {
-          {{ headline() }} Until it comes back, it counts in your spending.{{ owing().length ? ' Record repayments here as they arrive.' : '' }}
-        } @else {
+          {{ headline() }} Until it comes back, it counts in your spending. Record repayments here as they arrive.
+        } @else if (!totalYouOweCents()) {
           Everyone's square. Nothing you've split is waiting to be paid back.
+        }
+        @if (totalYouOweCents()) {
+          You owe {{ money(totalYouOweCents()) }}, which becomes spending when you pay it.
         }
       </p>
     </section>
@@ -47,17 +50,21 @@
       </section>
     }
 
-    <!-- ONE CARD PER PERSON WHO OWES -->
-    @for (b of owing(); track b.personId) {
+    <!-- ONE CARD PER PERSON YOU'RE NOT SQUARE WITH: their bills, and their groups -->
+    @for (b of open(); track b.personId) {
       <section class="card person">
         <div class="person-head">
           <div class="person-title">
             <h3>{{ people.nameOf(b.personId) }}</h3>
             <span class="person-sub">
-              <span class="fig">{{ money(b.owedCents) }}</span> across {{ b.openBills.length }} bill{{ b.openBills.length === 1 ? '' : 's' }}
+              @if (b.netCents < 0) { You owe <span class="fig">{{ money(-b.netCents) }}</span> }
+              @else { <span class="fig">{{ money(b.netCents) }}</span> }
+              {{ personSub(b) }}
             </span>
           </div>
-          <button class="btn-primary" (click)="openRepay(b)">Record repayment</button>
+          @if (repayable(b)) {
+            <button class="btn-primary" (click)="openRepay(b)">Record repayment</button>
+          }
         </div>
 
         <div class="bills">
@@ -69,6 +76,17 @@
               </span>
               <span class="bill-note fig">{{ billNote(bill) }}</span>
             </button>
+          }
+          @for (g of b.groups; track g.groupId) {
+            @if (g.cents !== 0) {
+              <a class="bill" [routerLink]="['/shared/groups', g.groupId]">
+                <span class="bill-main">
+                  <span class="bill-name">{{ g.name }}</span>
+                  <span class="bill-date label-mono">Group</span>
+                </span>
+                <span class="bill-note fig">{{ groupPartNote(g.cents) }}</span>
+              </a>
+            }
           }
           @if (showingHistory().has(b.personId)) {
             @for (bill of settledBills(b); track bill.tx.id) {
@@ -158,10 +176,10 @@
         <div class="field">
           <span class="label-sm">Pays off, oldest first</span>
           <div class="preview">
-            @for (p of preview(); track p.bill.tx.id) {
+            @for (p of preview(); track p.key) {
               <div class="preview-row">
-                <span>{{ p.bill.tx.merchant || 'Expense' }} <span class="label-mono">{{ formatDate(p.bill.tx.date) }}</span></span>
-                <span class="fig">{{ money(p.amountCents) }}{{ p.clears ? '' : ' of ' + money(p.bill.status.outstandingCents) }}</span>
+                <span>{{ p.name }} <span class="label-mono">{{ p.date ? formatDate(p.date) : 'Group' }}</span></span>
+                <span class="fig">{{ money(p.amountCents) }}{{ p.amountCents >= p.ofCents ? '' : ' of ' + money(p.ofCents) }}</span>
               </div>
             }
           </div>

@@ -158,8 +158,8 @@ describe('Shared page', () => {
   describe('groups', () => {
     const trip = { id: 'tahoe', name: 'Tahoe Trip', memberIds: ['m', 'p'], simplify: true, payments: [], createdAt: 0, updatedAt: 0 };
 
-    it("a group's bills are settled with the group, not person by person", async () => {
-      const gas = { ...bill('Chevron', '2026-09-05', 6000, ['m', 'p']) };
+    it("each person's total includes what they owe in groups, like Splitwise", async () => {
+      const gas = { ...bill('Chevron', '2026-09-05', 6000, ['m', 'p']), id: 'gas' };
       gas.split = { ...gas.split!, groupId: 'tahoe' };
       await setup([dinner, gas]);
       groups.groups.set([trip]);
@@ -167,17 +167,56 @@ describe('Shared page', () => {
 
       const row = el.querySelector('.group-row')!;
       expect(row.textContent).toContain('Tahoe Trip');
+      expect(row.textContent).toContain('3 people · 1 bill');
       expect(row.textContent).toContain("You're owed $40.00");
       expect(row.getAttribute('href')).toBe('/shared/groups/tahoe');
-      // The person cards only count the bill outside the group.
-      expect(el.textContent).toContain('Two friends owe you $60.00. Tahoe Trip owes you $40.00.');
+
+      // $30.00 each for ramen, plus $20.00 each in the trip.
+      expect(el.textContent).toContain('Two friends owe you $100.00.');
       expect(el.querySelector('.hero .num-display')!.textContent).toContain('$100.00');
+      const card = [...el.querySelectorAll('.person')][0];
+      expect(card.textContent).toContain('$50.00 across 1 bill and Tahoe Trip');
+      expect([...card.querySelectorAll('.bill-name')].map(b => b.textContent!.trim())).toEqual(['Ramen Bar', 'Tahoe Trip']);
+      expect(card.textContent).toContain('Owes $20.00');
+      // The group bill itself isn't listed per person: the group settles it.
       expect(el.textContent).not.toContain('Chevron');
-      expect(row.textContent).toContain('3 people · 1 bill');
+    });
+
+    it('someone you only share a group with has a total too', async () => {
+      const gas = { ...bill('Chevron', '2026-09-05', 6000, ['m', 'p']), id: 'gas' };
+      gas.split = { ...gas.split!, groupId: 'tahoe' };
+      await setup([gas]);
+      groups.groups.set([trip]);
+      await settle();
+      expect(el.textContent).toContain('Two friends owe you $40.00.');
+      expect([...el.querySelectorAll('.person')][0].textContent).toContain('$20.00 across Tahoe Trip');
+    });
+
+    it('one repayment pays the bills outside groups first, then the group', async () => {
+      const gas = { ...bill('Chevron', '2026-09-05', 6000, ['m', 'p']), id: 'gas' };
+      gas.split = { ...gas.split!, groupId: 'tahoe' };
+      await setup([dinner, gas]);
+      groups.groups.set([trip]);
+      await settle();
+      ([...el.querySelectorAll('.person')][0].querySelector('.btn-primary') as HTMLElement).click();
+      await settle();
+      expect((document.getElementById('repay-amount') as HTMLInputElement).value).toBe('50');
+      const preview = document.querySelector('.preview')!.textContent!;
+      expect(preview).toContain('Ramen Bar');
+      expect(preview).toContain('Tahoe Trip');
+      button('Save').click();
+      await settle();
+
+      const saved = (id: string) => txs.transactions().find(t => t.id === id)!.moneyBack;
+      expect(saved(dinner.id!)).toEqual([expect.objectContaining({ amountCents: 3000, fromPersonId: 'm' })]);
+      expect(saved(gas.id!)).toEqual([expect.objectContaining({ amountCents: 2000, fromPersonId: 'm' })]);
+      // Mrunaal is square; Priya still owes for both.
+      expect(el.textContent).toContain('Priya owes you $50.00.');
+      expect(el.querySelector('.square')!.textContent).toContain('Mrunaal');
     });
 
     it('a bill in a group that was deleted counts on its own again', async () => {
-      const gas = { ...bill('Chevron', '2026-09-05', 6000, ['m']) };
+      const gas = { ...bill('Chevron', '2026-09-05', 6000, ['m']), id: 'gas' };
       gas.split = { ...gas.split!, groupId: 'gone' };
       await setup([gas]);
       expect(el.querySelector('.group-row')).toBeNull();

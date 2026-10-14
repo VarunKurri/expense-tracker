@@ -121,8 +121,11 @@ The app is what we copy. Do not "correct" this back to dark.
   (`transactionService.transactions()` by id), never the copy the page passed
   in — that copy is stale the moment the sheet changes anything.
 - A bill in a group (`split.groupId`) is settled across the whole group, Splitwise
-  style: never show its per-bill "owes you" figures. Shared, Analysis and Reports
-  leave group bills out of per-person/"Owed to you" sums; the sheet links to the group.
+  style: never show its per-bill "owes you" figures. The details sheet shows each
+  person's share ("Their share") and a small "Open group" button. On Shared, a
+  person's total is their bills outside groups plus what each group's settle-up
+  plan has them paying you (`withGroups` in utils/shared.ts), shown as a row per
+  group on their card; a repayment pays their bills first, then their groups.
 - Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`).
 - Never centre a fixed panel with `transform`: it traps any pop-up inside it
   (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;

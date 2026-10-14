@@ -107,8 +107,12 @@ describe('Group page', () => {
     (el.querySelector('.bill') as HTMLElement).click();
     await settle();
     const view = document.querySelector('app-transaction-view')!.textContent!;
-    expect(view).toContain('Part of Tahoe Trip');
-    expect(view).toContain('Open Tahoe Trip');
+    // Everyone's share at a glance, and a small link to the group.
+    expect(view).toContain('Alex');
+    expect(view).toContain('Their share');
+    expect(view).toContain('$40.00');
+    expect(view).toContain('This bill is in Tahoe Trip');
+    expect(view).toContain('Open group');
     expect(view).not.toContain('Owes you');
   });
 

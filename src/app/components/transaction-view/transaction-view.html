@@ -93,12 +93,26 @@
           <div class="view-reimburse-head">Money back</div>
           @if (split(); as s) {
             @if (splitGroup(); as g) {
-              <!-- IN A GROUP: settled across the whole group, not bill by bill -->
-              <p class="reimburse-hint split-hint">
-                Part of <strong>{{ g.name }}</strong>. Your share is <span class="fig">{{ formatCents(s.myShareCents) }}</span>.
-                Balances are worked out across the whole group, so payments are recorded there.
-              </p>
-              <button type="button" class="btn-row split-group-link" (click)="openGroup(g.id!)">Open {{ g.name }}</button>
+              <!-- IN A GROUP: everyone's share, at a glance. Who pays whom is worked
+                   out across the whole group, so no per-bill "owes you" here. -->
+              <div class="split-people">
+                @for (p of s.people; track p.personId) {
+                  <div class="split-person static">
+                    <span class="split-person-main">
+                      <span class="split-person-name">{{ people.nameOf(p.personId) }}</span>
+                      <span class="split-person-status">{{ groupPersonStatus(p) }}</span>
+                    </span>
+                    <span class="split-person-amount fig">{{ formatCents(p.shareCents) }}</span>
+                  </div>
+                }
+              </div>
+              <div class="split-group-foot">
+                <p class="reimburse-hint split-hint">
+                  Your share is <span class="fig">{{ formatCents(s.myShareCents) }}</span>.
+                  This bill is in <strong>{{ g.name }}</strong>, where who pays whom is worked out across all its bills.
+                </p>
+                <button type="button" class="btn-row" (click)="openGroup(g.id!)">Open group</button>
+              </div>
             } @else {
               <!-- SPLIT: one row per person; tap to record what they paid back -->
               <div class="split-people">

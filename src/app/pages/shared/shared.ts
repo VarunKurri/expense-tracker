@@ -15,8 +15,10 @@ import { formatCurrency } from '../../utils/format';
 import { fromCents, toCents } from '../../utils/money';
 import { isMoneyBackIncome, newReturnId } from '../../utils/money-back';
 import { localDateString } from '../../utils/date';
-import { PersonBalance, SharedBill, balancesByPerson, spreadRepayment, totalOwedCents } from '../../utils/shared';
-import { groupLedger } from '../../utils/groups';
+import {
+  GroupPart, PersonBalance, SharedBill, balancesByPerson, repayableCents, spreadRepayment, totalOwedCents, totalYouOweCents, withGroups,
+} from '../../utils/shared';
+import { groupLedger, spreadReceived } from '../../utils/groups';
 
 const COUNT_WORDS = ['No one', 'One friend', 'Two friends', 'Three friends', 'Four friends', 'Five friends',
   'Six friends', 'Seven friends', 'Eight friends', 'Nine friends'];
@@ -46,18 +48,22 @@ export class Shared {
   /** Bills in a group that still exists are settled with the group, not here. */
   private inGroup = (t: Transaction) => !!this.groups.byId(t.split?.groupId);
 
-  balances = computed(() =>
-    balancesByPerson(this.txService.transactions(), t => this.txService.moneyBackEntriesFor(t), this.inGroup));
-
   // ── Groups ─────────────────────────────────────────────────
+  /** Every group's ledger (utils/groups.ts), worked out once for the page. */
+  private ledgers = computed(() => this.groups.groups()
+    .filter(g => g.id)
+    .map(g => ({
+      group: g,
+      ledger: groupLedger(g as typeof g & { id: string }, this.txService.transactions(), [],
+        t => this.txService.moneyBackEntriesFor(t)),
+    })));
+
   /** Each group not put away, with where you stand in it. */
-  groupRows = computed(() => this.groups.groups()
-    .filter(g => g.id && !g.archived)
-    .map(g => {
-      const ledger = groupLedger(g as typeof g & { id: string }, this.txService.transactions(), [],
-        t => this.txService.moneyBackEntriesFor(t));
-      return { group: g, balanceCents: ledger.myBalanceCents, bills: ledger.bills.length, people: g.memberIds.length + 1 };
-    }));
+  groupRows = computed(() => this.ledgers()
+    .filter(({ group }) => !group.archived)
+    .map(({ group, ledger }) => ({
+      group, balanceCents: ledger.myBalanceCents, bills: ledger.bills.length, people: group.memberIds.length + 1,
+    })));
 
   newGroupOpen = signal(false);
 
@@ -77,35 +83,52 @@ export class Shared {
     if (row.balanceCents < 0) return `You owe ${this.money(-row.balanceCents)}`;
     return 'All square';
   }
-  owing = computed(() => this.balances().filter(b => b.owedCents > 0));
-  /** People you've split with who owe nothing now. */
-  square = computed(() => this.balances().filter(b => b.owedCents === 0));
-  /** Groups where you're owed money. */
-  owingGroups = computed(() => this.groupRows().filter(r => r.balanceCents > 0));
-  /** Everything owed to you: by people outside groups, and by your groups. */
-  totalOwedCents = computed(() =>
-    totalOwedCents(this.owing()) + this.owingGroups().reduce((sum, r) => sum + r.balanceCents, 0));
-  anythingOwed = computed(() => this.owing().length > 0 || this.owingGroups().length > 0);
 
+  // ── People: everyone's total, groups included ──────────────
   /**
-   * "Mrunaal owes you $85.00." / "Three friends owe you $180.00.", then the
-   * groups: "Tahoe Trip owes you $570.00." / "Your groups owe you $640.00."
+   * Each person's total with you, the way Splitwise shows a friend: bills
+   * outside groups, plus what each group's settle-up plan has them paying you
+   * (or you paying them).
    */
+  balances = computed(() => withGroups(
+    balancesByPerson(this.txService.transactions(), t => this.txService.moneyBackEntriesFor(t), this.inGroup),
+    this.ledgers().map(({ group, ledger }) => ({ groupId: group.id!, name: group.name, plan: ledger.plan })),
+  ));
+  /** Everyone you're not square with: they owe you, or you owe them. */
+  open = computed(() => this.balances().filter(b => b.netCents !== 0 || b.openBills.length > 0));
+  owing = computed(() => this.balances().filter(b => b.netCents > 0));
+  /** People you've split with who are square with you. */
+  square = computed(() => this.balances().filter(b => b.netCents === 0 && !b.openBills.length));
+  totalOwedCents = computed(() => totalOwedCents(this.balances()));
+  totalYouOweCents = computed(() => totalYouOweCents(this.balances()));
+  anythingOwed = computed(() => this.totalOwedCents() > 0);
+
+  /** "Mrunaal owes you $85.00." / "Three friends owe you $180.00." */
   headline = computed(() => {
-    const parts: string[] = [];
     const owing = this.owing();
-    if (owing.length) {
-      const total = this.money(totalOwedCents(owing));
-      if (owing.length === 1) parts.push(`${this.people.nameOf(owing[0].personId)} owes you ${total}.`);
-      else parts.push(`${COUNT_WORDS[owing.length] ?? `${owing.length} friends`} owe you ${total}.`);
-    }
-    const groups = this.owingGroups();
-    if (groups.length) {
-      const total = this.money(groups.reduce((sum, r) => sum + r.balanceCents, 0));
-      parts.push(groups.length === 1 ? `${groups[0].group.name} owes you ${total}.` : `Your groups owe you ${total}.`);
-    }
-    return parts.join(' ');
+    const total = this.money(this.totalOwedCents());
+    if (owing.length === 1) return `${this.people.nameOf(owing[0].personId)} owes you ${total}.`;
+    return `${COUNT_WORDS[owing.length] ?? `${owing.length} friends`} owe you ${total}.`;
   });
+
+  /** "$57.44 across 4 bills and Tahoe & Cali Trip" */
+  personSub(b: PersonBalance): string {
+    const where: string[] = [];
+    if (b.openBills.length) where.push(`${b.openBills.length} bill${b.openBills.length === 1 ? '' : 's'}`);
+    const groups = b.groups.filter(g => g.cents !== 0);
+    if (groups.length === 1) where.push(groups[0].name);
+    else if (groups.length > 1) where.push(`${groups.length} groups`);
+    return where.length ? `across ${where.join(' and ')}` : '';
+  }
+
+  /** Whether a repayment from them has anything to pay off. */
+  repayable(b: PersonBalance): boolean {
+    return repayableCents(b) > 0;
+  }
+
+  groupPartNote(cents: number): string {
+    return cents > 0 ? `Owes ${this.money(cents)}` : `You owe ${this.money(-cents)}`;
+  }
 
   /** Whose settled bills are showing. */
   showingHistory = signal<Set<string>>(new Set());
@@ -151,22 +174,52 @@ export class Shared {
     ? (this.chosenIncome() ? toCents(this.chosenIncome()!.amount) : 0)
     : toCents(Number(this.repayAmount()) || 0));
 
-  /** How the repayment lands: which bills it pays, oldest first. */
+  /**
+   * How a repayment lands: bills outside groups first (oldest first), then
+   * the groups they owe you in. Anything beyond all of it is extra (income),
+   * on the newest bill. Money for a group goes on your group bills as money
+   * back from them, so the group's balances and your spending both follow.
+   */
+  private repayParts(b: PersonBalance, cents: number) {
+    let billCents = Math.min(cents, b.owedCents);
+    let left = cents - billCents;
+    const groupTakes: { part: GroupPart; cents: number }[] = [];
+    for (const part of b.groups.filter(g => g.cents > 0)) {
+      const take = Math.min(left, part.cents);
+      if (take > 0) { groupTakes.push({ part, cents: take }); left -= take; }
+    }
+    if (left > 0) {
+      if (b.openBills.length || !groupTakes.length) billCents += left;
+      else groupTakes[groupTakes.length - 1].cents += left;
+    }
+    const txs = this.txService.transactions();
+    const moneyBackFor = (t: Transaction) => this.txService.moneyBackEntriesFor(t);
+    return {
+      bills: spreadRepayment(b.openBills, billCents),
+      groups: groupTakes.map(g => ({ ...g, links: spreadReceived(g.part.groupId, txs, moneyBackFor, g.cents) })),
+    };
+  }
+
+  /** The repayment's preview: each bill and group it pays, and whether that clears it. */
   preview = computed(() => {
     const b = this.repaying();
     if (!b) return [];
-    const parts = spreadRepayment(b.openBills, this.repayCents());
-    return parts.map(p => {
-      const bill = b.openBills.find(x => x.tx.id === p.expenseId)!;
-      return { bill, amountCents: p.amountCents, clears: p.amountCents >= bill.status.outstandingCents };
-    });
+    const { bills, groups } = this.repayParts(b, this.repayCents());
+    return [
+      ...bills.map(p => {
+        const bill = b.openBills.find(x => x.tx.id === p.expenseId)!;
+        return { key: p.expenseId, name: bill.tx.merchant || 'Expense', date: bill.tx.date,
+                 amountCents: p.amountCents, ofCents: bill.status.outstandingCents };
+      }),
+      ...groups.map(g => ({ key: g.part.groupId, name: g.part.name, date: '', amountCents: g.cents, ofCents: g.part.cents })),
+    ];
   });
-  extraCents = computed(() => Math.max(0, this.repayCents() - (this.repaying()?.owedCents ?? 0)));
+  extraCents = computed(() => Math.max(0, this.repayCents() - (this.repaying() ? repayableCents(this.repaying()!) : 0)));
 
   openRepay(b: PersonBalance) {
     this.repaying.set(b);
     this.repayHow.set('cash');
-    this.repayAmount.set(fromCents(b.owedCents));
+    this.repayAmount.set(fromCents(repayableCents(b)));
     this.repayDate.set(localDateString());
     this.repayNote.set('');
     this.repayIncomeId.set('');
@@ -182,7 +235,10 @@ export class Shared {
     const cents = this.repayCents();
     if (this.repayHow() === 'bank' && !this.chosenIncome()) { this.toast.error('Pick the payment it came as.'); return; }
     if (cents <= 0) { this.toast.error('Enter how much they paid back.'); return; }
-    const parts = spreadRepayment(b.openBills, cents);
+    const { bills, groups } = this.repayParts(b, cents);
+    // Bills outside groups and group bills never overlap, so these are distinct expenses.
+    const parts = [...bills, ...groups.flatMap(g => g.links)];
+    if (!parts.length) { this.toast.error('There is no bill of yours to record this against.'); return; }
     const who = { fromPersonId: b.personId, coversPersonIds: [b.personId] };
     this.saving.set(true);
     try {
@@ -196,8 +252,9 @@ export class Shared {
       } else {
         const date = this.repayDate() || localDateString();
         const note = this.repayNote().trim();
+        const all = this.txService.transactions();
         await this.txService.applyPatches(parts.map(p => {
-          const tx = b.openBills.find(x => x.tx.id === p.expenseId)!.tx;
+          const tx = all.find(t => t.id === p.expenseId)!;
           const entry: UntrackedReturn = {
             id: newReturnId(), source: 'repayment', amountCents: p.amountCents, date, ...who, ...(note ? { note } : {}),
           };

@@ -261,6 +261,11 @@ export class TransactionView {
     }
   }
 
+  /** On a bill in a group: what they paid towards it, if anything; their share is the figure. */
+  groupPersonStatus(p: PersonSplitStatus): string {
+    return p.paidCents > 0 ? `Paid ${this.formatCents(p.paidCents)} · their share` : 'Their share';
+  }
+
   /** The figure on the right: what's still owed or, once settled, what came back. */
   personAmountCents(p: PersonSplitStatus): number {
     if (p.state === 'repaid') return p.repaidCents;
