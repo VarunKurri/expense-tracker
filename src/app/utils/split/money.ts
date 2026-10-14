@@ -110,3 +110,45 @@ export function exactShare(total: number, weight: number, totalWeight: number): 
 export function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
+
+/**
+ * Trackr addition (not in Split): turn exact, unrounded amounts into whole
+ * cents that add up to `total`, largest remainder first, with ties going in
+ * `priority` order (a list of indexes; anyone not listed comes after, by index).
+ *
+ * `allocate()` divides one amount by weights. This takes amounts that were
+ * worked out exactly elsewhere (a person's share of a whole bill, summed over
+ * many items) and rounds them once, together, so nobody's figure is more than
+ * a cent from exact and two equal shares are never more than a cent apart.
+ * Rounding item by item instead lets the odd cents pile up on one person.
+ *
+ * The exact amounts should add up to `total` (give or take float noise); if
+ * they don't, they're scaled to it, as `allocate()` scales weights.
+ */
+export function allocateExact(total: number, exact: number[], priority: number[] = []): number[] {
+  const n = exact.length;
+  if (n === 0) return [];
+  const exactTotal = exact.reduce((s, v) => s + v, 0);
+  if (exactTotal === 0) return total === 0 ? new Array<number>(n).fill(0) : allocate(total, exact.map(() => 1));
+
+  const sign = total < 0 ? -1 : 1;
+  const magnitude = Math.abs(total);
+  // Snap away float noise (1732.6666666666667 vs 1732.6666666666665) so equal
+  // shares tie exactly and the tie goes by priority, not by the last bit.
+  const scaled = exact.map(v => Math.round(((magnitude * v) / exactTotal) * 1e6) / 1e6);
+  const floors = scaled.map(v => Math.floor(v));
+  let remainder = magnitude - floors.reduce((s, v) => s + v, 0);
+
+  const rank = new Array<number>(n).fill(n);
+  priority.forEach((index, position) => { if (index >= 0 && index < n && rank[index] === n) rank[index] = position; });
+  const order = scaled
+    .map((v, index) => ({ index, frac: Math.round((v - Math.floor(v)) * 1e6) }))
+    .sort((a, b) => b.frac - a.frac || rank[a.index] - rank[b.index] || a.index - b.index);
+
+  const result = [...floors];
+  for (let i = 0; i < order.length && remainder > 0; i += 1) {
+    result[order[i].index] += 1;
+    remainder -= 1;
+  }
+  return sign === -1 ? result.map(v => -v) : result;
+}

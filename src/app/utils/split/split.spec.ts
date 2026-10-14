@@ -1,4 +1,5 @@
-// Ported verbatim from VarunKurri/split-the-bill src/domain/split.test.ts @ cc6a8db.
+// Ported verbatim from VarunKurri/split-the-bill src/domain/split.test.ts @ cc6a8db, plus
+// one Trackr block at the end (rounding once per bill, Part 105).
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -583,5 +584,76 @@ describe('calculateSplit: payments', () => {
       ]),
     );
     expect(sum(result.perPerson.map((p) => p.netCents))).toBe(0);
+  });
+});
+
+// Trackr addition (Part 105): a share is rounded once for the whole bill, not
+// item by item, so odd cents can't pile up on one person.
+describe('calculateSplit: rounding once per bill (Trackr)', () => {
+  const amount = (taxCents: number, tipCents = 0): Charges => ({
+    ...NO_CHARGES, taxMode: 'amount', taxCents, tipMode: 'amount', tipCents,
+  });
+
+  it('two people sharing three odd-priced items are a cent apart, not three', () => {
+    // You paid $49.05 for Priya and Nikhilesh: $24.525 each.
+    const people = [person('me', 'You'), person('priya', 'Priya'), person('nik', 'Nikhilesh')];
+    const items = [
+      item('a', 'Dosa', 1999, 'priya', 'nik'),
+      item('b', 'Biryani', 1503, 'priya', 'nik'),
+      item('c', 'Chai', 1403, 'priya', 'nik'),
+    ];
+    const result = calculateSplit(bill(people, items, NO_CHARGES, [{ personId: 'me', amountCents: 4905 }]));
+    expect(result.perPerson.map((p) => p.totalCents)).toEqual([0, 2453, 2452]);
+    expect(result.reconciles).toBe(true);
+  });
+
+  it('three ways with tax: the cent nobody can split goes to whoever paid first', () => {
+    // $51.98 of food + $4.89 tax = $56.87 three ways, $18.9567 each; you paid.
+    const people = [person('me', 'You'), person('m', 'Mrunaal'), person('p', 'Priya')];
+    const result = calculateSplit(bill(people, [item('i', 'Dinner', 5198, 'me', 'm', 'p')], amount(489),
+      [{ personId: 'me', amountCents: 5687 }]));
+    expect(result.perPerson.map((p) => p.totalCents)).toEqual([1896, 1896, 1895]);
+    expect(result.perPerson.map((p) => p.taxCents)).toEqual([163, 163, 163]);
+  });
+
+  it('the payer takes the spare cent even when listed last', () => {
+    const people = [person('a', 'Alex'), person('b', 'Bri')];
+    const result = calculateSplit(bill(people, [item('i', 'Lunch', 1001, 'a', 'b')], NO_CHARGES,
+      [{ personId: 'b', amountCents: 1001 }]));
+    expect(result.perPerson.map((p) => p.totalCents)).toEqual([500, 501]);
+  });
+
+  it('across many awkward bills: everyone within a cent of exact, equal shares within a cent', () => {
+    let seed = 7;
+    const rand = (n: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+    for (let run = 0; run < 400; run += 1) {
+      const size = 2 + rand(5);
+      const people = Array.from({ length: size }, (_, i) => person(`p${i}`, `P${i}`));
+      const items = Array.from({ length: 1 + rand(8) }, (_, i) => {
+        const owners = people.filter(() => rand(3) > 0).map((p) => p.id);
+        return item(`i${i}`, 'Thing', 1 + rand(5000), ...(owners.length ? owners : [people[0].id]));
+      });
+      const tax = rand(900) - 150; // sometimes a discount
+      const tip = rand(1200);
+      const result = calculateSplit(bill(people, items, amount(tax, tip), [{ personId: 'p0', amountCents: 1 }]));
+      expect(result.reconciles).toBe(true);
+
+      const subtotal = sum(items.map((i) => i.priceCents));
+      const exactSub = people.map((p) => sum(items.map((i) => {
+        const owners = i.assignments.map((a) => a.personId);
+        return owners.includes(p.id) ? i.priceCents / owners.length : 0;
+      })));
+      const exact = exactSub.map((s) => s + ((result.taxCents + result.tipCents) * s) / subtotal);
+      result.perPerson.forEach((p, i) => expect(Math.abs(p.totalCents - exact[i])).toBeLessThan(1));
+
+      // Anyone with the same exact share is within a cent of each other.
+      for (let i = 0; i < size; i += 1) {
+        for (let j = i + 1; j < size; j += 1) {
+          if (Math.abs(exact[i] - exact[j]) < 1e-6) {
+            expect(Math.abs(result.perPerson[i].totalCents - result.perPerson[j].totalCents)).toBeLessThanOrEqual(1);
+          }
+        }
+      }
+    }
   });
 });

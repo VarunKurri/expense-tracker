@@ -1,8 +1,10 @@
-// Ported verbatim from VarunKurri/split-the-bill src/domain/split.ts @ cc6a8db.
-// Keep it in sync by copying, not by editing: Split's invariants (integer cents,
-// allocate() for every division, reconciliation) are what make it trustworthy.
+// Ported from VarunKurri/split-the-bill src/domain/split.ts @ cc6a8db, with one
+// deliberate change (Trackr Part 105): a person's share is rounded once for the
+// whole bill, not item by item. See "Rounding" below. Otherwise keep it in sync
+// with Split by copying: its invariants (integer cents, every cent allocated,
+// reconciliation) are what make it trustworthy.
 
-import { allocate, exactShare, percentOf, sum } from './money';
+import { allocate, allocateExact, percentOf, sum } from './money';
 import { settle } from './settle';
 import type {
   Bill,
@@ -36,6 +38,17 @@ import type {
  * An item's split mode (equal, shares, percent) does not appear here on
  * purpose: all three are just ways of arriving at the weight vector, and the
  * arithmetic below is identical whichever was used.
+ *
+ * Rounding (Trackr): everyone's share is first worked out exactly (fractions
+ * of a cent and all), then each figure (items, tax, tip, total) is turned into
+ * whole cents once for the whole bill. Rounding each item separately let the
+ * odd cents pile up: two people sharing three odd-priced items came out
+ * $24.54 and $24.51 instead of $24.53 and $24.52, because the same person got
+ * the spare cent every time. Now nobody's total is more than a cent from
+ * exact, and equal shares are never more than a cent apart. When a cent can't
+ * be split, whoever paid takes it first, then people in the bill's order.
+ * Item lines (`lines`) are still each item's own split, for the breakdown;
+ * `roundingCents` is whatever the total differs from items + tax + tip.
  */
 export function calculateSplit(bill: Bill): BillSummary {
   const { people, items, charges } = bill;
@@ -43,7 +56,9 @@ export function calculateSplit(bill: Bill): BillSummary {
   const subtotalCents = sum(items.map((item) => item.priceCents));
 
   // ---- 1. Item shares -------------------------------------------------
-  const personSubtotals = new Map<ID, number>(people.map((p) => [p.id, 0]));
+  // `lines` keep each item's own split for the breakdown; the exact share is
+  // what the rounding at the end is based on.
+  const exactSubtotals = new Map<ID, number>(people.map((p) => [p.id, 0]));
   const personLines = new Map<ID, PersonLine[]>(people.map((p) => [p.id, []]));
   const unassignedItemIds: ID[] = [];
   let unassignedCents = 0;
@@ -62,13 +77,15 @@ export function calculateSplit(bill: Bill): BillSummary {
     const shares = allocate(item.priceCents, weights);
 
     claims.forEach((claim, index) => {
-      const amountCents = shares[index];
-      personSubtotals.set(claim.personId, (personSubtotals.get(claim.personId) ?? 0) + amountCents);
+      exactSubtotals.set(
+        claim.personId,
+        (exactSubtotals.get(claim.personId) ?? 0) + (item.priceCents * claim.weight) / totalWeight,
+      );
       personLines.get(claim.personId)?.push({
         itemId: item.id,
         itemName: item.name,
         shareLabel: shareLabel(item.splitMode, claims.length, claim.weight, totalWeight),
-        amountCents,
+        amountCents: shares[index],
       });
     });
   }
@@ -78,21 +95,7 @@ export function calculateSplit(bill: Bill): BillSummary {
   const tipCents = resolveTip(charges, subtotalCents, taxCents);
   const totalCents = subtotalCents + taxCents + tipCents;
 
-  // ---- 3. Allocate charges proportionally ------------------------------
-  // The unassigned value is the final weight; its slice is reported as
-  // unclaimed rather than handed to anybody.
-  const chargeWeights = [...people.map((p) => personSubtotals.get(p.id) ?? 0), unassignedCents];
-  const totalChargeWeight = sum(chargeWeights);
-
-  // Flat charges can exist before any priced items do (or after the last
-  // one is removed). With no proportional basis, keep every cent unclaimed
-  // instead of losing it or arbitrarily charging the people at the table.
-  if (totalChargeWeight === 0) chargeWeights[people.length] = 1;
-
-  const taxShares = allocate(taxCents, chargeWeights);
-  const tipShares = allocate(tipCents, chargeWeights);
-
-  // ---- 4. What each person actually paid --------------------------------
+  // ---- 3. What each person paid ---------------------------------------
   // Payments naming somebody who has since left the bill are dropped, for the
   // same reason stale assignments are: the engine must not be the thing that
   // turns an old localStorage payload into a wrong total.
@@ -106,16 +109,46 @@ export function calculateSplit(bill: Bill): BillSummary {
     );
   }
 
+  // A cent that can't be split goes to whoever paid first, then in bill order.
+  const priority = [
+    ...people.map((p, i) => i).filter((i) => (paidByPerson.get(people[i].id) ?? 0) > 0),
+    ...people.map((p, i) => i).filter((i) => (paidByPerson.get(people[i].id) ?? 0) <= 0),
+  ];
+
+  // ---- 4. Exact shares, rounded once ----------------------------------
+  // Tax and tip follow each person's item subtotal. The unassigned value is
+  // the final, phantom claimant: its slice is reported as unclaimed rather
+  // than handed to anybody. With nothing priced yet, keep every cent of a
+  // flat charge unclaimed instead of charging the people at the table.
+  const exactSubs = [...people.map((p) => exactSubtotals.get(p.id) ?? 0), unassignedCents];
+  const chargeBase = sum(exactSubs);
+  const chargeShare = (charge: number) =>
+    chargeBase > 0
+      ? exactSubs.map((s) => (charge * s) / chargeBase)
+      : [...people.map(() => 0), charge];
+
+  const phantom = people.length;
+  const exactTax = chargeShare(taxCents);
+  const exactTip = chargeShare(tipCents);
+  const subShares = allocateExact(subtotalCents, exactSubs, [...priority, phantom]);
+  const taxShares = allocateExact(taxCents, exactTax, [...priority, phantom]);
+  const tipShares = allocateExact(tipCents, exactTip, [...priority, phantom]);
+
+  // Totals are rounded from the exact totals (not by adding rounded parts), so
+  // two equal shares can't drift apart by a cent per part. Whatever the
+  // phantom holds stays unclaimed exactly as in the parts above.
+  const unclaimedCents = subShares[phantom] + taxShares[phantom] + tipShares[phantom];
+  const totals = allocateExact(
+    totalCents - unclaimedCents,
+    people.map((p, i) => exactSubs[i] + exactTax[i] + exactTip[i]),
+    priority,
+  );
+
   const perPerson: PersonBreakdown[] = people.map((person, index) => {
-    const subtotal = personSubtotals.get(person.id) ?? 0;
+    const subtotal = subShares[index];
     const tax = taxShares[index];
     const tip = tipShares[index];
-
-    const exactTax = exactShare(taxCents, subtotal, totalChargeWeight);
-    const exactTip = exactShare(tipCents, subtotal, totalChargeWeight);
-    const roundingCents = Math.round(tax + tip - (exactTax + exactTip));
-
-    const owed = subtotal + tax + tip;
+    const owed = totals[index];
     const paid = paidByPerson.get(person.id) ?? 0;
 
     return {
@@ -124,7 +157,7 @@ export function calculateSplit(bill: Bill): BillSummary {
       subtotalCents: subtotal,
       taxCents: tax,
       tipCents: tip,
-      roundingCents,
+      roundingCents: owed - (subtotal + tax + tip),
       totalCents: owed,
       paidCents: paid,
       netCents: paid - owed,
