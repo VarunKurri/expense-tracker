@@ -233,10 +233,15 @@ export const NO_SPLITS: SplitTotals = {
  * Per-bill arithmetic is `splitStatus`, the same numbers the transaction view
  * and the Shared page show, so the three can't disagree.
  */
-export function splitTotals(txs: Transaction[], moneyBackFor: (t: Transaction) => MoneyBackEntry[]): SplitTotals {
+export function splitTotals(
+  txs: Transaction[], moneyBackFor: (t: Transaction) => MoneyBackEntry[],
+  inGroup: (t: Transaction) => boolean = () => false,
+): SplitTotals {
   const totals = { ...NO_SPLITS };
   for (const t of spendingTransactions(txs)) {
-    if (!t.split) continue;
+    // A bill in a group is settled across the group (utils/groups.ts); its own
+    // "owed" figure would be wrong, so it's left out here.
+    if (!t.split || inGroup(t)) continue;
     const status = splitStatus(t.split, moneyBackFor(t));
     totals.bills++;
     totals.paidCents += status.myPaidCents;

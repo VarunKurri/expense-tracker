@@ -320,3 +320,6 @@
 @media (prefers-reduced-motion: reduce) {
   .view-panel, .view-backdrop { animation: none; }
 }
+
+/* A bill in a group: one link to the group, under the sentence. */
+.split-group-link { align-self: flex-start; margin-bottom: 4px; }

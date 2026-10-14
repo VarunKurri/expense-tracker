@@ -1,18 +1,22 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Transaction, UntrackedReturn } from '../../models';
 import { TransactionService } from '../../services/transaction.service';
 import { PersonService } from '../../services/person.service';
+import { GroupService } from '../../services/group.service';
 import { ToastService } from '../../services/toast.service';
 import { Modal } from '../../components/modal/modal';
 import { Confirm } from '../../components/confirm/confirm';
 import { TransactionView } from '../../components/transaction-view/transaction-view';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
+import { GroupForm } from '../../components/group-form/group-form';
 import { formatCurrency } from '../../utils/format';
 import { fromCents, toCents } from '../../utils/money';
 import { isMoneyBackIncome, newReturnId } from '../../utils/money-back';
 import { localDateString } from '../../utils/date';
 import { PersonBalance, SharedBill, balancesByPerson, spreadRepayment, totalOwedCents } from '../../utils/shared';
+import { groupLedger } from '../../utils/groups';
 
 const COUNT_WORDS = ['No one', 'One friend', 'Two friends', 'Three friends', 'Four friends', 'Five friends',
   'Six friends', 'Seven friends', 'Eight friends', 'Nine friends'];
@@ -28,29 +32,79 @@ const COUNT_WORDS = ['No one', 'One friend', 'Two friends', 'Three friends', 'Fo
 @Component({
   selector: 'app-shared',
   standalone: true,
-  imports: [FormsModule, Modal, Confirm, TransactionView, TransactionForm],
+  imports: [FormsModule, RouterLink, Modal, Confirm, TransactionView, TransactionForm, GroupForm],
   templateUrl: './shared.html',
   styleUrl: './shared.scss',
 })
 export class Shared {
   txService = inject(TransactionService);
   people = inject(PersonService);
+  groups = inject(GroupService);
   private toast = inject(ToastService);
+  private router = inject(Router);
+
+  /** Bills in a group that still exists are settled with the group, not here. */
+  private inGroup = (t: Transaction) => !!this.groups.byId(t.split?.groupId);
 
   balances = computed(() =>
-    balancesByPerson(this.txService.transactions(), t => this.txService.moneyBackEntriesFor(t)));
+    balancesByPerson(this.txService.transactions(), t => this.txService.moneyBackEntriesFor(t), this.inGroup));
+
+  // ── Groups ─────────────────────────────────────────────────
+  /** Each group not put away, with where you stand in it. */
+  groupRows = computed(() => this.groups.groups()
+    .filter(g => g.id && !g.archived)
+    .map(g => {
+      const ledger = groupLedger(g as typeof g & { id: string }, this.txService.transactions(), [],
+        t => this.txService.moneyBackEntriesFor(t));
+      return { group: g, balanceCents: ledger.myBalanceCents, bills: ledger.bills.length, people: g.memberIds.length + 1 };
+    }));
+
+  newGroupOpen = signal(false);
+
+  onGroupCreated(id: string) {
+    this.newGroupOpen.set(false);
+    this.router.navigate(['/shared/groups', id]);
+  }
+
+  /** "4 people · 2 bills" */
+  groupMeta(row: { people: number; bills: number }): string {
+    return `${row.people} people${row.bills ? ` · ${row.bills} bill${row.bills === 1 ? '' : 's'}` : ''}`;
+  }
+
+  groupNote(row: { balanceCents: number; bills: number }): string {
+    if (!row.bills) return 'No bills yet';
+    if (row.balanceCents > 0) return `You're owed ${this.money(row.balanceCents)}`;
+    if (row.balanceCents < 0) return `You owe ${this.money(-row.balanceCents)}`;
+    return 'All square';
+  }
   owing = computed(() => this.balances().filter(b => b.owedCents > 0));
   /** People you've split with who owe nothing now. */
   square = computed(() => this.balances().filter(b => b.owedCents === 0));
-  totalOwedCents = computed(() => totalOwedCents(this.owing()));
+  /** Groups where you're owed money. */
+  owingGroups = computed(() => this.groupRows().filter(r => r.balanceCents > 0));
+  /** Everything owed to you: by people outside groups, and by your groups. */
+  totalOwedCents = computed(() =>
+    totalOwedCents(this.owing()) + this.owingGroups().reduce((sum, r) => sum + r.balanceCents, 0));
+  anythingOwed = computed(() => this.owing().length > 0 || this.owingGroups().length > 0);
 
-  /** "Mrunaal owes you $85.00." / "Three friends owe you $180.00." */
+  /**
+   * "Mrunaal owes you $85.00." / "Three friends owe you $180.00.", then the
+   * groups: "Tahoe Trip owes you $570.00." / "Your groups owe you $640.00."
+   */
   headline = computed(() => {
+    const parts: string[] = [];
     const owing = this.owing();
-    const total = this.money(this.totalOwedCents());
-    if (owing.length === 1) return `${this.people.nameOf(owing[0].personId)} owes you ${total}.`;
-    const who = COUNT_WORDS[owing.length] ?? `${owing.length} friends`;
-    return `${who} owe you ${total}.`;
+    if (owing.length) {
+      const total = this.money(totalOwedCents(owing));
+      if (owing.length === 1) parts.push(`${this.people.nameOf(owing[0].personId)} owes you ${total}.`);
+      else parts.push(`${COUNT_WORDS[owing.length] ?? `${owing.length} friends`} owe you ${total}.`);
+    }
+    const groups = this.owingGroups();
+    if (groups.length) {
+      const total = this.money(groups.reduce((sum, r) => sum + r.balanceCents, 0));
+      parts.push(groups.length === 1 ? `${groups[0].group.name} owes you ${total}.` : `Your groups owe you ${total}.`);
+    }
+    return parts.join(' ');
   });
 
   /** Whose settled bills are showing. */

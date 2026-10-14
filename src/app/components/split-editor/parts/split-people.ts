@@ -6,8 +6,9 @@ import { ToastService } from '../../../services/toast.service';
 
 /**
  * Who's on a bill: you (on or off), saved people as one-tap chips, anyone new
- * by name. Shared by the quick and itemized split editors; the editor decides
- * what adding or removing someone means for its own state.
+ * by name. Shared by the quick and itemized split editors (the editor decides
+ * what adding or removing someone means for its own state) and by the group
+ * form, which lists members without "You" (you're always in your own groups).
  */
 @Component({
   selector: 'app-split-people',
@@ -15,10 +16,12 @@ import { ToastService } from '../../../services/toast.service';
   imports: [FormsModule],
   template: `
     <div class="field">
-      <span class="label-sm">Split with</span>
+      <span class="label-sm">{{ label() }}</span>
       <div class="people">
-        <button type="button" class="chip name" [class.active]="includesMe()" [attr.aria-pressed]="includesMe()"
-                (click)="meToggled.emit()">You</button>
+        @if (withMe()) {
+          <button type="button" class="chip name" [class.active]="includesMe()" [attr.aria-pressed]="includesMe()"
+                  (click)="meToggled.emit()">You</button>
+        }
         @for (id of others(); track id) {
           <span class="chip name active person">
             {{ people.nameOf(id) }}
@@ -40,7 +43,7 @@ import { ToastService } from '../../../services/toast.service';
           }
         </div>
       }
-      @if (!includesMe()) {
+      @if (withMe() && !includesMe()) {
         <p class="field-hint">You're not in the split: you paid for them, and all of it is owed back to you.</p>
       }
     </div>
@@ -52,6 +55,9 @@ export class SplitPeople {
   private toast = inject(ToastService);
 
   participantIds = input.required<string[]>();
+  label = input('Split with');
+  /** Offer "You" as a chip (off for group members: you're always in). */
+  withMe = input(true);
   added = output<string>();
   removed = output<string>();
   meToggled = output<void>();

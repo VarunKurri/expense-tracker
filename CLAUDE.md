@@ -113,12 +113,17 @@ The app is what we copy. Do not "correct" this back to dark.
   `app-month-picker` (`‹ Month ›` stepper with a jump-to-month grid — use it for
   any month selection rather than a row of month pills),
   `app-confirm`, `app-modal`, `app-toast`, `app-logo`, `app-icon`,
+  `app-group-form` (create/edit a group: name, members, dates, simplify debts),
   `app-receipt-attach` (a receipt photo: Take photo on phones/tablets, Upload
   everywhere, thumbnail → full size; in Edit a ✕ on the thumbnail removes it,
   on the details sheet it's read-only — `[editable]="false"`).
 - A form opened from the details sheet must read the **live** transaction
   (`transactionService.transactions()` by id), never the copy the page passed
   in — that copy is stale the moment the sheet changes anything.
+- A bill in a group (`split.groupId`) is settled across the whole group, Splitwise
+  style: never show its per-bill "owes you" figures. Shared, Analysis and Reports
+  leave group bills out of per-person/"Owed to you" sums; the sheet links to the group.
+- Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`).
 - Never centre a fixed panel with `transform`: it traps any pop-up inside it
   (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;
   margin: auto; height: fit-content`.
@@ -174,6 +179,7 @@ src/app/
     analysis/
     forecast/       Analysis → Forecast tab: cash ahead (maths in utils/forecast.ts)
     shared/         who owes you, across every split bill (maths in utils/shared.ts, utils/splits.ts)
+      group-detail/ one group (a trip, a flat): balances, simplify debts, its bills (maths in utils/groups.ts)
     net-worth/      accounts + manual assets/debts (ManualAsset, dated valuations)
       loan-detail/  one loan: payments made/missed/to come (maths in utils/loans.ts)
   app.ts            shell with sidebar

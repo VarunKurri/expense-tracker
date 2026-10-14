@@ -164,6 +164,18 @@
       </div>
       @if (splitOn()) {
         <div class="form-section">
+          @if (groupChoices().length) {
+            <div class="field">
+              <label class="label-sm" for="split-group">Group <span class="label-optional">(optional)</span></label>
+              <select id="split-group" class="input-field" [ngModel]="splitGroupId()" (ngModelChange)="setSplitGroup($event)" name="splitGroup">
+                <option value="">None</option>
+                @for (g of groupChoices(); track g.id) { <option [value]="g.id">{{ g.name }}</option> }
+              </select>
+              @if (splitGroupId()) {
+                <p class="field-hint">Balances for this bill are worked out across the whole group, so everyone settles up once.</p>
+              }
+            </div>
+          }
           <div class="mini-seg" role="radiogroup" aria-label="Split the">
             <button type="button" role="radio" [class.active]="splitKind() === 'quick'"
                     [attr.aria-checked]="splitKind() === 'quick'" (click)="setSplitKind('quick')">Whole bill</button>

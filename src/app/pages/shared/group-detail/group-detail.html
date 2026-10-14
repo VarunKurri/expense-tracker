@@ -1,0 +1,121 @@
+@if (group(); as g) {
+  <div class="page">
+
+    <div class="top-bar">
+      <button class="btn-ghost sm" (click)="back()">← Shared</button>
+      <button class="btn-row" (click)="editing.set(true)">Edit group</button>
+    </div>
+
+    @if (ledger(); as l) {
+      @if (!l.bills.length) {
+
+        <section class="card empty">
+          <span class="card-label">{{ g.name }}</span>
+          <h2 class="display">Add the first bill to <em>{{ g.name }}</em>.</h2>
+          <p>Split an expense and pick this group under “Group”. Balances are worked out across all of its bills, so everyone settles up once, at the end.</p>
+          <p class="meta label-mono">{{ meta() }}</p>
+        </section>
+
+      } @else {
+
+        <!-- HERO: where you stand -->
+        <section class="card hero">
+          <span class="card-label">{{ g.name }}</span>
+          <div class="hero-figure">
+            <span class="num-display" [class.pos]="l.myBalanceCents > 0" [class.neg]="l.myBalanceCents < 0">{{ money(abs(l.myBalanceCents)) }}</span>
+          </div>
+          <p class="hero-sentence">
+            @if (l.myBalanceCents > 0) {
+              The group owes you {{ money(l.myBalanceCents) }}. Until it's paid back, what you covered for others counts in your spending.
+            } @else if (l.myBalanceCents < 0) {
+              You owe {{ money(-l.myBalanceCents) }}. Your share of what others paid becomes spending when you pay it.
+            } @else {
+              You're all square. What this cost you is exactly your share.
+            }
+          </p>
+          <p class="hero-sub">
+            {{ g.name }} came to <span class="fig">{{ money(l.totalCents) }}</span>; your share is <span class="fig">{{ money(l.myShareCents) }}</span>.
+          </p>
+          <p class="meta label-mono">{{ meta() }}</p>
+        </section>
+
+        <!-- SETTLE UP: the suggested payments -->
+        <section class="card list-card">
+          <div class="list-head"><span class="card-label">Settle up</span></div>
+          <p class="list-intro">
+            {{ g.simplify
+              ? 'Simplified: the fewest payments that settle everyone.'
+              : 'Everyone pays back whoever paid each bill.' }}
+          </p>
+          @if (l.plan.length) {
+            @for (t of l.plan; track $index) {
+              <div class="row" [class.mine]="t.fromPersonId === 'me' || t.toPersonId === 'me'">
+                <span class="row-name">{{ transferText(t) }}</span>
+                <span class="row-amount fig">{{ money(t.amountCents) }}</span>
+              </div>
+            }
+          } @else {
+            <div class="row"><span class="row-name muted">Nobody owes anybody.</span></div>
+          }
+        </section>
+
+        <!-- BALANCES -->
+        <section class="card list-card">
+          <div class="list-head"><span class="card-label">Balances</span></div>
+          @for (b of balances(); track b.personId) {
+            <div class="row">
+              <span class="row-name">{{ name(b.personId) }}</span>
+              <span class="row-amount fig" [class.pos]="b.netCents > 0" [class.neg]="b.netCents < 0">{{ balanceText(b.netCents, b.personId) }}</span>
+            </div>
+          }
+        </section>
+
+        <!-- BILLS -->
+        <section class="card list-card">
+          <div class="list-head"><span class="card-label">Bills · {{ l.bills.length }}</span></div>
+          @for (b of l.bills; track b.id) {
+            <button type="button" class="row bill" (click)="openBill(b)">
+              <span class="bill-main">
+                <span class="row-name">{{ b.merchant }}</span>
+                <span class="label-mono bill-date">{{ formatDate(b.date) }}</span>
+              </span>
+              <span class="bill-note fig">{{ billNote(b) }}</span>
+            </button>
+          }
+        </section>
+      }
+    }
+  </div>
+} @else if (groups.loaded()) {
+  <div class="page">
+    <section class="card empty">
+      <span class="card-label">Shared</span>
+      <h2 class="display">This group isn't <em>here</em> anymore.</h2>
+      <p>It may have been deleted. Its bills are still in your transactions.</p>
+      <button class="btn-primary" (click)="back()">Back to Shared</button>
+    </section>
+  </div>
+}
+
+<app-group-form [open]="editing()" [group]="group() ?? null"
+                (closed)="editing.set(false)" (saved)="editing.set(false)" (deleted)="onDeleted()" />
+
+<app-transaction-view
+  [transaction]="viewingTx()"
+  (closed)="viewingTx.set(null)"
+  (editRequested)="editFromTxView($event)" />
+
+<app-transaction-form
+  [open]="txFormOpen()"
+  [transaction]="editingTx()"
+  (closed)="closeTxForm()"
+  (saved)="handleTxSave($event)"
+  (deleteRequested)="askTxDelete()" />
+
+<app-confirm
+  [open]="txConfirmOpen()"
+  title="Delete transaction?"
+  message="This cannot be undone."
+  confirmText="Delete"
+  (confirmed)="confirmTxDelete()"
+  (cancelled)="txConfirmOpen.set(false)" />

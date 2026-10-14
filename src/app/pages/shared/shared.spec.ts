@@ -1,10 +1,12 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { Router, provideRouter } from '@angular/router';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Shared } from './shared';
 import { TransactionService } from '../../services/transaction.service';
 import { PersonService } from '../../services/person.service';
+import { GroupService } from '../../services/group.service';
+import { FakeGroups } from '../../testing/fake-groups';
 import { ToastService } from '../../services/toast.service';
 import { CategoryService } from '../../services/category.service';
 import { AccountService } from '../../services/account.service';
@@ -44,6 +46,7 @@ const bill = (merchant: string, date: string, cents: number, who: string[]): Tra
 
 describe('Shared page', () => {
   let txs: FakeTransactions;
+  let groups: FakeGroups;
   let fixture: ComponentFixture<Shared>;
   let el: HTMLElement;
 
@@ -65,13 +68,15 @@ describe('Shared page', () => {
   async function setup(list: Transaction[]) {
     txs = new FakeTransactions();
     txs.transactions.set(list);
+    groups = new FakeGroups();
     TestBed.configureTestingModule({
       imports: [Shared],
       providers: [
         provideRouter([]),
         { provide: TransactionService, useValue: txs },
         { provide: PersonService, useValue: { people, nameOf: (id: string) => personName(people(), id) } },
-        { provide: ToastService, useValue: { success() {}, error() {} } },
+        { provide: GroupService, useValue: groups },
+        { provide: ToastService, useValue: { success() {}, error: (m: string) => errors.push(m) } },
         { provide: CategoryService, useValue: { categories: signal([]) } },
         { provide: AccountService, useValue: { accounts: signal([]) } },
         { provide: ManualAssetService, useValue: { items: signal([]) } },
@@ -85,7 +90,8 @@ describe('Shared page', () => {
     await settle();
   }
 
-  beforeEach(() => { n = 0; });
+  let errors: string[] = [];
+  beforeEach(() => { n = 0; errors = []; });
 
   it('says what everyone owes, and lists each person with their open bills', async () => {
     await setup([dinner, pizza, tacos]);
@@ -147,5 +153,70 @@ describe('Shared page', () => {
   it('with nothing split yet, says how to start', async () => {
     await setup([]);
     expect(el.querySelector('.empty .display')!.textContent).toContain('See who owes you what.');
+  });
+
+  describe('groups', () => {
+    const trip = { id: 'tahoe', name: 'Tahoe Trip', memberIds: ['m', 'p'], simplify: true, payments: [], createdAt: 0, updatedAt: 0 };
+
+    it("a group's bills are settled with the group, not person by person", async () => {
+      const gas = { ...bill('Chevron', '2026-09-05', 6000, ['m', 'p']) };
+      gas.split = { ...gas.split!, groupId: 'tahoe' };
+      await setup([dinner, gas]);
+      groups.groups.set([trip]);
+      await settle();
+
+      const row = el.querySelector('.group-row')!;
+      expect(row.textContent).toContain('Tahoe Trip');
+      expect(row.textContent).toContain("You're owed $40.00");
+      expect(row.getAttribute('href')).toBe('/shared/groups/tahoe');
+      // The person cards only count the bill outside the group.
+      expect(el.textContent).toContain('Two friends owe you $60.00. Tahoe Trip owes you $40.00.');
+      expect(el.querySelector('.hero .num-display')!.textContent).toContain('$100.00');
+      expect(el.textContent).not.toContain('Chevron');
+      expect(row.textContent).toContain('3 people · 1 bill');
+    });
+
+    it('a bill in a group that was deleted counts on its own again', async () => {
+      const gas = { ...bill('Chevron', '2026-09-05', 6000, ['m']) };
+      gas.split = { ...gas.split!, groupId: 'gone' };
+      await setup([gas]);
+      expect(el.querySelector('.group-row')).toBeNull();
+      expect(el.textContent).toContain('Mrunaal owes you $30.00.');
+    });
+
+    it('New group: name it, add people, and it opens', async () => {
+      await setup([]);
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      button('New group').click();
+      await settle();
+      const name = document.getElementById('group-name') as HTMLInputElement;
+      name.value = 'Tahoe Trip';
+      name.dispatchEvent(new Event('input'));
+      button('+ Mrunaal').click();
+      button('+ Priya').click();
+      await settle();
+      button('Create group').click();
+      await settle();
+
+      expect(groups.groups()).toEqual([expect.objectContaining({ name: 'Tahoe Trip', memberIds: ['m', 'p'], simplify: true, payments: [] })]);
+      expect(navigate).toHaveBeenCalledWith(['/shared/groups', 'g1']);
+    });
+
+    it("won't create a group without a name or anyone in it", async () => {
+      await setup([]);
+      button('New group').click();
+      await settle();
+      button('Create group').click();
+      await settle();
+      expect(errors).toContain('Give the group a name.');
+      const name = document.getElementById('group-name') as HTMLInputElement;
+      name.value = 'Flat';
+      name.dispatchEvent(new Event('input'));
+      await settle();
+      button('Create group').click();
+      await settle();
+      expect(errors).toContain('Add at least one person to the group.');
+      expect(groups.groups()).toEqual([]);
+    });
   });
 });

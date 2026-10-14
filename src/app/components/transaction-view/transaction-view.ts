@@ -1,4 +1,4 @@
-import { Component, HostListener, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Component, HostListener, Injector, computed, effect, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CategoryService } from '../../services/category.service';
@@ -16,6 +16,7 @@ import { ReceiptAttach } from '../receipt-attach/receipt-attach';
 import { ReceiptService } from '../../services/receipt.service';
 import { ManualAsset, ME, MoneyBackSource, Transaction, UntrackedReturn } from '../../models';
 import { PersonService } from '../../services/person.service';
+import { GroupService } from '../../services/group.service';
 import { PersonSplitStatus, outstandingFor, setClosed, splitStatus } from '../../utils/splits';
 import { RefundState, incomeLinks, newReturnId } from '../../utils/money-back';
 import { fromCents, toCents } from '../../utils/money';
@@ -230,6 +231,21 @@ export class TransactionView {
     const t = this.tx();
     return t?.type === 'expense' && t.split ? splitStatus(t.split, this.txService.moneyBackEntriesFor(t)) : null;
   });
+
+  // Looked up only for a bill that's in a group, so screens that show this
+  // sheet don't need Firebase in their tests.
+  private injector = inject(Injector);
+
+  /** The group this bill belongs to, if it's in one that still exists. */
+  splitGroup = computed(() => {
+    const id = this.tx()?.split?.groupId;
+    return id ? this.injector.get(GroupService).byId(id) ?? null : null;
+  });
+
+  openGroup(id: string) {
+    this.close();
+    this.router.navigate(['/shared/groups', id]);
+  }
 
   /** Everyone on the bill but you. */
   splitOthers = computed(() => (this.tx()?.split?.participantIds ?? []).filter(id => id !== ME));

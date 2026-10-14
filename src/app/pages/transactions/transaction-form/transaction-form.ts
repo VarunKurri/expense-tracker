@@ -1,7 +1,4 @@
-import {
-  Component, EventEmitter, Input, Output,
-  OnChanges, SimpleChanges, inject, signal, computed
-} from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnChanges, SimpleChanges, inject, signal, computed, Injector } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Modal } from '../../../components/modal/modal';
@@ -25,6 +22,7 @@ import { TransactionTemplate } from '../../../models';
 import { QuickAddService } from '../../../services/quick-add.service';
 import { ToastService } from '../../../services/toast.service';
 import { ReceiptScanService } from '../../../services/receipt-scan.service';
+import { GroupService } from '../../../services/group.service';
 import { ReceiptService } from '../../../services/receipt.service';
 import { ReceiptAttach } from '../../../components/receipt-attach/receipt-attach';
 import { FittedImage } from '../../../utils/image';
@@ -49,6 +47,10 @@ export class TransactionForm implements OnChanges {
   private quickAddService = inject(QuickAddService);
   private receiptScanner = inject(ReceiptScanService);
   private receipts = inject(ReceiptService);
+  // Looked up when the split section needs it, so the many pages that embed
+  // this form don't need Firebase in their tests.
+  private injector = inject(Injector);
+  private get groupService() { return this.injector.get(GroupService); }
 
   @Input() open = false;
   @Input() transaction: Transaction | null = null;
@@ -81,6 +83,28 @@ export class TransactionForm implements OnChanges {
   itemizedState = signal<ItemizedSplitState>(emptyItemizedState());
   /** The split saved on the transaction being edited, if any. */
   private existingSplit: TransactionSplit | null = null;
+  /** The group this bill belongs to (a trip, a flat); '' for none. */
+  splitGroupId = signal('');
+
+  /** Groups to choose from: every one not put away, plus the bill's own. */
+  groupChoices = computed(() => this.groupService.groups()
+    .filter(g => g.id && (!g.archived || g.id === this.splitGroupId())));
+
+  /** Putting a bill in a group puts the group's members on it (anyone can still be taken off). */
+  setSplitGroup(id: string) {
+    this.splitGroupId.set(id);
+    const members = this.groupService.byId(id)?.memberIds ?? [];
+    if (!members.length) return;
+    this.splitState.update(s => {
+      const add = members.filter(m => !s.participantIds.includes(m));
+      const weights = { ...s.weights };
+      for (const m of add) if (!(m in weights)) weights[m] = s.mode === 'shares' ? 1 : 0;
+      return { ...s, participantIds: [...s.participantIds, ...add], weights };
+    });
+    this.itemizedState.update(s => ({
+      ...s, participantIds: [...s.participantIds, ...members.filter(m => !s.participantIds.includes(m))],
+    }));
+  }
 
   /** Switching modes keeps who's on the bill and who paid; each mode keeps its own details. */
   setSplitKind(kind: 'quick' | 'itemized') {
@@ -310,6 +334,7 @@ export class TransactionForm implements OnChanges {
       this.toAccountId = live.toAccountId || '';
       this.isInternalTransfer = live.isInternalTransfer || false;
       this.existingSplit = live.split ?? null;
+      this.splitGroupId.set(live.split?.groupId ?? '');
       this.splitOn.set(!!this.existingSplit && live.type === 'expense');
       const itemized = this.existingSplit?.mode === 'itemized';
       this.splitKind.set(itemized ? 'itemized' : 'quick');
@@ -328,6 +353,7 @@ export class TransactionForm implements OnChanges {
       this.applySmartDefaultsForType();
       this.applyDraft();
       this.existingSplit = null;
+      this.splitGroupId.set('');
       this.splitOn.set(false);
       this.splitKind.set('quick');
       this.splitState.set(emptyQuickState());
@@ -627,6 +653,9 @@ export class TransactionForm implements OnChanges {
         split = itemized
           ? buildItemizedSplit(this.itemizedState(), toCents(amount), this.existingSplit)
           : buildQuickSplit(this.splitState(), toCents(amount), this.existingSplit);
+        // Only a group that still exists: a deleted one leaves the bill on its own.
+        const groupId = this.splitGroupId();
+        if (groupId && this.groupService.byId(groupId)) split = { ...split, groupId };
         const problems = splitProblems(split, toCents(amount));
         if (problems.includes('no-one-else')) { this.toastService.error('Add someone to split this bill with.'); return; }
         if (problems.includes('unassigned')) {

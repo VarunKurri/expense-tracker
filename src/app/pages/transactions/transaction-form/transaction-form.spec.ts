@@ -10,6 +10,8 @@ import { TransactionService } from '../../../services/transaction.service';
 import { QuickAddService } from '../../../services/quick-add.service';
 import { ToastService } from '../../../services/toast.service';
 import { PersonService } from '../../../services/person.service';
+import { GroupService } from '../../../services/group.service';
+import { FakeGroups } from '../../../testing/fake-groups';
 import { ME, Transaction } from '../../../models';
 import { MoneyBackLedger } from '../../../utils/money-back';
 import { buildItemizedSplit, emptyItemizedState, newItem, personName, quickSplit, splitStatus } from '../../../utils/splits';
@@ -67,6 +69,7 @@ describe('TransactionForm: splitting a bill', () => {
   let host: Host;
   let el: HTMLElement;
   let errors: string[];
+  let groups: FakeGroups;
 
   async function settle() {
     fixture.detectChanges();
@@ -85,6 +88,7 @@ describe('TransactionForm: splitting a bill', () => {
   beforeEach(async () => {
     errors = [];
     const people = signal([{ id: 'alex', name: 'Alex', createdAt: 0, updatedAt: 0 }]);
+    groups = new FakeGroups();
     TestBed.configureTestingModule({
       imports: [Host],
       providers: [
@@ -96,6 +100,7 @@ describe('TransactionForm: splitting a bill', () => {
         { provide: QuickAddService, useValue: { defaultType: () => 'expense' } },
         { provide: ToastService, useValue: { success() {}, error: (m: string) => errors.push(m) } },
         { provide: PersonService, useValue: { people, nameOf: (id: string) => personName(people(), id) } },
+        { provide: GroupService, useValue: groups },
         { provide: ReceiptScanService, useValue: { scanImage: async () => { if (nextScan instanceof Error) throw nextScan; return nextScan; } } },
         { provide: ReceiptService, useFactory: () => (receipts = new FakeReceipts()) },
       ],
@@ -118,6 +123,50 @@ describe('TransactionForm: splitting a bill', () => {
     const split = host.saved[0].split!;
     expect(split.participantIds).toEqual([ME, 'alex']);
     expect(splitStatus(split).owedToMeCents).toBe(9000);
+  });
+
+  describe('a group', () => {
+    const trip = { id: 'tahoe', name: 'Tahoe Trip', memberIds: ['alex', 'ben'], simplify: true, payments: [], createdAt: 0, updatedAt: 0 };
+
+    it("picking a group puts its people on the bill and saves it in the group", async () => {
+      await openWith(dinner);
+      groups.groups.set([trip]);
+      (el.querySelector('[aria-label="Split this bill"]') as HTMLElement).click();
+      await settle();
+      const select = document.getElementById('split-group') as HTMLSelectElement;
+      select.value = 'tahoe';
+      select.dispatchEvent(new Event('change'));
+      await settle();
+      expect(el.textContent).toContain('worked out across the whole group');
+      await host.form().save();
+
+      expect(errors).toEqual([]);
+      const split = host.saved[0].split!;
+      expect(split.groupId).toBe('tahoe');
+      expect(split.participantIds).toEqual([ME, 'alex', 'ben']);
+    });
+
+    it('an edit keeps the group, and choosing None takes the bill out', async () => {
+      groups.groups.set([trip]);
+      await openWith({ ...dinner, split: { ...quickSplit(18000, [ME, 'alex']), groupId: 'tahoe' } });
+      expect((document.getElementById('split-group') as HTMLSelectElement).value).toBe('tahoe');
+      await host.form().save();
+      expect(host.saved[0].split!.groupId).toBe('tahoe');
+
+      const select = document.getElementById('split-group') as HTMLSelectElement;
+      select.value = '';
+      select.dispatchEvent(new Event('change'));
+      await settle();
+      await host.form().save();
+      expect(host.saved[1].split!.groupId).toBeUndefined();
+    });
+
+    it('with no groups, there is nothing to pick', async () => {
+      await openWith(dinner);
+      (el.querySelector('[aria-label="Split this bill"]') as HTMLElement).click();
+      await settle();
+      expect(document.getElementById('split-group')).toBeNull();
+    });
   });
 
   it("won't save a split with nobody else in it", async () => {

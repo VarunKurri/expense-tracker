@@ -92,30 +92,39 @@
         <div class="view-reimburse">
           <div class="view-reimburse-head">Money back</div>
           @if (split(); as s) {
-            <!-- SPLIT: one row per person; tap to record what they paid back -->
-            <div class="split-people">
-              @for (p of s.people; track p.personId) {
-                <button type="button" class="split-person" [class.settled]="p.state !== 'owed' && p.state !== 'partial'"
-                        [disabled]="!canOpenPerson(p)" (click)="openPerson(p)" [attr.aria-label]="personAriaLabel(p)">
-                  <span class="split-person-main">
-                    <span class="split-person-name">{{ people.nameOf(p.personId) }}</span>
-                    <span class="split-person-status">{{ personStatus(p) }}</span>
-                  </span>
-                  <span class="split-person-amount fig">{{ formatCents(personAmountCents(p)) }}</span>
-                </button>
-              }
-            </div>
-            <p class="reimburse-hint split-hint">
-              Your share is <span class="fig">{{ formatCents(s.myShareCents) }}</span>.
-              @if (s.owedToMeCents > 0) {
-                <span class="fig">{{ formatCents(s.owedToMeCents) }}</span> is still owed to you. Tap someone to record what they paid back.
-              } @else {
-                Nobody owes you anything on this.
-              }
-              @if (s.unappliedRepaymentCents > 0) {
-                <span class="fig">{{ formatCents(s.unappliedRepaymentCents) }}</span> came back beyond what anyone owed, so it covers your share too.
-              }
-            </p>
+            @if (splitGroup(); as g) {
+              <!-- IN A GROUP: settled across the whole group, not bill by bill -->
+              <p class="reimburse-hint split-hint">
+                Part of <strong>{{ g.name }}</strong>. Your share is <span class="fig">{{ formatCents(s.myShareCents) }}</span>.
+                Balances are worked out across the whole group, so payments are recorded there.
+              </p>
+              <button type="button" class="btn-row split-group-link" (click)="openGroup(g.id!)">Open {{ g.name }}</button>
+            } @else {
+              <!-- SPLIT: one row per person; tap to record what they paid back -->
+              <div class="split-people">
+                @for (p of s.people; track p.personId) {
+                  <button type="button" class="split-person" [class.settled]="p.state !== 'owed' && p.state !== 'partial'"
+                          [disabled]="!canOpenPerson(p)" (click)="openPerson(p)" [attr.aria-label]="personAriaLabel(p)">
+                    <span class="split-person-main">
+                      <span class="split-person-name">{{ people.nameOf(p.personId) }}</span>
+                      <span class="split-person-status">{{ personStatus(p) }}</span>
+                    </span>
+                    <span class="split-person-amount fig">{{ formatCents(personAmountCents(p)) }}</span>
+                  </button>
+                }
+              </div>
+              <p class="reimburse-hint split-hint">
+                Your share is <span class="fig">{{ formatCents(s.myShareCents) }}</span>.
+                @if (s.owedToMeCents > 0) {
+                  <span class="fig">{{ formatCents(s.owedToMeCents) }}</span> is still owed to you. Tap someone to record what they paid back.
+                } @else {
+                  Nobody owes you anything on this.
+                }
+                @if (s.unappliedRepaymentCents > 0) {
+                  <span class="fig">{{ formatCents(s.unappliedRepaymentCents) }}</span> came back beyond what anyone owed, so it covers your share too.
+                }
+              </p>
+            }
           }
           @if (moneyBackTotal() > 0) {
             <div class="reimburse-summary">

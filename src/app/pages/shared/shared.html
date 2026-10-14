@@ -5,14 +5,15 @@
       <h1>Shared</h1>
       <p class="sub">Bills you split, and who still owes you</p>
     </div>
+    <button class="btn-primary" (click)="newGroupOpen.set(true)">New group</button>
   </div>
 
-  @if (!balances().length) {
+  @if (!balances().length && !groupRows().length) {
 
     <section class="card empty">
       <span class="card-label">Shared</span>
       <h2 class="display">See who <em>owes you</em> what.</h2>
-      <p>Open any expense and turn on “Split this bill”. Everyone's share shows up here, added up across every bill you've shared.</p>
+      <p>Open any expense and turn on “Split this bill”. Everyone's share shows up here, added up across every bill you've shared. Going on a trip? Make a group, and everyone settles up once at the end.</p>
     </section>
 
   } @else {
@@ -22,13 +23,29 @@
       <span class="card-label">Owed to you ›</span>
       <div class="hero-figure"><span class="num-display">{{ money(totalOwedCents()) }}</span></div>
       <p class="hero-sentence">
-        @if (owing().length) {
-          {{ headline() }} Until it comes back, it counts in your spending. Record repayments here as they arrive.
+        @if (anythingOwed()) {
+          {{ headline() }} Until it comes back, it counts in your spending.{{ owing().length ? ' Record repayments here as they arrive.' : '' }}
         } @else {
           Everyone's square. Nothing you've split is waiting to be paid back.
         }
       </p>
     </section>
+
+    <!-- GROUPS: a trip, a flat. Each is settled across all its bills. -->
+    @if (groupRows().length) {
+      <section class="card groups">
+        <div class="groups-head"><span class="card-label">Groups</span></div>
+        @for (row of groupRows(); track row.group.id) {
+          <a class="group-row" [routerLink]="['/shared/groups', row.group.id]">
+            <span class="bill-main">
+              <span class="bill-name">{{ row.group.name }}</span>
+              <span class="bill-date label-mono">{{ groupMeta(row) }}</span>
+            </span>
+            <span class="bill-note fig" [class.pos]="row.bills && row.balanceCents > 0" [class.neg]="row.bills && row.balanceCents < 0">{{ groupNote(row) }}</span>
+          </a>
+        }
+      </section>
+    }
 
     <!-- ONE CARD PER PERSON WHO OWES -->
     @for (b of owing(); track b.personId) {
@@ -163,6 +180,8 @@
     </div>
   </div>
 </app-modal>
+
+<app-group-form [open]="newGroupOpen()" (closed)="newGroupOpen.set(false)" (saved)="onGroupCreated($event)" />
 
 <app-transaction-view
   [transaction]="viewingTx()"

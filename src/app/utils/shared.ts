@@ -28,13 +28,18 @@ export interface PersonBalance {
   allBills: SharedBill[];
 }
 
-/** Each person you split with, most owed first. */
+/**
+ * Each person you split with, most owed first. Bills in a group are left out
+ * (`inGroup`): a group is settled across all its bills (utils/groups.ts), so
+ * one bill's "owes you" would be the wrong number.
+ */
 export function balancesByPerson(
   txs: Transaction[], moneyBackFor: (t: Transaction) => MoneyBackEntry[],
+  inGroup: (t: Transaction) => boolean = () => false,
 ): PersonBalance[] {
   const byPerson = new Map<string, SharedBill[]>();
   for (const tx of txs) {
-    if (tx.type !== 'expense' || !tx.split) continue;
+    if (tx.type !== 'expense' || !tx.split || inGroup(tx)) continue;
     for (const status of splitStatus(tx.split, moneyBackFor(tx)).people) {
       byPerson.set(status.personId, [...(byPerson.get(status.personId) ?? []), { tx, status }]);
     }

@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TransactionService } from '../../services/transaction.service';
+import { GroupService } from '../../services/group.service';
 import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
@@ -227,7 +228,10 @@ export class Analysis implements AfterViewInit, OnDestroy {
 
   // ── Split bills ────────────────────────────────────────────
   /** Split bills in the period: your share, what you covered for others, what's come back. */
-  splits = computed(() => splitTotals(this.filtered(), t => this.txService.moneyBackEntriesFor(t)));
+  private groups = inject(GroupService);
+  /** Bills in a group are settled with the group, so they're left out of "Owed to you". */
+  splits = computed(() => splitTotals(this.filtered(), t => this.txService.moneyBackEntriesFor(t),
+    t => !!this.groups.byId(t.split?.groupId)));
 
   /** How the period reads in a sentence ("…on 2 split bills this month"). */
   private periodPhrase = computed(() => {
