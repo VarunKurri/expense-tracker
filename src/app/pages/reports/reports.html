@@ -264,7 +264,10 @@
         </tbody>
       </table>
       <!-- Not the period: who owes whom today, the same figures as Shared. -->
-      <p class="label-mono split-now-label">Right now, across every bill and group</p>
+      <div class="split-now">
+        <span class="label-mono">Right now</span>
+        <p>Who owes whom today, across every bill and group (the same as Shared), not just this period.</p>
+      </div>
       <table class="report-table">
         <tbody>
           <tr><td>Owed to you</td><td class="right fig">{{ cents(shared.owedToMeCents()) }}</td></tr>

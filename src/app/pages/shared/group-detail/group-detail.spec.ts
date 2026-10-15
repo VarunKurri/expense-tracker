@@ -378,6 +378,24 @@ describe('Group page', () => {
     const lines = [...card.querySelectorAll('.cat-row')].map(r =>
       [...r.querySelectorAll('.row-name, .row-amount, .cat-share')].map(x => x.textContent!.replace(/\s+/g, ' ').trim()).join(' | '));
     expect(lines).toEqual(['🍽️Dining | $120.00 | your share $40.00', '⛺Gear | $90.00 | your share $30.00']);
+
+    // Tap a category to see its bills, and a bill to open its sheet (and edit it from there).
+    const gear = [...card.querySelectorAll('.cat-row')][1] as HTMLElement;
+    gear.click();
+    await settle();
+    expect(gear.getAttribute('aria-expanded')).toBe('true');
+    const bills = [...card.querySelectorAll('.cat-bill')];
+    expect(bills.map(b => b.querySelector('.row-name')!.textContent!.trim())).toEqual(['REI']);
+    (bills[0] as HTMLElement).click();
+    await settle();
+    expect(document.querySelector('app-shared-bill-view')!.textContent).toContain('Paid by Ben');
+    (document.querySelector('app-shared-bill-view .view-edit-btn') as HTMLElement).click();
+    await settle();
+    expect(document.body.textContent).toContain('Edit bill');
+
+    gear.click(); // tap again to close
+    await settle();
+    expect(card.querySelectorAll('.cat-bill').length).toBe(0);
   });
 
   it('opening a bill shows it as part of the group', async () => {

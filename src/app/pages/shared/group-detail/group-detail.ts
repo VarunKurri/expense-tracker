@@ -93,9 +93,22 @@ export class GroupDetail {
     const cats = this.categoryService.categories();
     return rows.map(r => {
       const cat = r.categoryId ? cats.find(c => c.id === r.categoryId) : undefined;
-      return { ...r, name: cat?.name ?? 'Uncategorized', icon: cat?.icon ?? '', pct: top ? Math.round((r.totalCents / top) * 100) : 0 };
+      return { ...r, key: r.categoryId ?? '', name: cat?.name ?? 'Uncategorized', icon: cat?.icon ?? '',
+               pct: top ? Math.round((r.totalCents / top) * 100) : 0 };
     });
   });
+
+  /** The category opened to show its bills ('' is Uncategorized); null when none is. */
+  openCategory = signal<string | null>(null);
+
+  toggleCategory(key: string) {
+    this.openCategory.update(open => (open === key ? null : key));
+  }
+
+  /** A category's bills, newest first; each opens its sheet, where it can be edited. */
+  categoryBills(key: string): GroupBill[] {
+    return (this.ledger()?.bills ?? []).filter(b => (b.categoryId ?? '') === key && b.totalCents > 0);
+  }
 
   /** "Oct 3 – Oct 6 · You, Alex, Ben and Cara" */
   meta = computed(() => {

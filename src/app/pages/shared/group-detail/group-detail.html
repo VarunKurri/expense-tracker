@@ -143,8 +143,9 @@
           <section class="card list-card">
             <div class="list-head"><span class="card-label">By category</span></div>
             <p class="list-intro">Where {{ g.name }}'s money went, whoever paid, and how much of each was yours.</p>
-            @for (c of byCategory(); track c.categoryId ?? '') {
-              <div class="row cat-row">
+            @for (c of byCategory(); track c.key) {
+              <button type="button" class="row bill cat-row" [class.open]="openCategory() === c.key"
+                      [attr.aria-expanded]="openCategory() === c.key" (click)="toggleCategory(c.key)">
                 <span class="cat-main">
                   <span class="row-name">@if (c.icon) { <span class="cat-icon" aria-hidden="true">{{ c.icon }}</span> }{{ c.name }}</span>
                   <span class="cat-bar" aria-hidden="true"><span [style.width.%]="c.pct"></span></span>
@@ -153,7 +154,21 @@
                   <span class="row-amount fig">{{ money(c.totalCents) }}</span>
                   <span class="cat-share">your share <span class="fig">{{ money(c.myShareCents) }}</span></span>
                 </span>
-              </div>
+                <span class="cat-chevron" aria-hidden="true">›</span>
+              </button>
+              @if (openCategory() === c.key) {
+                <div class="cat-bills">
+                  @for (b of categoryBills(c.key); track b.id) {
+                    <button type="button" class="row bill cat-bill" (click)="openBill(b)">
+                      <span class="bill-main">
+                        <span class="row-name">{{ b.merchant }}</span>
+                        <span class="label-mono bill-date">{{ formatDate(b.date) }}</span>
+                      </span>
+                      <span class="bill-note fig">{{ billNote(b) }}</span>
+                    </button>
+                  }
+                </div>
+              }
             }
           </section>
         }

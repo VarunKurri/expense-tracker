@@ -351,5 +351,19 @@
   .tabs { padding: 0 8px; }
 }
 
-/* "Right now" under the period's split rows: today's balances, as on Shared. */
-.split-now-label { display: block; margin: 18px 0 4px; color: var(--fg-3); }
+/* "Right now" under the period's split rows: today's balances, as on Shared.
+   A sub-section of the card, lined up with the lede above it. */
+.split-now {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 22px 20px 12px;
+  border-top: 1px solid var(--line);
+  .label-mono { color: var(--fg-3); }
+  p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--fg-3); max-width: 640px; }
+}
+@media (max-width: 768px) {
+  /* Text in a card lines up with the table rows' 12px on phones. */
+  .split-now { padding: 18px 12px 10px; }
+  .split-lede, .table-note { padding-left: 12px; padding-right: 12px; }
+}

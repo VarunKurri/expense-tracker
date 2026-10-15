@@ -77,6 +77,21 @@
 
 /* By category: a bar against the biggest, in the chart accent (it's data). */
 .cat-row { align-items: center; }
+/* Tap a category to see its bills; each opens its sheet. */
+.cat-chevron {
+  flex-shrink: 0;
+  color: var(--fg-3);
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.18s ease;
+}
+.cat-row.open .cat-chevron { transform: rotate(90deg); }
+.cat-bills {
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+  .cat-bill { padding-left: calc(var(--pad-x) + 28px); }
+}
+.cat-bills + .bill { border-top: 1px solid var(--line); }
 .cat-main { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
 .cat-icon { margin-right: 8px; }
 .cat-bar {
@@ -109,6 +124,8 @@
   .bill-note { white-space: normal; }
   /* A payment is short: its amount stays beside it. */
   .bill.payment { flex-direction: row; gap: 12px; }
+  .bill.cat-row { flex-direction: row; align-items: center; gap: 12px; }
+  .cat-bills .cat-bill { padding-left: calc(var(--pad-x) + 12px); }
   .assign-row { flex-direction: column; align-items: stretch; gap: 8px; }
   .assign-select { width: 100%; }
 }
