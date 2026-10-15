@@ -64,6 +64,12 @@
             <span class="view-row-label">Settles up</span>
             <span class="view-row-value">{{ settlementText() }}</span>
           </div>
+          @if (settlementSpend()) {
+            <div class="view-row view-row-notes">
+              <span class="view-row-label">Counts as</span>
+              <span class="view-row-value notes-text">{{ settlementSpend() }}</span>
+            </div>
+          }
         }
         @if (tx.notes) {
           <div class="view-row view-row-notes">

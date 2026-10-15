@@ -1,4 +1,4 @@
-import { Injectable, inject, NgZone, signal, computed } from '@angular/core';
+import { Injectable, Injector, inject, NgZone, signal, computed } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
   collection, query, orderBy, onSnapshot,
@@ -18,6 +18,8 @@ import { resolvePlaidCategory } from '../utils/categories';
 import { TransactionRuleService } from './transaction-rule.service';
 import { applyRulesToDraft } from '../utils/rules';
 import { MoneyBackLedger } from '../utils/money-back';
+import { CategoryPart, settlementCategories } from '../utils/settlements';
+import { SharedBillService } from './shared-bill.service';
 
 @Injectable({ providedIn: 'root' })
 export class TransactionService extends MoneyBackLedger {
@@ -132,6 +134,16 @@ export class TransactionService extends MoneyBackLedger {
   // Money back (refunds and repayments): moneyBackFor, effectiveExpenseAmount,
   // reimbursementSurplus, refundState, isFullyRefunded, moneyRules… are inherited
   // from MoneyBackLedger (utils/money-back.ts), where they're tested on their own.
+
+  // Looked up when first needed rather than injected: the bills friends paid
+  // are only read for a settle-up payment's categories.
+  private injector = inject(Injector);
+
+  /** A settle-up payment counts under the categories of the shares it paid for. */
+  override settlementCategoryParts(t: Transaction): CategoryPart[] | null {
+    if (!t.settlement) return null;
+    return settlementCategories(t, this.injector.get(SharedBillService).bills());
+  }
 
   // For credit cards: currentBalance = openingBalance + txBalance
   // openingBalance is positive debt, expenses add to it, payments reduce it

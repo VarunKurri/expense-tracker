@@ -537,7 +537,7 @@ Ported Split's engine (`utils/split/`, integer cents) and built Splitwise-style 
 - [x] Settling up with you against the whole group (part 111): link a Zelle/Venmo or enter cash, any amount; a settle-up expense counts as spending.
 - [x] One searchable transaction picker for every link (part 112, `app-transaction-picker`).
 - [x] Reporting (part 113): Analysis and Reports show "Owed to you" and "You owe" right now, as on Shared (`SharedBalanceService`); period split figures include group bills; a group's "By category" card.
-- [ ] Later, if wanted: your share of bills friends paid as spending by category before you settle (today it becomes spending only when you pay them, under whatever category the payment has).
+- [x] Settle-ups by category (part 117): paying a friend back counts in Analysis, Reports, Budgets and the Dashboard under the categories of the shares it paid for (Dining, Gas…), not as one "Transfer" line. Your share still becomes spending only when you pay. (The Transactions page's category filter still lists a payment under its own category.)
 - [ ] Later, if wanted: Splitwise CSV import (dropped for now: groups are entered by hand).
 
 ---

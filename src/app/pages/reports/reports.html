@@ -153,6 +153,7 @@
               <td>
                 {{ t.merchant }}
                 @if (t.myShare !== null) { <span class="row-note">Split · your share {{ money(t.myShare) }}</span> }
+                @if (t.settles) { <span class="row-note">Paid {{ t.settles }} back · counted under what it paid for</span> }
               </td>
               <td class="muted">{{ t.category }}</td>
               <td class="right fig" [class.pos]="t.type === 'income'">

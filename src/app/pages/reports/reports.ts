@@ -23,7 +23,7 @@ import { chartColors, categoryPalette, otherColor } from '../../utils/theme-colo
 import {
   MoneyRules, totalExpenses, totalIncome, categoryTotals, incomeTotals,
   monthlySeries, monthsBetween, transferTotals, sankeyLinks, sankeyLabel,
-  expenseAmount, splitBills, splitPayments, addUpSplitBills,
+  expenseAmount, categorySpend, splitBills, splitPayments, addUpSplitBills,
 } from '../../utils/reporting';
 import { PersonService } from '../../services/person.service';
 import { ToastService } from '../../services/toast.service';
@@ -383,9 +383,13 @@ export class Reports implements AfterViewInit, OnDestroy {
     if (d.kind === 'month') {
       txs = txs.filter(t => t.date.slice(0, 7) === d.month);
     } else {
-      const id = d.categoryId;
-      txs = txs.filter(t => (t.categoryId || '__none__') === (id || '__none__'));
+      // A settle-up payment is in every category it paid for (utils/settlements.ts).
+      const id = d.categoryId || '__none__';
+      txs = txs.filter(t => t.type === 'expense'
+        ? categorySpend(t, rules).some(p => p.categoryId === id)
+        : (t.categoryId || '__none__') === id);
     }
+    const inCategory = d.kind === 'category' ? (d.categoryId || '__none__') : null;
 
     // Expenses and Income tabs each show only their own side; Cash flow shows both.
     if (this.report() === 'expenses') txs = txs.filter(t => t.type === 'expense');
@@ -399,9 +403,15 @@ export class Reports implements AfterViewInit, OnDestroy {
         id: t.id!,
         date: t.date,
         merchant: t.merchant || t.notes || 'Untitled',
-        category: this.catName(t.categoryId || '__none__'),
+        category: this.catName(inCategory ?? (t.categoryId || '__none__')),
         type: t.type,
-        amount: t.type === 'expense' ? expenseAmount(t, rules) : t.amount,
+        // In a category, a settle-up payment counts only its part there.
+        amount: t.type !== 'expense' ? t.amount
+          : inCategory && t.settlement
+            ? fromCents(categorySpend(t, rules).find(p => p.categoryId === inCategory)?.cents ?? 0)
+            : expenseAmount(t, rules),
+        /** A settle-up payment: who it paid, so the row says why it's here. */
+        settles: t.type === 'expense' && t.settlement ? this.personName(t.settlement.personId) : null,
         /** On a split bill, your part of it, i.e. what the row's amount is made of. */
         myShare: t.type === 'expense' && t.split
           ? fromCents(splitStatus(t.split, this.txService.moneyBackEntriesFor(t)).myShareCents)

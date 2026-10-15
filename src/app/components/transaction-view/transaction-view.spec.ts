@@ -114,6 +114,14 @@ describe('TransactionView: money back', () => {
     expect(row.textContent).toContain('Paid Ben');
   });
 
+  it('and says which categories it counts under: the shares it paid for', async () => {
+    txs.settlementCategoryParts = () => [{ categoryId: '__none__', cents: 3 }, { categoryId: 'gas', cents: 1 }];
+    await open({ ...haircut, merchant: 'Venmo to Ben', amount: 40, settlement: { personId: 'ben' } });
+    const row = [...document.querySelectorAll('.view-row')].find(r => r.textContent!.includes('Counts as'))!;
+    // No categories are set up in this test, so both read "Uncategorized": $40 split 3 : 1.
+    expect(row.textContent).toContain('Uncategorized $30.00 · Uncategorized $10.00');
+  });
+
   it('offers two actions', async () => {
     await open(haircut);
     const actions = [...view().querySelectorAll('.money-back-actions button')].map(b => b.textContent!.trim());

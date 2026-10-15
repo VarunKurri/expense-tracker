@@ -27,6 +27,7 @@ import {
   Tooltip, Legend
 } from 'chart.js';
 import { owesMoney } from '../../utils/finance';
+import { spreadOverCategories } from '../../utils/settlements';
 
 Chart.register(ArcElement, DoughnutController, Tooltip, Legend);
 
@@ -389,8 +390,10 @@ export class Dashboard implements OnDestroy {
   categoryBreakdown = computed(() => {
     const byCat = new Map<string, number>();
     for (const t of this.recentExpenses()) {
-      const key = t.categoryId || '__none__';
-      byCat.set(key, (byCat.get(key) || 0) + t.amount);
+      // A settle-up payment counts under the categories it paid for (utils/settlements.ts).
+      const weights = this.txService.settlementCategoryParts(t);
+      const parts = weights ? spreadOverCategories(Math.round(t.amount * 100), weights) : [{ categoryId: t.categoryId || '__none__', cents: Math.round(t.amount * 100) }];
+      for (const p of parts) byCat.set(p.categoryId, (byCat.get(p.categoryId) || 0) + p.cents / 100);
     }
     const total = this.recentTotal();
     return [...byCat.entries()]

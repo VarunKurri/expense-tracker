@@ -21,6 +21,7 @@ import { PersonSplitStatus, outstandingFor, setClosed, splitStatus } from '../..
 import { RefundState, incomeLinks, newReturnId } from '../../utils/money-back';
 import { fromCents, toCents } from '../../utils/money';
 import { TransactionPicker } from '../transaction-picker/transaction-picker';
+import { spreadOverCategories } from '../../utils/settlements';
 
 let nextLockId = 0;
 
@@ -249,6 +250,19 @@ export class TransactionView {
     if (!s) return '';
     const group = s.groupId ? this.injector.get(GroupService).byId(s.groupId) : null;
     return [`Paid ${this.people.nameOf(s.personId)}`, group?.name].filter(Boolean).join(' · ');
+  });
+
+  /**
+   * How a settle-up payment counts in spending: under the categories of the
+   * shares it paid for ("Dining $40.00 · Gas $13.33"), not its own.
+   */
+  settlementSpend = computed(() => {
+    const t = this.tx();
+    const weights = t?.settlement ? this.txService.settlementCategoryParts(t) : null;
+    if (!t || !weights) return '';
+    return spreadOverCategories(toCents(this.txService.effectiveExpenseAmount(t)), weights)
+      .map(p => `${this.categoryFor(p.categoryId)?.name ?? 'Uncategorized'} ${this.formatCents(p.cents)}`)
+      .join(' · ');
   });
 
   openGroup(id: string) {

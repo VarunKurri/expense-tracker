@@ -1,6 +1,7 @@
 import { MoneyBackEntry, Transaction, UntrackedReturn } from '../models';
 import { fromCents, toCents } from './money';
 import type { MoneyRules } from './reporting';
+import type { CategoryPart } from './settlements';
 
 /**
  * Money back on an expense (refunds and repayments alike) and what it leaves
@@ -226,7 +227,17 @@ export abstract class MoneyBackLedger {
       effectiveExpense: t => this.effectiveExpenseAmount(t),
       reimbursementSurplus: t => this.reimbursementSurplus(t),
       fullyRefunded: t => this.isFullyRefunded(t),
+      categoryParts: t => this.settlementCategoryParts(t),
     };
+  }
+
+  /**
+   * For a settle-up payment, the categories it paid for (utils/settlements.ts).
+   * None here, since that needs the bills friends paid; `TransactionService`
+   * supplies them.
+   */
+  settlementCategoryParts(_t: Transaction): CategoryPart[] | null {
+    return null;
   }
 
   /** For an income that pays back an expense: that expense's surplus, if any. Surplus

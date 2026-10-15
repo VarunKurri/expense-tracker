@@ -1,5 +1,5 @@
 import { Budget, Transaction } from '../models';
-import { MoneyRules, refundedOut, totalExpenses } from './reporting';
+import { MoneyRules, categorySpend, refundedOut, spendingTransactions } from './reporting';
 import { addMonths, monthLabel } from './calendar';
 import { fromCents, toCents } from './money';
 
@@ -192,11 +192,12 @@ export function budgetProgress(spent: number, amount: number) {
 export function budgetSpent(
   txs: Transaction[], categoryId: string, month: string, rules: MoneyRules,
 ): number {
-  return totalExpenses(
-    txs.filter(t =>
-      t.categoryId === categoryId && t.date.startsWith(month) && !refundedOut(t, rules)),
-    rules,
-  );
+  // A settle-up payment counts under the categories it paid for (utils/settlements.ts).
+  let cents = 0;
+  for (const t of spendingTransactions(txs.filter(t => t.date.startsWith(month) && !refundedOut(t, rules)))) {
+    for (const p of categorySpend(t, rules)) if (p.categoryId === categoryId) cents += p.cents;
+  }
+  return fromCents(cents);
 }
 
 /** Month options from `before` months before `from` to `after` months after, plus any extras. */

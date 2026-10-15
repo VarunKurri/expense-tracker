@@ -3,6 +3,7 @@ import { isFullyRefunded, isMoneyBackIncome } from './money-back';
 import { billPositions, splitStatus } from './splits';
 import { ME } from '../models';
 import { fromCents, toCents } from './money';
+import { CategoryPart, spreadOverCategories } from './settlements';
 
 /**
  * Shared money aggregation for the Analysis and Reports pages.
@@ -44,6 +45,23 @@ export interface MoneyRules {
    * bank. Pages pass `TransactionService.isFullyRefunded`, which can.
    */
   fullyRefunded?: (t: Transaction) => boolean;
+  /**
+   * For a payment that settles up with a friend: the categories it really
+   * paid for, as weights (utils/settlements.ts). Null or absent means the
+   * transaction counts under its own category.
+   */
+  categoryParts?: (t: Transaction) => CategoryPart[] | null;
+}
+
+/**
+ * One expense's spending, by category, in cents: its own category, or for a
+ * settle-up payment the categories of the shares it paid for. Always adds up
+ * to exactly what `expenseAmount` counts.
+ */
+export function categorySpend(t: Transaction, rules: MoneyRules): CategoryPart[] {
+  const cents = toCents(expenseAmount(t, rules));
+  const weights = rules.categoryParts?.(t);
+  return weights?.length ? spreadOverCategories(cents, weights) : [{ categoryId: t.categoryId || '__none__', cents }];
 }
 
 /** A fully refunded purchase, left out while money back is being counted. */
@@ -94,8 +112,7 @@ export interface CategoryTotal { categoryId: string; amount: number; }
 export function categoryTotals(txs: Transaction[], rules: MoneyRules): CategoryTotal[] {
   const byCat = new Map<string, number>();
   for (const t of spendingTransactions(txs)) {
-    const key = t.categoryId || '__none__';
-    byCat.set(key, (byCat.get(key) || 0) + toCents(expenseAmount(t, rules)));
+    for (const p of categorySpend(t, rules)) byCat.set(p.categoryId, (byCat.get(p.categoryId) || 0) + p.cents);
   }
   return [...byCat.entries()]
     .map(([categoryId, cents]) => ({ categoryId, amount: fromCents(cents) }))

@@ -166,6 +166,13 @@ The app is what we copy. Do not "correct" this back to dark.
   Reports lists what's behind them: `splitBills` (one row per bill; the totals
   are `addUpSplitBills` of the same rows, so they can't disagree) and
   `splitPayments` (what came back, one row per payment).
+- A settle-up payment (`Transaction.settlement`) counts in spending under the
+  categories of the shares it paid for (your shares of bills others paid in
+  that group, or that person's bills outside groups), not its own "Transfer"
+  category: `settlementCategories` (utils/settlements.ts), applied through
+  `MoneyRules.categoryParts` by `categoryTotals`, `budgetSpent`, the Reports
+  drill-down and the Dashboard. Any new by-category sum must go through
+  `categorySpend`, or a Venmo lands back in one lump.
 - Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`, `FakeSharedBills`).
 - Never centre a fixed panel with `transform`: it traps any pop-up inside it
   (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;
