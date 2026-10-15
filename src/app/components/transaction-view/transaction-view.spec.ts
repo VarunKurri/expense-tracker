@@ -92,6 +92,12 @@ describe('TransactionView: money back', () => {
     });
   });
 
+  it('a payment that settles up with someone says so', async () => {
+    await open({ ...haircut, merchant: 'Venmo to Ben', settlement: { personId: 'ben' } });
+    const row = [...document.querySelectorAll('.view-row')].find(r => r.textContent!.includes('Settles up'))!;
+    expect(row.textContent).toContain('Paid Ben');
+  });
+
   it('offers two actions', async () => {
     await open(haircut);
     const actions = [...view().querySelectorAll('.money-back-actions button')].map(b => b.textContent!.trim());

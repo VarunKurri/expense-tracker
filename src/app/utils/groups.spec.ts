@@ -210,6 +210,46 @@ describe('payments recorded on a bill the old way still count', () => {
   });
 });
 
+describe('settling up with you: one payment, however many bills it lands on', () => {
+  it('a Zelle spread over two of your bills reads as one payment from them', () => {
+    const { food } = tahoe();
+    const drinks = expense(6000, { date: '2026-09-13', split: inGroup(quickSplit(6000, [ME, 'alex', 'ben'])) });
+    const zelle = {
+      id: 'z', type: 'income', amount: 120, date: '2026-09-20', accountId: 'chk', merchant: 'Zelle', createdAt: 9, updatedAt: 9,
+      moneyBackSplits: [{ expenseId: food.id!, amountCents: 9000 }, { expenseId: drinks.id!, amountCents: 3000 }],
+      moneyBackInfo: { source: 'repayment', fromPersonId: 'alex', coversPersonIds: ['alex'] },
+    } as Transaction;
+    const { ledger } = ledgerFor([food, drinks, zelle], []);
+    const received = ledger.moves.filter(m => m.kind === 'received');
+    expect(received).toEqual([expect.objectContaining({
+      fromPersonId: 'alex', toPersonId: ME, amountCents: 12000, incomeId: 'z', txIds: [food.id, drinks.id],
+    })]);
+  });
+
+  it('cash written on several bills with one batch id is one payment, and knows its entries', () => {
+    const { food } = tahoe();
+    const drinks = expense(6000, { date: '2026-09-13', split: inGroup(quickSplit(6000, [ME, 'alex', 'ben'])) });
+    const part = (id: string, amountCents: number) =>
+      ({ id, source: 'repayment' as const, amountCents, date: '2026-09-20', fromPersonId: 'ben', coversPersonIds: ['ben'], batchId: 'b1' });
+    food.moneyBack = [part('e1', 9000)];
+    drinks.moneyBack = [part('e2', 1000)];
+    const { ledger } = ledgerFor([food, drinks], []);
+    expect(ledger.moves).toEqual([expect.objectContaining({
+      fromPersonId: 'ben', amountCents: 10000, entries: [{ txId: food.id, entryId: 'e1' }, { txId: drinks.id, entryId: 'e2' }],
+    })]);
+  });
+
+  it('cash you handed someone, kept on the group, counts as you paying them', () => {
+    const { food, shared } = tahoe();
+    const before = ledgerFor([food], shared).ledger;
+    const g = group({ payments: [{ id: 'p', fromPersonId: ME, toPersonId: 'ben', amountCents: 1500, date: '2026-09-20' }] });
+    const after = ledgerFor([food], shared, g).ledger;
+    expect(after.moves).toEqual([expect.objectContaining({ kind: 'sent', paymentId: 'p' })]);
+    expect(balanceOf(after, ME)).toBe(balanceOf(before, ME) + 1500);
+    expect(balanceOf(after, 'ben')).toBe(balanceOf(before, 'ben') - 1500);
+  });
+});
+
 describe('Who paid you? payments that don\'t say who sent them', () => {
   const income = (cents: number, over: Partial<Transaction> = {}): Transaction => ({
     id: `i${++n}`, type: 'income', amount: fromCents(cents), date: '2026-09-20', accountId: 'chk',

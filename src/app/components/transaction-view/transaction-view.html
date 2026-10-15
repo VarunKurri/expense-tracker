@@ -59,6 +59,12 @@
             </div>
           }
         }
+        @if (settlementText()) {
+          <div class="view-row">
+            <span class="view-row-label">Settles up</span>
+            <span class="view-row-value">{{ settlementText() }}</span>
+          </div>
+        }
         @if (tx.notes) {
           <div class="view-row view-row-notes">
             <span class="view-row-label">Notes</span>

@@ -63,6 +63,7 @@ export function linkedEntry(income: Transaction, amountCents = toCents(income.am
     date: income.date,
     fromPersonId: income.moneyBackInfo?.fromPersonId,
     coversPersonIds: income.moneyBackInfo?.coversPersonIds,
+    ...(income.id ? { incomeId: income.id } : {}),
   };
 }
 

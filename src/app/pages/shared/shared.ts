@@ -286,10 +286,12 @@ export class Shared {
         const date = this.repayDate() || localDateString();
         const note = this.repayNote().trim();
         const all = this.txService.transactions();
+        // One id across the parts, so a group reads them as one payment.
+        const batchId = newReturnId();
         await this.txService.applyPatches(parts.map(p => {
           const tx = all.find(t => t.id === p.expenseId)!;
           const entry: UntrackedReturn = {
-            id: newReturnId(), source: 'repayment', amountCents: p.amountCents, date, ...who, ...(note ? { note } : {}),
+            id: newReturnId(), source: 'repayment', amountCents: p.amountCents, date, ...who, batchId, ...(note ? { note } : {}),
           };
           return { id: p.expenseId, patch: { moneyBack: [...(tx.moneyBack ?? []), entry] } };
         }));

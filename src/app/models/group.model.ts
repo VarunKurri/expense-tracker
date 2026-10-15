@@ -24,9 +24,11 @@ export interface Group {
    */
   simplify: boolean;
   /**
-   * Payments between two other members ("Alex paid Ben $30"). Payments to or
-   * from you live on your own transactions instead (see `Settlement` and
-   * money back), so the bank transaction stays the one record of them.
+   * Payments recorded on the group itself: between two other members ("Alex
+   * paid Ben $30"), or cash you handed someone outside your accounts. Money
+   * you got, and bank payments you sent, live on your own transactions
+   * instead (money back, and `Settlement`), so the bank transaction stays the
+   * one record of them.
    */
   payments: GroupPayment[];
   /** Settled and put away: hidden from the Shared page's list. */

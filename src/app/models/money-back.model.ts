@@ -28,6 +28,13 @@ export interface MoneyBackEntry {
    * off. Defaults to `[fromPersonId]`, the common "Ben paid me back" case.
    */
   coversPersonIds?: string[];
+  /** Read back from a linked income: which income it was (not stored). */
+  incomeId?: string;
+  /**
+   * Cash recorded by hand as one payment spread over several expenses: the
+   * same id on each part, so it reads (and can be removed) as one payment.
+   */
+  batchId?: string;
 }
 
 /**

@@ -88,3 +88,16 @@
   .assign-row { flex-direction: column; align-items: stretch; gap: 8px; }
   .assign-select { width: 100%; }
 }
+
+/* A payment on your transactions, read-only. */
+.move-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0 8px;
+  color: var(--fg-2);
+  font-size: 14px;
+  .num-display { font-size: 32px; color: var(--fg); }
+}
+.move-line { margin: 0; font-size: 14px; color: var(--fg); }

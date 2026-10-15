@@ -1,4 +1,4 @@
-import { Group, ME, MoneyBackEntry, SharedBill, Transaction, TransactionSplit } from '../models';
+import { Group, ME, MoneyBackEntry, SharedBill, Transaction, TransactionSplit, UntrackedReturn } from '../models';
 import type { IncomeLink, LinkedIncome } from './money-back';
 import { toCents } from './money';
 import { sum } from './split/money';
@@ -22,8 +22,11 @@ import { billPositions, splitStatus } from './splits';
  * Where each payment lives:
  *   - money you got:  money back (a repayment) on your group expenses, as
  *                     Phase 1 records it: a linked income, or cash by hand.
+ *                     One payment is spread over several expenses
+ *                     (`spreadReceived`) but reads as one payment here.
  *   - money you sent: an expense with `settlement` (it's real spending).
- *   - between two friends: `Group.payments`.
+ *   - between two friends, and cash you sent outside your accounts:
+ *                     `Group.payments`.
  *
  * And spending: once a group is settled, what you're out of pocket across your
  * group expenses equals the sum of your shares, to the cent. The tests pin
@@ -59,8 +62,14 @@ export interface GroupMove {
   kind: 'received' | 'sent' | 'between';
   /** The expense it was recorded on (received) or that it is (sent). */
   txId?: string;
-  /** For `between`: its id in `Group.payments`. */
+  /** Received: every expense it was spread over. */
+  txIds?: string[];
+  /** Recorded on the group itself: its id in `Group.payments`. */
   paymentId?: string;
+  /** Received as a bank payment: the income transaction it came as. */
+  incomeId?: string;
+  /** Received as cash: the entries it was written as, so it can be removed. */
+  entries?: { txId: string; entryId: string }[];
   /** Received without saying who sent it, so credited by bill order: a guess until it's named. */
   guessed?: boolean;
 }
@@ -153,6 +162,7 @@ export function groupLedger(
   const groupId = group.id;
   const bills: GroupBill[] = [];
   const moves: GroupMove[] = [];
+  const received = new Map<string, GroupMove>();
 
   for (const tx of txs) {
     const mine = isGroupBill(tx, groupId);
@@ -168,10 +178,27 @@ export function groupLedger(
       moves.push({ fromPersonId: ME, toPersonId: tx.settlement!.personId, amountCents: toCents(tx.amount), date: tx.date, kind: 'sent', txId: tx.id });
     }
     // Repayments on any of your group expenses are money you got from someone.
+    // One payment spread over several expenses (the same income, or cash
+    // recorded together) is gathered back into one.
     for (const entry of moneyBack.filter(e => e.source === 'repayment')) {
       const guessed = unnamed(entry.fromPersonId, entry.coversPersonIds) || undefined;
+      const entryId = (entry as Partial<UntrackedReturn>).id;
       for (const p of payersOf(entry, mine ? tx.split : undefined, tx.settlement?.personId, refunds)) {
-        moves.push({ fromPersonId: p.personId, toPersonId: ME, amountCents: p.amountCents, date: entry.date, kind: 'received', txId: tx.id, guessed });
+        const key = entry.incomeId ? `i:${entry.incomeId}:${p.personId}` : entry.batchId ? `b:${entry.batchId}:${p.personId}` : '';
+        let move = key ? received.get(key) : undefined;
+        if (!move) {
+          move = {
+            fromPersonId: p.personId, toPersonId: ME, amountCents: 0, date: entry.date, kind: 'received',
+            txId: tx.id, txIds: [], guessed, ...(entry.incomeId ? { incomeId: entry.incomeId } : {}),
+          };
+          moves.push(move);
+          if (key) received.set(key, move);
+        }
+        move.amountCents += p.amountCents;
+        if (!move.txIds!.includes(tx.id!)) move.txIds!.push(tx.id!);
+        if (entryId && !move.entries?.some(e => e.entryId === entryId && e.txId === tx.id)) {
+          move.entries = [...(move.entries ?? []), { txId: tx.id!, entryId }];
+        }
       }
     }
   }
@@ -184,7 +211,8 @@ export function groupLedger(
   }
 
   for (const p of group.payments ?? []) {
-    moves.push({ fromPersonId: p.fromPersonId, toPersonId: p.toPersonId, amountCents: p.amountCents, date: p.date, kind: 'between', paymentId: p.id });
+    const kind = p.fromPersonId === ME ? 'sent' : p.toPersonId === ME ? 'received' : 'between';
+    moves.push({ fromPersonId: p.fromPersonId, toPersonId: p.toPersonId, amountCents: p.amountCents, date: p.date, kind, paymentId: p.id });
   }
 
   // ---- Where everyone stands --------------------------------------------

@@ -242,6 +242,14 @@ export class TransactionView {
     return id ? this.injector.get(GroupService).byId(id) ?? null : null;
   });
 
+  /** On an expense that settles up with someone: "Paid Nikhilesh · Tahoe Trip". */
+  settlementText = computed(() => {
+    const s = this.tx()?.settlement;
+    if (!s) return '';
+    const group = s.groupId ? this.injector.get(GroupService).byId(s.groupId) : null;
+    return [`Paid ${this.people.nameOf(s.personId)}`, group?.name].filter(Boolean).join(' · ');
+  });
+
   openGroup(id: string) {
     this.close();
     this.router.navigate(['/shared/groups', id]);

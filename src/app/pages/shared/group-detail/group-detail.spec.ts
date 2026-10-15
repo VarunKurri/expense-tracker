@@ -27,6 +27,10 @@ class FakeTransactions extends MoneyBackLedger {
   async update(id: string, patch: Partial<Transaction>) {
     this.transactions.update(all => all.map(t => (t.id === id ? JSON.parse(JSON.stringify({ ...t, ...patch })) : t)));
   }
+  async applyPatches(patches: { id: string; patch: Partial<Transaction> }[]) {
+    for (const p of patches) await this.update(p.id, p.patch);
+    return patches.length;
+  }
   async remove() {}
 }
 
@@ -186,6 +190,152 @@ describe('Group page', () => {
       lastButton('Delete').click();
       await settle();
       expect(groups.byId('tahoe')!.payments).toEqual([]);
+    });
+  });
+
+  describe('payments to and from you', () => {
+    const zelle: Transaction = { id: 'z', type: 'income', amount: 50, date: '2026-09-20', merchant: 'Zelle from ALEX', accountId: 'chk',
+      createdAt: 5, updatedAt: 5 };
+    const drinks: Transaction = { id: 'drinks', type: 'expense', merchant: 'BevMo', amount: 30, date: '2026-09-13', accountId: 'card',
+      createdAt: 2, updatedAt: 2, split: { ...quickSplit(3000, [ME, 'alex', 'ben']), groupId: 'tahoe' } };
+    const venmo: Transaction = { id: 'v', type: 'expense', amount: 30, date: '2026-09-21', merchant: 'Venmo to Ben', accountId: 'chk',
+      createdAt: 6, updatedAt: 6 };
+    const select = async (id: string, value: string) => {
+      const s = document.getElementById(id) as HTMLSelectElement;
+      s.value = value;
+      s.dispatchEvent(new Event('change'));
+      await settle();
+    };
+    const type = async (id: string, value: string) => {
+      const i = document.getElementById(id) as HTMLInputElement;
+      i.value = value;
+      i.dispatchEvent(new Event('input'));
+      await settle();
+    };
+
+    it('link a Zelle to the group: one payment over your bills, not income, and the balance follows', async () => {
+      await setup([food, drinks, zelle]);
+      expect(rows(0)).toEqual(['Alex pays you $50.00', 'Ben pays you $50.00']);
+      button('Record').click(); // Alex pays you
+      await settle();
+      expect((document.getElementById('pay-from') as HTMLSelectElement).value).toBe('alex');
+      expect((document.getElementById('pay-to') as HTMLSelectElement).value).toBe(ME);
+      await select('pay-tx', 'z');
+      expect(document.body.textContent).toContain('After this, Alex is square.');
+      button('Record payment').click();
+      await settle();
+
+      const income = txs.transactions().find(t => t.id === 'z')!;
+      expect(income.moneyBackInfo).toEqual({ source: 'repayment', fromPersonId: 'alex', coversPersonIds: ['alex'] });
+      // Safeway, the oldest, had $80 of other people's shares on it: all $50 fits there, as money back.
+      expect(income.reimbursesId).toBe('food');
+      expect(income.moneyBackSplits).toBeUndefined();
+      expect(rows(0)).toEqual(['Ben pays you $50.00']);
+      expect(rows(1)).toEqual(['You You get back $50.00', 'Alex Square', 'Ben Owes $50.00']);
+      expect(rows(2)).toEqual([expect.stringMatching(/^Alex paid you Sep 20 · Zelle from ALEX\s*\$50\.00$/)]);
+    });
+
+    it('pays less or more than suggested: the balance just follows', async () => {
+      await setup([food, drinks, { ...zelle, amount: 70 }]);
+      button('Record').click();
+      await settle();
+      await select('pay-tx', 'z');
+      expect(document.body.textContent).toContain('After this, Alex gets back $20.00.');
+      button('Record payment').click();
+      await settle();
+      expect(rows(1)).toEqual(['You You get back $30.00', 'Alex Gets back $20.00', 'Ben Owes $50.00']);
+    });
+
+    it('cash from a friend is written on your bills as one payment, and can be removed', async () => {
+      await setup([food, drinks]);
+      button('Record').click();
+      await settle();
+      button('Cash or other').click();
+      await settle();
+      await type('pay-amount', '90'); // more than Safeway's $80 of other people's shares, so it runs onto BevMo
+      button('Record payment').click();
+      await settle();
+
+      const entries = txs.transactions().flatMap(t => (t.moneyBack ?? []).map(e => ({ tx: t.id, ...e })));
+      expect(entries.map(e => [e.tx, e.amountCents, e.fromPersonId])).toEqual([['food', 8000, 'alex'], ['drinks', 1000, 'alex']]);
+      expect(new Set(entries.map(e => e.batchId)).size).toBe(1);
+      expect(rows(2)).toEqual([expect.stringMatching(/^Alex paid you .*cash\s*\$90\.00$/)]);
+      expect(rows(1)).toEqual(['You You get back $10.00', 'Alex Gets back $40.00', 'Ben Owes $50.00']);
+
+      (el.querySelectorAll('.list-card')[2].querySelector('.bill') as HTMLElement).click();
+      await settle();
+      expect(document.body.textContent).toContain('Paid back, on your bills');
+      button('Remove from group').click();
+      await settle();
+      lastButton('Remove').click();
+      await settle();
+      expect(txs.transactions().flatMap(t => t.moneyBack ?? [])).toEqual([]);
+      expect(rows(1)).toEqual(['You You get back $100.00', 'Alex Owes $50.00', 'Ben Owes $50.00']);
+    });
+
+    it('a Venmo you sent settles up with them and counts as spending; removing it unmarks it', async () => {
+      await setup([food, venmo]);
+      sharedBills.bills.set([{
+        id: 'tents', date: '2026-09-13', merchant: 'REI', createdAt: 2, updatedAt: 2,
+        split: { ...quickSplit(18000, [ME, 'alex', 'ben']), payments: [{ personId: 'ben', amountCents: 18000 }], groupId: 'tahoe' },
+      }]);
+      await settle();
+      expect(rows(1)).toEqual(['You You get back $20.00', 'Alex Owes $100.00', 'Ben Gets back $80.00']);
+      button('+ Record a payment').click();
+      await settle();
+      await select('pay-from', ME);
+      await select('pay-to', 'ben');
+      await select('pay-tx', 'v');
+      button('Record payment').click();
+      await settle();
+
+      expect(txs.transactions().find(t => t.id === 'v')!.settlement).toEqual({ personId: 'ben', groupId: 'tahoe' });
+      expect(rows(1)).toEqual(['You You get back $50.00', 'Alex Owes $100.00', 'Ben Gets back $50.00']);
+      expect(rows(2)).toEqual([expect.stringMatching(/^You paid Ben Sep 21 · Venmo to Ben\s*\$30\.00$/)]);
+
+      (el.querySelectorAll('.list-card')[2].querySelector('.bill') as HTMLElement).click();
+      await settle();
+      button('Remove from group').click();
+      await settle();
+      lastButton('Remove').click();
+      await settle();
+      expect(txs.transactions().find(t => t.id === 'v')!.settlement).toBeUndefined();
+    });
+
+    it('cash you handed someone is kept on the group, out of your spending', async () => {
+      await setup([food]);
+      button('+ Record a payment').click();
+      await settle();
+      await select('pay-from', ME);
+      await select('pay-to', 'ben');
+      button('Cash or other').click();
+      await settle();
+      expect(document.body.textContent).toContain("isn't in your spending");
+      await type('pay-amount', '10');
+      button('Record payment').click();
+      await settle();
+      expect(groups.byId('tahoe')!.payments).toEqual([expect.objectContaining({ fromPersonId: ME, toPersonId: 'ben', amountCents: 1000 })]);
+      expect(rows(1)).toEqual(['You You get back $90.00', 'Alex Owes $40.00', 'Ben Owes $50.00']);
+    });
+
+    it('with nothing of yours in the group to pay back, says so', async () => {
+      await setup([zelle]);
+      sharedBills.bills.set([{
+        id: 'tents', date: '2026-09-13', merchant: 'REI', createdAt: 2, updatedAt: 2,
+        split: { ...quickSplit(9000, [ME, 'alex', 'ben']), payments: [{ personId: 'ben', amountCents: 9000 }], groupId: 'tahoe' },
+      }]);
+      await settle();
+      const errors: string[] = [];
+      TestBed.inject(ToastService).error = (m: string) => { errors.push(m); };
+      button('+ Record a payment').click();
+      await settle();
+      await select('pay-from', 'alex');
+      await select('pay-to', ME);
+      await select('pay-tx', 'z');
+      button('Record payment').click();
+      await settle();
+      expect(errors).toEqual(['There is no expense of yours in this group to record it against yet.']);
+      expect(txs.transactions().find(t => t.id === 'z')!.moneyBackInfo).toBeUndefined();
     });
   });
 

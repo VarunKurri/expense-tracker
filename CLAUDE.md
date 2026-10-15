@@ -147,6 +147,15 @@ The app is what we copy. Do not "correct" this back to dark.
   you?" until they're named, and marks the guessed rows in Payments. Payments
   between two friends live on the group (`Group.payments`); record them (or
   "Mark as paid" on a Settle up row) so the balances match Splitwise.
+- Settling up with you in a group is against the **whole group**, never one
+  bill: any member can pay any amount (less or more than suggested) and the
+  balances follow. Money you got (a linked income, or cash) is spread over
+  your group expenses as money back by `spreadReceived`, so it isn't income
+  and your spending comes down to your share; the ledger gathers the parts
+  back into one payment (`incomeId`, or cash's shared `batchId`). A bank
+  payment you sent is that expense with `settlement` (spending). Cash you
+  sent goes on `Group.payments`. "Remove from group" unlinks; the bank
+  transaction itself stays.
 - Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`, `FakeSharedBills`).
 - Never centre a fixed panel with `transform`: it traps any pop-up inside it
   (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;
