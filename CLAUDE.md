@@ -119,6 +119,9 @@ The app is what we copy. Do not "correct" this back to dark.
   `app-shared-bill-view` (the read-only sheet for one of those bills: tapping it
   opens this, never the form; Edit top right opens `app-shared-bill-form`. It
   shows only what the payer's bill says: paid by, shares, what you owe them),
+  `app-transaction-picker` (pick one of your transactions: search by name or
+  amount, likely matches first; Link income, Record repayment on Shared and
+  Record a payment in a group all use it. Never a `<select>` of transactions),
   `app-receipt-attach` (a receipt photo: Take photo on phones/tablets, Upload
   everywhere, thumbnail → full size; in Edit a ✕ on the thumbnail removes it,
   on the details sheet it's read-only — `[editable]="false"`).

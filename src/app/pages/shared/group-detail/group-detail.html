@@ -111,7 +111,10 @@
               <span class="bill-note fig">{{ money(m.amountCents) }}</span>
             </button>
           } @empty {
-            <p class="list-intro">No payments yet. When someone pays someone back (you included), record it here so everyone's balance follows.</p>
+            <div class="empty list-empty">
+              <h3 class="display">No one has <em>paid</em> anyone yet.</h3>
+              <p>When someone pays someone back (you included), record it here and everyone's balance follows.</p>
+            </div>
           }
           <div class="list-foot">
             <button type="button" class="btn-add" (click)="recordPayment()">+ Record a payment</button>
@@ -197,17 +200,15 @@
 
       @if (payByBank()) {
         <div class="field">
-          <label class="label-sm" for="pay-tx">Which payment</label>
+          <span class="label-sm">Which payment</span>
           @if (payKind() === 'received') {
-            <select id="pay-tx" class="input-field" [ngModel]="payIncomeId()" (ngModelChange)="payIncomeId.set($event)" name="payIncome">
-              <option value="" disabled>Choose a payment</option>
-              @for (t of incomeChoices(); track t.id) { <option [value]="t.id">{{ txLabel(t) }}</option> }
-            </select>
+            <app-transaction-picker [transactions]="incomeChoices()" [selectedId]="payIncomeId()" name="payIncome"
+                                    [matchCents]="paySuggestedCents()" [matchText]="name(payFrom())"
+                                    (picked)="payIncomeId.set($event.id!)" />
           } @else {
-            <select id="pay-tx" class="input-field" [ngModel]="payExpenseId()" (ngModelChange)="payExpenseId.set($event)" name="payExpense">
-              <option value="" disabled>Choose a payment</option>
-              @for (t of expenseChoices(); track t.id) { <option [value]="t.id">{{ txLabel(t) }}</option> }
-            </select>
+            <app-transaction-picker [transactions]="expenseChoices()" [selectedId]="payExpenseId()" name="payExpense"
+                                    [matchCents]="paySuggestedCents()" [matchText]="name(payTo())"
+                                    (picked)="payExpenseId.set($event.id!)" />
           }
         </div>
       } @else {

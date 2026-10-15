@@ -301,22 +301,7 @@
   @if (askLinkWho()) {
     <div class="form link-who"><ng-container [ngTemplateOutlet]="who" /></div>
   }
-  <input class="link-search input-field"
-         [ngModel]="linkSearch()"
-         (ngModelChange)="linkSearch.set($event)"
-         placeholder="Search merchant or amount…" />
-  <div class="link-list">
-    @for (c of linkCandidates(); track c.id) {
-      <button class="link-item" (click)="confirmLink(c)">
-        <span class="link-item-main">{{ c.merchant || (c.type === 'income' ? 'Income' : 'Expense') }}</span>
-        <span class="link-item-meta">
-          {{ formatDate(c.date) }} · {{ c.type === 'expense' ? '−' : '+' }}{{ formatCurrency(c.amount) }}
-        </span>
-      </button>
-    } @empty {
-      <div class="link-empty">No matching transactions.</div>
-    }
-  </div>
+  <app-transaction-picker [transactions]="linkCandidates()" (picked)="confirmLink($event)" name="linkSearch" />
 </app-modal>
 
 <!-- ADD MONEY BACK: a refund, a friend paying you back, cash, store credit:

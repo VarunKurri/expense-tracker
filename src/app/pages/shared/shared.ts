@@ -14,6 +14,7 @@ import { TransactionForm } from '../transactions/transaction-form/transaction-fo
 import { GroupForm } from '../../components/group-form/group-form';
 import { SharedBillForm } from '../../components/shared-bill-form/shared-bill-form';
 import { SharedBillView } from '../../components/shared-bill-view/shared-bill-view';
+import { TransactionPicker } from '../../components/transaction-picker/transaction-picker';
 import { formatCurrency } from '../../utils/format';
 import { fromCents, toCents } from '../../utils/money';
 import { isMoneyBackIncome, newReturnId } from '../../utils/money-back';
@@ -37,7 +38,7 @@ const COUNT_WORDS = ['No one', 'One friend', 'Two friends', 'Three friends', 'Fo
 @Component({
   selector: 'app-shared',
   standalone: true,
-  imports: [FormsModule, RouterLink, Modal, Confirm, TransactionView, TransactionForm, GroupForm, SharedBillForm, SharedBillView],
+  imports: [FormsModule, RouterLink, Modal, Confirm, TransactionView, TransactionForm, GroupForm, SharedBillForm, SharedBillView, TransactionPicker],
   templateUrl: './shared.html',
   styleUrl: './shared.scss',
 })
@@ -195,11 +196,14 @@ export class Shared {
   repayIncomeId = signal('');
   saving = signal(false);
 
-  /** Bank payments that could be this repayment: incomes not already money back, newest first. */
+  /** Bank payments that could be this repayment: incomes not already money back. The picker searches them. */
   incomeChoices = computed(() => this.txService.transactions()
-    .filter(t => t.type === 'income' && !t.isInternalTransfer && !isMoneyBackIncome(t))
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 40));
+    .filter(t => t.type === 'income' && !t.isInternalTransfer && !isMoneyBackIncome(t)));
+
+  /** What they owe you in all, for the picker to list a payment of exactly that first. */
+  repayableCents(b: PersonBalance): number {
+    return repayableCents(b);
+  }
 
   private chosenIncome = computed(() => this.incomeChoices().find(t => t.id === this.repayIncomeId()) ?? null);
 
@@ -352,9 +356,5 @@ export class Shared {
 
   formatDate(date: string): string {
     return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
-
-  incomeLabel(t: Transaction): string {
-    return `${t.merchant || 'Income'} · ${this.formatDate(t.date)} · ${formatCurrency(t.amount)}`;
   }
 }

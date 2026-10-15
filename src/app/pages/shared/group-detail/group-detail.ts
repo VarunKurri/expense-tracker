@@ -16,6 +16,7 @@ import { SharedBillForm } from '../../../components/shared-bill-form/shared-bill
 import { SharedBillView } from '../../../components/shared-bill-view/shared-bill-view';
 import { TransactionView } from '../../../components/transaction-view/transaction-view';
 import { TransactionForm } from '../../transactions/transaction-form/transaction-form';
+import { TransactionPicker } from '../../../components/transaction-picker/transaction-picker';
 import { formatCurrency } from '../../../utils/format';
 import { fromCents, toCents } from '../../../utils/money';
 import { isMoneyBackIncome, newReturnId } from '../../../utils/money-back';
@@ -31,7 +32,7 @@ import type { Transfer } from '../../../utils/split/types';
 @Component({
   selector: 'app-group-detail',
   standalone: true,
-  imports: [FormsModule, Modal, Confirm, GroupForm, SharedBillForm, SharedBillView, TransactionView, TransactionForm],
+  imports: [FormsModule, Modal, Confirm, GroupForm, SharedBillForm, SharedBillView, TransactionView, TransactionForm, TransactionPicker],
   templateUrl: './group-detail.html',
   styleUrl: './group-detail.scss',
 })
@@ -154,17 +155,16 @@ export class GroupDetail {
   /** Whether the payment is a transaction in your accounts, which then says the amount. */
   payByBank = computed(() => !this.editingPayment() && this.payKind() !== 'between' && this.payHow() === 'bank');
 
-  /** Bank payments that could be money you got: incomes not already money back, newest first. */
-  incomeChoices = computed(() => this.txService.transactions()
-    .filter(t => t.type === 'income' && !t.isInternalTransfer && !isMoneyBackIncome(t))
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 60));
+  /** What Settle up suggested, if the dialog was opened from it: a payment of that amount is listed first. */
+  paySuggestedCents = signal(0);
 
-  /** Expenses that could be money you sent: not split, not already settling up, newest first. */
+  /** Bank payments that could be money you got: incomes not already money back. The picker searches them. */
+  incomeChoices = computed(() => this.txService.transactions()
+    .filter(t => t.type === 'income' && !t.isInternalTransfer && !isMoneyBackIncome(t)));
+
+  /** Expenses that could be money you sent: not split, not already settling up. */
   expenseChoices = computed(() => this.txService.transactions()
-    .filter(t => t.type === 'expense' && !t.isInternalTransfer && !t.split && !t.settlement)
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 60));
+    .filter(t => t.type === 'expense' && !t.isInternalTransfer && !t.split && !t.settlement));
 
   private chosenIncome = computed(() => this.incomeChoices().find(t => t.id === this.payIncomeId()) ?? null);
   private chosenExpense = computed(() => this.expenseChoices().find(t => t.id === this.payExpenseId()) ?? null);
@@ -223,6 +223,7 @@ export class GroupDetail {
     this.payIncomeId.set('');
     this.payExpenseId.set('');
     this.payAmount.set(prefill ? fromCents(prefill.amountCents) : null);
+    this.paySuggestedCents.set(prefill?.amountCents ?? 0);
     this.payDate.set(localDateString());
     this.payNote.set('');
     this.paymentOpen.set(true);

@@ -75,12 +75,20 @@
   p { color: var(--fg-3); font-size: 14px; line-height: 1.5; margin: 0; max-width: 460px; }
 }
 
+/* The same editorial moment, smaller, inside a list card with nothing in it yet. */
+.list-empty {
+  padding: 32px 24px 12px;
+  gap: 10px;
+  .display { font-size: 26px; }
+}
+
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
   .hero { padding: 16px; }
   .list-card { --pad-x: 16px; }
   .hero-figure .num-display { font-size: 34px; }
   .empty .display { font-size: 26px; }
+  .list-empty .display { font-size: 22px; }
   .bill { flex-direction: column; align-items: flex-start; gap: 4px; }
   .bill-note { white-space: normal; }
   /* A payment is short: its amount stays beside it. */

@@ -157,11 +157,10 @@
 
       @if (repayHow() === 'bank') {
         <div class="field">
-          <label class="label-sm" for="repay-income">Which payment</label>
-          <select id="repay-income" class="input-field" [ngModel]="repayIncomeId()" (ngModelChange)="repayIncomeId.set($event)" name="repayIncome">
-            <option value="" disabled>Choose a payment</option>
-            @for (t of incomeChoices(); track t.id) { <option [value]="t.id">{{ incomeLabel(t) }}</option> }
-          </select>
+          <span class="label-sm">Which payment</span>
+          <app-transaction-picker [transactions]="incomeChoices()" [selectedId]="repayIncomeId()" name="repayIncome"
+                                  [matchCents]="repayable(b) ? repayableCents(b) : 0" [matchText]="people.nameOf(b.personId)"
+                                  (picked)="repayIncomeId.set($event.id!)" />
         </div>
       } @else {
         <div class="form-grid">

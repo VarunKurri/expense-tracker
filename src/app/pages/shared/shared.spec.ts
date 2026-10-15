@@ -136,10 +136,12 @@ describe('Shared page', () => {
     await settle();
     button('A bank payment').click();
     await settle();
-    const select = document.getElementById('repay-income') as HTMLSelectElement;
-    select.value = 'z';
-    select.dispatchEvent(new Event('change'));
+    // Searchable, like Link income: the payment from Mrunaal for what she owes is listed first.
+    const items = () => [...document.querySelectorAll('.link-item')];
+    expect(items()[0].textContent).toContain('Zelle Mrunaal');
+    (items()[0] as HTMLElement).click();
     await settle();
+    expect(items()[0].classList).toContain('selected');
     button('Save').click();
     await settle();
 

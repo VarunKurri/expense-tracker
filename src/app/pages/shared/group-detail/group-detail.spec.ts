@@ -200,6 +200,12 @@ describe('Group page', () => {
       createdAt: 2, updatedAt: 2, split: { ...quickSplit(3000, [ME, 'alex', 'ben']), groupId: 'tahoe' } };
     const venmo: Transaction = { id: 'v', type: 'expense', amount: 30, date: '2026-09-21', merchant: 'Venmo to Ben', accountId: 'chk',
       createdAt: 6, updatedAt: 6 };
+    /** Pick a transaction in the searchable payment list, by its id. */
+    const pick = async (id: string) => {
+      const t = txs.transactions().find(x => x.id === id)!;
+      ([...document.querySelectorAll('.link-item')].find(b => b.textContent!.includes(t.merchant!)) as HTMLElement).click();
+      await settle();
+    };
     const select = async (id: string, value: string) => {
       const s = document.getElementById(id) as HTMLSelectElement;
       s.value = value;
@@ -220,7 +226,7 @@ describe('Group page', () => {
       await settle();
       expect((document.getElementById('pay-from') as HTMLSelectElement).value).toBe('alex');
       expect((document.getElementById('pay-to') as HTMLSelectElement).value).toBe(ME);
-      await select('pay-tx', 'z');
+      await pick('z');
       expect(document.body.textContent).toContain('After this, Alex is square.');
       button('Record payment').click();
       await settle();
@@ -239,7 +245,7 @@ describe('Group page', () => {
       await setup([food, drinks, { ...zelle, amount: 70 }]);
       button('Record').click();
       await settle();
-      await select('pay-tx', 'z');
+      await pick('z');
       expect(document.body.textContent).toContain('After this, Alex gets back $20.00.');
       button('Record payment').click();
       await settle();
@@ -285,7 +291,7 @@ describe('Group page', () => {
       await settle();
       await select('pay-from', ME);
       await select('pay-to', 'ben');
-      await select('pay-tx', 'v');
+      await pick('v');
       button('Record payment').click();
       await settle();
 
@@ -331,7 +337,7 @@ describe('Group page', () => {
       await settle();
       await select('pay-from', 'alex');
       await select('pay-to', ME);
-      await select('pay-tx', 'z');
+      await pick('z');
       button('Record payment').click();
       await settle();
       expect(errors).toEqual(['There is no expense of yours in this group to record it against yet.']);

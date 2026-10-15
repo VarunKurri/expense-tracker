@@ -20,6 +20,7 @@ import { GroupService } from '../../services/group.service';
 import { PersonSplitStatus, outstandingFor, setClosed, splitStatus } from '../../utils/splits';
 import { RefundState, incomeLinks, newReturnId } from '../../utils/money-back';
 import { fromCents, toCents } from '../../utils/money';
+import { TransactionPicker } from '../transaction-picker/transaction-picker';
 
 let nextLockId = 0;
 
@@ -43,7 +44,7 @@ let nextLockId = 0;
 @Component({
   selector: 'app-transaction-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, Modal, Confirm, ReceiptAttach],
+  imports: [CommonModule, FormsModule, Modal, Confirm, ReceiptAttach, TransactionPicker],
   templateUrl: './transaction-view.html',
   styleUrl: './transaction-view.scss',
 })
@@ -593,7 +594,6 @@ export class TransactionView {
 
   // ── Link picker ────────────────────────────────────────────
   linkingFrom = signal<Transaction | null>(null);
-  linkSearch = signal('');
   /** Repayment by default: a linked income is usually a friend's Venmo or Zelle. */
   linkSource = signal<MoneyBackSource>('repayment');
 
@@ -602,17 +602,14 @@ export class TransactionView {
     const from = this.linkingFrom();
     if (!from) return [];
     const wantType = from.type === 'income' ? 'expense' : 'income';
-    const q = this.linkSearch().trim().toLowerCase();
+    // Searching is the picker's; this only says which qualify.
     return this.txService.transactions().filter(t =>
       t.type === wantType && t.id !== from.id &&
       // An income can only ever reimburse one expense.
-      !this.txService.isMoneyBackIncome(t) &&
-      (!q || (t.merchant || '').toLowerCase().includes(q) || String(t.amount).includes(q))
-    ).slice(0, 50);
+      !this.txService.isMoneyBackIncome(t));
   });
 
   openLinkPicker(tx: Transaction) {
-    this.linkSearch.set('');
     this.linkSource.set('repayment');
     // Linking from a split expense asks who it was from, as "Add money back" does.
     const from = this.firstOwing();
@@ -623,7 +620,6 @@ export class TransactionView {
 
   closeLinkPicker() {
     this.linkingFrom.set(null);
-    this.linkSearch.set('');
   }
 
   async confirmLink(candidate: Transaction) {
