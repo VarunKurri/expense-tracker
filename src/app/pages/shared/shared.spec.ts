@@ -16,7 +16,7 @@ import { ManualAssetService } from '../../services/manual-asset.service';
 import { BillService } from '../../services/bill.service';
 import { TransactionTemplateService } from '../../services/transaction-template.service';
 import { QuickAddService } from '../../services/quick-add.service';
-import { ME, Transaction } from '../../models';
+import { ME, SplitPerson, Transaction } from '../../models';
 import { MoneyBackLedger } from '../../utils/money-back';
 import { personName, quickSplit } from '../../utils/splits';
 import { balancesByPerson } from '../../utils/shared';
@@ -35,10 +35,17 @@ class FakeTransactions extends MoneyBackLedger {
   async remove() {}
 }
 
-const people = signal([
+const PEOPLE: SplitPerson[] = [
   { id: 'm', name: 'Mrunaal', createdAt: 0, updatedAt: 0 },
   { id: 'p', name: 'Priya', createdAt: 0, updatedAt: 0 },
-]);
+];
+const people = signal<SplitPerson[]>(PEOPLE);
+const peopleService = {
+  people,
+  nameOf: (id: string) => personName(people(), id),
+  update: async (id: string, patch: Partial<SplitPerson>) =>
+    people.update(all => all.map(x => (x.id === id ? { ...x, ...patch } : x))),
+};
 
 let n = 0;
 const bill = (merchant: string, date: string, cents: number, who: string[]): Transaction => ({
@@ -78,7 +85,7 @@ describe('Shared page', () => {
       providers: [
         provideRouter([]),
         { provide: TransactionService, useValue: txs },
-        { provide: PersonService, useValue: { people, nameOf: (id: string) => personName(people(), id) } },
+        { provide: PersonService, useValue: peopleService },
         { provide: GroupService, useValue: groups },
         { provide: SharedBillService, useValue: sharedBills },
         { provide: ToastService, useValue: { success() {}, error: (m: string) => errors.push(m) } },
@@ -96,7 +103,7 @@ describe('Shared page', () => {
   }
 
   let errors: string[] = [];
-  beforeEach(() => { n = 0; errors = []; });
+  beforeEach(() => { n = 0; errors = []; people.set(PEOPLE); });
 
   it('says what everyone owes, and lists each person with their open bills', async () => {
     await setup([dinner, pizza, tacos]);
@@ -191,8 +198,8 @@ describe('Shared page', () => {
       expect(card.textContent).toContain('You owe $30.00');
       expect(card.textContent).toContain('Tents');
       expect(el.querySelector('.hero')!.textContent).toContain('You owe $30.00');
-      // Nothing to repay you: no Record repayment.
-      expect(card.querySelector('.btn-primary')).toBeNull();
+      // You owe them, so the card offers to record what you pay them.
+      expect(card.querySelector('.btn-primary')!.textContent!.trim()).toBe('Record a payment');
     });
 
     it('nets against what they owe you, into one balance', async () => {
@@ -229,6 +236,83 @@ describe('Shared page', () => {
       await settle();
       expect(document.body.textContent).toContain('Edit bill');
       expect((document.getElementById('sb-merchant') as HTMLInputElement).value).toBe('Tents');
+    });
+
+    describe('you paid them back', () => {
+      const tents = () => sharedBills.bills.set([{
+        id: 'sb', date: '2026-09-25', merchant: 'Tents', createdAt: 1, updatedAt: 1,
+        split: { ...quickSplit(6000, [ME, 'm']), payments: [{ personId: 'm', amountCents: 6000 }] },
+      }]); // you owe Mrunaal $30.00
+      const venmo: Transaction = { id: 'v', type: 'expense', merchant: 'Venmo to Mrunaal', amount: 30, date: '2026-09-30',
+        createdAt: 0, updatedAt: 0, accountId: 'a' };
+      const card = () => [...el.querySelectorAll('.person')][0];
+      async function openDialog() {
+        (card().querySelector('.btn-primary') as HTMLElement).click();
+        await settle();
+      }
+
+      it('link the Venmo: it settles up with them, and you are square', async () => {
+        await setup([venmo]);
+        tents();
+        await settle();
+        expect(card().textContent).toContain('You owe $30.00');
+        await openDialog();
+        // You owe, so "You paid Mrunaal" is picked already.
+        expect(document.querySelector('[aria-label="Who paid"] .active')!.textContent).toContain('You paid Mrunaal');
+        button('A bank payment').click();
+        await settle();
+        expect(document.querySelector('.link-item')!.textContent).toContain('Venmo to Mrunaal'); // the likely one, first
+        (document.querySelector('.link-item') as HTMLElement).click();
+        await settle();
+        expect(document.body.textContent).toContain('Pays back, oldest first');
+        button('Save').click();
+        await settle();
+
+        expect(txs.transactions().find(t => t.id === 'v')!.settlement).toEqual({ personId: 'm' });
+        expect(el.querySelector('.square')!.textContent).toContain('Mrunaal');
+      });
+
+      it('cash: part of it, shown on the bill and in history, and removable', async () => {
+        await setup([]);
+        tents();
+        await settle();
+        await openDialog();
+        const amount = document.getElementById('repay-amount') as HTMLInputElement;
+        expect(amount.value).toBe('30');
+        amount.value = '10';
+        amount.dispatchEvent(new Event('input'));
+        await settle();
+        button('Save').click();
+        await settle();
+
+        expect(people().find(p => p.id === 'm')!.payments).toEqual([expect.objectContaining({ amountCents: 1000 })]);
+        expect(card().textContent).toContain('You owe $20.00 of $30.00');
+        button('Show history (1)').click();
+        await settle();
+        const paid = [...card().querySelectorAll('.bill')].find(b => b.textContent!.includes('You paid Mrunaal')) as HTMLElement;
+        expect(paid.textContent).toContain('Cash or other');
+        paid.click();
+        await settle();
+        button('Remove').click();
+        await settle();
+        expect(people().find(p => p.id === 'm')!.payments).toEqual([]);
+        expect(card().textContent).toContain('You owe $30.00');
+      });
+
+      it('paying more than you owe: they owe you the rest', async () => {
+        await setup([]);
+        tents();
+        await settle();
+        await openDialog();
+        const amount = document.getElementById('repay-amount') as HTMLInputElement;
+        amount.value = '40';
+        amount.dispatchEvent(new Event('input'));
+        await settle();
+        expect(document.body.textContent).toContain("That's $10.00 more than you owe on their bills");
+        button('Save').click();
+        await settle();
+        expect(el.textContent).toContain('Mrunaal owes you $10.00.');
+      });
     });
 
     it("won't save without who paid", async () => {

@@ -62,7 +62,10 @@
         @if (settlementText()) {
           <div class="view-row">
             <span class="view-row-label">Settles up</span>
-            <span class="view-row-value">{{ settlementText() }}</span>
+            <span class="view-row-value settles">
+              {{ settlementText() }}
+              <button type="button" class="btn-row" (click)="unsettle(tx)">Unlink</button>
+            </span>
           </div>
           @if (settlementSpend()) {
             <div class="view-row view-row-notes">

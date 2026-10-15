@@ -65,8 +65,8 @@
               {{ personSub(b) }}
             </span>
           </div>
-          @if (repayable(b)) {
-            <button class="btn-primary" (click)="openRepay(b)">Record repayment</button>
+          @if (canRecord(b)) {
+            <button class="btn-primary" (click)="openRepay(b)">Record a payment</button>
           }
         </div>
 
@@ -86,7 +86,7 @@
                 <span class="bill-name">{{ o.bill.merchant }}</span>
                 <span class="bill-date label-mono">{{ formatDate(o.bill.date) }} · they paid</span>
               </span>
-              <span class="bill-note fig neg">You owe {{ money(o.cents) }}</span>
+              <span class="bill-note fig neg">{{ owedNote(o) }}</span>
             </button>
           }
           @for (g of b.groups; track g.groupId) {
@@ -101,6 +101,24 @@
             }
           }
           @if (showingHistory().has(b.personId)) {
+            @for (p of b.paidOut; track $index) {
+              <button type="button" class="bill settled" (click)="openPaidOut(p)">
+                <span class="bill-main">
+                  <span class="bill-name">You paid {{ people.nameOf(b.personId) }}</span>
+                  <span class="bill-date label-mono">{{ formatDate(p.date) }} · {{ paidOutVia(p) }}</span>
+                </span>
+                <span class="bill-note fig">{{ money(p.amountCents) }}</span>
+              </button>
+            }
+            @for (o of b.settledOwed; track o.bill.id) {
+              <button type="button" class="bill settled" (click)="openOtherPaid(o.bill)">
+                <span class="bill-main">
+                  <span class="bill-name">{{ o.bill.merchant }}</span>
+                  <span class="bill-date label-mono">{{ formatDate(o.bill.date) }} · they paid</span>
+                </span>
+                <span class="bill-note fig">Paid back {{ money(o.paidCents ?? 0) }}</span>
+              </button>
+            }
             @for (bill of settledBills(b); track bill.tx.id) {
               <button type="button" class="bill settled" (click)="viewingTx.set(bill.tx)">
                 <span class="bill-main">
@@ -112,9 +130,9 @@
             }
           }
         </div>
-        @if (settledBills(b).length) {
+        @if (historyCount(b)) {
           <button type="button" class="btn-row history" (click)="toggleHistory(b.personId)">
-            {{ showingHistory().has(b.personId) ? 'Hide settled bills' : 'Show ' + settledBills(b).length + ' settled' }}
+            {{ showingHistory().has(b.personId) ? 'Hide history' : 'Show history (' + historyCount(b) + ')' }}
           </button>
         }
       </section>
@@ -135,13 +153,22 @@
 
 </div>
 
-<!-- RECORD A REPAYMENT, ACROSS BILLS -->
-<app-modal [open]="!!repaying()" [title]="'Repayment from ' + (repaying() ? people.nameOf(repaying()!.personId) : '')"
+<!-- RECORD A PAYMENT, EITHER WAY, ACROSS BILLS -->
+<app-modal [open]="!!repaying()" [title]="'Payment with ' + (repaying() ? people.nameOf(repaying()!.personId) : '')"
            size="sm" (closed)="closeRepay()">
   @if (repaying(); as b) {
     <div class="form">
       <div class="field">
-        <span class="label-sm">It came as</span>
+        <span class="label-sm">Who paid</span>
+        <div class="mini-seg" role="radiogroup" aria-label="Who paid">
+          <button type="button" role="radio" [class.active]="repayDir() === 'in'" [attr.aria-checked]="repayDir() === 'in'"
+                  (click)="setRepayDir('in')">{{ people.nameOf(b.personId) }} paid you</button>
+          <button type="button" role="radio" [class.active]="repayDir() === 'out'" [attr.aria-checked]="repayDir() === 'out'"
+                  (click)="setRepayDir('out')">You paid {{ people.nameOf(b.personId) }}</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label-sm">{{ repayDir() === 'out' ? 'You paid with' : 'It came as' }}</span>
         <div class="mini-seg" role="radiogroup" aria-label="How it came">
           <button type="button" role="radio" [class.active]="repayHow() === 'cash'" [attr.aria-checked]="repayHow() === 'cash'"
                   (click)="repayHow.set('cash')">Cash or other</button>
@@ -149,18 +176,30 @@
                   (click)="repayHow.set('bank')">A bank payment</button>
         </div>
         <p class="field-hint">
-          {{ repayHow() === 'bank'
-            ? 'A payment already in your transactions (Zelle, Venmo…). It stops counting as income.'
-            : "Money that didn't reach an account Trackr tracks." }}
+          @if (repayDir() === 'out') {
+            {{ repayHow() === 'bank'
+              ? 'A payment already in your transactions (Venmo, Zelle…). It counts as spending, under what it paid for.'
+              : "Money that didn't leave an account Trackr tracks, so it isn't in your spending." }}
+          } @else {
+            {{ repayHow() === 'bank'
+              ? 'A payment already in your transactions (Zelle, Venmo…). It stops counting as income.'
+              : "Money that didn't reach an account Trackr tracks." }}
+          }
         </p>
       </div>
 
       @if (repayHow() === 'bank') {
         <div class="field">
           <span class="label-sm">Which payment</span>
-          <app-transaction-picker [transactions]="incomeChoices()" [selectedId]="repayIncomeId()" name="repayIncome"
-                                  [matchCents]="repayable(b) ? repayableCents(b) : 0" [matchText]="people.nameOf(b.personId)"
-                                  (picked)="repayIncomeId.set($event.id!)" />
+          @if (repayDir() === 'out') {
+            <app-transaction-picker [transactions]="expenseChoices()" [selectedId]="repayExpenseId()" name="payExpense"
+                                    [matchCents]="payTarget()?.owedCents ?? 0" [matchText]="people.nameOf(b.personId)"
+                                    (picked)="repayExpenseId.set($event.id!)" />
+          } @else {
+            <app-transaction-picker [transactions]="incomeChoices()" [selectedId]="repayIncomeId()" name="repayIncome"
+                                    [matchCents]="repayable(b) ? repayableCents(b) : 0" [matchText]="people.nameOf(b.personId)"
+                                    (picked)="repayIncomeId.set($event.id!)" />
+          }
         </div>
       } @else {
         <div class="form-grid">
@@ -183,7 +222,27 @@
         </div>
       }
 
-      @if (preview().length) {
+      @if (repayDir() === 'out') {
+        @if (payPreview().length) {
+          <div class="field">
+            <span class="label-sm">Pays back{{ payTarget()?.groupId ? '' : ', oldest first' }}</span>
+            <div class="preview">
+              @for (p of payPreview(); track p.key) {
+                <div class="preview-row">
+                  <span>{{ p.name }} <span class="label-mono">{{ p.date ? formatDate(p.date) : 'Group' }}</span></span>
+                  <span class="fig">{{ money(p.amountCents) }}{{ p.amountCents >= p.ofCents ? '' : ' of ' + money(p.ofCents) }}</span>
+                </div>
+              }
+            </div>
+            @if (payExtraCents() > 0) {
+              <p class="field-hint">That's {{ money(payExtraCents()) }} more than you owe {{ payTarget()?.groupId ? 'in ' + payTarget()!.name : 'on their bills' }}, so {{ people.nameOf(b.personId) }} will owe you that back.</p>
+            }
+            @if (payTarget()?.groupId) {
+              <p class="field-hint">You don't owe on their bills outside groups, so this pays what you owe in {{ payTarget()!.name }}.</p>
+            }
+          </div>
+        }
+      } @else if (preview().length) {
         <div class="field">
           <span class="label-sm">Pays off, oldest first</span>
           <div class="preview">
@@ -235,3 +294,11 @@
   confirmText="Delete"
   (confirmed)="confirmTxDelete()"
   (cancelled)="txConfirmOpen.set(false)" />
+
+<app-confirm
+  [open]="!!removingCash()"
+  title="Remove this payment?"
+  [message]="removingCash() ? 'The ' + money(removingCash()!.amountCents) + ' you gave ' + people.nameOf(removingCash()!.personId) + ' comes off, and what you owe them goes back up.' : ''"
+  confirmText="Remove"
+  (confirmed)="removeCash()"
+  (cancelled)="removingCash.set(null)" />

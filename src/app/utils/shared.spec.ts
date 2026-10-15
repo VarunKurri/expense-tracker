@@ -137,3 +137,36 @@ describe('bills someone else paid, outside groups', () => {
       .find(b => b.personId === 'ben')?.iOweCents ?? 0).toBe(0);
   });
 });
+
+describe('paying someone back outside groups', () => {
+  const theirs = (id: string, date: string, cents: number): SharedBill => ({
+    id, date, merchant: id, createdAt: 0, updatedAt: 0,
+    split: { ...quickSplit(cents, [ME, 'ben']), payments: [{ personId: 'ben', amountCents: cents }] },
+  });
+  const bills = [theirs('concert', '2026-07-17', 59600), theirs('pizza', '2026-09-29', 2000)]; // you owe $298 + $10
+  const ledger = new (class extends MoneyBackLedger { transactions = () => [] as Transaction[]; })();
+  const ben = (paid: number) => balancesByPerson([], t => ledger.moneyBackEntriesFor(t), () => false, bills,
+    paid ? [{ personId: 'ben', amountCents: paid, date: '2026-10-01', txId: 'venmo' }] : [])[0];
+
+  it('pays their bills off oldest first; a bill paid in full moves to history', () => {
+    const b = ben(30000);
+    expect(b.owedByMe.map(o => [o.bill.id, o.cents, o.paidCents])).toEqual([['pizza', 800, 200]]);
+    expect(b.settledOwed.map(o => [o.bill.id, o.cents, o.paidCents])).toEqual([['concert', 0, 29800]]);
+    expect(b.iOweCents).toBe(800);
+    expect(b.netCents).toBe(-800);
+    expect(b.paidOut).toEqual([expect.objectContaining({ txId: 'venmo', amountCents: 30000 })]);
+  });
+
+  it('paying more than you owe flips it: they owe you the rest', () => {
+    const b = ben(31000);
+    expect(b.iOweCents).toBe(0);
+    expect(b.overpaidCents).toBe(200);
+    expect(b.netCents).toBe(200);
+    expect(withGroups([b], [])[0].netCents).toBe(200);
+  });
+
+  it('someone you have only paid still shows up', () => {
+    const only = balancesByPerson([], () => [], () => false, [], [{ personId: 'cara', amountCents: 500, date: '2026-10-01', paymentId: 'p' }]);
+    expect(only).toEqual([expect.objectContaining({ personId: 'cara', netCents: 500, overpaidCents: 500 })]);
+  });
+});

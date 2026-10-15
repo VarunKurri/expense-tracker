@@ -114,6 +114,14 @@ describe('TransactionView: money back', () => {
     expect(row.textContent).toContain('Paid Ben');
   });
 
+  it('Unlink makes it an ordinary expense again', async () => {
+    await open({ ...haircut, merchant: 'Venmo to Ben', settlement: { personId: 'ben' } });
+    const row = [...document.querySelectorAll('.view-row')].find(r => r.textContent!.includes('Settles up'))!;
+    (row.querySelector('button') as HTMLElement).click();
+    await settle();
+    expect(txs.transactions()[0].settlement).toBeUndefined();
+  });
+
   it('and says which categories it counts under: the shares it paid for', async () => {
     txs.settlementCategoryParts = () => [{ categoryId: '__none__', cents: 3 }, { categoryId: 'gas', cents: 1 }];
     await open({ ...haircut, merchant: 'Venmo to Ben', amount: 40, settlement: { personId: 'ben' } });

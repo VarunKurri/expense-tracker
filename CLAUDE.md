@@ -138,6 +138,12 @@ The app is what we copy. Do not "correct" this back to dark.
   the same editors serve your expenses and bills someone else paid (`SharedBill`,
   `users/{uid}/sharedBills`). Outside groups, what you owe on those shows on the
   payer's card on Shared, netted into one balance.
+  Paying them back outside groups: the Shared card's "Record a payment" has a
+  "Who paid" switch. "You paid them" links a bank payment (that expense gets
+  `settlement: { personId }`, so it's spending) or records cash on the person
+  (`SplitPerson.payments`). Both are `PaidOut` in `balancesByPerson`: they pay
+  their bills off oldest first, and paying more flips the balance. When you
+  owe nothing outside groups, it pays the group you owe them most in.
 - Odd cents: when a bill doesn't divide evenly, whoever paid takes the extra
   cent first, then bill order, unless the split names who (`roundUpIds`,
   picked in the editors' "Odd cents" row, `split-odd-cents`). Splitwise picks

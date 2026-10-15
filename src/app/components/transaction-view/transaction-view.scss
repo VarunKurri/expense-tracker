@@ -286,3 +286,6 @@
 
 /* The bill-someone-else-paid sheet (app-shared-bill-view) shares this stylesheet. */
 .view-paid-by { margin-top: 6px; font-size: 13px; color: var(--fg-3); }
+
+/* "Paid Nikhilesh · Tahoe Trip" with a small Unlink beside it. */
+.view-row-value.settles { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }

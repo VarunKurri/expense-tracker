@@ -16,6 +16,12 @@ export const ME = 'me';
 export interface SplitPerson {
   id?: string;
   name: string;
+  /**
+   * Cash (or anything outside your accounts) you handed them to pay them back
+   * for their bills outside groups. A bank payment is that expense instead,
+   * with `settlement`. In a group, both live on the group.
+   */
+  payments?: PersonPayment[];
   createdAt: number;
   updatedAt: number;
 }
@@ -67,6 +73,15 @@ export interface TransactionSplit {
    * default: whoever paid first, then in bill order.
    */
   roundUpIds?: string[];
+}
+
+/** Money you handed someone outside your accounts, outside any group. */
+export interface PersonPayment {
+  id: string;
+  amountCents: number;
+  /** YYYY-MM-DD */
+  date: string;
+  note?: string;
 }
 
 export type { Charges, Item, Payment };

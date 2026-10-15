@@ -265,6 +265,16 @@ export class TransactionView {
       .join(' · ');
   });
 
+  /** Not a settle-up after all: back to an ordinary expense, under its own category. */
+  async unsettle(t: Transaction) {
+    if (!t.id) return;
+    try {
+      await this.txService.update(t.id, { settlement: undefined });
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
+
   openGroup(id: string) {
     this.close();
     this.router.navigate(['/shared/groups', id]);

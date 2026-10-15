@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { SharedBill, Transaction, UntrackedReturn } from '../../models';
+import { ME, SharedBill, Transaction, UntrackedReturn } from '../../models';
 import { TransactionService } from '../../services/transaction.service';
 import { PersonService } from '../../services/person.service';
 import { GroupService } from '../../services/group.service';
@@ -21,7 +21,7 @@ import { fromCents, toCents } from '../../utils/money';
 import { isMoneyBackIncome, newReturnId } from '../../utils/money-back';
 import { localDateString } from '../../utils/date';
 import {
-  GroupPart, PersonBalance, BillShare, repayableCents, spreadRepayment,
+  GroupPart, PaidOut, PersonBalance, BillShare, repayableCents, spreadRepayment,
 } from '../../utils/shared';
 import { spreadReceived } from '../../utils/groups';
 
@@ -140,6 +140,46 @@ export class Shared {
     return b.allBills.filter(x => !b.openBills.includes(x));
   }
 
+  /** What "Show history" holds: your settled bills, their bills you've paid off, and what you've paid them. */
+  historyCount(b: PersonBalance): number {
+    return this.settledBills(b).length + b.settledOwed.length + b.paidOut.length;
+  }
+
+  /** "You owe $198.00 of $298.00" once you've paid part of it. */
+  owedNote(o: { cents: number; paidCents?: number }): string {
+    return o.paidCents ? `You owe ${this.money(o.cents)} of ${this.money(o.cents + o.paidCents)}` : `You owe ${this.money(o.cents)}`;
+  }
+
+  /** "Venmo to Nikhilesh" for a bank payment, "Cash · at dinner" otherwise. */
+  paidOutVia(p: PaidOut): string {
+    if (p.txId) return this.txService.transactions().find(t => t.id === p.txId)?.merchant || 'A bank payment';
+    return p.note ? `Cash · ${p.note}` : 'Cash or other';
+  }
+
+  /** A bank payment opens its sheet (where it can be unlinked); cash asks to remove it. */
+  openPaidOut(p: PaidOut) {
+    if (p.txId) {
+      const t = this.txService.transactions().find(x => x.id === p.txId);
+      if (t) this.viewingTx.set(t);
+    } else {
+      this.removingCash.set(p);
+    }
+  }
+
+  removingCash = signal<PaidOut | null>(null);
+
+  async removeCash() {
+    const p = this.removingCash();
+    this.removingCash.set(null);
+    const person = p && this.people.people().find(x => x.id === p.personId);
+    if (!p || !person?.id) return;
+    try {
+      await this.people.update(person.id, { payments: (person.payments ?? []).filter(x => x.id !== p.paymentId) });
+    } catch {
+      this.toast.error('Could not remove it. Please try again.');
+    }
+  }
+
   billNote(bill: BillShare): string {
     const s = bill.status;
     if (s.state === 'closed') return `Won't be repaid · ${this.money(s.outstandingCents)}`;
@@ -176,8 +216,48 @@ export class Shared {
     this.editingBill.set(null);
   }
 
-  // ── Record a repayment, across bills ───────────────────────
+  // ── Record a payment, either way, across bills ─────────────
   repaying = signal<PersonBalance | null>(null);
+  /** `in`: they paid you back. `out`: you paid them back. */
+  repayDir = signal<'in' | 'out'>('in');
+  repayExpenseId = signal('');
+
+  /** Anything to record with them: either of you owes the other, outside groups or in one. */
+  canRecord(b: PersonBalance): boolean {
+    return this.repayable(b) || b.iOweCents > 0 || b.groups.some(g => g.cents < 0);
+  }
+
+  /** Bank payments that could be what you sent: expenses not split and not already settling up. */
+  expenseChoices = computed(() => this.txService.transactions()
+    .filter(t => t.type === 'expense' && !t.isInternalTransfer && !t.split && !t.settlement));
+  private chosenExpense = computed(() => this.expenseChoices().find(t => t.id === this.repayExpenseId()) ?? null);
+
+  /**
+   * What a payment to them pays back: their bills outside groups if you owe on
+   * any, otherwise the group you owe them most in. One payment pays one of
+   * those; to pay a group as well, record it from the group's page.
+   */
+  payTarget = computed<{ groupId?: string; name: string; owedCents: number } | null>(() => {
+    const b = this.repaying();
+    if (!b) return null;
+    if (b.iOweCents > 0 || !b.groups.some(g => g.cents < 0)) return { name: 'their bills', owedCents: b.iOweCents };
+    const g = [...b.groups].sort((x, y) => x.cents - y.cents)[0];
+    return { groupId: g.groupId, name: g.name, owedCents: -g.cents };
+  });
+
+  /** A payment to them, oldest bill first, and how much of each it clears. */
+  payPreview = computed(() => {
+    const b = this.repaying(), target = this.payTarget();
+    if (!b || !target) return [];
+    if (target.groupId) return [{ key: target.groupId, name: target.name, date: '', amountCents: Math.min(this.repayCents(), target.owedCents), ofCents: target.owedCents }];
+    let left = this.repayCents();
+    return b.owedByMe.map(o => {
+      const take = Math.min(left, o.cents);
+      left -= take;
+      return { key: o.bill.id!, name: o.bill.merchant, date: o.bill.date, amountCents: take, ofCents: o.cents };
+    }).filter(r => r.amountCents > 0);
+  });
+  payExtraCents = computed(() => Math.max(0, this.repayCents() - (this.payTarget()?.owedCents ?? 0)));
   /** Cash (or anything outside your accounts), or a payment that synced from the bank. */
   repayHow = signal<'cash' | 'bank'>('cash');
   repayAmount = signal<number | null>(null);
@@ -197,9 +277,11 @@ export class Shared {
 
   private chosenIncome = computed(() => this.incomeChoices().find(t => t.id === this.repayIncomeId()) ?? null);
 
-  repayCents = computed(() => this.repayHow() === 'bank'
-    ? (this.chosenIncome() ? toCents(this.chosenIncome()!.amount) : 0)
-    : toCents(Number(this.repayAmount()) || 0));
+  repayCents = computed(() => {
+    if (this.repayHow() !== 'bank') return toCents(Number(this.repayAmount()) || 0);
+    const t = this.repayDir() === 'out' ? this.chosenExpense() : this.chosenIncome();
+    return t ? toCents(t.amount) : 0;
+  });
 
   /**
    * How a repayment lands: bills outside groups first (oldest first), then
@@ -245,8 +327,12 @@ export class Shared {
 
   openRepay(b: PersonBalance) {
     this.repaying.set(b);
+    // Whoever owes is who's likely paying: you, when you owe them overall.
+    const out = !this.repayable(b) || b.netCents < 0;
+    this.repayDir.set(out ? 'out' : 'in');
+    this.repayExpenseId.set('');
     this.repayHow.set('cash');
-    this.repayAmount.set(fromCents(repayableCents(b)));
+    this.repayAmount.set(fromCents(out ? (this.payTarget()?.owedCents ?? 0) : repayableCents(b)));
     this.repayDate.set(localDateString());
     this.repayNote.set('');
     this.repayIncomeId.set('');
@@ -256,9 +342,17 @@ export class Shared {
     this.repaying.set(null);
   }
 
+  /** Switch who paid; the amount follows to what that side owes. */
+  setRepayDir(dir: 'in' | 'out') {
+    const b = this.repaying();
+    this.repayDir.set(dir);
+    if (b) this.repayAmount.set(fromCents(dir === 'out' ? (this.payTarget()?.owedCents ?? 0) : repayableCents(b)));
+  }
+
   async saveRepay() {
     const b = this.repaying();
     if (!b || this.saving()) return;
+    if (this.repayDir() === 'out') { await this.savePayment(b); return; }
     const cents = this.repayCents();
     if (this.repayHow() === 'bank' && !this.chosenIncome()) { this.toast.error('Pick the payment it came as.'); return; }
     if (cents <= 0) { this.toast.error('Enter how much they paid back.'); return; }
@@ -291,6 +385,45 @@ export class Shared {
         }));
       }
       this.toast.success(`Recorded ${this.money(cents)} from ${this.people.nameOf(b.personId)}.`);
+      this.closeRepay();
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  /**
+   * You paid them: a bank payment is that expense, marked as settling up with
+   * them (it's spending, under what it paid for); cash goes on the person, or
+   * on the group when it pays a group.
+   */
+  private async savePayment(b: PersonBalance) {
+    const target = this.payTarget();
+    const cents = this.repayCents();
+    if (this.repayHow() === 'bank' && !this.chosenExpense()) { this.toast.error('Pick the payment you made.'); return; }
+    if (cents <= 0 || !target) { this.toast.error('Enter how much you paid.'); return; }
+    const date = this.repayDate() || localDateString();
+    const note = this.repayNote().trim();
+    this.saving.set(true);
+    try {
+      if (this.repayHow() === 'bank') {
+        await this.txService.update(this.chosenExpense()!.id!, {
+          settlement: { personId: b.personId, ...(target.groupId ? { groupId: target.groupId } : {}) },
+        });
+      } else if (target.groupId) {
+        const g = this.groups.byId(target.groupId)!;
+        await this.groups.update(target.groupId, { payments: [...(g.payments ?? []), {
+          id: newReturnId(), fromPersonId: ME, toPersonId: b.personId, amountCents: cents, date, ...(note ? { note } : {}),
+        }] });
+      } else {
+        const person = this.people.people().find(p => p.id === b.personId);
+        if (!person?.id) throw new Error('No such person');
+        await this.people.update(person.id, { payments: [...(person.payments ?? []), {
+          id: newReturnId(), amountCents: cents, date, ...(note ? { note } : {}),
+        }] });
+      }
+      this.toast.success(`Recorded ${this.money(cents)} to ${this.people.nameOf(b.personId)}.`);
       this.closeRepay();
     } catch {
       this.toast.error('Could not save. Please try again.');

@@ -22,7 +22,24 @@ export interface BillShare {
 /** A bill someone else paid (outside any group), and what you owe them on it. */
 export interface OwedBill {
   bill: SharedBill;
+  /** Still to pay them on it, after what you've paid them so far. */
   cents: number;
+  /** What your payments to them have paid off on it. */
+  paidCents?: number;
+}
+
+/**
+ * A payment you made someone outside any group: a bank payment (an expense
+ * with `settlement`, `txId`) or cash (`SplitPerson.payments`, `paymentId`).
+ * It pays off their bills oldest first.
+ */
+export interface PaidOut {
+  personId: string;
+  amountCents: number;
+  date: string;
+  txId?: string;
+  paymentId?: string;
+  note?: string;
 }
 
 /**
@@ -41,8 +58,14 @@ export interface PersonBalance {
   owedCents: number;
   /** Bills they paid that you owe them on (outside groups), oldest first. */
   owedByMe: OwedBill[];
-  /** What you owe them on those bills. */
+  /** What you still owe them on those bills, after your payments. */
   iOweCents: number;
+  /** Their bills your payments have paid off in full, newest first. */
+  settledOwed: OwedBill[];
+  /** What you've paid them outside groups, newest first. */
+  paidOut: PaidOut[];
+  /** Paid them beyond what their bills came to: it's theirs to pay back. */
+  overpaidCents: number;
   /** What they owe you (+) or you owe them (−) in each group. Empty until `withGroups`. */
   groups: GroupPart[];
   /** Everything together: bills either way outside groups, plus every group. Positive, they owe you. */
@@ -62,6 +85,7 @@ export function balancesByPerson(
   txs: Transaction[], moneyBackFor: (t: Transaction) => MoneyBackEntry[],
   inGroup: (t: Transaction) => boolean = () => false,
   otherPaid: SharedBill[] = [],
+  paidOut: PaidOut[] = [],
 ): PersonBalance[] {
   const byPerson = new Map<string, BillShare[]>();
   for (const tx of txs) {
@@ -80,6 +104,7 @@ export function balancesByPerson(
     }
   }
   for (const personId of owed.keys()) if (!byPerson.has(personId)) byPerson.set(personId, []);
+  for (const p of paidOut) if (!byPerson.has(p.personId)) byPerson.set(p.personId, []);
   const byDate = (a: BillShare, b: BillShare) => a.tx.date.localeCompare(b.tx.date) || a.tx.createdAt - b.tx.createdAt;
   return [...byPerson.entries()]
     .map(([personId, bills]) => {
@@ -87,15 +112,28 @@ export function balancesByPerson(
         .filter(b => b.status.outstandingCents > 0 && b.status.state !== 'closed')
         .sort(byDate);
       const owedCents = sum(openBills.map(b => b.status.outstandingCents));
-      const owedByMe = owed.get(personId) ?? [];
-      const iOweCents = sum(owedByMe.map(o => o.cents));
+      // What you've paid them pays off their bills, oldest first.
+      const mine = paidOut.filter(p => p.personId === personId).sort((a, b) => b.date.localeCompare(a.date));
+      let left = sum(mine.map(p => p.amountCents));
+      const open: OwedBill[] = [];
+      const settledOwed: OwedBill[] = [];
+      for (const o of owed.get(personId) ?? []) {
+        const paid = Math.min(left, o.cents);
+        left -= paid;
+        const row = { bill: o.bill, cents: o.cents - paid, ...(paid ? { paidCents: paid } : {}) };
+        (row.cents > 0 ? open : settledOwed).push(row);
+      }
+      const iOweCents = sum(open.map(o => o.cents));
       return {
         personId,
         owedCents,
-        owedByMe,
+        owedByMe: open,
         iOweCents,
+        settledOwed: settledOwed.reverse(),
+        paidOut: mine,
+        overpaidCents: left,
         groups: [],
-        netCents: owedCents - iOweCents,
+        netCents: owedCents - iOweCents + left,
         openBills,
         allBills: [...bills].sort(byDate).reverse(),
       };
@@ -121,7 +159,8 @@ export function withGroups(balances: PersonBalance[], plans: GroupPlan[]): Perso
   const get = (personId: string) => {
     let b = byPerson.get(personId);
     if (!b) {
-      b = { personId, owedCents: 0, owedByMe: [], iOweCents: 0, groups: [], netCents: 0, openBills: [], allBills: [] };
+      b = { personId, owedCents: 0, owedByMe: [], iOweCents: 0, settledOwed: [], paidOut: [], overpaidCents: 0,
+            groups: [], netCents: 0, openBills: [], allBills: [] };
       byPerson.set(personId, b);
     }
     return b;
@@ -138,7 +177,7 @@ export function withGroups(balances: PersonBalance[], plans: GroupPlan[]): Perso
     }
   }
   return [...byPerson.values()]
-    .map(b => ({ ...b, netCents: b.owedCents - b.iOweCents + sum(b.groups.map(p => p.cents)) }))
+    .map(b => ({ ...b, netCents: b.owedCents - b.iOweCents + b.overpaidCents + sum(b.groups.map(p => p.cents)) }))
     .sort((a, b) => b.netCents - a.netCents);
 }
 
