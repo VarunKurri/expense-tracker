@@ -61,6 +61,12 @@ export interface TransactionSplit {
   source: 'manual' | 'receipt';
   /** The group this bill belongs to (a trip, a flat), if any. See models/group.model.ts. */
   groupId?: string;
+  /**
+   * When the bill doesn't divide evenly: who pays the extra cent, chosen by
+   * hand (to match Splitwise, which picks per bill). Absent means the
+   * default: whoever paid first, then in bill order.
+   */
+  roundUpIds?: string[];
 }
 
 export type { Charges, Item, Payment };

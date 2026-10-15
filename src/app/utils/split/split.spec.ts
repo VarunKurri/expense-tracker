@@ -657,3 +657,50 @@ describe('calculateSplit: rounding once per bill (Trackr)', () => {
     }
   });
 });
+
+// Trackr addition (Part 110): who pays the odd cents can be chosen per bill,
+// because Splitwise picks per bill and matching it means picking the same.
+describe('calculateSplit: choosing who pays the odd cents (Trackr)', () => {
+  // Taco Chapala: Nikhilesh paid $85.00 for six, $14.1666… each.
+  const six = [person('nik', 'Nikhilesh'), person('lek', 'Lekhana'), person('sujai', 'Sujai'),
+    person('me', 'You'), person('priya', 'Priya'), person('vyb', 'Vybhav')];
+  const taco = (roundUpIds?: string[]): Bill => ({
+    ...bill(six, [item('i', 'Tacos', 8500, ...six.map((p) => p.id))], NO_CHARGES, [{ personId: 'nik', amountCents: 8500 }]),
+    roundUpIds,
+  });
+
+  it('by default the payer takes the first odd cent, then bill order', () => {
+    const result = calculateSplit(taco());
+    expect(result.perPerson.map((p) => p.totalCents)).toEqual([1417, 1417, 1417, 1417, 1416, 1416]);
+    expect(result.roundedUpIds).toEqual(['nik', 'lek', 'sujai', 'me']);
+    expect(result.roundableIds).toEqual(six.map((p) => p.id));
+  });
+
+  it("the chosen people pay the extra cent, as Splitwise had it", () => {
+    const result = calculateSplit(taco(['sujai', 'me', 'priya', 'vyb']));
+    expect(result.perPerson.map((p) => p.totalCents)).toEqual([1416, 1416, 1417, 1417, 1417, 1417]);
+    expect(result.roundedUpIds).toEqual(['sujai', 'me', 'priya', 'vyb']);
+    expect(result.reconciles).toBe(true);
+  });
+
+  it('picking fewer than the odd cents leaves the rest to the default', () => {
+    const result = calculateSplit(taco(['vyb']));
+    expect(result.roundedUpIds).toEqual(['nik', 'lek', 'sujai', 'vyb']);
+  });
+
+  it('picking more than the odd cents only uses as many as there are, in order', () => {
+    const result = calculateSplit(taco(['vyb', 'priya', 'me', 'sujai', 'lek']));
+    expect(result.roundedUpIds).toEqual(['sujai', 'me', 'priya', 'vyb']);
+  });
+
+  it('a share that is already whole never takes an extra cent', () => {
+    // $10.00 two ways is $5.00 each: no odd cent to give, so the choice changes nothing.
+    const people = [person('a', 'Alex'), person('b', 'Bri')];
+    const lunch: Item = { id: 'i', name: 'Lunch', priceCents: 1000, splitMode: 'shares',
+      assignments: [{ personId: 'a', weight: 1 }, { personId: 'b', weight: 1 }] };
+    const result = calculateSplit({ ...bill(people, [lunch], NO_CHARGES, [{ personId: 'a', amountCents: 1000 }]), roundUpIds: ['b'] });
+    expect(result.perPerson.map((p) => p.totalCents)).toEqual([500, 500]);
+    expect(result.roundedUpIds).toEqual([]);
+    expect(result.roundableIds).toEqual([]);
+  });
+});

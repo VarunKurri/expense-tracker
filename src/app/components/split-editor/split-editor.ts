@@ -13,6 +13,7 @@ import { SplitPayers } from './parts/split-payers';
 import { SplitProgress } from './parts/split-progress';
 import { SplitPeople } from './parts/split-people';
 import { SplitSummary } from './parts/split-summary';
+import { SplitOddCents } from './parts/split-odd-cents';
 
 export const SPLIT_MODES: { value: SplitMode; label: string }[] = [
   { value: 'equal', label: 'Equally' },
@@ -32,7 +33,7 @@ export const SPLIT_MODES: { value: SplitMode; label: string }[] = [
 @Component({
   selector: 'app-split-editor',
   standalone: true,
-  imports: [FormsModule, SplitPeople, SplitPayers, SplitProgress, SplitSummary],
+  imports: [FormsModule, SplitPeople, SplitPayers, SplitProgress, SplitSummary, SplitOddCents],
   templateUrl: './split-editor.html',
   styleUrl: './split-editor.scss',
 })
@@ -88,6 +89,11 @@ export class SplitEditor {
 
   setPayments(otherPayments: Payment[]) {
     this.state.update(s => ({ ...s, otherPayments }));
+  }
+
+  /** Who pays the odd cents: picked by hand, or undefined for the default. */
+  setRoundUps(roundUpIds: string[] | undefined) {
+    this.state.update(s => ({ ...s, roundUpIds }));
   }
 
   // ── How it's divided ───────────────────────────────────────

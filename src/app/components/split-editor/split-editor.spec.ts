@@ -151,6 +151,38 @@ describe('SplitEditor (quick split)', () => {
     expect(el.textContent).toContain('Ben owes Alex $20.00 (between them).');
   });
 
+  it("odd cents: pick who pays the extra cent, as Splitwise had it, and it's saved", async () => {
+    host.paid.set(1000); // $10.00 three ways: $3.3333 each, so one person pays $3.34
+    await addByName('Bri');
+    button('+ Alex').click();
+    await settle();
+    expect(el.textContent).toContain('one person pays 1¢ more');
+    const chip = (name: string) => [...el.querySelectorAll('.odd-cents .chip')].find(c => c.textContent!.trim() === name) as HTMLButtonElement;
+    expect(chip('You').classList).toContain('active'); // the payer, by default
+    expect(chip('Bri').disabled).toBe(true); // only one cent to give
+
+    chip('You').click();
+    await settle();
+    expect(el.textContent).toContain('Pick 1 more.');
+    chip('Bri').click();
+    await settle();
+    expect(host.state().roundUpIds).toEqual(['bri']);
+    const shares = saved().people.map(p => [p.personId, p.shareCents]);
+    expect(shares).toEqual([['bri', 334], ['alex', 333]]); // and you $3.33
+    expect(buildQuickSplit(host.state(), host.paid()).roundUpIds).toEqual(['bri']);
+
+    button('Use the default').click();
+    await settle();
+    expect(host.state().roundUpIds).toBeUndefined();
+    expect(chip('You').classList).toContain('active');
+  });
+
+  it('no odd cents, no picker', async () => {
+    host.paid.set(1000);
+    await addByName('Bri');
+    expect(el.querySelector('.odd-cents')).toBeNull();
+  });
+
   it('removing a person also removes them as a payer', async () => {
     button('+ Alex').click();
     await settle();

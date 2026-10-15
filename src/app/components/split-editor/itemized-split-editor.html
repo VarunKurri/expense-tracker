@@ -136,6 +136,8 @@
 <app-split-payers [payments]="state().otherPayments" (paymentsChange)="setPayments($event)" [candidates]="others()"
                   [hint]="paidBy() === me ? 'They paid the restaurant directly, alongside you.' : 'They paid directly, alongside ' + people.nameOf(paidBy()) + '.'" />
 
+<app-split-odd-cents [split]="split()" [chosen]="state().roundUpIds" (chosenChange)="setRoundUps($event)" />
+
 <app-split-summary [split]="split()" [myPaidCents]="myPaidCents()" [paidBy]="paidBy()" />
 
 @if (problems().includes('no-one-else')) {

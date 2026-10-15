@@ -89,6 +89,11 @@ export interface Bill {
   charges: Charges;
   payments: Payment[];
   settledPersonIds: ID[];
+  /**
+   * Trackr addition: who pays the odd cents when the bill doesn't divide
+   * evenly, before the default (whoever paid, then bill order).
+   */
+  roundUpIds?: ID[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -146,6 +151,13 @@ export interface BillSummary {
   unclaimedTaxCents: number;
   unclaimedTipCents: number;
   perPerson: PersonBreakdown[];
+  /**
+   * Trackr addition: who was rounded up a cent because the bill didn't divide
+   * evenly (their exact share had a fraction of a cent). Empty when it did.
+   */
+  roundedUpIds: ID[];
+  /** Trackr addition: everyone whose exact share has a fraction of a cent, so could take one. */
+  roundableIds: ID[];
   /** True when Σ person totals + unclaimed value equals the bill total exactly. */
   reconciles: boolean;
   /** Total recorded against the bill, across everyone who paid. */

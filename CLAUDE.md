@@ -135,6 +135,12 @@ The app is what we copy. Do not "correct" this back to dark.
   the same editors serve your expenses and bills someone else paid (`SharedBill`,
   `users/{uid}/sharedBills`). Outside groups, what you owe on those shows on the
   payer's card on Shared, netted into one balance.
+- Odd cents: when a bill doesn't divide evenly, whoever paid takes the extra
+  cent first, then bill order, unless the split names who (`roundUpIds`,
+  picked in the editors' "Odd cents" row, `split-odd-cents`). Splitwise picks
+  per bill, so that choice is how a group matches it to the cent. The engine
+  only ever gives the chosen people the cent their exact share already has a
+  fraction of, so nobody is more than a cent from exact.
 - A group credits each payment to whoever made it. Money back on a group
   expense that names nobody (an old reimbursement link) can only be credited
   by bill order, which is a guess: the group page lists those under "Who paid

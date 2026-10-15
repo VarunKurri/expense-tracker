@@ -124,8 +124,13 @@ export function sum(values: number[]): number {
  *
  * The exact amounts should add up to `total` (give or take float noise); if
  * they don't, they're scaled to it, as `allocate()` scales weights.
+ *
+ * `preferred` (indexes) take the odd cents before anyone else, whatever the
+ * remainders, so long as their amount isn't already whole: "these people pay
+ * the extra cent", as Splitwise picks per bill. Nobody still ends up more
+ * than a cent from exact.
  */
-export function allocateExact(total: number, exact: number[], priority: number[] = []): number[] {
+export function allocateExact(total: number, exact: number[], priority: number[] = [], preferred: number[] = []): number[] {
   const n = exact.length;
   if (n === 0) return [];
   const exactTotal = exact.reduce((s, v) => s + v, 0);
@@ -141,9 +146,14 @@ export function allocateExact(total: number, exact: number[], priority: number[]
 
   const rank = new Array<number>(n).fill(n);
   priority.forEach((index, position) => { if (index >= 0 && index < n && rank[index] === n) rank[index] = position; });
+  const pick = new Array<number>(n).fill(n);
+  preferred.forEach((index, position) => { if (index >= 0 && index < n && pick[index] === n) pick[index] = position; });
   const order = scaled
-    .map((v, index) => ({ index, frac: Math.round((v - Math.floor(v)) * 1e6) }))
-    .sort((a, b) => b.frac - a.frac || rank[a.index] - rank[b.index] || a.index - b.index);
+    .map((v, index) => {
+      const frac = Math.round((v - Math.floor(v)) * 1e6);
+      return { index, frac, pick: frac > 0 ? pick[index] : n };
+    })
+    .sort((a, b) => a.pick - b.pick || b.frac - a.frac || rank[a.index] - rank[b.index] || a.index - b.index);
 
   const result = [...floors];
   for (let i = 0; i < order.length && remainder > 0; i += 1) {

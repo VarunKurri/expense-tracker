@@ -52,6 +52,8 @@
 
 <app-split-payers [payments]="state().otherPayments" (paymentsChange)="setPayments($event)" [candidates]="others()" [hint]="payersHint()" />
 
+<app-split-odd-cents [split]="split()" [chosen]="state().roundUpIds" (chosenChange)="setRoundUps($event)" />
+
 <app-split-summary [split]="split()" [myPaidCents]="myPaidCents()" [paidBy]="paidBy()" />
 
 @if (problems().includes('no-one-else')) {

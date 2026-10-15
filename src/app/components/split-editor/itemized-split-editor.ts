@@ -15,6 +15,7 @@ import { SplitPayers } from './parts/split-payers';
 import { SplitProgress } from './parts/split-progress';
 import { SplitPeople } from './parts/split-people';
 import { SplitSummary } from './parts/split-summary';
+import { SplitOddCents } from './parts/split-odd-cents';
 import { SPLIT_MODES, balanceNote, parseWeight } from './split-editor';
 
 /**
@@ -28,7 +29,7 @@ import { SPLIT_MODES, balanceNote, parseWeight } from './split-editor';
 @Component({
   selector: 'app-itemized-split-editor',
   standalone: true,
-  imports: [FormsModule, SplitPeople, SplitPayers, SplitProgress, SplitSummary],
+  imports: [FormsModule, SplitPeople, SplitPayers, SplitProgress, SplitSummary, SplitOddCents],
   templateUrl: './itemized-split-editor.html',
   styleUrl: './itemized-split-editor.scss',
 })
@@ -79,6 +80,11 @@ export class ItemizedSplitEditor {
 
   remove(id: string) {
     this.state.set(removeFromItemized(this.state(), id));
+  }
+
+  /** Who pays the odd cents: picked by hand, or undefined for the default. */
+  setRoundUps(roundUpIds: string[] | undefined) {
+    this.state.update(s => ({ ...s, roundUpIds }));
   }
 
   setPayments(otherPayments: Payment[]) {

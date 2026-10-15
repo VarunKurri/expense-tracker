@@ -101,3 +101,10 @@
   line-height: 1.5;
   color: var(--fg-3);
 }
+
+/* Odd cents: who pays the extra 1¢. A full row can't take one more. */
+.odd-cents {
+  .people { margin-top: 2px; }
+  .chip:disabled { opacity: 0.45; cursor: default; }
+  .btn-row { align-self: flex-start; }
+}

@@ -87,6 +87,7 @@ export function toBill(split: TransactionSplit): Bill {
     charges: split.charges,
     payments: split.payments,
     settledPersonIds: [],
+    roundUpIds: split.roundUpIds,
   };
 }
 
@@ -324,6 +325,14 @@ export interface QuickSplitState {
   weights: Record<string, number>;
   /** Other people who paid the merchant part of the bill, in cents. */
   otherPayments: Payment[];
+  /** Who pays the odd cents, if chosen (`TransactionSplit.roundUpIds`). */
+  roundUpIds?: string[];
+}
+
+/** The chosen odd-cent payers still on the bill, or nothing to store. */
+function keptRoundUps(ids: string[] | undefined, participantIds: string[]): string[] | undefined {
+  const kept = (ids ?? []).filter(id => participantIds.includes(id));
+  return kept.length ? kept : undefined;
 }
 
 export function emptyQuickState(): QuickSplitState {
@@ -368,6 +377,8 @@ export function buildQuickSplit(
     state.participantIds.map(id => state.weights[id] ?? 0),
   );
   split.payments = payments(state, myPaidCents, payerId);
+  const roundUps = keptRoundUps(state.roundUpIds, state.participantIds);
+  if (roundUps) split.roundUpIds = roundUps;
   if (existing?.closedPersonIds?.length) split.closedPersonIds = [...existing.closedPersonIds];
   if (existing?.source) split.source = existing.source;
   return split;
@@ -383,6 +394,7 @@ export function quickStateFrom(split: TransactionSplit, payerId: string = ME): Q
     mode: item?.splitMode ?? 'equal',
     weights: item?.splitMode === 'equal' ? {} : weights,
     otherPayments: split.payments.filter(p => p.personId !== payerId).map(p => ({ ...p })),
+    ...(split.roundUpIds?.length ? { roundUpIds: [...split.roundUpIds] } : {}),
   };
 }
 
@@ -444,6 +456,8 @@ export interface ItemizedSplitState {
   otherPayments: Payment[];
   /** 'receipt' once the items came from a scanned receipt. */
   source?: TransactionSplit['source'];
+  /** Who pays the odd cents, if chosen (`TransactionSplit.roundUpIds`). */
+  roundUpIds?: string[];
 }
 
 let nextItem = 0;
@@ -508,6 +522,8 @@ export function buildItemizedSplit(
     payments: payments(state, myPaidCents, payerId),
     source: state.source ?? existing?.source ?? 'manual',
   };
+  const roundUps = keptRoundUps(state.roundUpIds, state.participantIds);
+  if (roundUps) split.roundUpIds = roundUps;
   if (existing?.closedPersonIds?.length) split.closedPersonIds = [...existing.closedPersonIds];
   return split;
 }
@@ -518,6 +534,7 @@ export function itemizedStateFrom(split: TransactionSplit, payerId: string = ME)
     items: split.items.map(i => ({ ...i, assignments: i.assignments.map(a => ({ ...a })) })),
     charges: { ...split.charges },
     otherPayments: split.payments.filter(p => p.personId !== payerId).map(p => ({ ...p })),
+    ...(split.roundUpIds?.length ? { roundUpIds: [...split.roundUpIds] } : {}),
     // Only a receipt is worth carrying; anything else saves as it was.
     ...(split.source === 'receipt' ? { source: 'receipt' as const } : {}),
   };

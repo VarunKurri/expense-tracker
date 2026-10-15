@@ -137,12 +137,23 @@ export function calculateSplit(bill: Bill): BillSummary {
   // Totals are rounded from the exact totals (not by adding rounded parts), so
   // two equal shares can't drift apart by a cent per part. Whatever the
   // phantom holds stays unclaimed exactly as in the parts above.
+  // Odd cents go to the people chosen for this bill first, if any.
   const unclaimedCents = subShares[phantom] + taxShares[phantom] + tipShares[phantom];
-  const totals = allocateExact(
-    totalCents - unclaimedCents,
-    people.map((p, i) => exactSubs[i] + exactTax[i] + exactTip[i]),
-    priority,
-  );
+  const exactTotals = people.map((p, i) => exactSubs[i] + exactTax[i] + exactTip[i]);
+  const claimedCents = totalCents - unclaimedCents;
+  const preferred = (bill.roundUpIds ?? []).map((id) => people.findIndex((p) => p.id === id)).filter((i) => i >= 0);
+  const totals = allocateExact(claimedCents, exactTotals, priority, preferred);
+  const exactSum = sum(exactTotals);
+  const scaledTotal = (i: number) =>
+    exactSum === 0 ? 0 : Math.round(((Math.abs(claimedCents) * exactTotals[i]) / exactSum) * 1e6) / 1e6;
+  const roundable = people.filter((p, i) => scaledTotal(i) !== Math.floor(scaledTotal(i)));
+  const roundableIds = roundable.map((p) => p.id);
+  const roundedUpIds = roundable
+    .filter((p) => {
+      const i = people.indexOf(p);
+      return Math.abs(totals[i]) > Math.floor(scaledTotal(i));
+    })
+    .map((p) => p.id);
 
   const perPerson: PersonBreakdown[] = people.map((person, index) => {
     const subtotal = subShares[index];
@@ -184,6 +195,8 @@ export function calculateSplit(bill: Bill): BillSummary {
     unclaimedTaxCents,
     unclaimedTipCents,
     perPerson,
+    roundedUpIds,
+    roundableIds,
     reconciles,
     paidCents,
     unpaidCents: totalCents - paidCents,
