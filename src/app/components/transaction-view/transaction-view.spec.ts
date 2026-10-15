@@ -92,6 +92,22 @@ describe('TransactionView: money back', () => {
     });
   });
 
+  it('a linked income asks refund or repayment only when it does not say who sent it', async () => {
+    const zelle: Transaction = { id: 'z', type: 'income', amount: 23, date: '2026-10-05', merchant: 'Sent by Alex', accountId: 'chk',
+      createdAt: 0, updatedAt: 0, reimbursesId: 'cut', moneyBackInfo: { source: 'repayment', fromPersonId: 'alex' } };
+    await open(zelle, [haircut]);
+    const sheet = () => document.querySelector('.view-reimburse')!.textContent!;
+    expect(sheet()).toContain('Repayment from Alex on');
+    expect(document.querySelector('[aria-label="Kind of money back"]')).toBeNull();
+  });
+
+  it('an income linked without saying who sent it can still be a refund or a repayment', async () => {
+    const refund: Transaction = { id: 'r', type: 'income', amount: 23, date: '2026-10-05', merchant: 'IN 2 CUTS REFUND', accountId: 'chk',
+      createdAt: 0, updatedAt: 0, reimbursesId: 'cut' };
+    await open(refund, [haircut]);
+    expect(document.querySelector('[aria-label="Kind of money back"]')).not.toBeNull();
+  });
+
   it('a payment that settles up with someone says so', async () => {
     await open({ ...haircut, merchant: 'Venmo to Ben', settlement: { personId: 'ben' } });
     const row = [...document.querySelectorAll('.view-row')].find(r => r.textContent!.includes('Settles up'))!;

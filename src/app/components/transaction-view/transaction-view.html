@@ -212,7 +212,7 @@
             <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink from all {{ moneyBackParts().length }}</button>
           } @else if (reimbursesExpense(); as exp) {
             <div class="reimburse-summary">
-              ↩ {{ sourceLabel(incomeSource(tx)) }} on <strong>{{ exp.merchant || 'an expense' }}</strong> ·
+              ↩ {{ sourceLabel(incomeSource(tx)) }}{{ fromLabel(tx.moneyBackInfo ?? {}) }} on <strong>{{ exp.merchant || 'an expense' }}</strong> ·
               @if (reimbursesSurplus() > 0) {
                 {{ formatCurrency(reimbursesCovered()) }} covered +
                 <strong class="amt-surplus">{{ formatCurrency(reimbursesSurplus()) }} surplus</strong>
@@ -220,10 +220,14 @@
                 {{ formatCurrency(exp.amount) }} on {{ formatDate(exp.date) }}
               }
             </div>
-            <div class="mini-seg" role="radiogroup" aria-label="Kind of money back">
-              <button type="button" role="radio" [class.active]="incomeSource(tx) === 'refund'" [attr.aria-checked]="incomeSource(tx) === 'refund'" (click)="setIncomeSource(tx, 'refund')">Refund</button>
-              <button type="button" role="radio" [class.active]="incomeSource(tx) === 'repayment'" [attr.aria-checked]="incomeSource(tx) === 'repayment'" (click)="setIncomeSource(tx, 'repayment')">Repayment</button>
-            </div>
+            <!-- Only when it doesn't say who sent it: money from a person is a repayment,
+                 never a store refund (as on a payment spread over several bills). -->
+            @if (!tx.moneyBackInfo?.fromPersonId) {
+              <div class="mini-seg" role="radiogroup" aria-label="Kind of money back">
+                <button type="button" role="radio" [class.active]="incomeSource(tx) === 'refund'" [attr.aria-checked]="incomeSource(tx) === 'refund'" (click)="setIncomeSource(tx, 'refund')">Refund</button>
+                <button type="button" role="radio" [class.active]="incomeSource(tx) === 'repayment'" [attr.aria-checked]="incomeSource(tx) === 'repayment'" (click)="setIncomeSource(tx, 'repayment')">Repayment</button>
+              </div>
+            }
             <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink</button>
           } @else {
             <p class="reimburse-hint">
