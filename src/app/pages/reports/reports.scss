@@ -351,8 +351,9 @@
   .tabs { padding: 0 8px; }
 }
 
-/* "Right now" under the period's split rows: today's balances, as on Shared.
-   A sub-section of the card, lined up with the lede above it. */
+/* Sub-sections of the Split bills card ("The bills", "What came back",
+   "Right now"): a hairline, an eyebrow and a sentence, lined up with the rows. */
+.split-sub,
 .split-now {
   display: flex;
   flex-direction: column;
@@ -364,6 +365,11 @@
 }
 @media (max-width: 768px) {
   /* Text in a card lines up with the table rows' 12px on phones. */
-  .split-now { padding: 18px 12px 10px; }
+  .split-sub, .split-now { padding: 18px 12px 10px; }
+  .hide-sm { display: none; }
   .split-lede, .table-note { padding-left: 12px; padding-right: 12px; }
 }
+
+/* The bills' total, under them. */
+.report-table .total-row td { font-weight: 600; color: var(--fg); border-top: 1px solid var(--line-strong); }
+.split-bills td:first-child { min-width: 0; }

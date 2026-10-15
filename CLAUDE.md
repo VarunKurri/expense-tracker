@@ -163,6 +163,9 @@ The app is what we copy. Do not "correct" this back to dark.
   `SharedBalanceService`, so they can't disagree. A period's split figures
   (`splitTotals`) include group bills: for those, "for others" is what you paid
   beyond your share and "paid back" is the money back on it.
+  Reports lists what's behind them: `splitBills` (one row per bill; the totals
+  are `addUpSplitBills` of the same rows, so they can't disagree) and
+  `splitPayments` (what came back, one row per payment).
 - Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`, `FakeSharedBills`).
 - Never centre a fixed panel with `transform`: it traps any pop-up inside it
   (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;

@@ -3,7 +3,7 @@ import { ME, Transaction } from '../models';
 import {
   MoneyRules, totalExpenses, totalIncome, spendingTransactions, incomeTransactions,
   categoryTotals, monthlySeries, monthsBetween, transferTotals, sankeyLinks, sankeyLabel,
-  NO_SPLITS, SplitTotals, splitTotals,
+  NO_SPLITS, SplitTotals, splitTotals, splitBills, splitPayments, addUpSplitBills,
 } from './reporting';
 import { MoneyBackLedger } from './money-back';
 import { quickSplit } from './splits';
@@ -344,5 +344,38 @@ describe('reporting: split bills', () => {
 
   it('nothing split: all zero', () => {
     expect(totalsOf([tx({ type: 'expense', amount: 20 })])).toEqual(NO_SPLITS);
+  });
+});
+
+describe('splitBills and splitPayments: the report behind the totals', () => {
+  class Ledger extends MoneyBackLedger {
+    constructor(public transactions: () => Transaction[]) { super(); }
+  }
+  const dinner = tx({ id: 'dinner', type: 'expense', amount: 90, date: '2026-09-05', merchant: 'Dinner', split: quickSplit(9000, [ME, 'a', 'b']) });
+  const lunch = tx({ id: 'lunch', type: 'expense', amount: 60, date: '2026-09-08', merchant: 'Lunch', split: quickSplit(6000, [ME, 'a', 'b']),
+    moneyBack: [{ id: 'c1', source: 'repayment', amountCents: 2000, date: '2026-09-09', fromPersonId: 'b', note: 'cash at the bar' }] });
+  // One Zelle from A for both bills: $30 dinner + $20 lunch.
+  const zelle = tx({ id: 'z', type: 'income', amount: 50, date: '2026-09-12', merchant: 'Zelle from A',
+    moneyBackSplits: [{ expenseId: 'dinner', amountCents: 3000 }, { expenseId: 'lunch', amountCents: 2000 }],
+    moneyBackInfo: { source: 'repayment', fromPersonId: 'a', coversPersonIds: ['a'] } });
+  const txs = [dinner, lunch, zelle];
+  const ledger = new Ledger(() => txs);
+  const mb = (t: Transaction) => ledger.moneyBackEntriesFor(t);
+
+  it('one row per bill, newest first, adding up to the totals; not back yet is never your share', () => {
+    const rows = splitBills(txs, mb);
+    expect(rows.map(r => [r.tx.id, r.paidCents, r.myShareCents, r.forOthersCents, r.repaidCents, r.owedCents])).toEqual([
+      ['lunch', 6000, 2000, 4000, 4000, 0],
+      ['dinner', 9000, 3000, 6000, 3000, 3000],
+    ]);
+    expect(addUpSplitBills(rows)).toEqual(splitTotals(txs, mb));
+    for (const r of rows) expect(r.owedCents).toBeLessThanOrEqual(r.forOthersCents);
+  });
+
+  it('lists what came back: the Zelle once (over both bills), and the cash', () => {
+    expect(splitPayments(splitBills(txs, mb), mb)).toEqual([
+      { fromPersonId: 'a', date: '2026-09-12', amountCents: 5000, incomeId: 'z', billIds: ['lunch', 'dinner'] },
+      { fromPersonId: 'b', date: '2026-09-09', amountCents: 2000, note: 'cash at the bar', billIds: ['lunch'] },
+    ]);
   });
 });

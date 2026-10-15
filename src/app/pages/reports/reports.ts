@@ -23,8 +23,13 @@ import { chartColors, categoryPalette, otherColor } from '../../utils/theme-colo
 import {
   MoneyRules, totalExpenses, totalIncome, categoryTotals, incomeTotals,
   monthlySeries, monthsBetween, transferTotals, sankeyLinks, sankeyLabel,
-  expenseAmount, splitTotals,
+  expenseAmount, splitBills, splitPayments, addUpSplitBills,
 } from '../../utils/reporting';
+import { PersonService } from '../../services/person.service';
+import { ToastService } from '../../services/toast.service';
+import { TransactionView } from '../../components/transaction-view/transaction-view';
+import { TransactionForm } from '../transactions/transaction-form/transaction-form';
+import { Confirm } from '../../components/confirm/confirm';
 import { splitStatus } from '../../utils/splits';
 import { splitSentence } from '../../utils/shared';
 import { fromCents, toCents } from '../../utils/money';
@@ -57,7 +62,7 @@ const VIEWS: Record<ReportKey, { id: string; label: string }[]> = {
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, TransactionView, TransactionForm, Confirm],
   templateUrl: './reports.html',
   styleUrl: './reports.scss',
 })
@@ -158,9 +163,93 @@ export class Reports implements AfterViewInit, OnDestroy {
 
   /** Split bills in the period: the "Split bills" rows under the numbers. */
   private groups = inject(GroupService);
-  /** Group bills included: for those, what you paid beyond your share, and the money back on it. */
-  splits = computed(() => splitTotals(this.filtered(), t => this.txService.moneyBackEntriesFor(t),
+  /** Each split bill in the period (group bills included: what you paid beyond your share, and the money back on it). */
+  splitRows = computed(() => splitBills(this.filtered(), t => this.txService.moneyBackEntriesFor(t),
     t => !!this.groups.byId(t.split?.groupId)));
+  /** Their totals: the summary rows. Added up from the same rows, so the list and the totals always agree. */
+  splits = computed(() => addUpSplitBills(this.splitRows()));
+  /** What came back on those bills, one row per payment. */
+  splitBackRows = computed(() => splitPayments(this.splitRows(), t => this.txService.moneyBackEntriesFor(t)));
+  /** Payments can run past what these bills' shares were (a friend overpaid, or paid for later bills too). */
+  splitBackExtraCents = computed(() =>
+    Math.max(0, this.splitBackRows().reduce((s, p) => s + p.amountCents, 0) - this.splits().repaidCents));
+
+  private people = inject(PersonService);
+
+  /** "Tahoe & Cali Trip" for a bill in a group, else nothing. */
+  groupName(id?: string): string {
+    return id ? this.groups.byId(id)?.name ?? '' : '';
+  }
+
+  /** "Vybhav", or "Someone" when the payment doesn't say. */
+  personName(id?: string): string {
+    return id ? this.people.nameOf(id) : 'Someone';
+  }
+
+  /** How it came: the income's name ("Zelle from VYBHAV J"), or cash. */
+  paymentVia(p: { incomeId?: string; note?: string }): string {
+    if (p.incomeId) return this.txService.transactions().find(t => t.id === p.incomeId)?.merchant || 'A bank payment';
+    return p.note ? `Cash · ${p.note}` : 'Cash or other';
+  }
+
+  /** "On BevMo!" / "On BevMo! and 2 more" */
+  paymentBills(ids: string[]): string {
+    const first = this.splitRows().find(r => r.tx.id === ids[0])?.tx.merchant || 'a bill';
+    return ids.length > 1 ? `on ${first} and ${ids.length - 1} more` : `on ${first}`;
+  }
+
+  /** "Sep 12" */
+  shortDate(date: string): string {
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  /** A bank payment opens the income it came as; cash opens the bill it paid back. */
+  openPayment(p: { incomeId?: string; billIds: string[] }) {
+    const all = this.txService.transactions();
+    const t = p.incomeId ? all.find(x => x.id === p.incomeId) : all.find(x => x.id === p.billIds[0]);
+    if (t) this.viewingTx.set(t);
+  }
+
+  // ── A transaction: read, edit, delete (the same sheet and form as everywhere) ──
+  private toast = inject(ToastService);
+  viewingTx = signal<Transaction | null>(null);
+  editingTx = signal<Transaction | null>(null);
+  txFormOpen = signal(false);
+  txConfirmOpen = signal(false);
+  private txToDelete = signal<Transaction | null>(null);
+
+  editFromTxView(tx: Transaction) {
+    this.viewingTx.set(null);
+    this.editingTx.set(tx);
+    this.txFormOpen.set(true);
+  }
+
+  closeTxForm() { this.txFormOpen.set(false); this.editingTx.set(null); }
+
+  async handleTxSave(data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
+    const tx = this.editingTx();
+    if (!tx?.id) return;
+    try { await this.txService.update(tx.id, data); this.closeTxForm(); }
+    catch { this.toast.error('Could not save. Please try again.'); }
+  }
+
+  askTxDelete() {
+    this.txToDelete.set(this.editingTx());
+    this.txFormOpen.set(false);
+    this.txConfirmOpen.set(true);
+  }
+
+  async confirmTxDelete() {
+    const tx = this.txToDelete();
+    if (!tx?.id) return;
+    try { await this.txService.remove(tx.id); }
+    catch { this.toast.error('Could not delete. Please try again.'); }
+    finally {
+      this.txConfirmOpen.set(false);
+      this.txToDelete.set(null);
+      this.editingTx.set(null);
+    }
+  }
   /** Who owes whom today, the same figures as Shared. */
   shared = inject(SharedBalanceService);
   /** "You covered $74.69 of other people's shares on 2 split bills in the last 6 months…" */

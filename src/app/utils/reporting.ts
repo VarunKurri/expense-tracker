@@ -244,32 +244,109 @@ export function splitTotals(
   txs: Transaction[], moneyBackFor: (t: Transaction) => MoneyBackEntry[],
   inGroup: (t: Transaction) => boolean = () => false,
 ): SplitTotals {
-  const totals = { ...NO_SPLITS };
+  return addUpSplitBills(splitBills(txs, moneyBackFor, inGroup));
+}
+
+/** One split bill in a period, the figures `SplitTotals` adds up. */
+export interface SplitBillRow extends Omit<SplitTotals, 'bills'> {
+  tx: Transaction;
+  /** Set when the bill is in a group that still exists. */
+  groupId?: string;
+}
+
+/** Totals of some bill rows: always what `splitTotals` says for the same bills. */
+export function addUpSplitBills(rows: SplitBillRow[]): SplitTotals {
+  const totals = { ...NO_SPLITS, bills: rows.length };
+  for (const r of rows) {
+    totals.paidCents += r.paidCents;
+    totals.myShareCents += r.myShareCents;
+    totals.forOthersCents += r.forOthersCents;
+    totals.repaidCents += r.repaidCents;
+    totals.owedCents += r.owedCents;
+    totals.wontBeRepaidCents += r.wontBeRepaidCents;
+  }
+  return totals;
+}
+
+/**
+ * The split bills among `txs`, one row each, newest first: what `splitTotals`
+ * adds up, for a report that lists them. "Not back yet" is only ever other
+ * people's shares; your own share is never expected back.
+ */
+export function splitBills(
+  txs: Transaction[], moneyBackFor: (t: Transaction) => MoneyBackEntry[],
+  inGroup: (t: Transaction) => boolean = () => false,
+): SplitBillRow[] {
+  const rows: SplitBillRow[] = [];
   for (const t of spendingTransactions(txs)) {
     if (!t.split) continue;
     const moneyBack = moneyBackFor(t);
     const status = splitStatus(t.split, moneyBack);
-    totals.bills++;
-    totals.paidCents += status.myPaidCents;
-    totals.myShareCents += status.myShareCents;
+    const row: SplitBillRow = {
+      tx: t, paidCents: status.myPaidCents, myShareCents: status.myShareCents,
+      forOthersCents: 0, repaidCents: 0, owedCents: 0, wontBeRepaidCents: 0,
+    };
     if (inGroup(t)) {
+      // Settled with the group: what you paid beyond your share, and the money back on it.
       const mine = billPositions(t.split, moneyBack).positions.find(p => p.personId === ME)?.netCents ?? 0;
       const forOthers = Math.max(0, mine);
-      const back = moneyBack.filter(e => e.source === 'repayment').reduce((s, e) => s + e.amountCents, 0);
-      const repaid = Math.min(forOthers, back);
-      totals.forOthersCents += forOthers;
-      totals.repaidCents += repaid;
-      totals.owedCents += forOthers - repaid;
-      continue;
+      const back = moneyBack.filter(e => e.source === 'repayment').reduce((sum, e) => sum + e.amountCents, 0);
+      row.groupId = t.split.groupId;
+      row.forOthersCents = forOthers;
+      row.repaidCents = Math.min(forOthers, back);
+      row.owedCents = forOthers - row.repaidCents;
+    } else {
+      for (const p of status.people) {
+        row.forOthersCents += p.dueToMeCents;
+        row.repaidCents += p.repaidCents;
+        if (p.state === 'closed') row.wontBeRepaidCents += p.outstandingCents;
+        else row.owedCents += p.outstandingCents;
+      }
     }
-    for (const p of status.people) {
-      totals.forOthersCents += p.dueToMeCents;
-      totals.repaidCents += p.repaidCents;
-      if (p.state === 'closed') totals.wontBeRepaidCents += p.outstandingCents;
-      else totals.owedCents += p.outstandingCents;
-    }
+    rows.push(row);
   }
-  return totals;
+  return rows.sort((a, b) => b.tx.date.localeCompare(a.tx.date));
+}
+
+/** One payment back on some split bills: a bank payment, or cash recorded by hand. */
+export interface SplitPaymentRow {
+  /** Who sent it, when it says. */
+  fromPersonId?: string;
+  date: string;
+  /** What came back on these bills (a payment can also cover bills outside them). */
+  amountCents: number;
+  /** The income it came as, when it's a bank payment. */
+  incomeId?: string;
+  note?: string;
+  /** The bills it paid back, by transaction id. */
+  billIds: string[];
+}
+
+/**
+ * The money that came back on some split bills, one row per payment, newest
+ * first. A payment spread over several bills (one Zelle for three dinners, or
+ * a group repayment) is gathered back into one row, as the group page does.
+ * Refunds aren't listed: they make the bill smaller rather than paying anyone back.
+ */
+export function splitPayments(rows: SplitBillRow[], moneyBackFor: (t: Transaction) => MoneyBackEntry[]): SplitPaymentRow[] {
+  const byKey = new Map<string, SplitPaymentRow>();
+  for (const r of rows) {
+    moneyBackFor(r.tx).filter(e => e.source === 'repayment').forEach((e, i) => {
+      const entryId = (e as { id?: string }).id;
+      const key = e.incomeId ? `i:${e.incomeId}` : e.batchId ? `b:${e.batchId}` : `e:${r.tx.id}:${entryId ?? i}`;
+      const from = e.fromPersonId ?? (e.coversPersonIds?.length === 1 ? e.coversPersonIds[0] : undefined);
+      const row = byKey.get(key) ?? {
+        date: e.date, amountCents: 0, billIds: [],
+        ...(from ? { fromPersonId: from } : {}),
+        ...(e.incomeId ? { incomeId: e.incomeId } : {}),
+        ...((e as { note?: string }).note ? { note: (e as { note?: string }).note } : {}),
+      };
+      row.amountCents += e.amountCents;
+      if (r.tx.id && !row.billIds.includes(r.tx.id)) row.billIds.push(r.tx.id);
+      byKey.set(key, row);
+    });
+  }
+  return [...byKey.values()].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export interface SankeyLink { from: string; to: string; flow: number; }
