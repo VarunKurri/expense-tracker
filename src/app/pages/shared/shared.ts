@@ -21,7 +21,7 @@ import { fromCents, toCents } from '../../utils/money';
 import { isMoneyBackIncome, newReturnId } from '../../utils/money-back';
 import { localDateString } from '../../utils/date';
 import {
-  GroupPart, PaidOut, PersonBalance, BillShare, repayableCents, spreadRepayment,
+  GroupPart, OwedBill, PaidOut, PersonBalance, BillShare, repayableCents, spreadRepayment, stillOwedCents,
 } from '../../utils/shared';
 import { spreadReceived } from '../../utils/groups';
 
@@ -145,9 +145,37 @@ export class Shared {
     return this.settledBills(b).length + b.settledOwed.length + b.paidOut.length;
   }
 
-  /** "You owe $198.00 of $298.00" once you've paid part of it. */
-  owedNote(o: { cents: number; paidCents?: number }): string {
-    return o.paidCents ? `You owe ${this.money(o.cents)} of ${this.money(o.cents + o.paidCents)}` : `You owe ${this.money(o.cents)}`;
+  /** "You owe $198.00 of $298.00" once you've paid part of it, or some was evened out. */
+  owedNote(o: OwedBill): string {
+    const done = (o.paidCents ?? 0) + (o.nettedCents ?? 0);
+    return done ? `You owe ${this.money(o.cents)} of ${this.money(o.cents + done)}` : `You owe ${this.money(o.cents)}`;
+  }
+
+  /** A bill of theirs you no longer owe on: paid back, evened out, or both. */
+  settledOwedNote(o: OwedBill): string {
+    const paid = o.paidCents ?? 0, netted = o.nettedCents ?? 0;
+    if (paid && netted) return `Paid back ${this.money(paid)} · ${this.money(netted)} evened out`;
+    return paid ? `Paid back ${this.money(paid)}` : `Evened out against what they owed · ${this.money(netted)}`;
+  }
+
+  /**
+   * A person's open bills, both ways, newest first, as Splitwise lists them:
+   * your bills they owe on, and their bills you owe on.
+   */
+  openTimeline(b: PersonBalance): ({ kind: 'mine'; date: string; bill: BillShare } | { kind: 'theirs'; date: string; owed: OwedBill })[] {
+    return [
+      ...b.openBills.map(bill => ({ kind: 'mine' as const, date: bill.tx.date, bill })),
+      ...b.owedByMe.map(owed => ({ kind: 'theirs' as const, date: owed.bill.date, owed })),
+    ].sort((x, y) => y.date.localeCompare(x.date));
+  }
+
+  /** History, newest first: payments you made them, their bills you've settled, your settled bills. */
+  historyTimeline(b: PersonBalance): ({ kind: 'paid'; date: string; paid: PaidOut } | { kind: 'theirs'; date: string; owed: OwedBill } | { kind: 'mine'; date: string; bill: BillShare })[] {
+    return [
+      ...b.paidOut.map(paid => ({ kind: 'paid' as const, date: paid.date, paid })),
+      ...b.settledOwed.map(owed => ({ kind: 'theirs' as const, date: owed.bill.date, owed })),
+      ...this.settledBills(b).map(bill => ({ kind: 'mine' as const, date: bill.tx.date, bill })),
+    ].sort((x, y) => y.date.localeCompare(x.date));
   }
 
   /** "Venmo to Nikhilesh" for a bank payment, "Cash · at dinner" otherwise. */
@@ -182,6 +210,11 @@ export class Shared {
 
   billNote(bill: BillShare): string {
     const s = bill.status;
+    const netted = bill.nettedCents ?? 0;
+    if (netted > 0) {
+      const left = stillOwedCents(bill);
+      return left > 0 ? `Owes ${this.money(left)} of ${this.money(s.outstandingCents)}` : `Evened out against what you owed · ${this.money(netted)}`;
+    }
     if (s.state === 'closed') return `Won't be repaid · ${this.money(s.outstandingCents)}`;
     if (s.state === 'repaid') return `Repaid ${this.money(s.repaidCents)}`;
     if (s.dueToMeCents === 0) return `Share ${this.money(s.shareCents)} · paid their way`;
@@ -318,7 +351,7 @@ export class Shared {
       ...bills.map(p => {
         const bill = b.openBills.find(x => x.tx.id === p.expenseId)!;
         return { key: p.expenseId, name: bill.tx.merchant || 'Expense', date: bill.tx.date,
-                 amountCents: p.amountCents, ofCents: bill.status.outstandingCents };
+                 amountCents: p.amountCents, ofCents: stillOwedCents(bill) };
       }),
       ...groups.map(g => ({ key: g.part.groupId, name: g.part.name, date: '', amountCents: g.cents, ofCents: g.part.cents })),
     ];

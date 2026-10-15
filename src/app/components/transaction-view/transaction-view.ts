@@ -22,6 +22,7 @@ import { RefundState, incomeLinks, newReturnId } from '../../utils/money-back';
 import { fromCents, toCents } from '../../utils/money';
 import { TransactionPicker } from '../transaction-picker/transaction-picker';
 import { spreadOverCategories } from '../../utils/settlements';
+import { SharedBalanceService } from '../../services/shared-balance.service';
 
 let nextLockId = 0;
 
@@ -283,8 +284,33 @@ export class TransactionView {
   /** Everyone on the bill but you. */
   splitOthers = computed(() => (this.tx()?.split?.participantIds ?? []).filter(id => id !== ME));
 
+  /**
+   * What on this bill was evened out against what you owed each person, the
+   * Shared page's one balance per person (utils/shared.ts). Bills in a group
+   * are settled with the group, so nothing here for them.
+   */
+  private netted = computed(() => {
+    const t = this.tx();
+    const out = new Map<string, number>();
+    if (!t?.split || t.type !== 'expense' || this.splitGroup()) return out;
+    for (const b of this.injector.get(SharedBalanceService).balances()) {
+      const share = b.allBills.find(x => x.tx.id === t.id);
+      if (share?.nettedCents) out.set(b.personId, share.nettedCents);
+    }
+    return out;
+  });
+
+  nettedFor(personId: string): number {
+    return this.netted().get(personId) ?? 0;
+  }
+
   /** The status line under a person's name, in plain words with no chip. */
   personStatus(p: PersonSplitStatus): string {
+    const netted = this.nettedFor(p.personId);
+    if (netted) {
+      const left = p.outstandingCents - netted;
+      return left > 0 ? `Owes you · ${this.formatCents(netted)} evened out` : 'Evened out against what you owed them';
+    }
     switch (p.state) {
       case 'owed': return 'Owes you';
       case 'partial': return `Paid back ${this.formatCents(p.repaidCents)} of ${this.formatCents(p.dueToMeCents)}`;
@@ -301,6 +327,8 @@ export class TransactionView {
 
   /** The figure on the right: what's still owed or, once settled, what came back. */
   personAmountCents(p: PersonSplitStatus): number {
+    const netted = this.nettedFor(p.personId);
+    if (netted) return Math.max(0, p.outstandingCents - netted) || netted;
     if (p.state === 'repaid') return p.repaidCents;
     if (p.state === 'none') return p.shareCents;
     return p.outstandingCents;

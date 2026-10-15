@@ -17,6 +17,16 @@ import { PersonSplitStatus, splitStatus } from './splits';
 export interface BillShare {
   tx: Transaction;
   status: PersonSplitStatus;
+  /**
+   * What on it was cancelled out by what you owed them (one balance per
+   * person, as Splitwise keeps it). Still owed: `outstandingCents − nettedCents`.
+   */
+  nettedCents?: number;
+}
+
+/** What they still owe on a bill of yours, after anything netted against it. */
+export function stillOwedCents(b: BillShare): number {
+  return Math.max(0, b.status.outstandingCents - (b.nettedCents ?? 0));
 }
 
 /** A bill someone else paid (outside any group), and what you owe them on it. */
@@ -26,6 +36,8 @@ export interface OwedBill {
   cents: number;
   /** What your payments to them have paid off on it. */
   paidCents?: number;
+  /** What was cancelled out by what they owed you. */
+  nettedCents?: number;
 }
 
 /**
@@ -111,7 +123,6 @@ export function balancesByPerson(
       const openBills = bills
         .filter(b => b.status.outstandingCents > 0 && b.status.state !== 'closed')
         .sort(byDate);
-      const owedCents = sum(openBills.map(b => b.status.outstandingCents));
       // What you've paid them pays off their bills, oldest first.
       const mine = paidOut.filter(p => p.personId === personId).sort((a, b) => b.date.localeCompare(a.date));
       let left = sum(mine.map(p => p.amountCents));
@@ -123,18 +134,35 @@ export function balancesByPerson(
         const row = { bill: o.bill, cents: o.cents - paid, ...(paid ? { paidCents: paid } : {}) };
         (row.cents > 0 ? open : settledOwed).push(row);
       }
-      const iOweCents = sum(open.map(o => o.cents));
+      // One balance per person, as Splitwise keeps it: what each of you owes
+      // the other cancels out, oldest bills first on both sides. Your payments
+      // count first, so a payment of "the difference" settles both sides.
+      let offset = Math.min(sum(openBills.map(b => b.status.outstandingCents)), sum(open.map(o => o.cents)));
+      let mineLeft = offset;
+      for (const b of openBills) {
+        const take = Math.min(mineLeft, b.status.outstandingCents);
+        if (take > 0) { b.nettedCents = take; mineLeft -= take; }
+      }
+      for (const o of open) {
+        const take = Math.min(offset, o.cents);
+        if (take > 0) { o.cents -= take; o.nettedCents = take; offset -= take; }
+      }
+      const stillOpen = openBills.filter(b => stillOwedCents(b) > 0);
+      const owedOpen = open.filter(o => o.cents > 0);
+      settledOwed.push(...open.filter(o => o.cents === 0));
+      const iOweCents = sum(owedOpen.map(o => o.cents));
+      const owedAfter = sum(stillOpen.map(stillOwedCents));
       return {
         personId,
-        owedCents,
-        owedByMe: open,
+        owedCents: owedAfter,
+        owedByMe: owedOpen,
         iOweCents,
-        settledOwed: settledOwed.reverse(),
+        settledOwed: settledOwed.sort((a, b) => b.bill.date.localeCompare(a.bill.date)),
         paidOut: mine,
         overpaidCents: left,
         groups: [],
-        netCents: owedCents - iOweCents + left,
-        openBills,
+        netCents: owedAfter - iOweCents + left,
+        openBills: stillOpen,
         allBills: [...bills].sort(byDate).reverse(),
       };
     })
@@ -203,7 +231,7 @@ export function spreadRepayment(openBills: BillShare[], amountCents: number): Re
   let left = amountCents;
   for (const bill of openBills) {
     if (left <= 0) break;
-    const take = Math.min(left, bill.status.outstandingCents);
+    const take = Math.min(left, stillOwedCents(bill));
     if (take > 0) parts.push({ expenseId: bill.tx.id!, amountCents: take });
     left -= take;
   }

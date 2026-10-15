@@ -126,7 +126,10 @@ describe('bills someone else paid, outside groups', () => {
       split: quickSplit(8000, [ME, 'ben']),
     } as Transaction;
     const [ben] = balancesByPerson([lunch], t => ledger.moneyBackEntriesFor(t), () => false, [benPaid(6000, [ME, 'ben'])]);
-    expect(ben).toMatchObject({ owedCents: 4000, iOweCents: 3000, netCents: 1000 });
+    // $40 they owe you and $30 you owe them even out: $10 left on your lunch, and you owe nothing.
+    expect(ben).toMatchObject({ owedCents: 1000, iOweCents: 0, netCents: 1000 });
+    expect(ben.openBills[0].nettedCents).toBe(3000);
+    expect(ben.settledOwed).toEqual([expect.objectContaining({ cents: 0, nettedCents: 3000 })]);
     // ...and groups add to it.
     const [withTrip] = withGroups([ben], [{ groupId: 'g', name: 'Trip', plan: [{ fromPersonId: ME, toPersonId: 'ben', amountCents: 500 }] }]);
     expect(withTrip.netCents).toBe(500);
@@ -168,5 +171,31 @@ describe('paying someone back outside groups', () => {
   it('someone you have only paid still shows up', () => {
     const only = balancesByPerson([], () => [], () => false, [], [{ personId: 'cara', amountCents: 500, date: '2026-10-01', paymentId: 'p' }]);
     expect(only).toEqual([expect.objectContaining({ personId: 'cara', netCents: 500, overpaidCents: 500 })]);
+  });
+});
+
+describe('Splitwise settles "the difference": your payment and what they owe you even out', () => {
+  it('Nikhilesh: ColdStone $7.68 he owes, the $298 concert you owe, you paid $290.32: both settled', () => {
+    const coldstone: Transaction = {
+      id: 'cs', type: 'expense', amount: 15.36, date: '2026-07-02', merchant: 'ColdStone', accountId: 'a', createdAt: 0, updatedAt: 0,
+      split: quickSplit(1536, [ME, 'nik']),
+    } as Transaction;
+    const pizza: Transaction = {
+      id: 'tp', type: 'expense', amount: 24.52, date: '2026-09-29', merchant: 'Tandoori Pizza', accountId: 'a', createdAt: 0, updatedAt: 0,
+      split: quickSplit(2452, [ME, 'nik']),
+    } as Transaction;
+    const concert: SharedBill = {
+      id: 'concert', date: '2026-07-17', merchant: 'Anirudh Concert', createdAt: 0, updatedAt: 0,
+      split: { ...quickSplit(29800, [ME]), payments: [{ personId: 'nik', amountCents: 29800 }] },
+    };
+    const ledger = new (class extends MoneyBackLedger { transactions = () => [coldstone, pizza]; })();
+    const [nik] = balancesByPerson([coldstone, pizza], t => ledger.moneyBackEntriesFor(t), () => false, [concert],
+      [{ personId: 'nik', amountCents: 29032, date: '2026-07-17', txId: 'venmo' }]);
+
+    expect(nik.owedByMe).toEqual([]); // the concert is settled
+    expect(nik.settledOwed).toEqual([expect.objectContaining({ cents: 0, paidCents: 29032, nettedCents: 768 })]);
+    expect(nik.openBills.map(b => b.tx.id)).toEqual(['tp']); // ColdStone evened out; only the pizza is open
+    expect(nik.allBills.find(b => b.tx.id === 'cs')!.nettedCents).toBe(768);
+    expect(nik.netCents).toBe(1226);
   });
 });

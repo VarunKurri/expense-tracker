@@ -144,6 +144,11 @@ The app is what we copy. Do not "correct" this back to dark.
   (`SplitPerson.payments`). Both are `PaidOut` in `balancesByPerson`: they pay
   their bills off oldest first, and paying more flips the balance. When you
   owe nothing outside groups, it pays the group you owe them most in.
+  Outside groups each person has **one balance**, as Splitwise keeps it: after
+  your payments, what each of you owes the other evens out, oldest bills first
+  on both sides (`nettedCents` on `BillShare` / `OwedBill`; `stillOwedCents`).
+  So paying "the difference" settles both sides. A bill's details sheet shows
+  the evened-out part too. Person cards list bills newest first (groups on top).
 - Odd cents: when a bill doesn't divide evenly, whoever paid takes the extra
   cent first, then bill order, unless the split names who (`roundUpIds`,
   picked in the editors' "Odd cents" row, `split-odd-cents`). Splitwise picks

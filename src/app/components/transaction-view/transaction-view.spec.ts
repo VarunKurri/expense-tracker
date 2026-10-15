@@ -1,6 +1,10 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { GroupService } from '../../services/group.service';
+import { SharedBillService } from '../../services/shared-bill.service';
+import { FakeGroups } from '../../testing/fake-groups';
+import { FakeSharedBills } from '../../testing/fake-shared-bills';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TransactionView } from './transaction-view';
 import { TransactionService } from '../../services/transaction.service';
@@ -88,6 +92,8 @@ describe('TransactionView: money back', () => {
         { provide: ManualAssetService, useValue: { items: signal([]) } },
         { provide: ToastService, useValue: { success() {}, error() {} } },
         { provide: ReceiptService, useFactory: () => (receipts = new FakeReceipts()) },
+        { provide: GroupService, useValue: new FakeGroups() },
+        { provide: SharedBillService, useValue: new FakeSharedBills() },
       ],
     });
   });
@@ -106,6 +112,17 @@ describe('TransactionView: money back', () => {
       createdAt: 0, updatedAt: 0, reimbursesId: 'cut' };
     await open(refund, [haircut]);
     expect(document.querySelector('[aria-label="Kind of money back"]')).not.toBeNull();
+  });
+
+  it('a split bill shows what was evened out against what you owed them', async () => {
+    (TestBed.inject(SharedBillService) as unknown as FakeSharedBills).bills.set([{
+      id: 'tents', date: '2026-10-01', merchant: 'Tents', createdAt: 0, updatedAt: 0,
+      split: { ...quickSplit(4000, [ME, 'ben']), payments: [{ personId: 'ben', amountCents: 4000 }] },
+    }]); // you owe Ben $20.00
+    await open({ ...haircut, amount: 60, split: quickSplit(6000, [ME, 'ben']) }); // Ben owes you $30.00
+    const ben = [...document.querySelectorAll('.split-person')].find(r => r.textContent!.includes('Ben'))!;
+    expect(ben.textContent).toContain('Owes you · $20.00 evened out');
+    expect(ben.querySelector('.split-person-amount')!.textContent).toContain('$10.00');
   });
 
   it('a payment that settles up with someone says so', async () => {

@@ -112,7 +112,8 @@ describe('Shared page', () => {
     const cards = [...el.querySelectorAll('.person')];
     expect(cards[0].textContent).toContain('Mrunaal');
     expect(cards[0].textContent).toContain('$85.00 across 3 bills');
-    expect([...cards[0].querySelectorAll('.bill-name')].map(b => b.textContent!.trim())).toEqual(['Ramen Bar', 'Pizza Place', 'Taco Stand']);
+    // Newest first, as Splitwise lists them.
+    expect([...cards[0].querySelectorAll('.bill-name')].map(b => b.textContent!.trim())).toEqual(['Taco Stand', 'Pizza Place', 'Ramen Bar']);
     expect(cards[1].textContent).toContain('$60.00 across 2 bills');
   });
 
@@ -211,8 +212,10 @@ describe('Shared page', () => {
       await settle();
       expect(el.textContent).toContain('Mrunaal owes you $15.00.');
       const card = [...el.querySelectorAll('.person')][0];
-      expect(card.textContent).toContain('$15.00 across 2 bills');
-      expect(card.textContent).toContain('You owe $10.00');
+      // The $10.00 you owe evens out against her pizza: one balance, as Splitwise keeps it.
+      expect(card.textContent).toContain('$15.00 across 1 bill');
+      expect(card.textContent).toContain('Owes $15.00 of $25.00');
+      expect(card.textContent).not.toContain('You owe $10.00');
     });
 
     it('tapping their bill opens a read-only sheet, and Edit opens the form', async () => {
@@ -347,7 +350,7 @@ describe('Shared page', () => {
       expect(el.querySelector('.hero .num-display')!.textContent).toContain('$100.00');
       const card = [...el.querySelectorAll('.person')][0];
       expect(card.textContent).toContain('$50.00 across 1 bill and Tahoe Trip');
-      expect([...card.querySelectorAll('.bill-name')].map(b => b.textContent!.trim())).toEqual(['Ramen Bar', 'Tahoe Trip']);
+      expect([...card.querySelectorAll('.bill-name')].map(b => b.textContent!.trim())).toEqual(['Tahoe Trip', 'Ramen Bar']); // groups first
       expect(card.textContent).toContain('Owes $20.00');
       // The group bill itself isn't listed per person: the group settles it.
       expect(el.textContent).not.toContain('Chevron');

@@ -71,24 +71,7 @@
         </div>
 
         <div class="bills">
-          @for (bill of b.openBills; track bill.tx.id) {
-            <button type="button" class="bill" (click)="viewingTx.set(bill.tx)">
-              <span class="bill-main">
-                <span class="bill-name">{{ bill.tx.merchant || 'Expense' }}</span>
-                <span class="bill-date label-mono">{{ formatDate(bill.tx.date) }}</span>
-              </span>
-              <span class="bill-note fig">{{ billNote(bill) }}</span>
-            </button>
-          }
-          @for (o of b.owedByMe; track o.bill.id) {
-            <button type="button" class="bill" (click)="openOtherPaid(o.bill)">
-              <span class="bill-main">
-                <span class="bill-name">{{ o.bill.merchant }}</span>
-                <span class="bill-date label-mono">{{ formatDate(o.bill.date) }} · they paid</span>
-              </span>
-              <span class="bill-note fig neg">{{ owedNote(o) }}</span>
-            </button>
-          }
+          <!-- Groups first: each is one running total, not one bill. -->
           @for (g of b.groups; track g.groupId) {
             @if (g.cents !== 0) {
               <a class="bill" [routerLink]="['/shared/groups', g.groupId]">
@@ -100,33 +83,57 @@
               </a>
             }
           }
+          <!-- Then every open bill, both ways, newest first. -->
+          @for (item of openTimeline(b); track $index) {
+            @if (item.kind === 'mine') {
+              <button type="button" class="bill" (click)="viewingTx.set(item.bill.tx)">
+                <span class="bill-main">
+                  <span class="bill-name">{{ item.bill.tx.merchant || 'Expense' }}</span>
+                  <span class="bill-date label-mono">{{ formatDate(item.bill.tx.date) }}</span>
+                </span>
+                <span class="bill-note fig">{{ billNote(item.bill) }}</span>
+              </button>
+            } @else {
+              <button type="button" class="bill" (click)="openOtherPaid(item.owed.bill)">
+                <span class="bill-main">
+                  <span class="bill-name">{{ item.owed.bill.merchant }}</span>
+                  <span class="bill-date label-mono">{{ formatDate(item.owed.bill.date) }} · they paid</span>
+                </span>
+                <span class="bill-note fig neg">{{ owedNote(item.owed) }}</span>
+              </button>
+            }
+          }
           @if (showingHistory().has(b.personId)) {
-            @for (p of b.paidOut; track $index) {
-              <button type="button" class="bill settled" (click)="openPaidOut(p)">
-                <span class="bill-main">
-                  <span class="bill-name">You paid {{ people.nameOf(b.personId) }}</span>
-                  <span class="bill-date label-mono">{{ formatDate(p.date) }} · {{ paidOutVia(p) }}</span>
-                </span>
-                <span class="bill-note fig">{{ money(p.amountCents) }}</span>
-              </button>
-            }
-            @for (o of b.settledOwed; track o.bill.id) {
-              <button type="button" class="bill settled" (click)="openOtherPaid(o.bill)">
-                <span class="bill-main">
-                  <span class="bill-name">{{ o.bill.merchant }}</span>
-                  <span class="bill-date label-mono">{{ formatDate(o.bill.date) }} · they paid</span>
-                </span>
-                <span class="bill-note fig">Paid back {{ money(o.paidCents ?? 0) }}</span>
-              </button>
-            }
-            @for (bill of settledBills(b); track bill.tx.id) {
-              <button type="button" class="bill settled" (click)="viewingTx.set(bill.tx)">
-                <span class="bill-main">
-                  <span class="bill-name">{{ bill.tx.merchant || 'Expense' }}</span>
-                  <span class="bill-date label-mono">{{ formatDate(bill.tx.date) }}</span>
-                </span>
-                <span class="bill-note fig">{{ billNote(bill) }}</span>
-              </button>
+            @for (item of historyTimeline(b); track $index) {
+              @switch (item.kind) {
+                @case ('paid') {
+                  <button type="button" class="bill settled" (click)="openPaidOut(item.paid)">
+                    <span class="bill-main">
+                      <span class="bill-name">You paid {{ people.nameOf(b.personId) }}</span>
+                      <span class="bill-date label-mono">{{ formatDate(item.paid.date) }} · {{ paidOutVia(item.paid) }}</span>
+                    </span>
+                    <span class="bill-note fig">{{ money(item.paid.amountCents) }}</span>
+                  </button>
+                }
+                @case ('theirs') {
+                  <button type="button" class="bill settled" (click)="openOtherPaid(item.owed.bill)">
+                    <span class="bill-main">
+                      <span class="bill-name">{{ item.owed.bill.merchant }}</span>
+                      <span class="bill-date label-mono">{{ formatDate(item.owed.bill.date) }} · they paid</span>
+                    </span>
+                    <span class="bill-note fig">{{ settledOwedNote(item.owed) }}</span>
+                  </button>
+                }
+                @case ('mine') {
+                  <button type="button" class="bill settled" (click)="viewingTx.set(item.bill.tx)">
+                    <span class="bill-main">
+                      <span class="bill-name">{{ item.bill.tx.merchant || 'Expense' }}</span>
+                      <span class="bill-date label-mono">{{ formatDate(item.bill.tx.date) }}</span>
+                    </span>
+                    <span class="bill-note fig">{{ billNote(item.bill) }}</span>
+                  </button>
+                }
+              }
             }
           }
         </div>
