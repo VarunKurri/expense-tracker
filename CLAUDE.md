@@ -159,6 +159,10 @@ The app is what we copy. Do not "correct" this back to dark.
   payment you sent is that expense with `settlement` (spending). Cash you
   sent goes on `Group.payments`. "Remove from group" unlinks; the bank
   transaction itself stays.
+- "Owed to you" / "You owe" right now (Shared, Analysis, Reports) all come from
+  `SharedBalanceService`, so they can't disagree. A period's split figures
+  (`splitTotals`) include group bills: for those, "for others" is what you paid
+  beyond your share and "paid back" is the money back on it.
 - Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`, `FakeSharedBills`).
 - Never centre a fixed panel with `transform`: it traps any pop-up inside it
   (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;

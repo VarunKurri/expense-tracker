@@ -14,6 +14,7 @@ import { SankeyController, Flow } from 'chartjs-chart-sankey';
 import { Transaction } from '../../models';
 import { TransactionService } from '../../services/transaction.service';
 import { GroupService } from '../../services/group.service';
+import { SharedBalanceService } from '../../services/shared-balance.service';
 import { CategoryService } from '../../services/category.service';
 import { ThemeService } from '../../services/theme.service';
 import { filterForAnalysis } from '../../utils/analysis-filter';
@@ -157,9 +158,11 @@ export class Reports implements AfterViewInit, OnDestroy {
 
   /** Split bills in the period: the "Split bills" rows under the numbers. */
   private groups = inject(GroupService);
-  /** Bills in a group are settled with the group, so they're left out of "Owed to you". */
+  /** Group bills included: for those, what you paid beyond your share, and the money back on it. */
   splits = computed(() => splitTotals(this.filtered(), t => this.txService.moneyBackEntriesFor(t),
     t => !!this.groups.byId(t.split?.groupId)));
+  /** Who owes whom today, the same figures as Shared. */
+  shared = inject(SharedBalanceService);
   /** "You covered $74.69 of other people's shares on 2 split bills in the last 6 months…" */
   splitText = computed(() => splitSentence(this.splits(), this.periodPhrase()));
 

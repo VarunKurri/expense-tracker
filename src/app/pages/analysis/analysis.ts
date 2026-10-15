@@ -7,6 +7,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TransactionService } from '../../services/transaction.service';
 import { GroupService } from '../../services/group.service';
+import { SharedBalanceService } from '../../services/shared-balance.service';
 import { AccountService } from '../../services/account.service';
 import { CategoryService } from '../../services/category.service';
 import { TransactionForm } from '../transactions/transaction-form/transaction-form';
@@ -229,9 +230,13 @@ export class Analysis implements AfterViewInit, OnDestroy {
   // ── Split bills ────────────────────────────────────────────
   /** Split bills in the period: your share, what you covered for others, what's come back. */
   private groups = inject(GroupService);
-  /** Bills in a group are settled with the group, so they're left out of "Owed to you". */
+  /** This period's split bills, groups included (a group bill counts what you paid beyond your share). */
   splits = computed(() => splitTotals(this.filtered(), t => this.txService.moneyBackEntriesFor(t),
     t => !!this.groups.byId(t.split?.groupId)));
+
+  /** Who owes whom right now, across everything: the Shared page's own figures. */
+  shared = inject(SharedBalanceService);
+  showShared = computed(() => this.splits().bills > 0 || this.shared.owedToMeCents() > 0 || this.shared.youOweCents() > 0);
 
   /** How the period reads in a sentence ("…on 2 split bills this month"). */
   private periodPhrase = computed(() => {

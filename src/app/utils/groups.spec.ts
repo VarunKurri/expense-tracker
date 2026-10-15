@@ -3,7 +3,7 @@ import { Group, ME, MoneyBackEntry, SharedBill, Transaction, TransactionSplit } 
 import { MoneyBackLedger } from './money-back';
 import { fromCents } from './money';
 import { sum } from './split/money';
-import { groupLedger, myPlan, spreadReceived, unassignedPayments } from './groups';
+import { groupByCategory, groupLedger, myPlan, spreadReceived, unassignedPayments } from './groups';
 import { quickSplit, splitStatus } from './splits';
 
 class Ledger extends MoneyBackLedger {
@@ -324,5 +324,21 @@ describe('refunds and the rest of the app', () => {
     // Beyond everything that was other people's: the rest is a surplus on the newest.
     expect(spread(10000)).toEqual([{ expenseId: older.id, amountCents: 3000 }, { expenseId: newer.id, amountCents: 7000 }]);
     expect(spreadReceived(TRIP, [], () => [], 1000)).toEqual([]);
+  });
+});
+
+describe('where the money went, by category', () => {
+  it('adds every bill up by category, whoever paid, biggest first, with your share', () => {
+    const { food, shared } = tahoe();
+    food.categoryId = 'dining';
+    shared[0].categoryId = 'gas';       // Gas $80, Alex paid
+    shared[1].categoryId = 'dining';    // Tents $200, Ben paid (filed under dining here, to add up)
+    // Utilities $45 has no category
+    const { ledger } = ledgerFor([food], shared);
+    expect(groupByCategory(ledger.bills)).toEqual([
+      { categoryId: 'dining', totalCents: 32000, myShareCents: 3000 + 5000, bills: 2 },
+      { categoryId: 'gas', totalCents: 8000, myShareCents: 2667, bills: 1 },
+      { totalCents: 4500, myShareCents: 3000, bills: 1 },
+    ]);
   });
 });

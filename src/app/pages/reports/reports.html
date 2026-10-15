@@ -257,10 +257,18 @@
           <tr><td>Your share</td><td class="right fig">{{ cents(splits().myShareCents) }}</td></tr>
           <tr><td>Paid for others</td><td class="right fig">{{ cents(splits().forOthersCents) }}</td></tr>
           <tr><td class="muted">Paid back</td><td class="right fig muted">{{ cents(splits().repaidCents) }}</td></tr>
-          <tr><td>Still owed to you</td><td class="right fig">{{ cents(splits().owedCents) }}</td></tr>
+          <tr><td>Not back yet</td><td class="right fig">{{ cents(splits().owedCents) }}</td></tr>
           @if (splits().wontBeRepaidCents > 0) {
             <tr><td class="muted">Won't be repaid</td><td class="right fig muted">{{ cents(splits().wontBeRepaidCents) }}</td></tr>
           }
+        </tbody>
+      </table>
+      <!-- Not the period: who owes whom today, the same figures as Shared. -->
+      <p class="label-mono split-now-label">Right now, across every bill and group</p>
+      <table class="report-table">
+        <tbody>
+          <tr><td>Owed to you</td><td class="right fig">{{ cents(shared.owedToMeCents()) }}</td></tr>
+          <tr><td>You owe</td><td class="right fig">{{ cents(shared.youOweCents()) }}</td></tr>
         </tbody>
       </table>
       <p class="table-note">

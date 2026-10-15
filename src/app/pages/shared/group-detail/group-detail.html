@@ -137,6 +137,26 @@
             <button type="button" class="btn-add" (click)="addOtherPaid()">+ Someone else paid</button>
           </div>
         </section>
+
+        <!-- WHERE IT WENT: every bill, whoever paid, by category -->
+        @if (byCategory().length > 1) {
+          <section class="card list-card">
+            <div class="list-head"><span class="card-label">By category</span></div>
+            <p class="list-intro">Where {{ g.name }}'s money went, whoever paid, and how much of each was yours.</p>
+            @for (c of byCategory(); track c.categoryId ?? '') {
+              <div class="row cat-row">
+                <span class="cat-main">
+                  <span class="row-name">@if (c.icon) { <span class="cat-icon" aria-hidden="true">{{ c.icon }}</span> }{{ c.name }}</span>
+                  <span class="cat-bar" aria-hidden="true"><span [style.width.%]="c.pct"></span></span>
+                </span>
+                <span class="cat-figs">
+                  <span class="row-amount fig">{{ money(c.totalCents) }}</span>
+                  <span class="cat-share">your share <span class="fig">{{ money(c.myShareCents) }}</span></span>
+                </span>
+              </div>
+            }
+          </section>
+        }
       }
     }
   </div>

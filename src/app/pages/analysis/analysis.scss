@@ -495,6 +495,9 @@
 }
 .split-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .split-figure { font-size: 34px; }
+/* "Owed to you" with "You owe" beside it, both right now. */
+.split-now { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; }
+.split-owe { color: var(--fg-2); font-size: 14px; .fig { color: var(--fg); font-weight: 600; } }
 .split-sentence { margin: 0; max-width: 560px; color: var(--fg-2); font-size: 14px; line-height: 1.5; }
 .split-hint { margin: 0; color: var(--fg-3); font-size: 12.5px; }
 

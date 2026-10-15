@@ -75,6 +75,22 @@
   p { color: var(--fg-3); font-size: 14px; line-height: 1.5; margin: 0; max-width: 460px; }
 }
 
+/* By category: a bar against the biggest, in the chart accent (it's data). */
+.cat-row { align-items: center; }
+.cat-main { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.cat-icon { margin-right: 8px; }
+.cat-bar {
+  display: block;
+  height: 4px;
+  max-width: 320px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-3);
+  overflow: hidden;
+  span { display: block; height: 100%; background: var(--blue); border-radius: inherit; }
+}
+.cat-figs { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.cat-share { font-size: 12.5px; color: var(--fg-3); white-space: nowrap; }
+
 /* The same editorial moment, smaller, inside a list card with nothing in it yet. */
 .list-empty {
   padding: 32px 24px 12px;

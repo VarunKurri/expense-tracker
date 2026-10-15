@@ -21,7 +21,8 @@ import { formatCurrency } from '../../../utils/format';
 import { fromCents, toCents } from '../../../utils/money';
 import { isMoneyBackIncome, newReturnId } from '../../../utils/money-back';
 import { localDateString } from '../../../utils/date';
-import { GroupBill, GroupMove, UnassignedPayment, groupLedger, spreadReceived, unassignedPayments } from '../../../utils/groups';
+import { GroupBill, GroupMove, UnassignedPayment, groupByCategory, groupLedger, spreadReceived, unassignedPayments } from '../../../utils/groups';
+import { CategoryService } from '../../../services/category.service';
 import type { Transfer } from '../../../utils/split/types';
 
 /**
@@ -81,6 +82,20 @@ export class GroupDetail {
 
   /** You, then the members, with where each stands. */
   balances = computed(() => this.ledger()?.balances ?? []);
+
+  // ── Where it went ──────────────────────────────────────────
+  private categoryService = inject(CategoryService);
+
+  /** Every bill by category, biggest first, with a bar against the biggest. */
+  byCategory = computed(() => {
+    const rows = groupByCategory(this.ledger()?.bills ?? []);
+    const top = rows[0]?.totalCents ?? 0;
+    const cats = this.categoryService.categories();
+    return rows.map(r => {
+      const cat = r.categoryId ? cats.find(c => c.id === r.categoryId) : undefined;
+      return { ...r, name: cat?.name ?? 'Uncategorized', icon: cat?.icon ?? '', pct: top ? Math.round((r.totalCents / top) * 100) : 0 };
+    });
+  });
 
   /** "Oct 3 – Oct 6 · You, Alex, Ben and Cara" */
   meta = computed(() => {

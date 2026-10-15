@@ -292,6 +292,17 @@ describe('reporting: split bills', () => {
     expect(identity(t)).toBe(true);
   });
 
+  it('a bill in a group counts too: what you paid beyond your share, and the money back on it', () => {
+    const l = (txs: Transaction[]) => new Ledger(() => txs);
+    const food = bill(12000, [ME, 'a', 'b'], { split: { ...quickSplit(12000, [ME, 'a', 'b']), groupId: 'trip' },
+      moneyBack: [repay('a', 5000)] });
+    const txs = [food];
+    const ledger = l(txs);
+    const t = splitTotals(txs, x => ledger.moneyBackEntriesFor(x), x => x.split?.groupId === 'trip');
+    expect(t).toEqual({ bills: 1, paidCents: 12000, myShareCents: 4000, forOthersCents: 8000, repaidCents: 5000, owedCents: 3000, wontBeRepaidCents: 0 });
+    expect(identity(t)).toBe(true);
+  });
+
   it('paid for others with no share of your own', () => {
     const t = totalsOf([bill(9000, ['a', 'b'])]);
     expect(t.myShareCents).toBe(0);

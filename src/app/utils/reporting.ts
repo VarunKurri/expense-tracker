@@ -1,6 +1,7 @@
 import { MoneyBackEntry, Transaction } from '../models';
 import { isFullyRefunded, isMoneyBackIncome } from './money-back';
-import { splitStatus } from './splits';
+import { billPositions, splitStatus } from './splits';
+import { ME } from '../models';
 import { fromCents, toCents } from './money';
 
 /**
@@ -232,6 +233,12 @@ export const NO_SPLITS: SplitTotals = {
  * Totals for the split bills among `txs` (already filtered to a period).
  * Per-bill arithmetic is `splitStatus`, the same numbers the transaction view
  * and the Shared page show, so the three can't disagree.
+ *
+ * A bill in a group (`inGroup`) is settled with the group, not person by
+ * person, so for it "for others" is simply what you paid beyond your share,
+ * and "paid back" is the money back on it, which is where a group puts what
+ * people pay you (`spreadReceived`). Either way the figures say how much of
+ * your spending is other people's, which is what these totals are for.
  */
 export function splitTotals(
   txs: Transaction[], moneyBackFor: (t: Transaction) => MoneyBackEntry[],
@@ -239,13 +246,22 @@ export function splitTotals(
 ): SplitTotals {
   const totals = { ...NO_SPLITS };
   for (const t of spendingTransactions(txs)) {
-    // A bill in a group is settled across the group (utils/groups.ts); its own
-    // "owed" figure would be wrong, so it's left out here.
-    if (!t.split || inGroup(t)) continue;
-    const status = splitStatus(t.split, moneyBackFor(t));
+    if (!t.split) continue;
+    const moneyBack = moneyBackFor(t);
+    const status = splitStatus(t.split, moneyBack);
     totals.bills++;
     totals.paidCents += status.myPaidCents;
     totals.myShareCents += status.myShareCents;
+    if (inGroup(t)) {
+      const mine = billPositions(t.split, moneyBack).positions.find(p => p.personId === ME)?.netCents ?? 0;
+      const forOthers = Math.max(0, mine);
+      const back = moneyBack.filter(e => e.source === 'repayment').reduce((s, e) => s + e.amountCents, 0);
+      const repaid = Math.min(forOthers, back);
+      totals.forOthersCents += forOthers;
+      totals.repaidCents += repaid;
+      totals.owedCents += forOthers - repaid;
+      continue;
+    }
     for (const p of status.people) {
       totals.forOthersCents += p.dueToMeCents;
       totals.repaidCents += p.repaidCents;

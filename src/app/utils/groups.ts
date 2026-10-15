@@ -364,3 +364,32 @@ export function unassignedPayments(
   }
   return [...byIncome.values(), ...cash].sort((a, b) => a.date.localeCompare(b.date));
 }
+
+/** One category's part of a group: what the bills in it came to, and your share. */
+export interface GroupCategory {
+  /** Absent for bills with no category. */
+  categoryId?: string;
+  totalCents: number;
+  myShareCents: number;
+  bills: number;
+}
+
+/**
+ * Where a group's money went, by category, biggest first: "Dining $280.24,
+ * your share $46.70". Covers every bill, whoever paid it, so it reads the
+ * whole trip the way Splitwise's "spending by category" does.
+ */
+export function groupByCategory(bills: GroupBill[]): GroupCategory[] {
+  const byId = new Map<string, GroupCategory>();
+  for (const b of bills) {
+    const key = b.categoryId ?? '';
+    const row = byId.get(key) ?? { ...(b.categoryId ? { categoryId: b.categoryId } : {}), totalCents: 0, myShareCents: 0, bills: 0 };
+    row.totalCents += b.totalCents;
+    row.myShareCents += b.myShareCents;
+    row.bills += 1;
+    byId.set(key, row);
+  }
+  return [...byId.values()]
+    .filter(r => r.totalCents > 0)
+    .sort((a, b) => b.totalCents - a.totalCents || Number(!a.categoryId) - Number(!b.categoryId));
+}

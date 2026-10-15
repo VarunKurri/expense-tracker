@@ -363,6 +363,23 @@ describe('Group page', () => {
     expect(rows(1)).toEqual(['You You get back $40.00', 'Alex Owes $40.00', 'Ben Square']);
   });
 
+  it('By category: where the money went, whoever paid, with your share', async () => {
+    TestBed.overrideProvider(CategoryService, { useValue: { categories: signal([
+      { id: 'dining', name: 'Dining', icon: '🍽️', kind: 'expense', createdAt: 0 },
+      { id: 'gear', name: 'Gear', icon: '⛺', kind: 'expense', createdAt: 0 },
+    ]) } });
+    await setup([{ ...food, categoryId: 'dining' }]);
+    sharedBills.bills.set([{
+      id: 'tents', date: '2026-09-13', merchant: 'REI', categoryId: 'gear', createdAt: 2, updatedAt: 2,
+      split: { ...quickSplit(9000, [ME, 'alex', 'ben']), payments: [{ personId: 'ben', amountCents: 9000 }], groupId: 'tahoe' },
+    }]);
+    await settle();
+    const card = [...el.querySelectorAll('.list-card')].find(c => c.textContent!.includes('By category'))!;
+    const lines = [...card.querySelectorAll('.cat-row')].map(r =>
+      [...r.querySelectorAll('.row-name, .row-amount, .cat-share')].map(x => x.textContent!.replace(/\s+/g, ' ').trim()).join(' | '));
+    expect(lines).toEqual(['🍽️Dining | $120.00 | your share $40.00', '⛺Gear | $90.00 | your share $30.00']);
+  });
+
   it('opening a bill shows it as part of the group', async () => {
     await setup([food]);
     (el.querySelector('.bill') as HTMLElement).click();

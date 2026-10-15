@@ -350,3 +350,6 @@
   .card-head, .controls, .legend { padding-left: 14px; padding-right: 14px; }
   .tabs { padding: 0 8px; }
 }
+
+/* "Right now" under the period's split rows: today's balances, as on Shared. */
+.split-now-label { display: block; margin: 18px 0 4px; color: var(--fg-3); }

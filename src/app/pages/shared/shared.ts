@@ -6,6 +6,7 @@ import { TransactionService } from '../../services/transaction.service';
 import { PersonService } from '../../services/person.service';
 import { GroupService } from '../../services/group.service';
 import { SharedBillService } from '../../services/shared-bill.service';
+import { SharedBalanceService } from '../../services/shared-balance.service';
 import { ToastService } from '../../services/toast.service';
 import { Modal } from '../../components/modal/modal';
 import { Confirm } from '../../components/confirm/confirm';
@@ -20,9 +21,9 @@ import { fromCents, toCents } from '../../utils/money';
 import { isMoneyBackIncome, newReturnId } from '../../utils/money-back';
 import { localDateString } from '../../utils/date';
 import {
-  GroupPart, PersonBalance, BillShare, balancesByPerson, repayableCents, spreadRepayment, totalOwedCents, totalYouOweCents, withGroups,
+  GroupPart, PersonBalance, BillShare, repayableCents, spreadRepayment,
 } from '../../utils/shared';
-import { groupLedger, spreadReceived } from '../../utils/groups';
+import { spreadReceived } from '../../utils/groups';
 
 const COUNT_WORDS = ['No one', 'One friend', 'Two friends', 'Three friends', 'Four friends', 'Five friends',
   'Six friends', 'Seven friends', 'Eight friends', 'Nine friends'];
@@ -50,18 +51,11 @@ export class Shared {
   private toast = inject(ToastService);
   private router = inject(Router);
 
-  /** Bills in a group that still exists are settled with the group, not here. */
-  private inGroup = (t: Transaction) => !!this.groups.byId(t.split?.groupId);
+  private shared = inject(SharedBalanceService);
 
   // ── Groups ─────────────────────────────────────────────────
-  /** Every group's ledger (utils/groups.ts), worked out once for the page. */
-  private ledgers = computed(() => this.groups.groups()
-    .filter(g => g.id)
-    .map(g => ({
-      group: g,
-      ledger: groupLedger(g as typeof g & { id: string }, this.txService.transactions(), this.sharedBills.bills(),
-        t => this.txService.moneyBackEntriesFor(t)),
-    })));
+  /** Every group's ledger (utils/groups.ts). */
+  private ledgers = this.shared.ledgers;
 
   /** Each group not put away, with where you stand in it. */
   groupRows = computed(() => this.ledgers()
@@ -95,18 +89,14 @@ export class Shared {
    * outside groups, plus what each group's settle-up plan has them paying you
    * (or you paying them).
    */
-  balances = computed(() => withGroups(
-    balancesByPerson(this.txService.transactions(), t => this.txService.moneyBackEntriesFor(t), this.inGroup,
-      this.sharedBills.bills().filter(b => !this.groups.byId(b.split.groupId))),
-    this.ledgers().map(({ group, ledger }) => ({ groupId: group.id!, name: group.name, plan: ledger.plan })),
-  ));
+  balances = this.shared.balances;
   /** Everyone you're not square with: they owe you, or you owe them. */
   open = computed(() => this.balances().filter(b => b.netCents !== 0 || b.openBills.length > 0 || b.owedByMe.length > 0));
   owing = computed(() => this.balances().filter(b => b.netCents > 0));
   /** People you've split with who are square with you. */
   square = computed(() => this.balances().filter(b => b.netCents === 0 && !b.openBills.length && !b.owedByMe.length));
-  totalOwedCents = computed(() => totalOwedCents(this.balances()));
-  totalYouOweCents = computed(() => totalYouOweCents(this.balances()));
+  totalOwedCents = this.shared.owedToMeCents;
+  totalYouOweCents = this.shared.youOweCents;
   anythingOwed = computed(() => this.totalOwedCents() > 0);
 
   /** "Mrunaal owes you $85.00." / "Three friends owe you $180.00." */

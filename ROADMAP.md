@@ -526,6 +526,20 @@ Three-part follow-up request building on Phase 10's credit-card strip and reimbu
   - **"Excluding refunded" didn't govern reimbursement netting anywhere, and one page skipped it entirely.** The toggle only ever touched `refunded`-flagged transactions; reimbursement netting always applied regardless of its state. Per the user's request, the two are now the same on/off switch — "Include refunded" means "count everything exactly as recorded": reimbursing income counts as ordinary income, expenses count at their full amount, no surplus folding. Applied to `analysis.ts` (`eff()`, `income`, `totalIncome`, `monthlyTrend`) and Transactions' analysis-view (`excludedFromAnalysis`, `totals`, `grouped`). Along the way, found `category-breakdown.ts` (the "see all categories" drill-through) had **never** applied reimbursement netting at all since it shipped in part 35/42 — a pre-existing gap, not something the user reported — fixed with the same toggle-gated `eff()` helper for consistency with the Analysis page it drills in from.
   - `ng build` passes clean. Deployed, pushed to `main`. Not yet re-verified on-device.
 
+## Phase 12: Split Bills, Groups And Settling Up (parts 91–113)
+
+Ported Split's engine (`utils/split/`, integer cents) and built Splitwise-style sharing on it.
+
+- [x] One-off splits (parts 91–99): quick and item-by-item splits, tax and tip, one "Money back" model for refunds and repayments, the Shared page, receipt scanning.
+- [x] Integer cents in loans and the Analysis/Reports totals (parts 100–101).
+- [x] Groups (parts 104–109): group balances, simplify debts, bills someone else paid, a read-only sheet for them, "Who paid you?" for unnamed money back, payments between friends.
+- [x] Matching Splitwise to the cent (part 110): pick who pays the odd cents on each bill (`roundUpIds`).
+- [x] Settling up with you against the whole group (part 111): link a Zelle/Venmo or enter cash, any amount; a settle-up expense counts as spending.
+- [x] One searchable transaction picker for every link (part 112, `app-transaction-picker`).
+- [x] Reporting (part 113): Analysis and Reports show "Owed to you" and "You owe" right now, as on Shared (`SharedBalanceService`); period split figures include group bills; a group's "By category" card.
+- [ ] Later, if wanted: your share of bills friends paid as spending by category before you settle (today it becomes spending only when you pay them, under whatever category the payment has).
+- [ ] Later, if wanted: Splitwise CSV import (dropped for now: groups are entered by hand).
+
 ---
 
 ### Session handoff (2026-08-27) — continue here
