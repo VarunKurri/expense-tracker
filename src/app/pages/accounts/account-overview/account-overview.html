@@ -37,6 +37,9 @@
         <div class="balance-value" [class.pos]="balance() >= 0" [class.neg]="balance() < 0">
           {{ balance() < 0 ? '−' : '' }}{{ formatCurrency(balance()) }}
         </div>
+        @if (bankNote(); as note) {
+          <p class="balance-source" [class.warn]="!note.ok">{{ note.text }}</p>
+        }
       </div>
     </div>
 

@@ -41,19 +41,21 @@ export function replacementCandidates(
 }
 
 /**
- * The account a new link already has here: the same bank, kind and last 4
- * digits, but from an earlier link. Linking a bank again (rather than Manage
- * accounts) gives every account a new Plaid id, and this is how it carries on
- * in the account you have instead of appearing twice.
+ * The account a Plaid account already is here: the same bank, kind and last 4
+ * digits, but on an id Plaid has stopped using. Linking a bank again gives
+ * every account a new id, and Chase can renumber accounts on the same link
+ * when you change which accounts it shares. Either way it carries on in the
+ * account you have instead of appearing twice.
  */
-export function sameAccountOnEarlierLink(
+export function sameBankAccount(
   accounts: Account[], institution: string, itemId: string, type: Account['type'], mask: string | null,
-  claimedIds: Set<string> = new Set(),
+  returnedPlaidIds: string[], claimedIds: Set<string> = new Set(),
 ): Account | undefined {
   if (!mask) return undefined;
   return accounts.find(a =>
-    !!a.id && !a.archived && !claimedIds.has(a.id) &&
-    !!a.plaidItemId && a.plaidItemId !== itemId &&
+    !!a.id && !a.archived && !claimedIds.has(a.id) && !!a.plaidItemId && !!a.plaidAccountId &&
+    // An earlier link, or this link under an id it no longer reports.
+    (a.plaidItemId !== itemId || !returnedPlaidIds.includes(a.plaidAccountId)) &&
     a.institution === institution && a.type === type && a.last4 === mask,
   );
 }
@@ -67,9 +69,10 @@ export function moveToLink(account: Account, plaidAccountId: string, plaidItemId
 }
 
 /**
- * Bank accounts that are here twice because the bank was linked again: the
- * same bank, kind and last 4 digits on different links. The first one made
- * stays (it has your history and edits); the copies fold into it.
+ * Bank accounts that are here twice: the same bank, kind and last 4 digits,
+ * because the bank was linked again or renumbered the account and it was
+ * added as new. The first one made stays (it has your history and edits); the
+ * copies fold into it, and it follows the newest (the id the bank uses now).
  */
 export function linkedTwice(accounts: Account[]): { keep: Account; copies: Account[] }[] {
   const groups = new Map<string, Account[]>();
@@ -80,9 +83,9 @@ export function linkedTwice(accounts: Account[]): { keep: Account; copies: Accou
   }
   const out: { keep: Account; copies: Account[] }[] = [];
   for (const list of groups.values()) {
-    if (new Set(list.map(a => a.plaidItemId)).size < 2) continue;
+    if (list.length < 2) continue;
     const [keep, ...copies] = [...list].sort((x, y) => (x.createdAt ?? 0) - (y.createdAt ?? 0));
-    out.push({ keep, copies: copies.filter(c => c.plaidItemId !== keep.plaidItemId) });
+    out.push({ keep, copies });
   }
-  return out.filter(g => g.copies.length > 0);
+  return out;
 }

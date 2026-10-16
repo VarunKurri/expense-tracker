@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Account } from '../models';
-import { accountForPlaidId, linkedTwice, moveToLink, replaceCard, replacementCandidates, sameAccountOnEarlierLink } from './plaid-accounts';
+import { accountForPlaidId, linkedTwice, moveToLink, replaceCard, replacementCandidates, sameBankAccount } from './plaid-accounts';
 
 const acc = (over: Partial<Account>): Account =>
   ({ id: 'a', name: 'Card', type: 'credit', openingBalance: 0, currency: 'USD', createdAt: 0, ...over }) as Account;
@@ -37,11 +37,17 @@ describe('a bank linked a second time', () => {
     plaidItemId: 'old-item', plaidAccountId: 'old', createdAt: 1 });
 
   it('finds the account you already have by bank, kind and last 4', () => {
-    expect(sameAccountOnEarlierLink([college], 'Chase', 'new-item', 'checking', '2107')?.id).toBe('college');
-    expect(sameAccountOnEarlierLink([college], 'Chase', 'new-item', 'checking', '9999')).toBeUndefined();
-    expect(sameAccountOnEarlierLink([college], 'Chase', 'new-item', 'savings', '2107')).toBeUndefined();
-    expect(sameAccountOnEarlierLink([college], 'Chase', 'old-item', 'checking', '2107')).toBeUndefined();
-    expect(sameAccountOnEarlierLink([college], 'Chase', 'new-item', 'checking', '2107', new Set(['college']))).toBeUndefined();
+    expect(sameBankAccount([college], 'Chase', 'new-item', 'checking', '2107', ['new'])?.id).toBe('college');
+    expect(sameBankAccount([college], 'Chase', 'new-item', 'checking', '9999', ['new'])).toBeUndefined();
+    expect(sameBankAccount([college], 'Chase', 'new-item', 'savings', '2107', ['new'])).toBeUndefined();
+    expect(sameBankAccount([college], 'Chase', 'new-item', 'checking', '2107', ['new'], new Set(['college']))).toBeUndefined();
+  });
+
+  it('finds it on the same link too, once the bank stops reporting its old id', () => {
+    // Chase renumbered the account when you changed what it shares.
+    expect(sameBankAccount([college], 'Chase', 'old-item', 'checking', '2107', ['renumbered'])?.id).toBe('college');
+    // Still reported: a different account that happens to share the digits.
+    expect(sameBankAccount([college], 'Chase', 'old-item', 'checking', '2107', ['old', 'other'])).toBeUndefined();
   });
 
   it('moves the account onto the new link, keeping every earlier id', () => {
@@ -56,6 +62,11 @@ describe('a bank linked a second time', () => {
     const groups = linkedTwice([copy, college, savings]);
     expect(groups.map(g => [g.keep.id, g.copies.map(c => c.id)])).toEqual([['college', ['copy']]]);
     expect(linkedTwice([college, savings])).toEqual([]);
+  });
+
+  it('folds a copy made on the same link (renumbered, then added as new)', () => {
+    const copy = acc({ ...college, id: 'copy', plaidAccountId: 'renumbered', createdAt: 2 });
+    expect(linkedTwice([college, copy]).map(g => [g.keep.id, g.copies.map(c => c.id)])).toEqual([['college', ['copy']]]);
   });
 
   it('offers the old link’s accounts as replacements too', () => {

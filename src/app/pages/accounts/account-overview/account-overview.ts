@@ -48,6 +48,27 @@ export class AccountOverview {
     return owesMoney(a.type) ? a.openingBalance - delta : (a.openingBalance || 0) + delta;
   });
 
+  /**
+   * Where a linked account's balance comes from, in a sentence. The balance is
+   * the bank's (see openingBalanceFor), so when it looks wrong this says why:
+   * the bank hasn't sent one, or stopped sending this account.
+   */
+  bankNote = computed<{ ok: boolean; text: string } | null>(() => {
+    const a = this.account();
+    if (!a?.plaidAccountId) return null;
+    const bank = a.institution || 'your bank';
+    if (a.plaidBalance == null || !a.plaidBalanceAt) {
+      return { ok: false, text: `${bank} hasn't sent this account's balance yet, so it's worked out from the opening balance. Sync on Accounts; if this stays, open Manage accounts on ${bank} and make sure this account is ticked.` };
+    }
+    const sameLink = this.accountService.accounts().filter(o => !o.archived && o.plaidItemId === a.plaidItemId && o.plaidBalanceAt);
+    const latest = Math.max(...sameLink.map(o => o.plaidBalanceAt!));
+    const when = (t: number) => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (latest - a.plaidBalanceAt > 6 * 3_600_000) {
+      return { ok: false, text: `${bank} stopped sending this account after ${when(a.plaidBalanceAt)}. If its number changed, open Manage accounts on ${bank} and tick it.` };
+    }
+    return { ok: true, text: `${bank}'s balance as of ${when(a.plaidBalanceAt)}.` };
+  });
+
   // This month's income and expenses for this account
   monthlyStats = computed(() => {
     const a = this.account();

@@ -203,7 +203,8 @@ The app is what we copy. Do not "correct" this back to dark.
   arriving later (a relink sends it all again) would move the balance.
   Linking a bank a second time gives every row a new Plaid id. A Plaid account
   matching an earlier link's account (same bank, type and last 4) carries on in
-  that account (`sameAccountOnEarlierLink`, `moveToLink`); copies already made
+  that account (`sameBankAccount`, which also catches Chase renumbering an account on
+  the same link, and `moveToLink`); copies already made, on either link,
   are folded back on sync (`linkedTwice`). The rows the second link sent again
   are paired by `relinkDuplicates` (utils/relink-duplicates.ts: only between two
   Plaid ids of one account, same amount and direction, within 3 days, never a

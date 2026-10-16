@@ -10,7 +10,7 @@ import { TransactionService } from './transaction.service';
 import { ReconciliationService } from './reconciliation.service';
 import { ToastService } from './toast.service';
 import { Account, AccountType } from '../models';
-import { accountForPlaidId, linkedTwice, moveToLink, replacementCandidates, sameAccountOnEarlierLink } from '../utils/plaid-accounts';
+import { accountForPlaidId, linkedTwice, moveToLink, replacementCandidates, sameBankAccount } from '../utils/plaid-accounts';
 
 /** A linked bank (Plaid item). Metadata is plaintext; the access token is not stored here. */
 export interface PlaidItem {
@@ -252,10 +252,10 @@ export class PlaidService {
         // An id an account has moved on from (a replaced card the bank still
         // reports, or the old link of a bank linked again): already handled.
         if (!match && accountForPlaidId(existing, a.account_id)) continue;
-        // The same account (bank, kind, last 4) from an earlier link of this
-        // bank: it carries on in the account you have, never a second copy.
+        // The same account (bank, kind, last 4) on an id the bank stopped
+        // using: it carries on in the account you have, never a second copy.
         const type = mapPlaidAccountType(a.type, a.subtype);
-        const same = match ? undefined : sameAccountOnEarlierLink(existing, institutionName, itemId, type, a.mask, claimed);
+        const same = match ? undefined : sameBankAccount(existing, institutionName, itemId, type, a.mask, returnedIds, claimed);
         if (same?.id) {
           claimed.add(same.id);
           await this.accountSvc.update(same.id, {
@@ -390,7 +390,7 @@ export class PlaidService {
             archived: true, plaidAccountId: undefined, plaidItemId: undefined, previousPlaidAccountIds: undefined,
           });
         }
-        this.toast.info(`${keep.name} was linked twice. It's one account again; check Transactions for duplicates.`);
+        this.toast.info(`${keep.name} was here twice. It's one account again; check Transactions for duplicates.`);
       } catch (err) {
         console.error('foldLinkedTwice failed:', err);
       }
