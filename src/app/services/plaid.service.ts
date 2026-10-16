@@ -10,9 +10,7 @@ import { TransactionService } from './transaction.service';
 import { ReconciliationService } from './reconciliation.service';
 import { ToastService } from './toast.service';
 import { Account, AccountType } from '../models';
-import { owesMoney } from '../utils/finance';
-import { roundMoney } from '../utils/finance';
-import { replaceCard, replacementCandidates } from '../utils/plaid-accounts';
+import { accountForPlaidId, linkedTwice, moveToLink, replacementCandidates, sameAccountOnEarlierLink } from '../utils/plaid-accounts';
 
 /** A linked bank (Plaid item). Metadata is plaintext; the access token is not stored here. */
 export interface PlaidItem {
@@ -243,11 +241,29 @@ export class PlaidService {
       const existing = this.accountSvc.accounts();
       // A bank linked before has its accounts already: anything new on it is
       // asked about (a replaced card?) instead of being added as a second card.
-      const askAboutNew = existing.some(acc => acc.plaidItemId === itemId);
+      // That includes the same bank linked a second time.
+      const askAboutNew = existing.some(acc =>
+        acc.plaidItemId === itemId || (!!acc.plaidItemId && !acc.archived && acc.institution === institutionName));
       const returnedIds = data.accounts.map(a => a.account_id);
+      const claimed = new Set(existing.filter(acc => returnedIds.includes(acc.plaidAccountId ?? '')).map(acc => acc.id!));
 
       for (const a of data.accounts) {
         const match = existing.find(acc => acc.plaidAccountId === a.account_id);
+        // An id an account has moved on from (a replaced card the bank still
+        // reports, or the old link of a bank linked again): already handled.
+        if (!match && accountForPlaidId(existing, a.account_id)) continue;
+        // The same account (bank, kind, last 4) from an earlier link of this
+        // bank: it carries on in the account you have, never a second copy.
+        const type = mapPlaidAccountType(a.type, a.subtype);
+        const same = match ? undefined : sameAccountOnEarlierLink(existing, institutionName, itemId, type, a.mask, claimed);
+        if (same?.id) {
+          claimed.add(same.id);
+          await this.accountSvc.update(same.id, {
+            ...moveToLink(same, a.account_id, itemId),
+            ...(a.current_balance != null ? { plaidBalance: a.current_balance, plaidBalanceAt: Date.now() } : {}),
+          });
+          continue;
+        }
         if (match) {
           // Already created, so backfill any credit-card fields Plaid now reports
           // that we didn't have yet (covers accounts created before these fields
@@ -266,37 +282,23 @@ export class PlaidService {
           if (a.last_payment_date && a.last_payment_date !== match.lastPaymentDate) patch.lastPaymentDate = a.last_payment_date;
           if (a.last_payment_amount != null && a.last_payment_amount !== match.lastPaymentAmount) patch.lastPaymentAmount = a.last_payment_amount;
           if (a.is_overdue != null && a.is_overdue !== match.statementOverdue) patch.statementOverdue = a.is_overdue;
-          // One-time opening-balance reconciliation: accounts are auto-created with
-          // openingBalance 0, so the locally-computed balance only reflects whatever
-          // history Plaid happened to sync, so it's wrong whenever the real account had
-          // activity before that window. Once Plaid reports a real current_balance,
-          // back-solve the opening balance that makes our formula land on it exactly,
-          // using whatever's already synced locally at that moment. Only ever runs
-          // once per account (flagged), so it never fights with balance changes the
-          // user makes afterward.
-          // A loan account created before 'loan' existed came in as checking. Correct
-          // it, and re-seed its opening balance with the owed-money formula.
-          if (a.type === 'loan' && match.type !== 'loan') {
-            patch.type = 'loan';
-            if (a.current_balance != null && match.id) {
-              patch.openingBalance = roundMoney(a.current_balance + this.txService.balanceForAccount(match.id));
-              patch.openingBalanceSeeded = true;
-            }
-          }
-          if (!match.openingBalanceSeeded && !patch.openingBalanceSeeded && a.current_balance != null && match.id) {
-            const txDelta = this.txService.balanceForAccount(match.id);
-            patch.openingBalance = roundMoney(
-              owesMoney(match.type) ? a.current_balance + txDelta : a.current_balance - txDelta,
-            );
-            patch.openingBalanceSeeded = true;
+          // A loan account created before 'loan' existed came in as checking.
+          if (a.type === 'loan' && match.type !== 'loan') patch.type = 'loan';
+          // The bank's balance is the balance (see openingBalanceFor), read fresh
+          // every sync. It replaced a one-time seed of the opening balance, which
+          // went wrong whenever more history arrived later (a relink sends it all
+          // again).
+          if (a.current_balance != null) {
+            patch.plaidBalance = a.current_balance;
+            patch.plaidBalanceAt = Date.now();
           }
           if (Object.keys(patch).length > 0 && match.id) await this.accountSvc.update(match.id, patch);
           continue;
         }
         if (askAboutNew) {
-          const type = mapPlaidAccountType(a.type, a.subtype);
           this.pendingNewAccounts.update(list => list.some(p => p.plaid.account_id === a.account_id) ? list : [...list, {
-            itemId, institutionName, plaid: a, candidates: replacementCandidates(existing, itemId, type, returnedIds),
+            itemId, institutionName, plaid: a,
+            candidates: replacementCandidates(existing, itemId, type, returnedIds, institutionName),
           }]);
           continue;
         }
@@ -327,6 +329,7 @@ export class PlaidService {
       ...(a.last_payment_date ? { lastPaymentDate: a.last_payment_date } : {}),
       ...(a.last_payment_amount != null ? { lastPaymentAmount: a.last_payment_amount } : {}),
       ...(a.is_overdue != null ? { statementOverdue: a.is_overdue } : {}),
+      ...(a.current_balance != null ? { plaidBalance: a.current_balance, plaidBalanceAt: Date.now() } : {}),
       plaidAccountId: a.account_id,
       plaidItemId: itemId,
       archived: false,
@@ -342,7 +345,12 @@ export class PlaidService {
     try {
       const existing = replaceId ? this.accountSvc.accounts().find(a => a.id === replaceId) : undefined;
       if (existing?.id) {
-        await this.accountSvc.update(existing.id, replaceCard(existing, pending.plaid.account_id, pending.plaid.mask));
+        const p = pending.plaid;
+        await this.accountSvc.update(existing.id, {
+          ...moveToLink(existing, p.account_id, pending.itemId),
+          ...(p.mask ? { last4: p.mask } : {}),
+          ...(p.current_balance != null ? { plaidBalance: p.current_balance, plaidBalanceAt: Date.now() } : {}),
+        });
         this.toast.success(`${existing.name} now follows the new card${pending.plaid.mask ? ` ••${pending.plaid.mask}` : ''}.`);
       } else {
         await this.createAccountFor(pending.plaid, pending.itemId, pending.institutionName);
@@ -360,8 +368,38 @@ export class PlaidService {
     this.pendingNewAccounts.update(list => list.filter(p => p.plaid.account_id !== pending.plaid.account_id));
   }
 
+  /**
+   * A bank linked a second time (Connect bank account rather than Manage
+   * accounts) used to add every account again. Fold each copy back into the
+   * account you had: it follows the new link, keeps the old link's history,
+   * and anything saved against the copy moves over. The duplicate rows the
+   * second link sent show up in Transactions' duplicate review.
+   */
+  private async foldLinkedTwice(): Promise<void> {
+    for (const { keep, copies } of linkedTwice(this.accountSvc.accounts())) {
+      try {
+        const newest = copies[copies.length - 1];
+        const earlier = copies.flatMap(c => [c.plaidAccountId!, ...(c.previousPlaidAccountIds ?? [])]);
+        await this.accountSvc.update(keep.id!, {
+          ...moveToLink(keep, newest.plaidAccountId!, newest.plaidItemId!, earlier),
+          ...(newest.plaidBalance != null ? { plaidBalance: newest.plaidBalance, plaidBalanceAt: newest.plaidBalanceAt } : {}),
+        });
+        for (const copy of copies) {
+          await this.txService.moveAccountReferences(copy.id!, keep.id!);
+          await this.accountSvc.update(copy.id!, {
+            archived: true, plaidAccountId: undefined, plaidItemId: undefined, previousPlaidAccountIds: undefined,
+          });
+        }
+        this.toast.info(`${keep.name} was linked twice. It's one account again; check Transactions for duplicates.`);
+      } catch (err) {
+        console.error('foldLinkedTwice failed:', err);
+      }
+    }
+  }
+
   /** Ensure every linked bank has its app accounts created (covers items linked earlier). */
   private async setupAllAccounts(): Promise<void> {
+    await this.foldLinkedTwice();
     for (const item of this.linkedItems()) {
       await this.setupAccountsForItem(item.itemId, item.institutionName);
     }

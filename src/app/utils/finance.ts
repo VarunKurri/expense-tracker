@@ -26,14 +26,29 @@ export function owesMoney(type: AccountType): boolean {
 
 export function accountBalance(account: Account, transactions: Transaction[]): number {
   const delta = transactionDeltaForAccount(transactions, account.id || '');
-  const balance = owesMoney(account.type)
-    ? account.openingBalance - delta
-    : (account.openingBalance || 0) + delta;
-  return roundMoney(balance);
+  const opening = openingBalanceFor(account, transactions);
+  return roundMoney(owesMoney(account.type) ? opening - delta : opening + delta);
+}
+
+/**
+ * The opening balance the app counts from. A linked account takes the bank's
+ * word for its balance (`plaidBalance`), so its opening balance is whatever
+ * makes its history land exactly on that. Every other account uses the one
+ * you entered.
+ */
+export function openingBalanceFor(account: Account, transactions: Transaction[]): number {
+  if (account.plaidBalance == null || !account.id) return account.openingBalance || 0;
+  const delta = transactionDeltaForAccount(transactions, account.id);
+  return roundMoney(owesMoney(account.type) ? account.plaidBalance + delta : account.plaidBalance - delta);
+}
+
+/** Accounts with their opening balance worked out (see `openingBalanceFor`), for code that reads it directly. */
+export function withBankOpenings(accounts: Account[], transactions: Transaction[]): Account[] {
+  return accounts.map(a => a.plaidBalance == null ? a : { ...a, openingBalance: openingBalanceFor(a, transactions) });
 }
 
 export function creditCardBalance(account: Account, transactions: Transaction[]): number {
-  return account.openingBalance - transactionDeltaForAccount(transactions, account.id || '');
+  return openingBalanceFor(account, transactions) - transactionDeltaForAccount(transactions, account.id || '');
 }
 
 export function availableCredit(account: Account, transactions: Transaction[]): number {

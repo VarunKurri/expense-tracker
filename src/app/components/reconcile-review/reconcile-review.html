@@ -1,13 +1,22 @@
 <app-modal [open]="open" title="Review possible duplicates" size="lg" (closed)="closed.emit()">
   @if (reconcile.matches().length === 0) {
-    <p class="empty">No duplicates to review. 🎉</p>
+    <p class="empty">No duplicates to review.</p>
   } @else {
     <div class="review-head">
-      <p class="hint">
-        {{ reconcile.matches().length }} bank transaction(s) look like entries you already added.
-        Merging keeps <strong>your</strong> details (merchant, notes, category) and removes the duplicate bank row.
-      </p>
-      <button class="btn primary" (click)="mergeAll()" [disabled]="reconcile.busy()">Merge all</button>
+      @if (relinkCount() > 0) {
+        <p class="hint">
+          <strong>{{ relinkCount() }}</strong> bank transaction{{ relinkCount() === 1 ? ' was' : 's were' }} sent
+          twice after a bank was linked again. Merging keeps the one you already had, with your edits and
+          anything linked to it, and removes the copy, so your spending and balances count it once.
+        </p>
+      }
+      @if (manualCount() > 0) {
+        <p class="hint">
+          <strong>{{ manualCount() }}</strong> bank transaction{{ manualCount() === 1 ? ' looks' : 's look' }} like
+          entries you already added. Merging keeps <strong>your</strong> details (merchant, notes, category) and
+          removes the bank row.
+        </p>
+      }
     </div>
 
     <div class="match-list">
@@ -15,7 +24,7 @@
         <div class="match-card">
           <div class="sides">
             <div class="side keep">
-              <div class="side-label">Your entry · kept</div>
+              <div class="side-label">{{ m.kind === 'relink' ? 'Already here · kept' : 'Your entry · kept' }}</div>
               <div class="side-merchant">{{ m.manual.merchant || 'Untitled' }}</div>
               <div class="side-meta">
                 <span class="chip">{{ categoryName(m.manual.categoryId) }}</span>
@@ -24,32 +33,42 @@
               @if (m.manual.notes) {
                 <div class="side-notes">"{{ m.manual.notes }}"</div>
               }
-              <div class="side-amount" [class.neg]="m.manual.type === 'expense'">
-                {{ m.manual.type === 'expense' ? '−' : '+' }}{{ formatCurrency(m.manual.amount) }}
+              <div class="side-amount fig" [class.neg]="m.manual.type === 'expense'">
+                {{ m.manual.type === 'expense' ? '−' : m.manual.type === 'income' ? '+' : '' }}{{ formatCurrency(m.manual.amount) }}
               </div>
             </div>
 
-            <div class="link-icon">🔗</div>
+            <div class="link-icon" aria-hidden="true">=</div>
 
             <div class="side drop">
-              <div class="side-label">From your bank · removed on merge</div>
+              <div class="side-label">{{ m.kind === 'relink' ? 'Sent again · removed' : 'From your bank · removed' }}</div>
               <div class="side-merchant">{{ m.plaid.merchant || 'Unknown' }}</div>
               <div class="side-meta">
                 <span>{{ accountName(m.plaid.accountId) }}</span>
                 <span>{{ formatDate(m.plaid.date) }}</span>
               </div>
-              <div class="side-amount" [class.neg]="m.plaid.type === 'expense'">
+              <div class="side-amount fig" [class.neg]="m.plaid.type === 'expense'">
                 {{ m.plaid.type === 'expense' ? '−' : '+' }}{{ formatCurrency(m.plaid.amount) }}
               </div>
             </div>
           </div>
 
           <div class="match-actions">
-            <button class="btn ghost" (click)="keepBoth(m)" [disabled]="reconcile.busy()">Keep both</button>
-            <button class="btn primary" (click)="merge(m)" [disabled]="reconcile.busy()">Merge</button>
+            <button class="btn-ghost" (click)="keepBoth(m)" [disabled]="reconcile.busy()">Keep both</button>
+            <button class="btn-primary" (click)="merge(m)" [disabled]="reconcile.busy()">Merge</button>
           </div>
         </div>
       }
+    </div>
+  }
+
+  @if (reconcile.matches().length > 0) {
+    <div modal-footer class="modal-actions">
+      <span class="footer-count">{{ reconcile.matches().length }} to review</span>
+      <div class="actions-right">
+        <button class="btn-ghost" (click)="closed.emit()">Later</button>
+        <button class="btn-solid" (click)="mergeAll()" [disabled]="reconcile.busy()">Merge all</button>
+      </div>
     </div>
   }
 </app-modal>

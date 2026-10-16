@@ -1,5 +1,5 @@
 import { Account, Transaction } from '../models';
-import { accountBalance, availableCredit, creditCardBalance, transactionDeltaForAccount } from './finance';
+import { accountBalance, availableCredit, creditCardBalance, openingBalanceFor, transactionDeltaForAccount, withBankOpenings } from './finance';
 
 describe('finance utilities', () => {
   const checking: Account = {
@@ -39,5 +39,31 @@ describe('finance utilities', () => {
   it('calculates credit card debt and available credit', () => {
     expect(creditCardBalance(credit, transactions)).toBe(45);
     expect(availableCredit(credit, transactions)).toBe(455);
+  });
+});
+
+describe('a linked account shows the bank’s balance', () => {
+  const tx = (type: 'income' | 'expense', amount: number, id: string) =>
+    ({ id, type, amount, accountId: 'college', date: '2026-01-15' }) as Transaction;
+  // History that a relink sent twice: the same $1,000 in twice.
+  const history = [tx('income', 1000, 'a'), tx('income', 1000, 'b'), tx('expense', 100, 'c')];
+  const college = { id: 'college', type: 'checking', openingBalance: 0, plaidBalance: 1214.95 } as Account;
+
+  it('works the opening balance out so the history lands on the bank’s balance', () => {
+    expect(openingBalanceFor(college, history)).toBe(-685.05);
+    expect(accountBalance(college, history)).toBe(1214.95);
+  });
+
+  it('does the same for a card, where the balance is what you owe', () => {
+    const card = { id: 'college', type: 'credit', openingBalance: 0, plaidBalance: 250 } as Account;
+    expect(accountBalance(card, history)).toBe(250);
+    expect(creditCardBalance(card, history)).toBe(250);
+  });
+
+  it('keeps the opening balance you entered on an account the bank does not report', () => {
+    const cash = { id: 'college', type: 'cash', openingBalance: 50 } as Account;
+    expect(openingBalanceFor(cash, history)).toBe(50);
+    expect(withBankOpenings([cash], history)[0]).toBe(cash);
+    expect(withBankOpenings([college], history)[0].openingBalance).toBe(-685.05);
   });
 });

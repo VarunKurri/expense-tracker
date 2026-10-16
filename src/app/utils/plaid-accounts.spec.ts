@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Account } from '../models';
-import { accountForPlaidId, replaceCard, replacementCandidates } from './plaid-accounts';
+import { accountForPlaidId, linkedTwice, moveToLink, replaceCard, replacementCandidates, sameAccountOnEarlierLink } from './plaid-accounts';
 
 const acc = (over: Partial<Account>): Account =>
   ({ id: 'a', name: 'Card', type: 'credit', openingBalance: 0, currency: 'USD', createdAt: 0, ...over }) as Account;
@@ -29,5 +29,38 @@ describe('a replaced card carries on in the same account', () => {
     const amex = acc({ id: 'amex', name: 'Amex', plaidItemId: 'amex', plaidAccountId: 'ax' });
     const list = replacementCandidates([sapphire, freedom, checking, amex], 'chase', 'credit', ['sap', 'chk', 'new']);
     expect(list.map(c => [c.account.id, c.stale])).toEqual([['freedom', true], ['sapphire', false]]);
+  });
+});
+
+describe('a bank linked a second time', () => {
+  const college = acc({ id: 'college', name: 'Chase College', type: 'checking', institution: 'Chase', last4: '2107',
+    plaidItemId: 'old-item', plaidAccountId: 'old', createdAt: 1 });
+
+  it('finds the account you already have by bank, kind and last 4', () => {
+    expect(sameAccountOnEarlierLink([college], 'Chase', 'new-item', 'checking', '2107')?.id).toBe('college');
+    expect(sameAccountOnEarlierLink([college], 'Chase', 'new-item', 'checking', '9999')).toBeUndefined();
+    expect(sameAccountOnEarlierLink([college], 'Chase', 'new-item', 'savings', '2107')).toBeUndefined();
+    expect(sameAccountOnEarlierLink([college], 'Chase', 'old-item', 'checking', '2107')).toBeUndefined();
+    expect(sameAccountOnEarlierLink([college], 'Chase', 'new-item', 'checking', '2107', new Set(['college']))).toBeUndefined();
+  });
+
+  it('moves the account onto the new link, keeping every earlier id', () => {
+    const patch = moveToLink(college, 'new', 'new-item', ['copy-old']);
+    expect(patch).toEqual({ plaidAccountId: 'new', plaidItemId: 'new-item', previousPlaidAccountIds: ['old', 'copy-old'] });
+    expect(accountForPlaidId([{ ...college, ...patch }], 'old')?.id).toBe('college');
+  });
+
+  it('spots an account that was added twice, keeping the first one made', () => {
+    const copy = acc({ ...college, id: 'copy', plaidItemId: 'new-item', plaidAccountId: 'new', createdAt: 2 });
+    const savings = acc({ id: 'sav', type: 'savings', institution: 'Chase', last4: '2107', plaidItemId: 'new-item', plaidAccountId: 's' });
+    const groups = linkedTwice([copy, college, savings]);
+    expect(groups.map(g => [g.keep.id, g.copies.map(c => c.id)])).toEqual([['college', ['copy']]]);
+    expect(linkedTwice([college, savings])).toEqual([]);
+  });
+
+  it('offers the old link’s accounts as replacements too', () => {
+    const list = replacementCandidates([college], 'new-item', 'checking', ['new'], 'Chase');
+    expect(list.map(c => [c.account.id, c.stale])).toEqual([['college', true]]);
+    expect(replacementCandidates([college], 'new-item', 'checking', ['new'])).toEqual([]);
   });
 });

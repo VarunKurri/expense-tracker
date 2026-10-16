@@ -91,7 +91,8 @@ export class TransactionService extends MoneyBackLedger {
    */
   transactions = computed<Transaction[]>(() => {
     const txs = this.rawTransactions();
-    const accounts = this.accountSvc.accounts();
+    // As saved: the shown accounts work their balances out from these transactions.
+    const accounts = this.accountSvc.storedAccounts();
     const categories = this.categorySvc.categories();
 
     return txs.map(t => {
@@ -210,6 +211,14 @@ availableCredit(account: Account): number {
     // would leave the old envelope-only fields in place alongside the new ciphertext,
     // producing a document that's neither validly enveloped nor validly symmetric.
     await setDoc(ref, await this.encryption.encryptForWrite({ ...current, ...patch, updatedAt: Date.now() }) as any);
+  }
+
+  /** Everything saved against one account now belongs to another (an account linked twice, folded into one). */
+  async moveAccountReferences(fromId: string, toId: string) {
+    const raw = this.rawTransactions();
+    await this.updateMany(raw.filter(t => t.accountId === fromId).map(t => t.id!), { accountId: toId });
+    await this.updateMany(raw.filter(t => t.fromAccountId === fromId).map(t => t.id!), { fromAccountId: toId });
+    await this.updateMany(raw.filter(t => t.toAccountId === fromId).map(t => t.id!), { toAccountId: toId });
   }
 
   async updateMany(ids: string[], patch: Partial<Transaction>) {

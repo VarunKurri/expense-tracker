@@ -5,11 +5,18 @@ import { AuthService } from './auth.service';
 import { TransactionService } from './transaction.service';
 import { ToastService } from './toast.service';
 import { Transaction } from '../models';
+import { AccountService } from './account.service';
+import { relinkDuplicates } from '../utils/relink-duplicates';
 
-/** A likely-duplicate pair: a bank-synced transaction and a manual entry that look like the same thing. */
+/**
+ * A likely-duplicate pair. `manual`: a bank row and an entry you added
+ * yourself. `relink`: the same bank row sent twice, once by an earlier link
+ * of the bank and again by the new one (see utils/relink-duplicates.ts).
+ */
 export interface ReconcileMatch {
-  plaid: Transaction;   // server-written Plaid transaction (doc id === plaidTransactionId)
-  manual: Transaction;  // user's manual entry (no plaidTransactionId yet)
+  kind: 'manual' | 'relink';
+  plaid: Transaction;   // the bank row removed on merge (doc id === plaidTransactionId)
+  manual: Transaction;  // the row kept: your entry, or the copy you already had
 }
 
 const MATCH_DAYS = 3; // dates within this many days count as the same transaction
@@ -19,6 +26,7 @@ export class ReconciliationService {
   private db = inject(Firestore);
   private auth = inject(AuthService);
   private txService = inject(TransactionService);
+  private accountSvc = inject(AccountService);
   private toast = inject(ToastService);
 
   /** plaidTransactionIds the user chose to "keep both"; they are never suggested again. */
@@ -42,7 +50,16 @@ export class ReconciliationService {
   matches = computed<ReconcileMatch[]>(() => {
     const txs = this.txService.transactions();
     const ignore = this.ignoreIds();
-    const serverPlaid = txs.filter(t => t.plaidTransactionId && t.id === t.plaidTransactionId);
+    const results: ReconcileMatch[] = [];
+    // A relink sends every bank row again: those pairs first, so a repeat
+    // isn't also offered against something you entered by hand.
+    const repeats = new Set<string>();
+    for (const pair of relinkDuplicates(txs, this.accountSvc.accounts())) {
+      if (ignore.has(pair.drop.plaidTransactionId!)) continue;
+      results.push({ kind: 'relink', plaid: pair.drop, manual: pair.keep });
+      repeats.add(pair.drop.id!);
+    }
+    const serverPlaid = txs.filter(t => t.plaidTransactionId && t.id === t.plaidTransactionId && !repeats.has(t.id!));
     // Once an entry is merged it's permanently excluded from being reconsidered. A
     // looser rule (re-open matching once the original link target is gone, e.g. after
     // a disconnect/relink) was tried and reverted: with no merchant check and only a
@@ -52,7 +69,6 @@ export class ReconciliationService {
     // meant to fix is handled as a one-off manual merge instead.
     const manual = txs.filter(t => !t.plaidTransactionId);
 
-    const results: ReconcileMatch[] = [];
     const usedManual = new Set<string>();
     for (const p of serverPlaid) {
       if (ignore.has(p.plaidTransactionId!)) continue;
@@ -63,7 +79,7 @@ export class ReconciliationService {
         this.dayDiff(m.date, p.date) <= MATCH_DAYS,
       );
       if (cands.length === 1) {
-        results.push({ plaid: p, manual: cands[0] });
+        results.push({ kind: 'manual', plaid: p, manual: cands[0] });
         usedManual.add(cands[0].id!);
       }
     }
@@ -140,13 +156,19 @@ export class ReconciliationService {
   }
 
   private async linkAndDrop(match: ReconcileMatch): Promise<void> {
+    // The kept row takes the bank row's ids, so when the bank sends it again
+    // cleanupReconciled drops the copy rather than it coming back.
     const patch: Partial<Transaction> = {
-      date: match.plaid.date,
       plaidTransactionId: match.plaid.plaidTransactionId,
       plaidItemId: match.plaid.plaidItemId,
       plaidAccountId: match.plaid.plaidAccountId,
     };
-    if (match.plaid.accountId) patch.accountId = match.plaid.accountId;
+    // Your own entry takes the bank's date and account. A relinked copy you
+    // already had keeps its own: it's the same row, maybe with your edits.
+    if (match.kind === 'manual') {
+      patch.date = match.plaid.date;
+      if (match.plaid.accountId) patch.accountId = match.plaid.accountId;
+    }
     await this.txService.update(match.manual.id!, patch);
     await this.txService.remove(match.plaid.id!);
   }

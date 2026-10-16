@@ -194,6 +194,21 @@ The app is what we copy. Do not "correct" this back to dark.
   moves to `Account.previousPlaidAccountIds` and every Plaid id lookup goes through
   `accountForPlaidId` (utils/plaid-accounts.ts). The `NEW_ACCOUNTS_AVAILABLE`
   webhook sets `newAccountsAvailable` on the item, shown as a chip on the bank row.
+  A linked account's balance is the bank's: every sync stores Plaid's current
+  balance (`Account.plaidBalance`) and `openingBalanceFor` (utils/finance.ts)
+  works the opening balance out from it. `AccountService.accounts()` already
+  carries that opening balance, so the screens that add history to it land on
+  the bank; `storedAccounts()` is the saved copy (TransactionService reads it).
+  Never seed or hand-edit a linked account's opening balance: more history
+  arriving later (a relink sends it all again) would move the balance.
+  Linking a bank a second time gives every row a new Plaid id. A Plaid account
+  matching an earlier link's account (same bank, type and last 4) carries on in
+  that account (`sameAccountOnEarlierLink`, `moveToLink`); copies already made
+  are folded back on sync (`linkedTwice`). The rows the second link sent again
+  are paired by `relinkDuplicates` (utils/relink-duplicates.ts: only between two
+  Plaid ids of one account, same amount and direction, within 3 days, never a
+  copy you edited or linked) and reviewed in the Transactions duplicate review
+  as `kind: 'relink'`; merging keeps the row you had and gives it the new ids.
 - Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`, `FakeSharedBills`).
 - Never centre a fixed panel with `transform`: it traps any pop-up inside it
   (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;

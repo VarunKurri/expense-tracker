@@ -85,7 +85,7 @@ export class Accounts {
 
   balanceFor(account: Account): number {
     const txDelta = this.transactionSvc.balanceForAccount(account.id!);
-    if (account.type === 'credit') {
+    if (owesMoney(account.type)) {
       return account.openingBalance - txDelta;
     }
     return (account.openingBalance || 0) + txDelta;

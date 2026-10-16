@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, Output, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Modal } from '../modal/modal';
 import { ReconciliationService, ReconcileMatch } from '../../services/reconciliation.service';
@@ -19,6 +19,9 @@ export class ReconcileReview {
   reconcile = inject(ReconciliationService);
   private categorySvc = inject(CategoryService);
   private accountSvc = inject(AccountService);
+
+  relinkCount = computed(() => this.reconcile.matches().filter(m => m.kind === 'relink').length);
+  manualCount = computed(() => this.reconcile.matches().filter(m => m.kind === 'manual').length);
 
   categoryName(id?: string): string {
     if (!id) return 'Uncategorized';

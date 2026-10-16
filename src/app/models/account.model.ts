@@ -21,7 +21,13 @@ export interface Account {
   // as the same account, so the old card's synced transactions still land here.
   previousPlaidAccountIds?: string[];
   plaidItemId?: string;      // which linked bank, for cleanup on disconnect
-  openingBalanceSeeded?: boolean; // true once openingBalance has been reconciled against Plaid's real balance
+  // What the bank last said the balance is (Plaid's current balance), and when
+  // that was read. A linked account shows this: its opening balance is worked
+  // out from it (`openingBalanceFor` in utils/finance.ts), so history that a
+  // relink sent twice, or more history arriving later, can't move the balance.
+  plaidBalance?: number;
+  plaidBalanceAt?: number;
+  openingBalanceSeeded?: boolean; // legacy: the one-time seed that plaidBalance replaced
 
   // Credit card specific
   creditLimit?: number;

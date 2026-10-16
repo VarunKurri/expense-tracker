@@ -95,6 +95,11 @@ export class AccountForm implements OnChanges {
     }
   }
 
+  /** A linked account's balance is the bank's (see openingBalanceFor), so there's no opening balance to enter. */
+  get fromBank(): boolean {
+    return this.account?.plaidBalance != null;
+  }
+
   onTypeChange() {
     const preset = this.accountTypes.find(t => t.value === this.type);
     if (preset && !this.account) {

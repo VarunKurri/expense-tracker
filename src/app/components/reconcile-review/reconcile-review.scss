@@ -7,9 +7,8 @@
 
 .review-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  gap: 8px;
   margin-bottom: 16px;
 
   .hint {
@@ -19,15 +18,12 @@
     line-height: 1.5;
   }
 
-  .btn { flex-shrink: 0; cursor: pointer; }
 }
 
 .match-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 60vh;
-  overflow-y: auto;
 }
 
 .match-card {
@@ -97,7 +93,7 @@
 
 .side-amount {
   margin-top: 6px;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 15px;
   color: var(--teal);
 
@@ -105,8 +101,9 @@
 }
 
 .link-icon {
-  font-size: 18px;
-  opacity: 0.6;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  color: var(--fg-3);
 }
 
 .match-actions {
@@ -114,11 +111,17 @@
   justify-content: flex-end;
   gap: 8px;
   margin-top: 12px;
+}
 
-  .btn { cursor: pointer; }
+.footer-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: var(--fg-3);
 }
 
 @media (max-width: 640px) {
   .sides { grid-template-columns: 1fr; }
-  .link-icon { transform: rotate(90deg); justify-self: center; }
+  .link-icon { justify-self: center; }
 }
