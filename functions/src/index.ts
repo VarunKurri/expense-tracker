@@ -430,7 +430,11 @@ async function snapshotAccounts(
 ): Promise<void> {
   const accessToken = decryptToken(itemDoc.data()!.accessToken as EncryptedValue, tokenEncKeyValue);
   const accounts = await loadPlaidAccounts(client, accessToken, itemDoc.id);
-  const env = envelopeEncrypt(JSON.stringify({ accounts }), publicKey);
+  const pending = await recentPending(client, accessToken).catch(err => {
+    console.warn(`pending list failed for item ${itemDoc.id}:`, err?.response?.data?.error_code || err?.message);
+    return null;
+  });
+  const env = envelopeEncrypt(JSON.stringify({ accounts, ...(pending ? { pending } : {}) }), publicKey);
   const now = Date.now();
   await itemDoc.ref.set({
     accountsSnapshot: {
@@ -439,6 +443,38 @@ async function snapshotAccounts(
     },
     accountsSnapshotAt: now,
   }, { merge: true });
+}
+
+/**
+ * What the bank has as pending right now (last 30 days), and which posted
+ * transaction each pending one became. Pending is the bank's state, not
+ * something a row should remember: the app shows Pending only for what's in
+ * this list, and folds a posted transaction into the row that was pending
+ * (some banks never link the two, so the app also matches them itself).
+ */
+async function recentPending(client: PlaidApi, accessToken: string) {
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 30);
+  const windowStart = start.toISOString().slice(0, 10);
+  const pendingIds: string[] = [];
+  const postedFrom: Record<string, string> = {};
+  let offset = 0;
+  let total = Infinity;
+  while (offset < total) {
+    const resp = await client.transactionsGet({
+      access_token: accessToken, start_date: windowStart, end_date: end.toISOString().slice(0, 10),
+      options: { count: 500, offset },
+    });
+    total = resp.data.total_transactions;
+    for (const t of resp.data.transactions) {
+      if (t.pending) pendingIds.push(t.transaction_id);
+      else if (t.pending_transaction_id) postedFrom[t.pending_transaction_id] = t.transaction_id;
+    }
+    if (resp.data.transactions.length === 0) break;
+    offset += resp.data.transactions.length;
+  }
+  return { windowStart, pendingIds, postedFrom };
 }
 
 /** Point the item's webhooks at this app (items linked before the webhook existed never got them). */
@@ -541,80 +577,6 @@ export const scheduledPlaidSync = onSchedule(
         console.warn('Scheduled sync skipped for', uid, err?.message || err);
       }
     }
-  },
-);
-
-/**
- * Rows stuck as pending: before pending charges posted into the same row,
- * one you'd edited while pending kept its pending copy and never got the
- * posted version. Look each up in the bank's posted transactions (by
- * pending_transaction_id) and give it the posted version, keeping your edits.
- */
-export const repairPendingTransactions = onCall(
-  { secrets: [plaidClientId, plaidSecret, tokenEncKey], timeoutSeconds: 300 },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'You must be signed in.');
-    const uid = request.auth.uid;
-    const rows = (request.data?.rows ?? []) as { docId: string; plaidTransactionId: string; date: string }[];
-    if (!Array.isArray(rows) || rows.length === 0) return { fixed: 0, unresolved: [] };
-    const publicKey = await getUserPublicKey(uid);
-    if (!publicKey) throw new HttpsError('failed-precondition', 'Unlock the app once before repairing.');
-
-    const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
-    const db = getFirestore();
-    const txCol = db.collection(`users/${uid}/transactions`);
-    const indexCol = db.collection(`users/${uid}/plaidTxIndex`);
-    const earliest = rows.map(r => r.date).sort()[0];
-    const start = new Date(earliest + 'T00:00:00Z');
-    start.setUTCDate(start.getUTCDate() - 7);
-    const startDate = start.toISOString().slice(0, 10);
-    const endDate = new Date().toISOString().slice(0, 10);
-
-    // Every posted transaction that began as a pending one, by its pending id.
-    const postedFor = new Map<string, { t: PlaidTransaction; itemId: string }>();
-    const items = await db.collection(`users/${uid}/plaidItems`).get();
-    for (const itemDoc of items.docs) {
-      try {
-        const accessToken = decryptToken(itemDoc.data().accessToken as EncryptedValue, tokenEncKey.value());
-        let offset = 0;
-        let total = Infinity;
-        while (offset < total) {
-          const resp = await client.transactionsGet({
-            access_token: accessToken, start_date: startDate, end_date: endDate, options: { count: 500, offset },
-          });
-          total = resp.data.total_transactions;
-          for (const t of resp.data.transactions) {
-            if (t.pending_transaction_id && !t.pending) postedFor.set(t.pending_transaction_id, { t, itemId: itemDoc.id });
-          }
-          offset += resp.data.transactions.length;
-          if (resp.data.transactions.length === 0) break;
-        }
-      } catch (err: any) {
-        console.warn(`repair: transactionsGet failed for item ${itemDoc.id}:`, err?.response?.data?.error_code || err?.message);
-      }
-    }
-
-    const docs = await docStates(txCol, rows.map(r => r.docId));
-    const copies = await docStates(txCol, [...postedFor.values()].map(p => p.t.transaction_id));
-    const batch = db.batch();
-    const unresolved: string[] = [];
-    let fixed = 0;
-    for (const row of rows) {
-      const found = postedFor.get(row.plaidTransactionId);
-      const state = docs.get(row.docId);
-      if (!found || !state?.exists) { unresolved.push(row.docId); continue; }
-      const envelope = envelopeDoc(mapPlaidTransaction(found.t, found.itemId), publicKey);
-      if (state.edited) batch.set(txCol.doc(row.docId), { bankUpdate: envelope }, { merge: true });
-      else batch.set(txCol.doc(row.docId), envelope);
-      batch.set(indexCol.doc(found.t.transaction_id), { docId: row.docId });
-      batch.set(indexCol.doc(row.plaidTransactionId), { docId: row.docId, postedAs: found.t.transaction_id });
-      // A copy of the posted one written on its own later: this row is it.
-      const copy = copies.get(found.t.transaction_id);
-      if (found.t.transaction_id !== row.docId && copy?.exists && !copy.edited) batch.delete(txCol.doc(found.t.transaction_id));
-      fixed++;
-    }
-    await batch.commit();
-    return { fixed, unresolved };
   },
 );
 

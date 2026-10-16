@@ -40,13 +40,25 @@ export function accountBalance(account: Account, transactions: Transaction[]): n
 /**
  * The opening balance the app counts from. A linked account takes the bank's
  * word for its balance (`plaidBalance`), so its opening balance is whatever
- * makes its history land exactly on that. Every other account uses the one
- * you entered.
+ * makes the bank's own rows land exactly on that. Entries you add by hand
+ * aren't the bank's, so they move the balance on top (as they did before it
+ * was pinned), until the bank's row for the same thing is merged with them.
+ * Every other account uses the opening balance you entered.
  */
 export function openingBalanceFor(account: Account, transactions: Transaction[]): number {
   if (account.plaidBalance == null || !account.id) return account.openingBalance || 0;
-  const delta = transactionDeltaForAccount(transactions, account.id);
+  const delta = transactionDeltaForAccount(transactions.filter(isBankRow), account.id);
   return roundMoney(owesMoney(account.type) ? account.plaidBalance + delta : account.plaidBalance - delta);
+}
+
+/** A row the bank sent (or one of yours merged with the bank's), as opposed to one you added by hand. */
+export function isBankRow(t: Transaction): boolean {
+  return !!t.plaidTransactionId;
+}
+
+/** Entries you added by hand on an account, as money out (positive) or in (negative). */
+export function handAddedTotal(transactions: Transaction[], accountId: string): number {
+  return roundMoney(-transactionDeltaForAccount(transactions.filter(t => !isBankRow(t)), accountId));
 }
 
 /** Accounts with their opening balance worked out (see `openingBalanceFor`), for code that reads it directly. */
@@ -84,7 +96,8 @@ export function postedBalanceOn(account: Account, transactions: Transaction[], d
   const id = account.id || '';
   const owes = owesMoney(account.type);
   if (account.plaidBalance != null) {
-    const after = transactionDeltaForAccount(transactions.filter(t => postedOn(t) > date), id);
+    // The bank's rows only: a statement knows nothing of what you added by hand.
+    const after = transactionDeltaForAccount(transactions.filter(t => isBankRow(t) && postedOn(t) > date), id);
     return roundMoney(owes ? account.plaidBalance + after : account.plaidBalance - after);
   }
   const upTo = transactionDeltaForAccount(transactions.filter(t => postedOn(t) <= date), id);

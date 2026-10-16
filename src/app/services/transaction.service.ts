@@ -173,21 +173,17 @@ availableCredit(account: Account): number {
 
   /**
    * Fold the bank's newer version into rows you've edited (an amount that
-   * settled, a pending charge that posted), and drop pending charges the bank
-   * cancelled. Saving the row clears the waiting update, since a save
-   * replaces the whole document.
+   * settled, a pending charge that posted). Saving the row clears the
+   * waiting update, since a save replaces the whole document.
    */
   private async applyBankUpdates(txs: Transaction[]) {
     for (const t of txs) {
-      if (!t.id || this.applying.has(t.id)) continue;
-      // A pending charge the bank dropped was cancelled: it never happened, so
-      // it goes, whatever you'd added to it. Anything else it drops is asked about.
-      const cancelled = t.bankRemoved && t.plaidPending && !t.bankUpdate;
-      if (!t.bankUpdate && !cancelled) continue;
+      // (A pending row the bank dropped is settled by PlaidService: folded into
+      // its posted version, or removed if it was cancelled.)
+      if (!t.id || !t.bankUpdate || this.applying.has(t.id)) continue;
       this.applying.add(t.id);
       try {
-        if (cancelled) await this.remove(t.id);
-        else await this.update(t.id, bankUpdatePatch(t, t.bankUpdate!));
+        await this.update(t.id, bankUpdatePatch(t, t.bankUpdate));
       } catch (err) {
         console.error('Could not apply a bank update:', err);
       } finally {

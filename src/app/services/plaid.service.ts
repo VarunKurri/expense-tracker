@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, NgZone, effect, untracked } from '@angular/core';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Firestore } from '@angular/fire/firestore';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { Observable, of, switchMap } from 'rxjs';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth.service';
@@ -11,6 +11,8 @@ import { ReconciliationService } from './reconciliation.service';
 import { ToastService } from './toast.service';
 import { EncryptionService } from './encryption.service';
 import { localDateString } from '../utils/date';
+import { BankPending, settlePending } from '../utils/pending';
+import { bankUpdatePatch } from '../utils/bank-updates';
 import { Account, AccountType } from '../models';
 import { accountForPlaidId, linkedTwice, moveToLink, replacementCandidates, sameBankAccount } from '../utils/plaid-accounts';
 
@@ -151,7 +153,10 @@ export class PlaidService {
   /** Each bank's snapshot already applied, by item id, so it's applied once. */
   private appliedSnapshots = new Map<string, number>();
   private applyingSnapshots = false;
-  private repairedPending = false;
+  private settling = false;
+
+  /** What each bank has as pending right now, from its latest snapshot. */
+  bankPending = signal<Map<string, BankPending>>(new Map());
 
   constructor() {
     // Background sync: the server saves each bank's balances and card
@@ -164,12 +169,13 @@ export class PlaidService {
       const fresh = items.filter(i => i.accountsSnapshot && (i.accountsSnapshotAt ?? 0) > (this.appliedSnapshots.get(i.itemId) ?? 0));
       if (fresh.length) untracked(() => void this.applySnapshots(fresh));
     });
-    // Rows stuck as pending from before pending charges posted into the same row.
+    // Pending follows the bank: whenever a row the app marks Pending isn't
+    // pending at the bank any more (or the bank dropped it), settle it.
     effect(() => {
       const txs = this.txService.transactions();
-      if (this.repairedPending || !this.encryption.unlocked() || txs.length === 0) return;
-      this.repairedPending = true;
-      untracked(() => void this.repairStuckPending());
+      this.bankPending();
+      if (!this.encryption.unlocked() || !txs.some(t => t.plaidPending)) return;
+      untracked(() => void this.settlePendingRows());
     });
   }
 
@@ -180,8 +186,13 @@ export class PlaidService {
       for (const item of items) {
         const at = item.accountsSnapshotAt ?? 0;
         try {
-          const { accounts } = await this.encryption.decryptDoc<{ accounts: PlaidAccount[] }>(item.accountsSnapshot!);
+          const { accounts, pending } = await this.encryption.decryptDoc<{
+            accounts: PlaidAccount[]; pending?: Omit<BankPending, 'itemId'>;
+          }>(item.accountsSnapshot!);
           await this.setupAccountsForItem(item.itemId, item.institutionName, accounts);
+          if (pending) {
+            this.bankPending.update(m => new Map(m).set(item.itemId, { itemId: item.itemId, ...pending }));
+          }
         } catch (err) {
           console.error('Could not apply the bank snapshot for', item.institutionName, err);
         }
@@ -195,35 +206,38 @@ export class PlaidService {
   }
 
   /**
-   * Before a pending charge posted into the same row, a row you'd edited while
-   * pending kept its pending copy and never got the posted one, so old
-   * transactions still read Pending. Ask the server to find each one's posted
-   * version; anything it can't find that's over two weeks old has posted
-   * long since (no hold lasts that long), so it stops being pending.
+   * Make every row marked Pending agree with the bank: still pending there,
+   * it stays; posted as a separate row, that row folds into this one (your
+   * notes, split, category and links stay, and the bank's amount and posted
+   * date come in); posted with nothing else standing for it, it just stops
+   * being pending; dropped by the bank, it was cancelled and goes.
    */
-  private async repairStuckPending(): Promise<void> {
-    const cutoff = new Date(localDateString() + 'T00:00:00');
-    cutoff.setDate(cutoff.getDate() - 5);
-    const stale = localDateString(cutoff);
-    const stuck = this.txService.transactions().filter(t => t.plaidPending && t.plaidTransactionId && t.id && t.date < stale);
-    if (stuck.length === 0) return;
+  private async settlePendingRows(): Promise<void> {
+    if (this.settling) return;
+    this.settling = true;
     try {
-      const repair = httpsCallable<
-        { rows: { docId: string; plaidTransactionId: string; date: string }[] },
-        { fixed: number; unresolved: string[] }
-      >(this.functions, 'repairPendingTransactions');
-      const { data } = await repair({ rows: stuck.map(t => ({ docId: t.id!, plaidTransactionId: t.plaidTransactionId!, date: t.date })) });
-      const longAgo = new Date(localDateString() + 'T00:00:00');
-      longAgo.setDate(longAgo.getDate() - 14);
-      const old = localDateString(longAgo);
-      const settle = stuck.filter(t => data.unresolved.includes(t.id!) && t.date < old).map(t => t.id!);
-      if (settle.length) await this.txService.updateMany(settle, { plaidPending: false });
-      if (data.fixed + settle.length > 0) {
-        this.toast.info(`${data.fixed + settle.length} old transaction${data.fixed + settle.length === 1 ? ' was' : 's were'} still marked pending; ${data.fixed + settle.length === 1 ? 'it has' : 'they have'} posted, and your edits stay.`);
+      const actions = settlePending(this.txService.transactions(), [...this.bankPending().values()], localDateString());
+      const user = this.auth.user();
+      for (const a of actions) {
+        try {
+          if (a.kind === 'cancelled') {
+            await this.txService.remove(a.row.id!);
+          } else if (a.kind === 'posted') {
+            await this.txService.update(a.row.id!, { plaidPending: false });
+          } else {
+            await this.txService.update(a.row.id!, bankUpdatePatch(a.row, a.posted));
+            // The posted id now lives in this row: the bank's later changes land here.
+            if (user && a.posted.plaidTransactionId) {
+              await setDoc(doc(this.db, `users/${user.uid}/plaidTxIndex/${a.posted.plaidTransactionId}`), { docId: a.row.id });
+            }
+            await this.txService.remove(a.posted.id!);
+          }
+        } catch (err) {
+          console.error('Could not settle a pending row:', err);
+        }
       }
-    } catch (err) {
-      // Not deployed yet, or offline: tried again next time the app opens.
-      console.warn('Pending repair skipped:', err);
+    } finally {
+      this.settling = false;
     }
   }
 

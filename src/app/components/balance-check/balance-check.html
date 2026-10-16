@@ -8,6 +8,14 @@
       <p class="bc-line" [class.warn]="!s.ok">{{ s.text }}</p>
     }
 
+    @if (handAddedCount() > 0 && handAdded() !== 0) {
+      <p class="bc-line">
+        It includes <span class="fig">{{ money(handAdded() < 0 ? -handAdded() : handAdded()) }}</span>
+        {{ handAdded() < 0 ? 'in' : 'out' }} from {{ handAddedCount() }} entr{{ handAddedCount() === 1 ? 'y' : 'ies' }} you added by hand.
+        When {{ bank() }}'s own row for one arrives, merge them in Transactions so it isn't counted twice.
+      </p>
+    }
+
     @if (pendingCount() > 0) {
       <p class="bc-line">
         <span class="pending-tag">Pending</span>

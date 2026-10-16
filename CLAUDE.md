@@ -196,7 +196,9 @@ The app is what we copy. Do not "correct" this back to dark.
   webhook sets `newAccountsAvailable` on the item, shown as a chip on the bank row.
   A linked account's balance is the bank's: every sync stores Plaid's current
   balance (`Account.plaidBalance`) and `openingBalanceFor` (utils/finance.ts)
-  works the opening balance out from it. `AccountService.accounts()` already
+  works the opening balance out from it, over the bank's rows only
+  (`isBankRow`): entries added by hand move the balance on top until merged
+  with the bank's row. `AccountService.accounts()` already
   carries that opening balance, so the screens that add history to it land on
   the bank; `storedAccounts()` is the saved copy (TransactionService reads it).
   Never seed or hand-edit a linked account's opening balance: more history
@@ -228,8 +230,13 @@ The app is what we copy. Do not "correct" this back to dark.
   `users/{uid}/plaidTxIndex/{plaidId} -> { docId }` routes a Plaid id that
   lives in another doc (posted-into-pending, or a bank row you merged). A
   cancelled pending charge is removed even if edited.
-  `repairPendingTransactions` gives rows stuck as pending from before this
-  their posted version (run once per session by `PlaidService`).
+  Pending is the bank's state, not the row's: each snapshot carries what the
+  bank has as pending now and which posted id each pending one became
+  (`recentPending`), and `settlePending` (utils/pending.ts, run by
+  `PlaidService`) keeps the rows in step: still pending stays; posted as a
+  separate row folds into the pending one (bank-linked, or matched: same
+  account, same money or a tip on top at the same merchant, within 5 days);
+  posted with nothing else stands down; dropped by the bank is cancelled.
 - Dates: `date` is when you made the purchase (Plaid's authorized date, else
   its date) and is what spending goes by. `postedDate` is when the bank posted
   it, what statements go by: statement maths use `postedOn` / `postedBalanceOn`

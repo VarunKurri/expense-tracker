@@ -1,5 +1,5 @@
 import { Account, Transaction } from '../models';
-import { accountBalance, availableCredit, creditCardBalance, openingBalanceFor, transactionDeltaForAccount, withBankOpenings } from './finance';
+import { accountBalance, availableCredit, creditCardBalance, handAddedTotal, openingBalanceFor, transactionDeltaForAccount, withBankOpenings } from './finance';
 
 describe('finance utilities', () => {
   const checking: Account = {
@@ -44,7 +44,7 @@ describe('finance utilities', () => {
 
 describe('a linked account shows the bank’s balance', () => {
   const tx = (type: 'income' | 'expense', amount: number, id: string) =>
-    ({ id, type, amount, accountId: 'college', date: '2026-01-15' }) as Transaction;
+    ({ id, type, amount, accountId: 'college', date: '2026-01-15', plaidTransactionId: id }) as Transaction;
   // History that a relink sent twice: the same $1,000 in twice.
   const history = [tx('income', 1000, 'a'), tx('income', 1000, 'b'), tx('expense', 100, 'c')];
   const college = { id: 'college', type: 'checking', openingBalance: 0, plaidBalance: 1214.95 } as Account;
@@ -65,5 +65,16 @@ describe('a linked account shows the bank’s balance', () => {
     expect(openingBalanceFor(cash, history)).toBe(50);
     expect(withBankOpenings([cash], history)[0]).toBe(cash);
     expect(withBankOpenings([college], history)[0].openingBalance).toBe(-685.05);
+  });
+});
+
+describe('an entry you add by hand on a linked account', () => {
+  it('moves the balance on top of the bank’s, until the bank’s row for it is merged', () => {
+    const bankRows = [{ id: 'a', type: 'expense', amount: 100, accountId: 'chk', date: '2026-10-01', plaidTransactionId: 'a' }] as Transaction[];
+    const chk = { id: 'chk', type: 'checking', openingBalance: 0, plaidBalance: 1000 } as Account;
+    expect(accountBalance(chk, bankRows)).toBe(1000);
+    const coffee = { id: 'm', type: 'expense', amount: 5, accountId: 'chk', date: '2026-10-16' } as Transaction;
+    expect(accountBalance(chk, [...bankRows, coffee])).toBe(995);
+    expect(handAddedTotal([...bankRows, coffee], 'chk')).toBe(5);
   });
 });

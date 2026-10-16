@@ -5,7 +5,7 @@ import { pendingTotal, postedBalanceOn, transactionDeltaForAccount } from './fin
 
 const card = { id: 'card', type: 'credit', openingBalance: 0, plaidBalance: 588.81 } as Account;
 const tx = (amount: number, date: string, over: Partial<Transaction> = {}) =>
-  ({ id: date + amount, type: 'expense', amount, date, accountId: 'card', ...over }) as Transaction;
+  ({ id: date + amount, type: 'expense', amount, date, accountId: 'card', plaidTransactionId: date + amount, ...over }) as Transaction;
 
 const history = [
   tx(40, '2026-09-10'),

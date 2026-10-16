@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Account } from '../../models';
 import { TransactionService } from '../../services/transaction.service';
 import { AccountService } from '../../services/account.service';
-import { owesMoney, pendingTotal, roundMoney } from '../../utils/finance';
+import { handAddedTotal, owesMoney, pendingTotal, roundMoney } from '../../utils/finance';
 import { StatementCheck, checkStatement } from '../../utils/statement-check';
 import { fromCents } from '../../utils/money';
 import { localDateString } from '../../utils/date';
@@ -48,6 +48,11 @@ export class BalanceCheck {
   /** Money still pending: out is positive. Not in the balance until it posts. */
   pending = computed(() => pendingTotal(this.txService.transactions(), this.account().id!));
   pendingCount = computed(() => this.txService.transactions().filter(t => t.plaidPending && t.accountId === this.account().id).length);
+  /** What you added by hand on this account (not from the bank): on top of the bank's balance. */
+  handAdded = computed(() => this.account().plaidBalance == null ? 0 : handAddedTotal(this.txService.transactions(), this.account().id!));
+  handAddedCount = computed(() => this.account().plaidBalance == null ? 0
+    : this.txService.transactions().filter(t => !t.plaidTransactionId && (t.accountId === this.account().id || t.fromAccountId === this.account().id || t.toAccountId === this.account().id)).length);
+
   /** The balance once everything pending posts. */
   afterPending = computed(() => {
     const a = this.account();
