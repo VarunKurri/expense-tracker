@@ -1,4 +1,5 @@
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -272,11 +273,26 @@ function statusForErrorCode(code: string | undefined): 'login_required' | 'error
 }
 
 /**
- * Sync one Plaid item: page through `transactionsSync` from the stored cursor,
- * envelope-encrypt each transaction to the user's public key, and write it under
- * the Plaid transaction_id (so re-runs and modifications are idempotent; that's
- * the dedup). The cursor is advanced in the same batch as the page's writes, so a
- * failure re-fetches rather than skips.
+ * Sync one Plaid item: page through `transactionsSync` from the stored cursor
+ * and write each transaction, envelope-encrypted to the user's public key.
+ *
+ * Where a transaction lives: normally the doc named after its Plaid id. Two
+ * things move that, recorded in `plaidTxIndex/{plaidId} -> { docId }` (server
+ * written, plus the app when you merge a duplicate):
+ *  - a pending charge that posts arrives as a new posted id (with
+ *    pending_transaction_id) plus `removed: [pendingId]`. The posted version
+ *    goes INTO the pending row's doc, so the doc never changes and anything
+ *    you did while it was pending (notes, a split, a category, a repayment
+ *    linked to it) stays with it;
+ *  - a bank row you merged into your own entry.
+ *
+ * A row you've edited is re-encrypted with your key, so the server can't read
+ * or merge it: the bank's version waits beside it as `bankUpdate` and the app
+ * folds in the bank's figures. A removed row is deleted (a cancelled pending
+ * charge is simply gone); one you'd edited gets `bankRemoved` and the app
+ * decides (a cancelled pending row goes, anything else is asked about).
+ * Removals are done after every page, so a pending id that posted on a later
+ * page is never mistaken for a cancellation.
  */
 async function syncItem(
   uid: string,
@@ -290,63 +306,54 @@ async function syncItem(
   if (!item) return { added: 0, modified: 0, removed: 0 };
   const accessToken = decryptToken(item.accessToken as EncryptedValue, tokenEncKeyValue);
   const txCol = db.collection(`users/${uid}/transactions`);
+  const indexCol = db.collection(`users/${uid}/plaidTxIndex`);
 
   const totals: ItemSyncTotals = { added: 0, modified: 0, removed: 0 };
   let cursor: string | undefined = item.cursor || undefined;
   let hasMore = true;
-  // Edited pending rows that took their posted version, across pages: the
-  // pending id's removal must not flag them.
+  // Pending ids whose row took its posted version: their removal isn't a cancellation.
   const postedOver = new Set<string>();
+  const removedIds: string[] = [];
 
   while (hasMore) {
     const resp = await client.transactionsSync({ access_token: accessToken, cursor });
     const { added, modified, removed, next_cursor, has_more } = resp.data;
     const incoming = [...added, ...modified];
 
-    // Rows you've edited in the app are re-encrypted with your key, so the
-    // server can't read or merge them. It never overwrites or deletes one:
-    //  - a change from the bank (an amount settling, a pending charge posting,
-    //    which arrives as `removed: [pendingId]` plus a new posted transaction
-    //    with pending_transaction_id) waits beside your version as `bankUpdate`,
-    //    and the app takes the bank's figures while keeping your edits;
-    //  - a row the bank stops listing gets `bankRemoved`, and the app asks you
-    //    (Chase renumbering an account used to delete every row you'd edited,
-    //    links and splits included).
-    // This is a doc-ID lookup, not a field query: plaidTransactionId etc. are
-    // only plaintext on untouched envelope docs.
-    const touched = [...new Set([
+    const home = await homesFor(indexCol, [
       ...incoming.map(t => t.transaction_id),
       ...incoming.map(t => t.pending_transaction_id).filter((id): id is string => !!id),
-      ...removed.map(r => r.transaction_id).filter((id): id is string => !!id),
-    ])];
-    const snaps = touched.length > 0 ? await db.getAll(...touched.map(id => txCol.doc(id))) : [];
-    const edited = new Set(snaps.filter(snap => snap.exists && !snap.data()?.['__envelope']).map(snap => snap.id));
+    ]);
+    const docIdFor = (id: string) => home.get(id) ?? id;
+    const wanted = incoming.map(t => home.get(t.transaction_id)
+      ?? (t.pending_transaction_id ? docIdFor(t.pending_transaction_id) : t.transaction_id));
+    // Their own docs too, in case the posted one already stands alone.
+    const docs = await docStates(txCol, [...wanted, ...incoming.map(t => t.transaction_id)]);
 
     const batch = db.batch();
-    for (const t of incoming) {
+    incoming.forEach((t, i) => {
+      let target = wanted[i];
+      // The pending row is gone (or never came): the posted one stands on its own.
+      if (target !== t.transaction_id && !docs.get(target)?.exists) target = t.transaction_id;
       const envelope = envelopeDoc(mapPlaidTransaction(t, itemDoc.id), publicKey);
-      if (edited.has(t.transaction_id)) {
-        batch.set(txCol.doc(t.transaction_id), { bankUpdate: envelope }, { merge: true });
-      } else if (t.pending_transaction_id && edited.has(t.pending_transaction_id)) {
-        // Your edited pending row becomes the posted one; no second copy.
-        batch.set(txCol.doc(t.pending_transaction_id), { bankUpdate: envelope }, { merge: true });
-        postedOver.add(t.pending_transaction_id);
+      if (docs.get(target)?.edited) {
+        batch.set(txCol.doc(target), { bankUpdate: envelope }, { merge: true });
       } else {
-        batch.set(txCol.doc(t.transaction_id), envelope);
+        batch.set(txCol.doc(target), envelope);
       }
-    }
-    for (const r of removed) {
-      if (!r.transaction_id || postedOver.has(r.transaction_id)) continue;
-      if (edited.has(r.transaction_id)) {
-        batch.set(txCol.doc(r.transaction_id), { bankRemoved: true }, { merge: true });
-      } else {
-        batch.delete(txCol.doc(r.transaction_id));
+      if (target !== t.transaction_id) {
+        batch.set(indexCol.doc(t.transaction_id), { docId: target });
+        if (t.pending_transaction_id && target === docIdFor(t.pending_transaction_id)) {
+          postedOver.add(t.pending_transaction_id);
+          batch.set(indexCol.doc(t.pending_transaction_id), { docId: target, postedAs: t.transaction_id });
+        }
       }
-    }
+    });
     // Advance the cursor atomically with this page's writes.
     batch.set(itemDoc.ref, { cursor: next_cursor, status: 'active', updatedAt: Date.now() }, { merge: true });
     await batch.commit();
 
+    removedIds.push(...removed.map(r => r.transaction_id).filter((id): id is string => !!id));
     totals.added += added.length;
     totals.modified += modified.length;
     totals.removed += removed.length;
@@ -354,6 +361,104 @@ async function syncItem(
     hasMore = has_more;
   }
 
+  let gone = removedIds.filter(id => !postedOver.has(id));
+  if (gone.length > 0) {
+    const home = await homesFor(indexCol, gone);
+    gone = gone.filter(id => !home.posted?.has(id));
+    const targets = gone.map(id => home.get(id) ?? id);
+    const docs = await docStates(txCol, targets);
+    let batch = db.batch();
+    let n = 0;
+    for (let i = 0; i < gone.length; i++) {
+      const state = docs.get(targets[i]);
+      if (state?.exists) {
+        if (state.edited) batch.set(txCol.doc(targets[i]), { bankRemoved: true }, { merge: true });
+        else batch.delete(txCol.doc(targets[i]));
+      }
+      if (home.has(gone[i])) batch.delete(indexCol.doc(gone[i]));
+      if (++n % 200 === 0) { await batch.commit(); batch = db.batch(); }
+    }
+    await batch.commit();
+  }
+
+  return totals;
+}
+
+/**
+ * Plaid ids that live in another doc (see syncItem), as id -> docId. A
+ * pending id whose row took its posted version is in `posted`: removing that
+ * pending id later is the bank tidying up, not a cancellation.
+ */
+async function homesFor(
+  indexCol: FirebaseFirestore.CollectionReference, ids: string[],
+): Promise<Map<string, string> & { posted?: Set<string> }> {
+  const unique = [...new Set(ids)];
+  const out: Map<string, string> & { posted?: Set<string> } = new Map();
+  out.posted = new Set();
+  for (let i = 0; i < unique.length; i += 300) {
+    const snaps = await getFirestore().getAll(...unique.slice(i, i + 300).map(id => indexCol.doc(id)));
+    for (const snap of snaps) {
+      if (!snap.exists) continue;
+      const docId = snap.data()?.['docId'] as string | undefined;
+      if (docId) out.set(snap.id, docId);
+      if (snap.data()?.['postedAs']) out.posted.add(snap.id);
+    }
+  }
+  return out;
+}
+
+/** Whether each doc exists, and whether you've edited it (no longer the envelope the bank wrote). */
+async function docStates(txCol: FirebaseFirestore.CollectionReference, ids: string[]): Promise<Map<string, { exists: boolean; edited: boolean }>> {
+  const unique = [...new Set(ids)];
+  const out = new Map<string, { exists: boolean; edited: boolean }>();
+  for (let i = 0; i < unique.length; i += 300) {
+    const snaps = await getFirestore().getAll(...unique.slice(i, i + 300).map(id => txCol.doc(id)));
+    for (const snap of snaps) out.set(snap.id, { exists: snap.exists, edited: snap.exists && !snap.data()?.['__envelope'] });
+  }
+  return out;
+}
+
+/**
+ * The item's accounts (balances and card statement details), saved beside
+ * the item envelope-encrypted to the user's key. The app's accounts are
+ * encrypted with a key the server never has, so it can't update them itself:
+ * the app applies this copy whenever it changes, so balances and card
+ * payments stay current without anyone pressing Sync.
+ */
+async function snapshotAccounts(
+  itemDoc: FirebaseFirestore.DocumentSnapshot, client: PlaidApi, tokenEncKeyValue: string, publicKey: string,
+): Promise<void> {
+  const accessToken = decryptToken(itemDoc.data()!.accessToken as EncryptedValue, tokenEncKeyValue);
+  const accounts = await loadPlaidAccounts(client, accessToken, itemDoc.id);
+  const env = envelopeEncrypt(JSON.stringify({ accounts }), publicKey);
+  const now = Date.now();
+  await itemDoc.ref.set({
+    accountsSnapshot: {
+      __envelope: true, encryptionVersion: 1,
+      encryptedDEK: env.encryptedDEK, encryptedPayload: env.ciphertext, iv: env.iv, tag: env.tag,
+    },
+    accountsSnapshotAt: now,
+  }, { merge: true });
+}
+
+/** Point the item's webhooks at this app (items linked before the webhook existed never got them). */
+async function ensureWebhook(itemDoc: FirebaseFirestore.DocumentSnapshot, client: PlaidApi, tokenEncKeyValue: string): Promise<void> {
+  const url = plaidWebhookUrl.value();
+  if (!url || itemDoc.data()?.['webhookUrl'] === url) return;
+  const accessToken = decryptToken(itemDoc.data()!.accessToken as EncryptedValue, tokenEncKeyValue);
+  await client.itemWebhookUpdate({ access_token: accessToken, webhook: url });
+  await itemDoc.ref.set({ webhookUrl: url }, { merge: true });
+}
+
+/** Everything a bank needs to be current: its webhook, its transactions, its balances. */
+async function refreshItem(
+  uid: string, itemDoc: FirebaseFirestore.DocumentSnapshot, client: PlaidApi, tokenEncKeyValue: string, publicKey: string,
+): Promise<ItemSyncTotals> {
+  await ensureWebhook(itemDoc, client, tokenEncKeyValue).catch(err =>
+    console.warn(`webhook update failed for item ${itemDoc.id}:`, err?.response?.data || err?.message));
+  const totals = await syncItem(uid, itemDoc, client, tokenEncKeyValue, publicKey);
+  await snapshotAccounts(itemDoc, client, tokenEncKeyValue, publicKey).catch(err =>
+    console.warn(`account snapshot failed for item ${itemDoc.id}:`, err?.response?.data || err?.message));
   return totals;
 }
 
@@ -379,7 +484,7 @@ async function syncUser(
     // Keep the reverse index fresh (covers items linked before it existed).
     await indexPlaidItem(itemDoc.id, uid);
     try {
-      const r = await syncItem(uid, itemDoc, client, tokenEncKeyValue, publicKey);
+      const r = await refreshItem(uid, itemDoc, client, tokenEncKeyValue, publicKey);
       totals.added += r.added;
       totals.modified += r.modified;
       totals.removed += r.removed;
@@ -413,6 +518,103 @@ export const syncTransactions = onCall(
     const uid = request.auth.uid;
     const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
     return syncUser(uid, client, tokenEncKey.value());
+  },
+);
+
+/**
+ * Background sync, so the app is current without pressing Sync: every few
+ * hours each linked bank's transactions and balances are refreshed (the
+ * webhook does it as soon as the bank has news; this catches anything a
+ * webhook missed, and banks that never send one).
+ */
+export const scheduledPlaidSync = onSchedule(
+  { schedule: 'every 6 hours', secrets: [plaidClientId, plaidSecret, tokenEncKey], timeoutSeconds: 540 },
+  async () => {
+    const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
+    const items = await getFirestore().collectionGroup('plaidItems').get();
+    const uids = new Set(items.docs.map(d => d.ref.parent.parent?.id).filter((id): id is string => !!id));
+    for (const uid of uids) {
+      try {
+        const totals = await syncUser(uid, client, tokenEncKey.value());
+        console.log('Scheduled sync for', uid, totals);
+      } catch (err: any) {
+        console.warn('Scheduled sync skipped for', uid, err?.message || err);
+      }
+    }
+  },
+);
+
+/**
+ * Rows stuck as pending: before pending charges posted into the same row,
+ * one you'd edited while pending kept its pending copy and never got the
+ * posted version. Look each up in the bank's posted transactions (by
+ * pending_transaction_id) and give it the posted version, keeping your edits.
+ */
+export const repairPendingTransactions = onCall(
+  { secrets: [plaidClientId, plaidSecret, tokenEncKey], timeoutSeconds: 300 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'You must be signed in.');
+    const uid = request.auth.uid;
+    const rows = (request.data?.rows ?? []) as { docId: string; plaidTransactionId: string; date: string }[];
+    if (!Array.isArray(rows) || rows.length === 0) return { fixed: 0, unresolved: [] };
+    const publicKey = await getUserPublicKey(uid);
+    if (!publicKey) throw new HttpsError('failed-precondition', 'Unlock the app once before repairing.');
+
+    const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
+    const db = getFirestore();
+    const txCol = db.collection(`users/${uid}/transactions`);
+    const indexCol = db.collection(`users/${uid}/plaidTxIndex`);
+    const earliest = rows.map(r => r.date).sort()[0];
+    const start = new Date(earliest + 'T00:00:00Z');
+    start.setUTCDate(start.getUTCDate() - 7);
+    const startDate = start.toISOString().slice(0, 10);
+    const endDate = new Date().toISOString().slice(0, 10);
+
+    // Every posted transaction that began as a pending one, by its pending id.
+    const postedFor = new Map<string, { t: PlaidTransaction; itemId: string }>();
+    const items = await db.collection(`users/${uid}/plaidItems`).get();
+    for (const itemDoc of items.docs) {
+      try {
+        const accessToken = decryptToken(itemDoc.data().accessToken as EncryptedValue, tokenEncKey.value());
+        let offset = 0;
+        let total = Infinity;
+        while (offset < total) {
+          const resp = await client.transactionsGet({
+            access_token: accessToken, start_date: startDate, end_date: endDate, options: { count: 500, offset },
+          });
+          total = resp.data.total_transactions;
+          for (const t of resp.data.transactions) {
+            if (t.pending_transaction_id && !t.pending) postedFor.set(t.pending_transaction_id, { t, itemId: itemDoc.id });
+          }
+          offset += resp.data.transactions.length;
+          if (resp.data.transactions.length === 0) break;
+        }
+      } catch (err: any) {
+        console.warn(`repair: transactionsGet failed for item ${itemDoc.id}:`, err?.response?.data?.error_code || err?.message);
+      }
+    }
+
+    const docs = await docStates(txCol, rows.map(r => r.docId));
+    const copies = await docStates(txCol, [...postedFor.values()].map(p => p.t.transaction_id));
+    const batch = db.batch();
+    const unresolved: string[] = [];
+    let fixed = 0;
+    for (const row of rows) {
+      const found = postedFor.get(row.plaidTransactionId);
+      const state = docs.get(row.docId);
+      if (!found || !state?.exists) { unresolved.push(row.docId); continue; }
+      const envelope = envelopeDoc(mapPlaidTransaction(found.t, found.itemId), publicKey);
+      if (state.edited) batch.set(txCol.doc(row.docId), { bankUpdate: envelope }, { merge: true });
+      else batch.set(txCol.doc(row.docId), envelope);
+      batch.set(indexCol.doc(found.t.transaction_id), { docId: row.docId });
+      batch.set(indexCol.doc(row.plaidTransactionId), { docId: row.docId, postedAs: found.t.transaction_id });
+      // A copy of the posted one written on its own later: this row is it.
+      const copy = copies.get(found.t.transaction_id);
+      if (found.t.transaction_id !== row.docId && copy?.exists && !copy.edited) batch.delete(txCol.doc(found.t.transaction_id));
+      fixed++;
+    }
+    await batch.commit();
+    return { fixed, unresolved };
   },
 );
 
@@ -460,6 +662,82 @@ export const refreshPlaidItems = onCall(
   },
 );
 
+/** The accounts under an item, with balances and (for cards) statement details. */
+async function loadPlaidAccounts(client: PlaidApi, accessToken: string, itemId: string) {
+  const resp = await client.accountsGet({ access_token: accessToken });
+
+  // Liabilities (min payment, due date, statement date) is a separate call and a
+  // separate consent scope. Items linked before Liabilities was requested at Link
+  // time will fail here (e.g. PRODUCT_NOT_READY / no access). That's expected for
+  // not-yet-relinked items, so we degrade gracefully rather than fail the whole call.
+  type CreditInfo = {
+    min: number | null;
+    dueDay: number | null;
+    statementDay: number | null;
+    statementBalance: number | null; // last closed statement balance: what's actually due
+    dueDate: string | null;          // exact next payment due date (YYYY-MM-DD)
+    statementIssueDate: string | null; // last statement close date, for paid detection
+    lastPaymentDate: string | null;    // when the last payment posted
+    lastPaymentAmount: number | null;  // how much the last payment was
+    isOverdue: boolean | null;         // Plaid's own overdue flag (authoritative)
+  };
+  const creditByAccountId = new Map<string, CreditInfo>();
+  try {
+    const liab = await client.liabilitiesGet({ access_token: accessToken });
+    const creditList = liab.data.liabilities?.credit ?? [];
+    // Diagnostic: shows exactly what statement/cycle data each institution returns
+    // (e.g. confirms whether Discover ever provides Liabilities). Safe: no amounts
+    // of user spending, just statement metadata for the linked cards.
+    console.log(`liabilitiesGet item ${itemId}: ${creditList.length} credit account(s):`,
+      JSON.stringify(creditList.map(c => ({
+        account_id: c.account_id,
+        last_statement_balance: c.last_statement_balance,
+        last_statement_issue_date: c.last_statement_issue_date,
+        next_payment_due_date: c.next_payment_due_date,
+        is_overdue: c.is_overdue,
+      }))));
+    for (const c of creditList) {
+      if (!c.account_id) continue;
+      creditByAccountId.set(c.account_id, {
+        min: c.minimum_payment_amount ?? null,
+        dueDay: dayOfMonth(c.next_payment_due_date),
+        statementDay: dayOfMonth(c.last_statement_issue_date),
+        statementBalance: c.last_statement_balance ?? null,
+        dueDate: c.next_payment_due_date ?? null,
+        statementIssueDate: c.last_statement_issue_date ?? null,
+        lastPaymentDate: c.last_payment_date ?? null,
+        lastPaymentAmount: c.last_payment_amount ?? null,
+        isOverdue: c.is_overdue ?? null,
+      });
+    }
+  } catch (err: any) {
+    console.warn('liabilitiesGet unavailable (item may need re-link for this product):', err?.response?.data?.error_code || err?.message);
+  }
+
+  return resp.data.accounts.map(a => {
+    const credit = creditByAccountId.get(a.account_id);
+    return {
+      account_id: a.account_id,
+      name: a.name,
+      official_name: a.official_name ?? null,
+      mask: a.mask ?? null,
+      type: a.type,
+      subtype: a.subtype ?? null,
+      current_balance: a.balances?.current ?? null,
+      credit_limit: a.balances?.limit ?? null,
+      minimum_payment: credit?.min ?? null,
+      payment_due_day: credit?.dueDay ?? null,
+      statement_closing_day: credit?.statementDay ?? null,
+      statement_balance: credit?.statementBalance ?? null,
+      payment_due_date: credit?.dueDate ?? null,
+      statement_issue_date: credit?.statementIssueDate ?? null,
+      last_payment_date: credit?.lastPaymentDate ?? null,
+      last_payment_amount: credit?.lastPaymentAmount ?? null,
+      is_overdue: credit?.isOverdue ?? null,
+    };
+  });
+}
+
 /**
  * Return the accounts held under a linked Plaid item (name, mask, type, balance)
  * so the client can auto-create matching app accounts. Not stored server-side;
@@ -481,80 +759,7 @@ export const getPlaidAccounts = onCall(
     try {
       const client = getPlaidClient(plaidClientId.value(), plaidSecret.value(), plaidEnv.value());
       const accessToken = decryptToken(itemSnap.data()!.accessToken as EncryptedValue, tokenEncKey.value());
-      const resp = await client.accountsGet({ access_token: accessToken });
-
-      // Liabilities (min payment, due date, statement date) is a separate call and a
-      // separate consent scope. Items linked before Liabilities was requested at Link
-      // time will fail here (e.g. PRODUCT_NOT_READY / no access). That's expected for
-      // not-yet-relinked items, so we degrade gracefully rather than fail the whole call.
-      type CreditInfo = {
-        min: number | null;
-        dueDay: number | null;
-        statementDay: number | null;
-        statementBalance: number | null; // last closed statement balance: what's actually due
-        dueDate: string | null;          // exact next payment due date (YYYY-MM-DD)
-        statementIssueDate: string | null; // last statement close date, for paid detection
-        lastPaymentDate: string | null;    // when the last payment posted
-        lastPaymentAmount: number | null;  // how much the last payment was
-        isOverdue: boolean | null;         // Plaid's own overdue flag (authoritative)
-      };
-      const creditByAccountId = new Map<string, CreditInfo>();
-      try {
-        const liab = await client.liabilitiesGet({ access_token: accessToken });
-        const creditList = liab.data.liabilities?.credit ?? [];
-        // Diagnostic: shows exactly what statement/cycle data each institution returns
-        // (e.g. confirms whether Discover ever provides Liabilities). Safe: no amounts
-        // of user spending, just statement metadata for the linked cards.
-        console.log(`liabilitiesGet item ${itemId}: ${creditList.length} credit account(s):`,
-          JSON.stringify(creditList.map(c => ({
-            account_id: c.account_id,
-            last_statement_balance: c.last_statement_balance,
-            last_statement_issue_date: c.last_statement_issue_date,
-            next_payment_due_date: c.next_payment_due_date,
-            is_overdue: c.is_overdue,
-          }))));
-        for (const c of creditList) {
-          if (!c.account_id) continue;
-          creditByAccountId.set(c.account_id, {
-            min: c.minimum_payment_amount ?? null,
-            dueDay: dayOfMonth(c.next_payment_due_date),
-            statementDay: dayOfMonth(c.last_statement_issue_date),
-            statementBalance: c.last_statement_balance ?? null,
-            dueDate: c.next_payment_due_date ?? null,
-            statementIssueDate: c.last_statement_issue_date ?? null,
-            lastPaymentDate: c.last_payment_date ?? null,
-            lastPaymentAmount: c.last_payment_amount ?? null,
-            isOverdue: c.is_overdue ?? null,
-          });
-        }
-      } catch (err: any) {
-        console.warn('liabilitiesGet unavailable (item may need re-link for this product):', err?.response?.data?.error_code || err?.message);
-      }
-
-      return {
-        accounts: resp.data.accounts.map(a => {
-          const credit = creditByAccountId.get(a.account_id);
-          return {
-            account_id: a.account_id,
-            name: a.name,
-            official_name: a.official_name ?? null,
-            mask: a.mask ?? null,
-            type: a.type,
-            subtype: a.subtype ?? null,
-            current_balance: a.balances?.current ?? null,
-            credit_limit: a.balances?.limit ?? null,
-            minimum_payment: credit?.min ?? null,
-            payment_due_day: credit?.dueDay ?? null,
-            statement_closing_day: credit?.statementDay ?? null,
-            statement_balance: credit?.statementBalance ?? null,
-            payment_due_date: credit?.dueDate ?? null,
-            statement_issue_date: credit?.statementIssueDate ?? null,
-            last_payment_date: credit?.lastPaymentDate ?? null,
-            last_payment_amount: credit?.lastPaymentAmount ?? null,
-            is_overdue: credit?.isOverdue ?? null,
-          };
-        }),
-      };
+      return { accounts: await loadPlaidAccounts(client, accessToken, itemId) };
     } catch (err: any) {
       const plaidError = err?.response?.data;
       console.error('getPlaidAccounts failed:', plaidError || err);
@@ -711,7 +916,7 @@ export const plaidWebhook = onRequest(
         if (uid && publicKey) {
           const itemDoc = await getFirestore().doc(`users/${uid}/plaidItems/${item_id}`).get();
           if (itemDoc.exists) {
-            const totals = await syncItem(uid, itemDoc, client, tokenEncKey.value(), publicKey);
+            const totals = await refreshItem(uid, itemDoc, client, tokenEncKey.value(), publicKey);
             console.log('Webhook sync complete for', item_id, totals);
           }
         } else {
@@ -726,6 +931,21 @@ export const plaidWebhook = onRequest(
             { merge: true },
           ).catch(() => {}); // best-effort: don't let a status-flag failure break the ack
         }
+      }
+    }
+
+    // New statement details (a card's balance due, due date): refresh the
+    // account snapshot so Credit card payments update on their own.
+    if (webhook_type === 'LIABILITIES' && item_id) {
+      try {
+        const uid = await uidForItem(item_id);
+        const publicKey = uid ? await getUserPublicKey(uid) : null;
+        if (uid && publicKey) {
+          const itemDoc = await getFirestore().doc(`users/${uid}/plaidItems/${item_id}`).get();
+          if (itemDoc.exists) await snapshotAccounts(itemDoc, client, tokenEncKey.value(), publicKey);
+        }
+      } catch (err) {
+        console.error('Webhook LIABILITIES handling failed for', item_id, err);
       }
     }
 

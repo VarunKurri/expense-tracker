@@ -217,6 +217,19 @@ The app is what we copy. Do not "correct" this back to dark.
   stops listing gets `bankRemoved` and is reviewed (`kind: 'removed'`, Keep or
   Remove, never in Merge all). Both are read beside the doc and never saved in
   it (`withoutBankSidecars`).
+- Bank sync runs in the background: the webhook (as soon as the bank has
+  news), `scheduledPlaidSync` (every 6 hours) and Sync all call `refreshItem`
+  (functions): webhook URL, transactions, then `snapshotAccounts`, which saves
+  the bank's balances and card statements on the item envelope-encrypted to
+  your key (`accountsSnapshot`). The server can't write your encrypted
+  accounts, so `PlaidService` applies each new snapshot when the app is open.
+  A pending charge posts INTO its pending row's doc (doc ids never change, so
+  notes, splits, categories and links made while pending stay);
+  `users/{uid}/plaidTxIndex/{plaidId} -> { docId }` routes a Plaid id that
+  lives in another doc (posted-into-pending, or a bank row you merged). A
+  cancelled pending charge is removed even if edited.
+  `repairPendingTransactions` gives rows stuck as pending from before this
+  their posted version (run once per session by `PlaidService`).
 - Dates: `date` is when you made the purchase (Plaid's authorized date, else
   its date) and is what spending goes by. `postedDate` is when the bank posted
   it, what statements go by: statement maths use `postedOn` / `postedBalanceOn`

@@ -13,6 +13,7 @@ import { EncryptionService } from './services/encryption.service';
 import { AccountService } from './services/account.service';
 import { CategoryService } from './services/category.service';
 import { TransactionService } from './services/transaction.service';
+import { PlaidService } from './services/plaid.service';
 import { BudgetService } from './services/budget.service';
 
 describe('App', () => {
@@ -64,6 +65,7 @@ describe('App', () => {
         { provide: AccountService, useValue: { accounts, loaded: signal(true) } },
         { provide: CategoryService, useValue: { categories } },
         { provide: TransactionService, useValue: { transactions } },
+        { provide: PlaidService, useValue: {} },
         { provide: BudgetService, useValue: { budgets } },
         {
           provide: QuickAddService,

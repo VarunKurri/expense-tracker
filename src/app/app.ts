@@ -21,6 +21,7 @@ import { BudgetService } from './services/budget.service';
 import { monthKeyOf } from './utils/calendar';
 import { Account } from './models';
 import { Logo } from './components/logo/logo';
+import { PlaidService } from './services/plaid.service';
 
 interface NavItem {
   path: string;
@@ -68,6 +69,9 @@ export class App {
   private accountService = inject(AccountService);
   private categoryService = inject(CategoryService);
   private transactionService = inject(TransactionService);
+  // Created at start so linked banks stay current in the background (it applies
+  // each bank's synced balances as they arrive), not only once Accounts opens.
+  private plaid = inject(PlaidService);
   private budgetService = inject(BudgetService);
 
   sidebarOpen = signal(false);

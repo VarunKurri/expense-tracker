@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, NgZone } from '@angular/core';
+import { Injectable, inject, signal, NgZone, effect, untracked } from '@angular/core';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Firestore } from '@angular/fire/firestore';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
@@ -9,6 +9,8 @@ import { AccountService } from './account.service';
 import { TransactionService } from './transaction.service';
 import { ReconciliationService } from './reconciliation.service';
 import { ToastService } from './toast.service';
+import { EncryptionService } from './encryption.service';
+import { localDateString } from '../utils/date';
 import { Account, AccountType } from '../models';
 import { accountForPlaidId, linkedTwice, moveToLink, replacementCandidates, sameBankAccount } from '../utils/plaid-accounts';
 
@@ -22,6 +24,9 @@ export interface PlaidItem {
   lastError?: string;
   /** Plaid reported an account the user hasn't shared yet (NEW_ACCOUNTS_AVAILABLE): a replaced card, say. */
   newAccountsAvailable?: boolean;
+  /** The bank's accounts (balances, card statements) as of its last sync, encrypted to your key. */
+  accountsSnapshot?: Record<string, unknown>;
+  accountsSnapshotAt?: number;
 }
 
 /** A Plaid account newly shared on a bank that already has accounts here: new, or a replaced card? */
@@ -102,6 +107,7 @@ export class PlaidService {
   private reconcileSvc = inject(ReconciliationService);
   private toast = inject(ToastService);
   private ngZone = inject(NgZone);
+  private encryption = inject(EncryptionService);
 
   /** True while we are minting a link token / opening Link. */
   connecting = signal(false);
@@ -141,6 +147,85 @@ export class PlaidService {
     }),
   );
   linkedItems = toSignal(this.items$, { initialValue: [] as PlaidItem[] });
+
+  /** Each bank's snapshot already applied, by item id, so it's applied once. */
+  private appliedSnapshots = new Map<string, number>();
+  private applyingSnapshots = false;
+  private repairedPending = false;
+
+  constructor() {
+    // Background sync: the server saves each bank's balances and card
+    // statements beside it whenever it syncs (webhook, schedule, or Sync).
+    // Apply them as they arrive, so nothing waits for you to press Sync.
+    effect(() => {
+      const items = this.linkedItems();
+      const ready = this.encryption.unlocked() && this.accountSvc.loaded();
+      if (!ready) return;
+      const fresh = items.filter(i => i.accountsSnapshot && (i.accountsSnapshotAt ?? 0) > (this.appliedSnapshots.get(i.itemId) ?? 0));
+      if (fresh.length) untracked(() => void this.applySnapshots(fresh));
+    });
+    // Rows stuck as pending from before pending charges posted into the same row.
+    effect(() => {
+      const txs = this.txService.transactions();
+      if (this.repairedPending || !this.encryption.unlocked() || txs.length === 0) return;
+      this.repairedPending = true;
+      untracked(() => void this.repairStuckPending());
+    });
+  }
+
+  private async applySnapshots(items: PlaidItem[]): Promise<void> {
+    if (this.applyingSnapshots) return;
+    this.applyingSnapshots = true;
+    try {
+      for (const item of items) {
+        const at = item.accountsSnapshotAt ?? 0;
+        try {
+          const { accounts } = await this.encryption.decryptDoc<{ accounts: PlaidAccount[] }>(item.accountsSnapshot!);
+          await this.setupAccountsForItem(item.itemId, item.institutionName, accounts);
+        } catch (err) {
+          console.error('Could not apply the bank snapshot for', item.institutionName, err);
+        }
+        this.appliedSnapshots.set(item.itemId, at);
+      }
+      await this.foldLinkedTwice();
+      await this.reconcileSvc.cleanupReconciled();
+    } finally {
+      this.applyingSnapshots = false;
+    }
+  }
+
+  /**
+   * Before a pending charge posted into the same row, a row you'd edited while
+   * pending kept its pending copy and never got the posted one, so old
+   * transactions still read Pending. Ask the server to find each one's posted
+   * version; anything it can't find that's over two weeks old has posted
+   * long since (no hold lasts that long), so it stops being pending.
+   */
+  private async repairStuckPending(): Promise<void> {
+    const cutoff = new Date(localDateString() + 'T00:00:00');
+    cutoff.setDate(cutoff.getDate() - 5);
+    const stale = localDateString(cutoff);
+    const stuck = this.txService.transactions().filter(t => t.plaidPending && t.plaidTransactionId && t.id && t.date < stale);
+    if (stuck.length === 0) return;
+    try {
+      const repair = httpsCallable<
+        { rows: { docId: string; plaidTransactionId: string; date: string }[] },
+        { fixed: number; unresolved: string[] }
+      >(this.functions, 'repairPendingTransactions');
+      const { data } = await repair({ rows: stuck.map(t => ({ docId: t.id!, plaidTransactionId: t.plaidTransactionId!, date: t.date })) });
+      const longAgo = new Date(localDateString() + 'T00:00:00');
+      longAgo.setDate(longAgo.getDate() - 14);
+      const old = localDateString(longAgo);
+      const settle = stuck.filter(t => data.unresolved.includes(t.id!) && t.date < old).map(t => t.id!);
+      if (settle.length) await this.txService.updateMany(settle, { plaidPending: false });
+      if (data.fixed + settle.length > 0) {
+        this.toast.info(`${data.fixed + settle.length} old transaction${data.fixed + settle.length === 1 ? ' was' : 's were'} still marked pending; ${data.fixed + settle.length === 1 ? 'it has' : 'they have'} posted, and your edits stay.`);
+      }
+    } catch (err) {
+      // Not deployed yet, or offline: tried again next time the app opens.
+      console.warn('Pending repair skipped:', err);
+    }
+  }
 
   private scriptPromise: Promise<void> | null = null;
 
@@ -234,13 +319,13 @@ export class PlaidService {
    * any Plaid account already linked to an app account). Runs client-side so the
    * accounts are encrypted with the user's key like all other app data.
    */
-  private async setupAccountsForItem(itemId: string, institutionName: string): Promise<void> {
+  private async setupAccountsForItem(itemId: string, institutionName: string, known?: PlaidAccount[]): Promise<void> {
     try {
-      const getAccounts = httpsCallable<{ item_id: string }, { accounts: PlaidAccount[] }>(
+      // From the bank's saved snapshot when there is one; else ask the server.
+      const data = known ? { accounts: known } : (await httpsCallable<{ item_id: string }, { accounts: PlaidAccount[] }>(
         this.functions,
         'getPlaidAccounts',
-      );
-      const { data } = await getAccounts({ item_id: itemId });
+      )({ item_id: itemId })).data;
       const existing = this.accountSvc.accounts();
       // A bank linked before has its accounts already: anything new on it is
       // asked about (a replaced card?) instead of being added as a second card.

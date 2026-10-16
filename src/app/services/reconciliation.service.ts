@@ -65,10 +65,14 @@ export class ReconciliationService {
     // settles them (merging gives the kept row its new id).
     const kept = new Set(results.map(m => m.manual.id));
     for (const t of txs) {
-      if (t.bankRemoved && t.id && !kept.has(t.id)) results.push({ kind: 'removed', plaid: t, manual: t });
+      // (A cancelled pending charge is removed on its own; see TransactionService.)
+      if (t.bankRemoved && !t.plaidPending && t.id && !kept.has(t.id)) results.push({ kind: 'removed', plaid: t, manual: t });
     }
+    // Bank rows as the bank wrote them: under their own id, or a pending row
+    // that posted into the same doc (untouched, so written once).
     const serverPlaid = txs.filter(t =>
-      t.plaidTransactionId && t.id === t.plaidTransactionId && !repeats.has(t.id!) && !t.bankRemoved);
+      t.plaidTransactionId && (t.id === t.plaidTransactionId || t.createdAt === t.updatedAt) &&
+      !repeats.has(t.id!) && !t.bankRemoved);
     // Once an entry is merged it's permanently excluded from being reconsidered. A
     // looser rule (re-open matching once the original link target is gone, e.g. after
     // a disconnect/relink) was tried and reverted: with no merchant check and only a
@@ -181,12 +185,20 @@ export class ReconciliationService {
       plaidTransactionId: match.plaid.plaidTransactionId,
       plaidItemId: match.plaid.plaidItemId,
       plaidAccountId: match.plaid.plaidAccountId,
+      plaidPending: match.plaid.plaidPending,
+      postedDate: match.plaid.postedDate,
     };
     // Your own entry takes the bank's date and account. A relinked copy you
     // already had keeps its own: it's the same row, maybe with your edits.
     if (match.kind === 'manual') {
       patch.date = match.plaid.date;
       if (match.plaid.accountId) patch.accountId = match.plaid.accountId;
+    }
+    // Tell the server the bank's id now lives in the kept row, so the bank's
+    // later changes to it land there instead of bringing the copy back.
+    const user = this.auth.user();
+    if (user && match.plaid.plaidTransactionId) {
+      await setDoc(doc(this.db, `users/${user.uid}/plaidTxIndex/${match.plaid.plaidTransactionId}`), { docId: match.manual.id });
     }
     await this.txService.update(match.manual.id!, patch);
     await this.txService.remove(match.plaid.id!);
