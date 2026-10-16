@@ -18,7 +18,7 @@ import { ManualAsset, ME, MoneyBackSource, Transaction, UntrackedReturn } from '
 import { PersonService } from '../../services/person.service';
 import { GroupService } from '../../services/group.service';
 import { PersonSplitStatus, outstandingFor, setClosed, splitStatus } from '../../utils/splits';
-import { RefundState, incomeLinks, newReturnId } from '../../utils/money-back';
+import { RefundState, SpreadTarget, incomeLinks, incomeLinksPatch, newReturnId, spreadIncome } from '../../utils/money-back';
 import { fromCents, toCents } from '../../utils/money';
 import { TransactionPicker } from '../transaction-picker/transaction-picker';
 import { spreadOverCategories } from '../../utils/settlements';
@@ -654,12 +654,59 @@ export class TransactionView {
     const from = this.linkingFrom();
     if (!from) return [];
     const wantType = from.type === 'income' ? 'expense' : 'income';
+    const already = new Set(from.type === 'income' ? incomeLinks(from).map(l => l.expenseId) : []);
     // Searching is the picker's; this only says which qualify.
     return this.txService.transactions().filter(t =>
-      t.type === wantType && t.id !== from.id &&
-      // An income can only ever reimburse one expense.
-      !this.txService.isMoneyBackIncome(t));
+      t.type === wantType && t.id !== from.id && !already.has(t.id!) &&
+      // An income already paying back other purchases qualifies while some of
+      // it is left over (Priya's $3,150 covers the $3,000 and then the $150).
+      (!this.txService.isMoneyBackIncome(t) || (from.type === 'expense' && this.spareCents(t) > 0)));
   });
+
+  /** What a purchase still needs, not counting this income's own part of it. */
+  private roomFor(expense: Transaction, income: Transaction): SpreadTarget {
+    const own = incomeLinks(income).find(l => l.expenseId === expense.id)?.amountCents ?? 0;
+    const others = toCents(this.txService.moneyBackFor(expense)) - own;
+    return { expenseId: expense.id!, date: expense.date, roomCents: Math.max(0, toCents(expense.amount) - others) };
+  }
+
+  /** How much of an income is left once the purchases it's linked to are covered. */
+  spareCents(income: Transaction): number {
+    const txs = this.txService.transactions();
+    const room = incomeLinks(income)
+      .map(l => txs.find(t => t.id === l.expenseId))
+      .filter((e): e is Transaction => !!e)
+      .reduce((sum, e) => sum + this.roomFor(e, income).roomCents, 0);
+    return Math.max(0, toCents(income.amount) - room);
+  }
+
+  /**
+   * Point an income at these purchases, spread oldest first (spreadIncome).
+   * Returns the part the purchase `added` got: 0 when the income was used up.
+   */
+  private async linkIncomeTo(income: Transaction, expenses: Transaction[], extra: Partial<Transaction> = {}, added?: string): Promise<number> {
+    const parts = spreadIncome(toCents(income.amount), expenses.map(e => this.roomFor(e, income)));
+    await this.txService.update(income.id!, { ...incomeLinksPatch(parts), ...extra });
+    return added ? parts.find(p => p.expenseId === added)?.amountCents ?? 0 : 0;
+  }
+
+  /** The purchases an income is linked to now. */
+  private linkedPurchases(income: Transaction): Transaction[] {
+    const txs = this.txService.transactions();
+    return incomeLinks(income).map(l => txs.find(t => t.id === l.expenseId)).filter((e): e is Transaction => !!e);
+  }
+
+  /** Take one purchase off an income spread over several; the rest re-spread. */
+  async unlinkPurchase(income: Transaction, expense: Transaction) {
+    if (!income.id) return;
+    try {
+      const rest = this.linkedPurchases(income).filter(e => e.id !== expense.id);
+      await this.linkIncomeTo(income, rest, rest.length ? {} : { moneyBackInfo: undefined });
+      this.toast.success(`Unlinked from ${expense.merchant || 'that purchase'}.`);
+    } catch {
+      this.toast.error('Could not unlink. Please try again.');
+    }
+  }
 
   openLinkPicker(tx: Transaction) {
     this.linkSource.set('repayment');
@@ -682,11 +729,13 @@ export class TransactionView {
     if (!income.id || !expense.id) return;
     try {
       const who = from.type === 'expense' ? this.whoFields(this.linkSource()) : {};
-      await this.txService.update(income.id, {
-        reimbursesId: expense.id,
+      // Already paying back other purchases: this one joins them.
+      const purchases = [...this.linkedPurchases(income).filter(e => e.id !== expense.id), expense];
+      const got = await this.linkIncomeTo(income, purchases, {
         moneyBackInfo: { ...income.moneyBackInfo, source: this.linkSource(), ...who },
-      });
-      this.toast.success(this.linkSource() === 'refund' ? 'Refund linked.' : 'Repayment linked.');
+      }, expense.id);
+      if (got === 0) this.toast.info('All of that income already went to earlier purchases, so none of it is left for this one.');
+      else this.toast.success(this.linkSource() === 'refund' ? 'Refund linked.' : 'Repayment linked.');
       this.closeLinkPicker();
     } catch {
       this.toast.error('Could not link. Please try again.');

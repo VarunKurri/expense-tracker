@@ -210,6 +210,23 @@ The app is what we copy. Do not "correct" this back to dark.
   Plaid ids of one account, same amount and direction, within 3 days, never a
   copy you edited or linked) and reviewed in the Transactions duplicate review
   as `kind: 'relink'`; merging keeps the row you had and gives it the new ids.
+  The server never overwrites or deletes a row you've edited (it can't read
+  it): the bank's newer version waits beside it as `bankUpdate` and
+  `bankUpdatePatch` (utils/bank-updates.ts) folds in the bank's amount, pending
+  state and posted date while keeping your edits and date; a row the bank
+  stops listing gets `bankRemoved` and is reviewed (`kind: 'removed'`, Keep or
+  Remove, never in Merge all). Both are read beside the doc and never saved in
+  it (`withoutBankSidecars`).
+- Dates: `date` is when you made the purchase (Plaid's authorized date, else
+  its date) and is what spending goes by. `postedDate` is when the bank posted
+  it, what statements go by: statement maths use `postedOn` / `postedBalanceOn`
+  (utils/finance.ts). Pending rows (`plaidPending`, tagged `.pending-tag`) count
+  as spending but are left out of every balance, as the bank leaves them out.
+  `app-balance-check` on an account's page says where the balance comes from,
+  what's pending, and checks the history against a statement (`checkStatement`).
+- One income can pay back several purchases (`moneyBackSplits`): linking more
+  re-spreads it with `spreadIncome`, oldest purchase first, any surplus on the
+  newest. An income with some left over shows up when linking from a purchase.
 - Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`, `FakeSharedBills`).
 - Never centre a fixed panel with `transform`: it traps any pop-up inside it
   (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;

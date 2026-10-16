@@ -476,6 +476,9 @@
                       @if (tx.isInternalTransfer) {
                         <span class="refunded-badge">↔ Transfer</span>
                       }
+                      @if (tx.plaidPending) {
+                        <span class="pending-tag" title="Not posted by the bank yet, so not in the balance">Pending</span>
+                      }
                       <!-- What's attached: quiet line icons, side by side -->
                       @if (tx.notes || tx.receiptId) {
                         <span class="tx-flags">

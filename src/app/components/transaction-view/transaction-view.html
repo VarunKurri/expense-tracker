@@ -25,6 +25,9 @@
         @if (tx.isInternalTransfer) {
           <div class="view-refunded-badge">↔ Internal transfer, not counted in analysis</div>
         }
+        @if (tx.plaidPending) {
+          <div class="view-pending"><span class="pending-tag">Pending</span> Not in the account's balance until the bank posts it.</div>
+        }
       </div>
 
       <div class="view-details">
@@ -210,15 +213,19 @@
           <div class="view-reimburse-head">Money back</div>
           @if (moneyBackParts().length > 1) {
             <div class="reimburse-summary">
-              ↩ {{ sourceLabel(incomeSource(tx)) }}{{ fromLabel(tx.moneyBackInfo ?? {}) }}, spread over {{ moneyBackParts().length }} bills
+              ↩ {{ sourceLabel(incomeSource(tx)) }}{{ fromLabel(tx.moneyBackInfo ?? {}) }}, spread over {{ moneyBackParts().length }} purchases
             </div>
             @for (p of moneyBackParts(); track p.expense.id) {
               <div class="reimburse-row">
                 <span class="reimburse-row-text">{{ p.expense.merchant || 'Expense' }} · {{ formatDate(p.expense.date) }}</span>
                 <span class="fig">+{{ formatCents(p.amountCents) }}</span>
+                <button class="reimburse-unlink" (click)="unlinkPurchase(tx, p.expense)" title="Unlink" aria-label="Unlink this purchase">✕</button>
               </div>
             }
-            <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink from all {{ moneyBackParts().length }}</button>
+            <div class="money-back-actions">
+              <button class="btn-add reimburse-add" (click)="openLinkPicker(tx)">+ Link another purchase</button>
+              <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink from all {{ moneyBackParts().length }}</button>
+            </div>
           } @else if (reimbursesExpense(); as exp) {
             <div class="reimburse-summary">
               ↩ {{ sourceLabel(incomeSource(tx)) }}{{ fromLabel(tx.moneyBackInfo ?? {}) }} on <strong>{{ exp.merchant || 'an expense' }}</strong> ·
@@ -237,7 +244,12 @@
                 <button type="button" role="radio" [class.active]="incomeSource(tx) === 'repayment'" [attr.aria-checked]="incomeSource(tx) === 'repayment'" (click)="setIncomeSource(tx, 'repayment')">Repayment</button>
               </div>
             }
-            <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink</button>
+            <div class="money-back-actions">
+              @if (reimbursesSurplus() > 0) {
+                <button class="btn-add reimburse-add" (click)="openLinkPicker(tx)">+ Link another purchase</button>
+              }
+              <button class="btn-add reimburse-add" (click)="unlinkReimbursement(tx)">Unlink</button>
+            </div>
           } @else {
             <p class="reimburse-hint">
               Is this money back on a purchase, like a refund or a friend paying you back?

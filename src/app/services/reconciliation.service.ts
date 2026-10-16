@@ -14,7 +14,9 @@ import { relinkDuplicates } from '../utils/relink-duplicates';
  * of the bank and again by the new one (see utils/relink-duplicates.ts).
  */
 export interface ReconcileMatch {
-  kind: 'manual' | 'relink';
+  // `removed`: one row (plaid and manual are the same) that the bank stopped
+  // listing after you'd edited it. Merging deletes it; keeping clears the flag.
+  kind: 'manual' | 'relink' | 'removed';
   plaid: Transaction;   // the bank row removed on merge (doc id === plaidTransactionId)
   manual: Transaction;  // the row kept: your entry, or the copy you already had
 }
@@ -59,7 +61,14 @@ export class ReconciliationService {
       results.push({ kind: 'relink', plaid: pair.drop, manual: pair.keep });
       repeats.add(pair.drop.id!);
     }
-    const serverPlaid = txs.filter(t => t.plaidTransactionId && t.id === t.plaidTransactionId && !repeats.has(t.id!));
+    // Rows the bank stopped listing, unless a relink pair above already
+    // settles them (merging gives the kept row its new id).
+    const kept = new Set(results.map(m => m.manual.id));
+    for (const t of txs) {
+      if (t.bankRemoved && t.id && !kept.has(t.id)) results.push({ kind: 'removed', plaid: t, manual: t });
+    }
+    const serverPlaid = txs.filter(t =>
+      t.plaidTransactionId && t.id === t.plaidTransactionId && !repeats.has(t.id!) && !t.bankRemoved);
     // Once an entry is merged it's permanently excluded from being reconsidered. A
     // looser rule (re-open matching once the original link target is gone, e.g. after
     // a disconnect/relink) was tried and reverted: with no merchant check and only a
@@ -100,9 +109,10 @@ export class ReconciliationService {
     }
   }
 
-  /** Merge every current match. Isolated per-item so one failure doesn't abandon the rest. */
+  /** Merge every current match. Isolated per-item so one failure doesn't abandon the rest.
+   *  Rows the bank removed are never deleted in bulk: each is your call. */
   async mergeAll(): Promise<void> {
-    const all = this.matches();
+    const all = this.matches().filter(m => m.kind !== 'removed');
     if (all.length === 0) return;
     this.busy.set(true);
     try {
@@ -129,6 +139,11 @@ export class ReconciliationService {
 
   /** Dismiss a pair as genuinely separate; never suggest it again. */
   async keepBoth(match: ReconcileMatch): Promise<void> {
+    if (match.kind === 'removed') {
+      try { await this.txService.keepRemovedByBank(match.manual.id!); }
+      catch { this.toast.error('Could not save. Please try again.'); }
+      return;
+    }
     const previous = this.ignoreIds();
     const next = new Set(previous);
     next.add(match.plaid.plaidTransactionId!);
@@ -156,6 +171,10 @@ export class ReconciliationService {
   }
 
   private async linkAndDrop(match: ReconcileMatch): Promise<void> {
+    if (match.kind === 'removed') {
+      await this.txService.remove(match.manual.id!);
+      return;
+    }
     // The kept row takes the bank row's ids, so when the bank sends it again
     // cleanupReconciled drops the copy rather than it coming back.
     const patch: Partial<Transaction> = {

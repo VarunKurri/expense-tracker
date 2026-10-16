@@ -52,6 +52,36 @@ export function incomeLinks(t: Transaction): IncomeLink[] {
   return t.reimbursesId ? [{ expenseId: t.reimbursesId, amountCents: toCents(t.amount) }] : [];
 }
 
+/** A purchase an income can pay back, and how much of it is still uncovered. */
+export interface SpreadTarget { expenseId: string; date: string; roomCents: number; }
+
+/**
+ * One income paying back several purchases (Priya sending $3,150 for the
+ * $3,000 and the $150 you lent her): oldest purchase first, each up to what
+ * it still needs; anything left over lands on the newest as a surplus, so
+ * the parts always add up to the income. A purchase it doesn't reach gets
+ * no part.
+ */
+export function spreadIncome(incomeCents: number, targets: SpreadTarget[]): IncomeLink[] {
+  const sorted = [...targets].sort((a, b) => a.date.localeCompare(b.date));
+  let left = incomeCents;
+  const parts = sorted.map(t => {
+    const take = Math.max(0, Math.min(left, t.roomCents));
+    left -= take;
+    return { expenseId: t.expenseId, amountCents: take };
+  });
+  if (left > 0 && parts.length) parts[parts.length - 1].amountCents += left;
+  return parts.filter(p => p.amountCents > 0);
+}
+
+/** The patch that stores an income's links: one purchase is `reimbursesId`, several are `moneyBackSplits`. */
+export function incomeLinksPatch(links: IncomeLink[]): Partial<Transaction> {
+  if (links.length === 0) return { reimbursesId: undefined, moneyBackSplits: undefined, moneyBackInfo: undefined };
+  return links.length === 1
+    ? { reimbursesId: links[0].expenseId, moneyBackSplits: undefined }
+    : { moneyBackSplits: links, reimbursesId: undefined };
+}
+
 /** Money back on some purchase: kept out of income while money back is counted. */
 export function isMoneyBackIncome(t: Transaction): boolean {
   return incomeLinks(t).length > 0;

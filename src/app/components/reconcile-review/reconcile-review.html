@@ -10,6 +10,14 @@
           anything linked to it, and removes the copy, so your spending and balances count it once.
         </p>
       }
+      @if (removedCount() > 0) {
+        <p class="hint">
+          <strong>{{ removedCount() }}</strong> transaction{{ removedCount() === 1 ? '' : 's' }} you'd edited
+          {{ removedCount() === 1 ? 'is' : 'are' }} no longer listed by your bank, so
+          {{ removedCount() === 1 ? 'it was' : 'they were' }} kept for you to decide. Remove one if the charge
+          was cancelled; keep it if it really happened.
+        </p>
+      }
       @if (manualCount() > 0) {
         <p class="hint">
           <strong>{{ manualCount() }}</strong> bank transaction{{ manualCount() === 1 ? ' looks' : 's look' }} like
@@ -21,6 +29,26 @@
 
     <div class="match-list">
       @for (m of reconcile.matches(); track m.plaid.id) {
+        @if (m.kind === 'removed') {
+          <div class="match-card">
+            <div class="side">
+              <div class="side-label">No longer at your bank</div>
+              <div class="side-merchant">{{ m.manual.merchant || 'Untitled' }}</div>
+              <div class="side-meta">
+                <span class="chip">{{ categoryName(m.manual.categoryId) }}</span>
+                <span>{{ accountName(m.manual.accountId) }}</span>
+                <span>{{ formatDate(m.manual.date) }}</span>
+              </div>
+              <div class="side-amount fig" [class.neg]="m.manual.type === 'expense'">
+                {{ m.manual.type === 'expense' ? '−' : m.manual.type === 'income' ? '+' : '' }}{{ formatCurrency(m.manual.amount) }}
+              </div>
+            </div>
+            <div class="match-actions">
+              <button class="btn-ghost" (click)="keepBoth(m)" [disabled]="reconcile.busy()">Keep</button>
+              <button class="btn-danger" (click)="merge(m)" [disabled]="reconcile.busy()">Remove</button>
+            </div>
+          </div>
+        } @else {
         <div class="match-card">
           <div class="sides">
             <div class="side keep">
@@ -58,6 +86,7 @@
             <button class="btn-primary" (click)="merge(m)" [disabled]="reconcile.busy()">Merge</button>
           </div>
         </div>
+        }
       }
     </div>
   }
@@ -67,7 +96,9 @@
       <span class="footer-count">{{ reconcile.matches().length }} to review</span>
       <div class="actions-right">
         <button class="btn-ghost" (click)="closed.emit()">Later</button>
-        <button class="btn-solid" (click)="mergeAll()" [disabled]="reconcile.busy()">Merge all</button>
+        @if (relinkCount() + manualCount() > 0) {
+          <button class="btn-solid" (click)="mergeAll()" [disabled]="reconcile.busy()">Merge all</button>
+        }
       </div>
     </div>
   }

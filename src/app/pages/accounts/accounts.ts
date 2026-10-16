@@ -14,7 +14,7 @@ import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Account, Bill } from '../../models';
 import { ToastService } from '../../services/toast.service';
 import { PlaidService, PlaidItem, PendingPlaidAccount } from '../../services/plaid.service';
-import { monthActivityForAccount, transactionDeltaForAccount, roundMoney, owesMoney } from '../../utils/finance';
+import { monthActivityForAccount, roundMoney, owesMoney, postedBalanceOn, postedOn } from '../../utils/finance';
 import { localDateString } from '../../utils/date';
 
 type CardDueStatus = 'paid' | 'settled' | 'overdue' | 'due' | 'no-date';
@@ -223,16 +223,19 @@ export class Accounts {
     if (!a.statementIssueDate) return a.statementBalance;
     const refunds = roundMoney(
       this.transactionSvc.transactions()
-        .filter(t => t.accountId === a.id && t.type === 'income' && t.date > a.statementIssueDate!)
+        .filter(t => t.accountId === a.id && t.type === 'income' && !t.plaidPending && postedOn(t) > a.statementIssueDate!)
         .reduce((s, t) => s + t.amount, 0)
     );
     return Math.max(0, roundMoney(a.statementBalance - refunds));
   }
 
-  /** Balance owed on a credit card as of a given date (inclusive), using local history. */
+  /**
+   * Balance owed on a credit card at the end of a day, as the statement has it:
+   * by posted date, not purchase date (a purchase on the 16th that posts on the
+   * 18th is on the next statement), and nothing still pending.
+   */
   private balanceOwedAsOf(a: Account, dateStr: string): number {
-    const txns = this.transactionSvc.transactions().filter(t => t.date <= dateStr);
-    return roundMoney(a.openingBalance - transactionDeltaForAccount(txns, a.id!));
+    return postedBalanceOn(a, this.transactionSvc.transactions(), dateStr);
   }
 
   /** Most recent statement-closing day (1-31) on/before today, as YYYY-MM-DD. */

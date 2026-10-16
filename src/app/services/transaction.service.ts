@@ -19,6 +19,7 @@ import { TransactionRuleService } from './transaction-rule.service';
 import { applyRulesToDraft } from '../utils/rules';
 import { MoneyBackLedger } from '../utils/money-back';
 import { accountForPlaidId } from '../utils/plaid-accounts';
+import { bankUpdatePatch, withoutBankSidecars } from '../utils/bank-updates';
 import { CategoryPart, settlementCategories } from '../utils/settlements';
 import { SharedBillService } from './shared-bill.service';
 
@@ -51,7 +52,15 @@ export class TransactionService extends MoneyBackLedger {
             const results = await Promise.allSettled(
               snap.docs.map(async d => {
                 try {
-                  return { id: d.id, ...(await this.encryption.decryptDoc<Transaction>(d.data())) };
+                  const data = d.data();
+                  const tx: Transaction = { id: d.id, ...(await this.encryption.decryptDoc<Transaction>(data)) };
+                  // Beside a row you've edited, never inside it (see syncItem in functions).
+                  if (data['bankRemoved']) tx.bankRemoved = true;
+                  if (data['bankUpdate']) {
+                    try { tx.bankUpdate = await this.encryption.decryptDoc<Transaction>(data['bankUpdate']); }
+                    catch (err) { console.error(`bank update on ${d.id} could not be read:`, err); }
+                  }
+                  return tx;
                 } catch (err) {
                   throw new Error(`doc ${d.id}: ${(err as Error)?.message || err}`);
                 }
@@ -63,6 +72,8 @@ export class TransactionService extends MoneyBackLedger {
               if (r.status === 'fulfilled') transactions.push(r.value);
               else { failed++; console.error('Failed to decrypt a transaction doc:', r.reason); }
             }
+            // The bank changed rows you've edited: take its figures, keep your edits.
+            void this.applyBankUpdates(transactions);
             this.ngZone.run(() => {
               this.error.set(failed > 0
                 ? `${failed} transaction${failed === 1 ? '' : 's'} failed to decrypt and ${failed === 1 ? 'is' : 'are'} hidden. The rest are shown below.`
@@ -157,13 +168,40 @@ availableCredit(account: Account): number {
   return availableCredit(account, this.transactions());
 }
 
+  /** Rows whose bank update is being written, so a second snapshot doesn't write it twice. */
+  private applying = new Set<string>();
+
+  /**
+   * Fold the bank's newer version into rows you've edited (an amount that
+   * settled, a pending charge that posted). Saving the row clears the
+   * waiting update, since a save replaces the whole document.
+   */
+  private async applyBankUpdates(txs: Transaction[]) {
+    for (const t of txs) {
+      if (!t.id || !t.bankUpdate || this.applying.has(t.id)) continue;
+      this.applying.add(t.id);
+      try {
+        await this.update(t.id, bankUpdatePatch(t, t.bankUpdate));
+      } catch (err) {
+        console.error('Could not apply a bank update:', err);
+      } finally {
+        this.applying.delete(t.id);
+      }
+    }
+  }
+
+  /** Keep a row the bank no longer lists: saving it clears the flag. */
+  async keepRemovedByBank(id: string) {
+    await this.update(id, {});
+  }
+
   async add(tx: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
     const now = Date.now();
     // Rules run before the write, so a manually added transaction lands already
     // filed rather than needing a second pass.
-    const ruled = applyRulesToDraft(this.ruleService.activeRules(), tx);
+    const ruled = applyRulesToDraft(this.ruleService.activeRules(), withoutBankSidecars(tx));
     const data = {
       ...ruled, createdAt: now, updatedAt: now
     };
@@ -184,7 +222,7 @@ availableCredit(account: Account): number {
     const rules = this.ruleService.activeRules();
 
     for (const tx of txs) {
-      const ruled = applyRulesToDraft(rules, tx);
+      const ruled = applyRulesToDraft(rules, withoutBankSidecars(tx));
       const data = { ...ruled, createdAt: now + count, updatedAt: now + count };
       batch.set(doc(ref), await this.encryption.encryptForWrite(data));
       count++;
@@ -210,7 +248,7 @@ availableCredit(account: Account): number {
     // flag). Editing it re-encrypts it as a symmetric `__encrypted` doc; updateDoc
     // would leave the old envelope-only fields in place alongside the new ciphertext,
     // producing a document that's neither validly enveloped nor validly symmetric.
-    await setDoc(ref, await this.encryption.encryptForWrite({ ...current, ...patch, updatedAt: Date.now() }) as any);
+    await setDoc(ref, await this.encryption.encryptForWrite(withoutBankSidecars({ ...current, ...patch, updatedAt: Date.now() })) as any);
   }
 
   /** Everything saved against one account now belongs to another (an account linked twice, folded into one). */
@@ -235,7 +273,7 @@ availableCredit(account: Account): number {
       const snap = await getDoc(ref);
       if (!snap.exists()) continue;
       const current = await this.encryption.decryptDoc<Transaction>(snap.data());
-      batch.set(ref, await this.encryption.encryptForWrite({ ...current, ...patch, updatedAt: now + count }));
+      batch.set(ref, await this.encryption.encryptForWrite(withoutBankSidecars({ ...current, ...patch, updatedAt: now + count })));
       count++;
 
       if (count % 400 === 0) {

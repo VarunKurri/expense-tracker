@@ -3,7 +3,7 @@ import { Transaction } from '../models';
 import { filterForAnalysis } from './analysis-filter';
 import { budgetSpent } from './budgets';
 import {
-  MoneyBackLedger, fullRefundEntry, incomeLinks, isFullyRefunded, isMoneyBackIncome, refundState, refundedPatch, untrackedEntries,
+  MoneyBackLedger, fullRefundEntry, incomeLinks, incomeLinksPatch, spreadIncome, isFullyRefunded, isMoneyBackIncome, refundState, refundedPatch, untrackedEntries,
 } from './money-back';
 import { totalExpenses, totalIncome } from './reporting';
 
@@ -202,5 +202,36 @@ describe('one payment spread over several bills', () => {
     const one = tx({ type: 'income', amount: 20, reimbursesId: d1.id });
     expect(incomeLinks(one)).toEqual([{ expenseId: d1.id, amountCents: 2000 }]);
     expect(incomeLinks(salary)).toEqual([]);
+  });
+});
+
+describe('one income paying back several purchases', () => {
+  it('covers the oldest first, each up to what it needs (Priya’s $3,150 for $3,000 and $150)', () => {
+    const parts = spreadIncome(315000, [
+      { expenseId: 'b', date: '2026-02-10', roomCents: 15000 },
+      { expenseId: 'a', date: '2026-02-09', roomCents: 300000 },
+    ]);
+    expect(parts).toEqual([{ expenseId: 'a', amountCents: 300000 }, { expenseId: 'b', amountCents: 15000 }]);
+  });
+
+  it('puts anything left over on the newest, as a surplus', () => {
+    expect(spreadIncome(10000, [
+      { expenseId: 'a', date: '2026-01-01', roomCents: 3000 },
+      { expenseId: 'b', date: '2026-01-02', roomCents: 4000 },
+    ])).toEqual([{ expenseId: 'a', amountCents: 3000 }, { expenseId: 'b', amountCents: 7000 }]);
+  });
+
+  it('gives a purchase nothing once the income is used up', () => {
+    expect(spreadIncome(3000, [
+      { expenseId: 'a', date: '2026-01-01', roomCents: 3000 },
+      { expenseId: 'b', date: '2026-01-02', roomCents: 4000 },
+    ])).toEqual([{ expenseId: 'a', amountCents: 3000 }]);
+  });
+
+  it('stores one purchase as a plain link and several as a spread', () => {
+    expect(incomeLinksPatch([{ expenseId: 'a', amountCents: 5 }])).toEqual({ reimbursesId: 'a', moneyBackSplits: undefined });
+    const two = [{ expenseId: 'a', amountCents: 5 }, { expenseId: 'b', amountCents: 6 }];
+    expect(incomeLinksPatch(two)).toEqual({ moneyBackSplits: two, reimbursesId: undefined });
+    expect(incomeLinks({ type: 'income', amount: 0.11, ...incomeLinksPatch(two) } as Transaction)).toEqual(two);
   });
 });

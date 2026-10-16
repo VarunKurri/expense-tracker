@@ -37,9 +37,6 @@
         <div class="balance-value" [class.pos]="balance() >= 0" [class.neg]="balance() < 0">
           {{ balance() < 0 ? '−' : '' }}{{ formatCurrency(balance()) }}
         </div>
-        @if (bankNote(); as note) {
-          <p class="balance-source" [class.warn]="!note.ok">{{ note.text }}</p>
-        }
       </div>
     </div>
 
@@ -77,6 +74,10 @@
         }
       </div>
     </div>
+
+    @if (a.plaidAccountId) {
+      <app-balance-check [account]="a" />
+    }
 
     <!-- RECENT ACTIVITY -->
     <div class="recent-section">
@@ -118,7 +119,10 @@
                     {{ accountName(tx.fromAccountId) }} → {{ accountName(tx.toAccountId) }}
                   </div>
                 } @else {
-                  <div class="recent-tx-title">{{ tx.merchant || 'Untitled' }}</div>
+                  <div class="recent-tx-title">
+                    {{ tx.merchant || 'Untitled' }}
+                    @if (tx.plaidPending) { <span class="pending-tag">Pending</span> }
+                  </div>
                   <div class="recent-tx-meta">
                     @if (categoryFor(tx.categoryId); as cat) {
                       {{ cat.icon }} {{ cat.name }} ·

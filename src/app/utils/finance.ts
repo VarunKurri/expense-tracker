@@ -1,8 +1,15 @@
 import { Account, AccountType, Transaction } from '../models';
 
+/**
+ * How the account's history moves its balance. Pending rows are left out: a
+ * bank's balance doesn't include them until they post (Chase shows $588.81
+ * with $11.76 pending), so neither does the app's. They still count as
+ * spending; see `pendingTotal`.
+ */
 export function transactionDeltaForAccount(transactions: Transaction[], accountId: string): number {
   let balance = 0;
   for (const t of transactions) {
+    if (t.plaidPending) continue;
     if (t.type === 'income' && t.accountId === accountId) {
       balance += t.amount;
     } else if (t.type === 'expense' && t.accountId === accountId) {
@@ -54,6 +61,34 @@ export function creditCardBalance(account: Account, transactions: Transaction[])
 export function availableCredit(account: Account, transactions: Transaction[]): number {
   if (!account.creditLimit) return 0;
   return roundMoney(account.creditLimit - creditCardBalance(account, transactions));
+}
+
+/** Pending rows on an account, as money out (positive) or in (negative). Not in the balance yet. */
+export function pendingTotal(transactions: Transaction[], accountId: string): number {
+  return roundMoney(-transactionDeltaForAccount(
+    transactions.filter(t => t.plaidPending).map(t => ({ ...t, plaidPending: false })), accountId));
+}
+
+/** The day the bank counts a row on: when it posted, or (for older rows) its date. */
+export function postedOn(t: Transaction): string {
+  return t.postedDate ?? t.date;
+}
+
+/**
+ * The balance at the end of `date` as the bank's books had it: by posted
+ * date, pending left out. A linked account walks back from the bank's own
+ * balance, so this checks the history between that day and today against a
+ * statement. Others count up from the opening balance. For a card, what you owe.
+ */
+export function postedBalanceOn(account: Account, transactions: Transaction[], date: string): number {
+  const id = account.id || '';
+  const owes = owesMoney(account.type);
+  if (account.plaidBalance != null) {
+    const after = transactionDeltaForAccount(transactions.filter(t => postedOn(t) > date), id);
+    return roundMoney(owes ? account.plaidBalance + after : account.plaidBalance - after);
+  }
+  const upTo = transactionDeltaForAccount(transactions.filter(t => postedOn(t) <= date), id);
+  return roundMoney(owes ? (account.openingBalance || 0) - upTo : (account.openingBalance || 0) + upTo);
 }
 
 export function roundMoney(value: number): number {

@@ -10,11 +10,12 @@ import { Confirm } from '../../../components/confirm/confirm';
 import { Account, Transaction } from '../../../models';
 import { ToastService } from '../../../services/toast.service';
 import { owesMoney } from '../../../utils/finance';
+import { BalanceCheck } from '../../../components/balance-check/balance-check';
 
 @Component({
   selector: 'app-account-detail',
   standalone: true,
-  imports: [CommonModule, AccountForm, TransactionForm, Confirm],
+  imports: [CommonModule, AccountForm, TransactionForm, Confirm, BalanceCheck],
   templateUrl: './account-detail.html',
   styleUrl: './account-detail.scss'
 })

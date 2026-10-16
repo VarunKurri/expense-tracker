@@ -1,0 +1,58 @@
+<div class="card balance-check">
+  <div class="bc-head">
+    <span class="card-label">Balance check ›</span>
+  </div>
+
+  <div class="bc-body">
+    @if (source(); as s) {
+      <p class="bc-line" [class.warn]="!s.ok">{{ s.text }}</p>
+    }
+
+    @if (pendingCount() > 0) {
+      <p class="bc-line">
+        <span class="pending-tag">Pending</span>
+        <span class="fig">{{ money(pending() < 0 ? -pending() : pending()) }}</span>
+        {{ pending() < 0 ? 'coming in' : 'going out' }} across {{ pendingCount() }} transaction{{ pendingCount() === 1 ? '' : 's' }},
+        not in the balance until {{ bank() }} posts {{ pendingCount() === 1 ? 'it' : 'them' }}. Then it'll be
+        <strong class="fig">{{ money(afterPending()) }}</strong>.
+      </p>
+    }
+
+    @if (lastStatement(); as st) {
+      <div class="bc-check">
+        <div class="bc-check-title">{{ bank() }}'s last statement</div>
+        <p class="bc-line">
+          On {{ long(st.date) }} it said <strong class="fig">{{ money(st.amount) }}</strong>; the transactions here give
+          <strong class="fig">{{ money(st.check.appBalance) }}</strong>.
+        </p>
+        <p class="bc-verdict" [class.ok]="st.check.matches" [class.off]="!st.check.matches">{{ verdict(st.check, st.date) }}</p>
+      </div>
+    }
+
+    <div class="bc-check">
+      <div class="bc-check-title">Check against a statement</div>
+      <p class="bc-line">
+        Enter the closing balance from any statement. The oldest one you have is the best test: if it matches,
+        every transaction since then adds up.
+      </p>
+      <div class="form-grid">
+        <div class="field">
+          <label class="label-sm" for="bc-date">Statement date</label>
+          <input id="bc-date" class="input" type="date" [ngModel]="checkDate()" (ngModelChange)="checkDate.set($event)" name="bcDate" />
+        </div>
+        <div class="field">
+          <label class="label-sm" for="bc-amount">{{ owes() ? 'Balance owed' : 'Closing balance' }}</label>
+          <div class="input-affix">
+            <span class="affix">$</span>
+            <input id="bc-amount" class="input" type="number" step="0.01" inputmode="decimal" placeholder="0.00"
+                   [ngModel]="checkAmount()" (ngModelChange)="checkAmount.set($event === '' || $event == null ? null : $event)" name="bcAmount" />
+          </div>
+        </div>
+      </div>
+      @if (result(); as r) {
+        <p class="bc-line">The transactions here give <strong class="fig">{{ money(r.appBalance) }}</strong> on {{ long(checkDate()) }}.</p>
+        <p class="bc-verdict" [class.ok]="r.matches" [class.off]="!r.matches">{{ verdict(r, checkDate()) }}</p>
+      }
+    </div>
+  </div>
+</div>

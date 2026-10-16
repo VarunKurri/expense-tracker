@@ -78,4 +78,13 @@ export interface Transaction {
   plaidAccountId?: string;                // Plaid account_id, for later mapping to an app account
   plaidPersonalFinanceCategory?: string;  // Plaid personal_finance_category.primary, for client-side categorization
   plaidPending?: boolean;                 // whether Plaid still marks it pending
+  // When the bank posted it (YYYY-MM-DD). `date` is when you made the purchase,
+  // which is what spending goes by; a statement goes by this. Unset while
+  // pending, and on rows synced before it was stored (they use `date`).
+  postedDate?: string;
+
+  // Read from the doc, never saved inside it (see TransactionService). A row
+  // you've edited is yours, so the bank's later changes wait beside it:
+  bankUpdate?: Partial<Transaction>;      // the bank's newer version, applied on load
+  bankRemoved?: boolean;                  // the bank no longer lists it; you decide
 }

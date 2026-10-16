@@ -214,6 +214,9 @@ function mapPlaidTransaction(t: PlaidTransaction, itemId: string): Record<string
     // posting). Prefer authorized_date, falling back to date when Plaid doesn't
     // supply one (common for some institutions/pending rows).
     date: t.authorized_date ?? t.date, // YYYY-MM-DD
+    // When it posted, which is what a statement goes by. A pending row hasn't
+    // (its `date` is when it happened), so it has none yet.
+    ...(t.pending ? {} : { postedDate: t.date }),
     merchant: t.merchant_name || t.name || 'Unknown',
     createdAt: now,
     updatedAt: now,
@@ -291,41 +294,52 @@ async function syncItem(
   const totals: ItemSyncTotals = { added: 0, modified: 0, removed: 0 };
   let cursor: string | undefined = item.cursor || undefined;
   let hasMore = true;
+  // Edited pending rows that took their posted version, across pages: the
+  // pending id's removal must not flag them.
+  const postedOver = new Set<string>();
 
   while (hasMore) {
     const resp = await client.transactionsSync({ access_token: accessToken, cursor });
     const { added, modified, removed, next_cursor, has_more } = resp.data;
     const incoming = [...added, ...modified];
 
-    // A pending transaction posting arrives as `removed: [oldId]` + a new incoming
-    // transaction with a different transaction_id and pending_transaction_id set to
-    // the old id. Naively that deletes the old doc and writes a fresh one, silently
-    // discarding any edits the user made while it was pending. Check whether the old
-    // doc still exists and whether it's still the untouched server-written envelope
-    // (safe to replace) or has become user-edited (must be preserved as-is, since the
-    // server can't decrypt it to merge fields, by design). This is a doc-ID lookup,
-    // not a field query, since plaidTransactionId etc. are only guaranteed plaintext
-    // on untouched envelope docs.
-    const pendingIds = [...new Set(
-      incoming.map(t => t.pending_transaction_id).filter((id): id is string => !!id),
-    )];
-    const pendingSnaps = pendingIds.length > 0
-      ? await db.getAll(...pendingIds.map(id => txCol.doc(id)))
-      : [];
-    const preserveIds = new Set<string>();
-    for (const snap of pendingSnaps) {
-      if (snap.exists && !snap.data()?.['__envelope']) preserveIds.add(snap.id);
-    }
+    // Rows you've edited in the app are re-encrypted with your key, so the
+    // server can't read or merge them. It never overwrites or deletes one:
+    //  - a change from the bank (an amount settling, a pending charge posting,
+    //    which arrives as `removed: [pendingId]` plus a new posted transaction
+    //    with pending_transaction_id) waits beside your version as `bankUpdate`,
+    //    and the app takes the bank's figures while keeping your edits;
+    //  - a row the bank stops listing gets `bankRemoved`, and the app asks you
+    //    (Chase renumbering an account used to delete every row you'd edited,
+    //    links and splits included).
+    // This is a doc-ID lookup, not a field query: plaidTransactionId etc. are
+    // only plaintext on untouched envelope docs.
+    const touched = [...new Set([
+      ...incoming.map(t => t.transaction_id),
+      ...incoming.map(t => t.pending_transaction_id).filter((id): id is string => !!id),
+      ...removed.map(r => r.transaction_id).filter((id): id is string => !!id),
+    ])];
+    const snaps = touched.length > 0 ? await db.getAll(...touched.map(id => txCol.doc(id))) : [];
+    const edited = new Set(snaps.filter(snap => snap.exists && !snap.data()?.['__envelope']).map(snap => snap.id));
 
     const batch = db.batch();
     for (const t of incoming) {
-      if (t.pending_transaction_id && preserveIds.has(t.pending_transaction_id)) {
-        continue; // keep the user's edited doc in place; don't create a duplicate
+      const envelope = envelopeDoc(mapPlaidTransaction(t, itemDoc.id), publicKey);
+      if (edited.has(t.transaction_id)) {
+        batch.set(txCol.doc(t.transaction_id), { bankUpdate: envelope }, { merge: true });
+      } else if (t.pending_transaction_id && edited.has(t.pending_transaction_id)) {
+        // Your edited pending row becomes the posted one; no second copy.
+        batch.set(txCol.doc(t.pending_transaction_id), { bankUpdate: envelope }, { merge: true });
+        postedOver.add(t.pending_transaction_id);
+      } else {
+        batch.set(txCol.doc(t.transaction_id), envelope);
       }
-      batch.set(txCol.doc(t.transaction_id), envelopeDoc(mapPlaidTransaction(t, itemDoc.id), publicKey));
     }
     for (const r of removed) {
-      if (r.transaction_id && !preserveIds.has(r.transaction_id)) {
+      if (!r.transaction_id || postedOver.has(r.transaction_id)) continue;
+      if (edited.has(r.transaction_id)) {
+        batch.set(txCol.doc(r.transaction_id), { bankRemoved: true }, { merge: true });
+      } else {
         batch.delete(txCol.doc(r.transaction_id));
       }
     }
@@ -422,7 +436,7 @@ export const refreshPlaidItems = onCall(
     const db = getFirestore();
     const itemsSnap = await db.collection(`users/${uid}/plaidItems`).get();
 
-    const results: { itemId: string; institutionName: string; ok: boolean; error?: string }[] = [];
+    const results: { itemId: string; institutionName: string; ok: boolean; error?: string; errorCode?: string }[] = [];
     for (const itemDoc of itemsSnap.docs) {
       const institutionName = (itemDoc.data()?.institutionName as string) || 'Your bank';
       try {
@@ -430,9 +444,16 @@ export const refreshPlaidItems = onCall(
         await client.transactionsRefresh({ access_token: accessToken });
         results.push({ itemId: itemDoc.id, institutionName, ok: true });
       } catch (err: any) {
-        const message = err?.response?.data?.error_message || err?.message || 'Refresh failed.';
-        console.error(`transactionsRefresh failed for item ${itemDoc.id}:`, err?.response?.data || err);
-        results.push({ itemId: itemDoc.id, institutionName, ok: false, error: message });
+        const data = err?.response?.data;
+        const message = data?.display_message || data?.error_message || err?.message || 'Refresh failed.';
+        const errorCode: string | undefined = data?.error_code;
+        console.error(`transactionsRefresh failed for item ${itemDoc.id}:`, data || err);
+        // A login problem means syncing is broken too: show Reconnect for it.
+        if (errorCode && REAUTH_ERROR_CODES.has(errorCode)) {
+          await itemDoc.ref.set(
+            { status: statusForErrorCode(errorCode), lastError: errorCode, updatedAt: Date.now() }, { merge: true });
+        }
+        results.push({ itemId: itemDoc.id, institutionName, ok: false, error: message, ...(errorCode ? { errorCode } : {}) });
       }
     }
     return { results };

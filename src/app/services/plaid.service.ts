@@ -54,6 +54,9 @@ export interface PlaidAccount {
   is_overdue: boolean | null;
 }
 
+/** Plaid error codes that mean signing in to the bank again (matches the server's list). */
+const REAUTH_CODES = new Set(['ITEM_LOGIN_REQUIRED', 'PENDING_EXPIRATION', 'USER_PERMISSION_REVOKED', 'USER_ACCOUNT_REVOKED', 'PENDING_DISCONNECT']);
+
 /** Map a Plaid account type/subtype onto an app AccountType. */
 function mapPlaidAccountType(type: string, subtype: string | null): AccountType {
   if (type === 'credit') return 'credit';
@@ -455,12 +458,19 @@ export class PlaidService {
     try {
       const refresh = httpsCallable<
         unknown,
-        { results: { itemId: string; institutionName: string; ok: boolean; error?: string }[] }
+        { results: { itemId: string; institutionName: string; ok: boolean; error?: string; errorCode?: string }[] }
       >(this.functions, 'refreshPlaidItems');
       const { data } = await refresh();
       const failed = data.results.filter(r => !r.ok);
       if (failed.length > 0) {
-        this.toast.error(`Refresh failed for ${failed.map(f => f.institutionName).join(', ')}.`);
+        // Say why, per bank: a login problem needs Reconnect (now shown on the
+        // bank), anything else is the bank not refreshing on demand, which
+        // doesn't stop its normal syncing.
+        const why = failed.map(f => REAUTH_CODES.has(f.errorCode ?? '')
+          ? `${f.institutionName} needs you to reconnect (see Accounts).`
+          : `${f.institutionName} couldn't refresh right now${f.error ? ` (${f.error.replace(/\.$/, '')})` : ''}; it still syncs on its own.`);
+        const ok = data.results.length - failed.length;
+        this.toast.error([...(ok > 0 ? [`Refresh requested for ${ok} bank${ok === 1 ? '' : 's'}.`] : []), ...why].join(' '));
       } else {
         this.toast.success('Refresh requested. Give it 10-30s, then Sync transactions.');
       }

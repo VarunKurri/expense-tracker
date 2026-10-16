@@ -22,6 +22,7 @@ export class ReconcileReview {
 
   relinkCount = computed(() => this.reconcile.matches().filter(m => m.kind === 'relink').length);
   manualCount = computed(() => this.reconcile.matches().filter(m => m.kind === 'manual').length);
+  removedCount = computed(() => this.reconcile.matches().filter(m => m.kind === 'removed').length);
 
   categoryName(id?: string): string {
     if (!id) return 'Uncategorized';
