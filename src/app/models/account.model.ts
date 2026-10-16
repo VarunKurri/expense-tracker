@@ -17,6 +17,9 @@ export interface Account {
 
   // Plaid (set for auto-created bank accounts)
   plaidAccountId?: string;   // links synced transactions (via their plaidAccountId) to this account
+  // Plaid accounts this one used to be: a replaced card (new number) carries on
+  // as the same account, so the old card's synced transactions still land here.
+  previousPlaidAccountIds?: string[];
   plaidItemId?: string;      // which linked bank, for cleanup on disconnect
   openingBalanceSeeded?: boolean; // true once openingBalance has been reconciled against Plaid's real balance
 

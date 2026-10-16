@@ -123,6 +123,11 @@ export const exchangePublicToken = onCall(
  * `products` puts Link into update mode: same item_id, same access_token stays
  * valid; the user just re-authenticates at their bank. No new exchange needed;
  * Plaid clears the item's error state once update-mode Link completes.
+ *
+ * With `account_selection: true` it also lets the user choose which accounts
+ * the item shares ("Manage accounts"): how a replaced card, or any new
+ * account, gets added to an existing connection instead of linking the bank a
+ * second time (which, for Chase, can invalidate the existing item).
  */
 export const createReauthLinkToken = onCall(
   { secrets: [plaidClientId, plaidSecret, tokenEncKey] },
@@ -133,6 +138,7 @@ export const createReauthLinkToken = onCall(
     const uid = request.auth.uid;
     const itemId = (request.data?.item_id ?? '').toString().trim();
     if (!itemId) throw new HttpsError('invalid-argument', 'An item_id is required.');
+    const accountSelection = request.data?.account_selection === true;
 
     const itemSnap = await getFirestore().doc(`users/${uid}/plaidItems/${itemId}`).get();
     if (!itemSnap.exists) throw new HttpsError('not-found', 'That linked bank was not found.');
@@ -148,6 +154,7 @@ export const createReauthLinkToken = onCall(
         country_codes: [CountryCode.Us],
         language: 'en',
         access_token: accessToken,
+        ...(accountSelection ? { update: { account_selection_enabled: true } } : {}),
         ...(webhook ? { webhook } : {}),
       });
       return { link_token: resp.data.link_token, expiration: resp.data.expiration };
@@ -717,6 +724,10 @@ export const plaidWebhook = onRequest(
               { status: statusForErrorCode(code), lastError: code || 'item_error', updatedAt: Date.now() },
               { merge: true },
             );
+          } else if (webhook_code === 'NEW_ACCOUNTS_AVAILABLE') {
+            // A new account (a replaced card, say) the user hasn't shared with
+            // us yet. Flag it; "Manage accounts" in the app adds it.
+            await itemRef.set({ newAccountsAvailable: true, updatedAt: Date.now() }, { merge: true });
           } else if (webhook_code === 'PENDING_EXPIRATION' || webhook_code === 'PENDING_DISCONNECT') {
             await itemRef.set(
               { status: 'login_required', lastError: webhook_code, updatedAt: Date.now() },

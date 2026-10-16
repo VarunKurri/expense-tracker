@@ -18,6 +18,7 @@ import { resolvePlaidCategory } from '../utils/categories';
 import { TransactionRuleService } from './transaction-rule.service';
 import { applyRulesToDraft } from '../utils/rules';
 import { MoneyBackLedger } from '../utils/money-back';
+import { accountForPlaidId } from '../utils/plaid-accounts';
 import { CategoryPart, settlementCategories } from '../utils/settlements';
 import { SharedBillService } from './shared-bill.service';
 
@@ -97,7 +98,7 @@ export class TransactionService extends MoneyBackLedger {
       let out = t;
 
       if (!out.accountId && out.plaidAccountId) {
-        const match = accounts.find(a => a.plaidAccountId === out.plaidAccountId);
+        const match = accountForPlaidId(accounts, out.plaidAccountId);
         if (match?.id) out = { ...out, accountId: match.id };
       }
 

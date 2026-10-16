@@ -461,3 +461,6 @@
   .dtl-date { color: var(--fg-3); flex-shrink: 0; }
   .dtl-amount { color: var(--fg); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 }
+
+/* A new account: the cards it might replace, then "new", one per row. */
+.replace-choices { display: flex; flex-direction: column; gap: 8px; }

@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -13,7 +13,7 @@ import { Modal } from '../../components/modal/modal';
 import { ErrorBanner } from '../../components/error-banner/error-banner';
 import { Account, Bill } from '../../models';
 import { ToastService } from '../../services/toast.service';
-import { PlaidService, PlaidItem } from '../../services/plaid.service';
+import { PlaidService, PlaidItem, PendingPlaidAccount } from '../../services/plaid.service';
 import { monthActivityForAccount, transactionDeltaForAccount, roundMoney, owesMoney } from '../../utils/finance';
 import { localDateString } from '../../utils/date';
 
@@ -370,6 +370,40 @@ export class Accounts {
 
   reconnectItem(item: PlaidItem) {
     this.plaidSvc.reconnect(item);
+  }
+
+  manageAccounts(item: PlaidItem) {
+    this.plaidSvc.manageAccounts(item);
+  }
+
+  // ── A newly shared account: replacement or new ─────────────
+  /** The first account waiting to be set up, one at a time. */
+  pendingAccount = computed<PendingPlaidAccount | null>(() => this.plaidSvc.pendingNewAccounts()[0] ?? null);
+  /** The chosen account it replaces, or 'new'. Starts on the likely old card. */
+  replaceChoice = signal<string>('');
+  private lastPending = '';
+
+  constructor() {
+    effect(() => {
+      const p = this.pendingAccount();
+      const key = p?.plaid.account_id ?? '';
+      if (key === this.lastPending) return;
+      this.lastPending = key;
+      const stale = p?.candidates.find(c => c.stale);
+      this.replaceChoice.set(stale?.account.id ?? (p && !p.candidates.length ? 'new' : ''));
+    });
+  }
+
+  async savePending() {
+    const p = this.pendingAccount();
+    const choice = this.replaceChoice();
+    if (!p || !choice) return;
+    await this.plaidSvc.resolveNewAccount(p, choice === 'new' ? null : choice);
+  }
+
+  skipPending() {
+    const p = this.pendingAccount();
+    if (p) this.plaidSvc.skipNewAccount(p);
   }
 
   /** Friendly label for an item's raw Plaid status. */

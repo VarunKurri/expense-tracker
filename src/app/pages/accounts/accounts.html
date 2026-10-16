@@ -123,6 +123,8 @@
               <span class="bank-name">🏦 {{ item.institutionName }}</span>
               @if (needsReconnect(item)) {
                 <span class="bank-status warn">⚠️ {{ statusLabel(item) }}</span>
+              } @else if (item.newAccountsAvailable) {
+                <span class="bank-status">New account to add</span>
               }
             </div>
             <div class="bank-actions">
@@ -134,6 +136,14 @@
                   {{ plaidSvc.reauthenticatingId() === item.itemId ? 'Reconnecting…' : 'Reconnect' }}
                 </button>
               }
+              <!-- Add a replaced card or a new account to this connection (never link the bank twice). -->
+              <button
+                class="btn btn-primary-outline"
+                (click)="manageAccounts(item)"
+                [disabled]="plaidSvc.reauthenticatingId() === item.itemId"
+                title="Choose which accounts this bank shares, e.g. a replacement card">
+                Manage accounts
+              </button>
               <button
                 class="btn btn-danger-outline"
                 (click)="askDisconnect(item)"
@@ -146,6 +156,40 @@
       </div>
     </div>
   }
+
+  <!-- A NEWLY SHARED ACCOUNT: a replacement for a card you have, or new? -->
+  <app-modal [open]="!!pendingAccount()" [title]="'New account at ' + (pendingAccount()?.institutionName ?? '')" size="sm"
+             (closed)="skipPending()">
+    @if (pendingAccount(); as p) {
+      <div class="form">
+        <p class="form-note">
+          {{ p.institutionName }} now shares <strong>{{ p.plaid.name }}{{ p.plaid.mask ? ' ••' + p.plaid.mask : '' }}</strong>.
+          If it's a replacement for a card you already have here, its transactions and balance carry on in that account.
+        </p>
+        <div class="field">
+          <span class="label-sm">Is it a replacement?</span>
+          <div class="replace-choices">
+            @for (c of p.candidates; track c.account.id) {
+              <button type="button" class="choice" [class.active]="replaceChoice() === c.account.id" (click)="replaceChoice.set(c.account.id!)">
+                <div class="choice-title">Replaces {{ c.account.name }}{{ c.account.last4 ? ' ••' + c.account.last4 : '' }}</div>
+                <div class="choice-sub">{{ c.stale ? 'No longer syncing: likely the old card.' : 'Still syncing.' }}</div>
+              </button>
+            }
+            <button type="button" class="choice" [class.active]="replaceChoice() === 'new'" (click)="replaceChoice.set('new')">
+              <div class="choice-title">It's a new account</div>
+              <div class="choice-sub">Add it alongside your other accounts.</div>
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+    <div class="modal-actions" modal-footer>
+      <div class="actions-right">
+        <button type="button" class="btn-ghost" (click)="skipPending()">Not now</button>
+        <button type="button" class="btn-primary" [disabled]="!replaceChoice()" (click)="savePending()">Save</button>
+      </div>
+    </div>
+  </app-modal>
 
   <app-account-form
     [open]="formOpen()"

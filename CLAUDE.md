@@ -184,6 +184,16 @@ The app is what we copy. Do not "correct" this back to dark.
   `MoneyRules.categoryParts` by `categoryTotals`, `budgetSpent`, the Reports
   drill-down and the Dashboard. Any new by-category sum must go through
   `categorySpend`, or a Venmo lands back in one lump.
+- Linked banks (Plaid): "Manage accounts" on Accounts opens Plaid update mode with
+  account selection on the **existing** item (`createReauthLinkToken` with
+  `account_selection: true`), so a replaced or newly opened card is added without
+  linking the bank twice (linking Chase again can break the old link). A new
+  account on a bank that already has accounts is never auto-added: it's queued in
+  `PlaidService.pendingNewAccounts` and the "New account at X" dialog asks whether
+  it replaces one you have. A replaced card keeps its account: the old Plaid id
+  moves to `Account.previousPlaidAccountIds` and every Plaid id lookup goes through
+  `accountForPlaidId` (utils/plaid-accounts.ts). The `NEW_ACCOUNTS_AVAILABLE`
+  webhook sets `newAccountsAvailable` on the item, shown as a chip on the bank row.
 - Test fakes shared by several specs live in `src/app/testing/` (e.g. `FakeGroups`, `FakeSharedBills`).
 - Never centre a fixed panel with `transform`: it traps any pop-up inside it
   (the receipt viewer opened tiny inside the details sheet). Use `inset: 0;
