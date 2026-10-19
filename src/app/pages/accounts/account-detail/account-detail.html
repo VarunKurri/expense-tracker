@@ -107,7 +107,7 @@
 
     <!-- RECENT TRANSACTIONS -->
     @if (a.plaidAccountId) {
-      <app-balance-check [account]="a" />
+      <app-balance-check [account]="a" (openTx)="openTxView($event)" />
     }
 
     <div class="recent-section">

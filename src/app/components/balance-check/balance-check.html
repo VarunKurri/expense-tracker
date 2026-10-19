@@ -8,12 +8,34 @@
       <p class="bc-line" [class.warn]="!s.ok">{{ s.text }}</p>
     }
 
-    @if (handAddedCount() > 0 && handAdded() !== 0) {
-      <p class="bc-line">
-        It includes <span class="fig">{{ money(handAdded() < 0 ? -handAdded() : handAdded()) }}</span>
-        {{ handAdded() < 0 ? 'in' : 'out' }} from {{ handAddedCount() }} entr{{ handAddedCount() === 1 ? 'y' : 'ies' }} you added by hand.
-        When {{ bank() }}'s own row for one arrives, merge them in Transactions so it isn't counted twice.
-      </p>
+    @if (handAddedRows().length > 0) {
+      <div class="bc-hand">
+        <p class="bc-line">
+          @if (handAdded() !== 0) {
+            <span class="fig">{{ money(handAdded() < 0 ? -handAdded() : handAdded()) }}</span>
+            {{ handAdded() < 0 ? 'in' : 'out' }} you added by hand in the last few days is counted on top of
+            {{ bank() }}'s balance, until {{ bank() }}'s own row arrives (merge the two in Transactions).
+          }
+          {{ handAddedRows().length }} entr{{ handAddedRows().length === 1 ? 'y was' : 'ies were' }} added by hand
+          on this account. Older ones are already in {{ bank() }}'s balance, so they don't move it.
+        </p>
+        <button type="button" class="btn-row" (click)="showHandAdded.set(!showHandAdded())">
+          {{ showHandAdded() ? 'Hide' : 'Show' }} {{ handAddedRows().length === 1 ? 'it' : 'them' }}
+        </button>
+        @if (showHandAdded()) {
+          <div class="bc-rows">
+            @for (r of handAddedRows(); track r.t.id) {
+              <button type="button" class="bc-row" (click)="openTx.emit(r.t)">
+                <span class="bc-row-main">
+                  <span class="bc-row-name">{{ r.t.merchant || (r.t.type === 'transfer' ? 'Transfer' : 'Untitled') }}</span>
+                  <span class="bc-row-meta">{{ short(r.t.date) }} · {{ r.onTop ? 'counted on top' : 'already in ' + bank() + '\'s balance' }}</span>
+                </span>
+                <span class="fig" [class.in]="r.moneyIn">{{ r.moneyIn ? '+' : '−' }}{{ money(r.t.amount) }}</span>
+              </button>
+            }
+          </div>
+        }
+      </div>
     }
 
     @if (pendingCount() > 0) {

@@ -1,9 +1,9 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Account } from '../../models';
+import { Account, Transaction } from '../../models';
 import { TransactionService } from '../../services/transaction.service';
 import { AccountService } from '../../services/account.service';
-import { handAddedTotal, owesMoney, pendingTotal, roundMoney } from '../../utils/finance';
+import { addsToBankBalance, handAddedTotal, isBankRow, owesMoney, pendingTotal, roundMoney } from '../../utils/finance';
 import { StatementCheck, checkStatement } from '../../utils/statement-check';
 import { fromCents } from '../../utils/money';
 import { localDateString } from '../../utils/date';
@@ -22,6 +22,8 @@ import { localDateString } from '../../utils/date';
 })
 export class BalanceCheck {
   account = input.required<Account>();
+  /** Open a transaction (a hand-added entry listed here). */
+  openTx = output<Transaction>();
 
   private txService = inject(TransactionService);
   private accountService = inject(AccountService);
@@ -40,18 +42,35 @@ export class BalanceCheck {
     const sameLink = this.accountService.accounts().filter(o => !o.archived && o.plaidItemId === a.plaidItemId && o.plaidBalanceAt);
     const latest = Math.max(...sameLink.map(o => o.plaidBalanceAt!));
     if (latest - a.plaidBalanceAt > 6 * 3_600_000) {
-      return { ok: false, text: `${bank} stopped sending this account after ${this.short(a.plaidBalanceAt)}. If its number changed, open Manage accounts on ${bank} and tick it.` };
+      return { ok: false, text: `${bank} stopped sending this account after ${this.shortTime(a.plaidBalanceAt)}. If its number changed, open Manage accounts on ${bank} and tick it.` };
     }
-    return { ok: true, text: `The balance is ${bank}'s, as of ${this.short(a.plaidBalanceAt)}.` };
+    return { ok: true, text: `The balance is ${bank}'s, as of ${this.shortTime(a.plaidBalanceAt)}.` };
   });
 
   /** Money still pending: out is positive. Not in the balance until it posts. */
   pending = computed(() => pendingTotal(this.txService.transactions(), this.account().id!));
   pendingCount = computed(() => this.txService.transactions().filter(t => t.plaidPending && t.accountId === this.account().id).length);
-  /** What you added by hand on this account (not from the bank): on top of the bank's balance. */
-  handAdded = computed(() => this.account().plaidBalance == null ? 0 : handAddedTotal(this.txService.transactions(), this.account().id!));
-  handAddedCount = computed(() => this.account().plaidBalance == null ? 0
-    : this.txService.transactions().filter(t => !t.plaidTransactionId && (t.accountId === this.account().id || t.fromAccountId === this.account().id || t.toAccountId === this.account().id)).length);
+  /**
+   * Entries you added by hand on this account, newest first. A recent one
+   * counts on top of the bank's balance (the bank may not have it yet); an
+   * older one is already in it, usually something Plaid never sent.
+   */
+  handAddedRows = computed(() => {
+    const a = this.account();
+    if (a.plaidBalance == null) return [];
+    return this.txService.transactions()
+      .filter(t => !isBankRow(t) && (t.accountId === a.id || t.fromAccountId === a.id || t.toAccountId === a.id))
+      .sort((x, y) => y.date.localeCompare(x.date))
+      .map(t => ({ t, onTop: addsToBankBalance(t, a), moneyIn: this.moneyIn(t) }));
+  });
+  /** What the recent ones add on top: money out positive, in negative. */
+  handAdded = computed(() => this.account().plaidBalance == null ? 0 : handAddedTotal(this.txService.transactions(), this.account()));
+  showHandAdded = signal(false);
+
+  private moneyIn(t: Transaction): boolean {
+    const id = this.account().id;
+    return t.type === 'income' || (t.type === 'transfer' && t.toAccountId === id);
+  }
 
   /** The balance once everything pending posts. */
   afterPending = computed(() => {
@@ -95,6 +114,10 @@ export class BalanceCheck {
     return `${gap} apart. Since ${this.long(date)}, ${missing} is likely missing here, or ${twice} counted twice. Check that stretch on Transactions.`;
   }
 
+  short(date: string): string {
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
   money(n: number): string {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
   }
@@ -103,7 +126,7 @@ export class BalanceCheck {
     return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  private short(t: number): string {
+  private shortTime(t: number): string {
     return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 

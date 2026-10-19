@@ -69,12 +69,21 @@ describe('a linked account shows the bank’s balance', () => {
 });
 
 describe('an entry you add by hand on a linked account', () => {
-  it('moves the balance on top of the bank’s, until the bank’s row for it is merged', () => {
-    const bankRows = [{ id: 'a', type: 'expense', amount: 100, accountId: 'chk', date: '2026-10-01', plaidTransactionId: 'a' }] as Transaction[];
-    const chk = { id: 'chk', type: 'checking', openingBalance: 0, plaidBalance: 1000 } as Account;
+  const read = new Date('2026-10-18T12:00:00').getTime();
+  const bankRows = [{ id: 'a', type: 'expense', amount: 100, accountId: 'chk', date: '2026-10-01', plaidTransactionId: 'a' }] as Transaction[];
+  const chk = { id: 'chk', type: 'checking', openingBalance: 0, plaidBalance: 1000, plaidBalanceAt: read } as Account;
+
+  it('moves the balance on top while the bank may not have it yet', () => {
     expect(accountBalance(chk, bankRows)).toBe(1000);
-    const coffee = { id: 'm', type: 'expense', amount: 5, accountId: 'chk', date: '2026-10-16' } as Transaction;
+    const coffee = { id: 'm', type: 'expense', amount: 5, accountId: 'chk', date: '2026-10-17' } as Transaction;
     expect(accountBalance(chk, [...bankRows, coffee])).toBe(995);
-    expect(handAddedTotal([...bankRows, coffee], 'chk')).toBe(5);
+    expect(handAddedTotal([...bankRows, coffee], chk)).toBe(5);
+  });
+
+  it('doesn’t once it’s older: the bank’s balance already includes it', () => {
+    // A refund Plaid never sent, filled in by hand weeks ago (the AMEX $37.95).
+    const refund = { id: 'r', type: 'income', amount: 37.95, accountId: 'chk', date: '2026-09-02' } as Transaction;
+    expect(accountBalance(chk, [...bankRows, refund])).toBe(1000);
+    expect(handAddedTotal([...bankRows, refund], chk)).toBe(0);
   });
 });

@@ -40,14 +40,16 @@ export function accountBalance(account: Account, transactions: Transaction[]): n
 /**
  * The opening balance the app counts from. A linked account takes the bank's
  * word for its balance (`plaidBalance`), so its opening balance is whatever
- * makes the bank's own rows land exactly on that. Entries you add by hand
- * aren't the bank's, so they move the balance on top (as they did before it
- * was pinned), until the bank's row for the same thing is merged with them.
+ * makes its history land exactly on that. The one exception is an entry you
+ * added by hand in the last few days (`addsToBankBalance`): the bank may not
+ * have it yet, so it moves the balance on top until the bank's row arrives
+ * and is merged with it. An older hand-added entry is already in the bank's
+ * balance (it's how you filled in something Plaid never sent), so it doesn't.
  * Every other account uses the opening balance you entered.
  */
 export function openingBalanceFor(account: Account, transactions: Transaction[]): number {
   if (account.plaidBalance == null || !account.id) return account.openingBalance || 0;
-  const delta = transactionDeltaForAccount(transactions.filter(isBankRow), account.id);
+  const delta = transactionDeltaForAccount(transactions.filter(t => !addsToBankBalance(t, account)), account.id);
   return roundMoney(owesMoney(account.type) ? account.plaidBalance + delta : account.plaidBalance - delta);
 }
 
@@ -56,9 +58,29 @@ export function isBankRow(t: Transaction): boolean {
   return !!t.plaidTransactionId;
 }
 
-/** Entries you added by hand on an account, as money out (positive) or in (negative). */
-export function handAddedTotal(transactions: Transaction[], accountId: string): number {
-  return roundMoney(-transactionDeltaForAccount(transactions.filter(t => !isBankRow(t)), accountId));
+/** Days a hand-added entry counts on top of the bank's balance: about how long a charge takes to reach it. */
+export const HAND_ADDED_DAYS = 5;
+
+/** The first date whose hand-added entries the bank may not have yet. */
+export function handAddedFrom(account: Account): string {
+  const read = account.plaidBalanceAt ? new Date(account.plaidBalanceAt) : new Date();
+  read.setDate(read.getDate() - HAND_ADDED_DAYS);
+  const y = read.getFullYear(), m = String(read.getMonth() + 1).padStart(2, '0'), d = String(read.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * A hand-added entry recent enough that the bank's balance may not include it
+ * yet, so it moves a linked account's balance on top. Never true for the
+ * bank's own rows, or for accounts the bank doesn't report.
+ */
+export function addsToBankBalance(t: Transaction, account: Account): boolean {
+  return account.plaidBalance != null && !isBankRow(t) && t.date >= handAddedFrom(account);
+}
+
+/** Hand-added entries counted on top of the bank's balance, as money out (positive) or in (negative). */
+export function handAddedTotal(transactions: Transaction[], account: Account): number {
+  return roundMoney(-transactionDeltaForAccount(transactions.filter(t => addsToBankBalance(t, account)), account.id || ''));
 }
 
 /** Accounts with their opening balance worked out (see `openingBalanceFor`), for code that reads it directly. */
@@ -96,8 +118,9 @@ export function postedBalanceOn(account: Account, transactions: Transaction[], d
   const id = account.id || '';
   const owes = owesMoney(account.type);
   if (account.plaidBalance != null) {
-    // The bank's rows only: a statement knows nothing of what you added by hand.
-    const after = transactionDeltaForAccount(transactions.filter(t => isBankRow(t) && postedOn(t) > date), id);
+    // Everything the bank's balance includes (so not a hand-added entry it may not have yet).
+    const after = transactionDeltaForAccount(
+      transactions.filter(t => !addsToBankBalance(t, account) && postedOn(t) > date), id);
     return roundMoney(owes ? account.plaidBalance + after : account.plaidBalance - after);
   }
   const upTo = transactionDeltaForAccount(transactions.filter(t => postedOn(t) <= date), id);
@@ -105,7 +128,8 @@ export function postedBalanceOn(account: Account, transactions: Transaction[], d
 }
 
 export function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
+  // `+ 0` turns −0 (from negating an empty total) into 0.
+  return Math.round(value * 100) / 100 + 0;
 }
 
 /** Money in/out for one account within a given "YYYY-MM" month. Includes transfers

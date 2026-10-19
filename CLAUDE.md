@@ -196,9 +196,11 @@ The app is what we copy. Do not "correct" this back to dark.
   webhook sets `newAccountsAvailable` on the item, shown as a chip on the bank row.
   A linked account's balance is the bank's: every sync stores Plaid's current
   balance (`Account.plaidBalance`) and `openingBalanceFor` (utils/finance.ts)
-  works the opening balance out from it, over the bank's rows only
-  (`isBankRow`): entries added by hand move the balance on top until merged
-  with the bank's row. `AccountService.accounts()` already
+  works the opening balance out from it. Only an entry added by hand in the
+  last few days (`addsToBankBalance`, `HAND_ADDED_DAYS`) moves the balance on
+  top: the bank may not have it yet. An older hand-added entry is already in
+  the bank's balance (usually something Plaid never sent), so it doesn't;
+  `app-balance-check` lists them all. `AccountService.accounts()` already
   carries that opening balance, so the screens that add history to it land on
   the bank; `storedAccounts()` is the saved copy (TransactionService reads it).
   Never seed or hand-edit a linked account's opening balance: more history
