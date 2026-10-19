@@ -49,6 +49,8 @@ export interface PlaidAccount {
   type: string;
   subtype: string | null;
   current_balance: number | null;
+  available_balance?: number | null;
+  balance_updated_at?: string | null;
   credit_limit: number | null;
   minimum_payment: number | null;
   payment_due_day: number | null;
@@ -174,7 +176,7 @@ export class PlaidService {
     effect(() => {
       const txs = this.txService.transactions();
       this.bankPending();
-      if (!this.encryption.unlocked() || !txs.some(t => t.plaidPending)) return;
+      if (!this.encryption.unlocked() || (!txs.some(t => t.plaidPending) && this.bankPending().size === 0)) return;
       untracked(() => void this.settlePendingRows());
     });
   }
@@ -210,7 +212,8 @@ export class PlaidService {
    * it stays; posted as a separate row, that row folds into this one (your
    * notes, split, category and links stay, and the bank's amount and posted
    * date come in); posted with nothing else standing for it, it just stops
-   * being pending; dropped by the bank, it was cancelled and goes.
+   * being pending; dropped by the bank, it was cancelled and goes. And a row
+   * the bank still has as pending is marked so, if the app had lost that.
    */
   private async settlePendingRows(): Promise<void> {
     if (this.settling) return;
@@ -224,6 +227,8 @@ export class PlaidService {
             await this.txService.remove(a.row.id!);
           } else if (a.kind === 'posted') {
             await this.txService.update(a.row.id!, { plaidPending: false });
+          } else if (a.kind === 'pending') {
+            await this.txService.update(a.row.id!, { plaidPending: true });
           } else {
             await this.txService.update(a.row.id!, bankUpdatePatch(a.row, a.posted));
             // The posted id now lives in this row: the bank's later changes land here.
@@ -394,6 +399,8 @@ export class PlaidService {
             patch.plaidBalance = a.current_balance;
             patch.plaidBalanceAt = Date.now();
           }
+          if (a.available_balance != null) patch.plaidAvailable = a.available_balance;
+          if (a.balance_updated_at) patch.plaidBalanceUpdated = a.balance_updated_at;
           if (Object.keys(patch).length > 0 && match.id) await this.accountSvc.update(match.id, patch);
           continue;
         }

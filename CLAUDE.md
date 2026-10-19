@@ -238,7 +238,13 @@ The app is what we copy. Do not "correct" this back to dark.
   `PlaidService`) keeps the rows in step: still pending stays; posted as a
   separate row folds into the pending one (bank-linked, or matched: same
   account, same money or a tip on top at the same merchant, within 5 days);
-  posted with nothing else stands down; dropped by the bank is cancelled.
+  posted with nothing else stands down; dropped by the bank is cancelled; a
+  row the bank lists as pending but the app had as posted is marked pending.
+  The hero balance is the bank's current balance (what transactions add up
+  to); the available one (`plaidAvailable`, what a bank's app usually leads
+  with for checking) shows beside it. The details sheet's "At the bank" row
+  says what the bank reports for a transaction (pending, posted date, or
+  added by hand).
 - Dates: `date` is when you made the purchase (Plaid's authorized date, else
   its date) and is what spending goes by. `postedDate` is when the bank posted
   it, what statements go by: statement maths use `postedOn` / `postedBalanceOn`

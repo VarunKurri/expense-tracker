@@ -21,7 +21,9 @@ export type PendingAction =
   /** It's posted and nothing else stands for it: just stop calling it pending. */
   | { kind: 'posted'; row: Transaction }
   /** The bank dropped it and nothing posted for it: a cancelled charge. */
-  | { kind: 'cancelled'; row: Transaction };
+  | { kind: 'cancelled'; row: Transaction }
+  /** The bank has it as pending but the app had lost that (a merge or edit from before it carried over). */
+  | { kind: 'pending'; row: Transaction };
 
 /** Days a pending row may wait with no word from its bank before it's taken as posted. */
 const NO_WORD_DAYS = 10;
@@ -34,8 +36,13 @@ export function settlePending(transactions: Transaction[], banks: BankPending[],
   const claimed = new Set<string>();
   const actions: PendingAction[] = [];
 
+  const pendingAtBank = new Set(banks.flatMap(b => b.pendingIds));
   for (const row of transactions) {
-    if (!row.plaidPending || !row.id) continue;
+    if (!row.id) continue;
+    if (!row.plaidPending) {
+      if (row.plaidTransactionId && pendingAtBank.has(row.plaidTransactionId)) actions.push({ kind: 'pending', row });
+      continue;
+    }
     const bank = row.plaidItemId ? byItem.get(row.plaidItemId) : undefined;
     const inWindow = !!bank && row.date >= bank.windowStart;
 

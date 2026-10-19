@@ -686,6 +686,10 @@ async function loadPlaidAccounts(client: PlaidApi, accessToken: string, itemId: 
       type: a.type,
       subtype: a.subtype ?? null,
       current_balance: a.balances?.current ?? null,
+      // What the bank's own app usually shows for checking: current, less
+      // pending debits and holds. And when the bank last updated these, if it says.
+      available_balance: a.balances?.available ?? null,
+      balance_updated_at: a.balances?.last_updated_datetime ?? null,
       credit_limit: a.balances?.limit ?? null,
       minimum_payment: credit?.min ?? null,
       payment_due_day: credit?.dueDay ?? null,

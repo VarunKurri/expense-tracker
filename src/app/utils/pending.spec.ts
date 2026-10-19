@@ -53,4 +53,9 @@ describe('Pending follows the bank', () => {
     const edited = row('x1', { updatedAt: 5 });
     expect(settlePending([p, edited], [bank()], TODAY)).toEqual([{ kind: 'posted', row: p }]);
   });
+
+  it('marks a row pending again when the bank still has it as pending', () => {
+    const merged = row('p1', { plaidPending: false, updatedAt: 9 });
+    expect(settlePending([merged], [bank({ pendingIds: ['p1'] })], TODAY)).toEqual([{ kind: 'pending', row: merged }]);
+  });
 });

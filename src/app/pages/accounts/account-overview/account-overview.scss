@@ -466,3 +466,10 @@
   color: var(--fg-3);
 }
 
+
+.balance-available {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--fg-3);
+  .fig { color: var(--fg-2); font-weight: 600; }
+}

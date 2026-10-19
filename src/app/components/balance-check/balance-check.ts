@@ -44,7 +44,20 @@ export class BalanceCheck {
     if (latest - a.plaidBalanceAt > 6 * 3_600_000) {
       return { ok: false, text: `${bank} stopped sending this account after ${this.shortTime(a.plaidBalanceAt)}. If its number changed, open Manage accounts on ${bank} and tick it.` };
     }
-    return { ok: true, text: `The balance is ${bank}'s, as of ${this.shortTime(a.plaidBalanceAt)}.` };
+    const updated = a.plaidBalanceUpdated ? ` (${bank} last updated it ${this.shortTime(Date.parse(a.plaidBalanceUpdated))})` : '';
+    return { ok: true, text: `The balance is ${bank}'s current balance, read ${this.shortTime(a.plaidBalanceAt)}${updated}.` };
+  });
+
+  /**
+   * The bank's available balance, when it differs from the current one: a
+   * bank's own app usually leads with it for checking. It takes pending
+   * debits and holds out (and can leave new deposits out until they clear),
+   * which the current balance, the one transactions add up to, doesn't.
+   */
+  available = computed(() => {
+    const a = this.account();
+    if (a.plaidAvailable == null || a.plaidBalance == null || owesMoney(a.type)) return null;
+    return Math.abs(a.plaidAvailable - a.plaidBalance) >= 0.005 ? a.plaidAvailable : null;
   });
 
   /** Money still pending: out is positive. Not in the balance until it posts. */

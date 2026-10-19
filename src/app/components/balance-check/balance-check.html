@@ -8,6 +8,14 @@
       <p class="bc-line" [class.warn]="!s.ok">{{ s.text }}</p>
     }
 
+    @if (available() != null) {
+      <p class="bc-line">
+        {{ bank() }}'s <strong>available</strong> balance is <strong class="fig">{{ money(available()!) }}</strong>.
+        {{ bank() }}'s app usually shows that one first: it takes out pending payments and holds, and can leave a
+        new deposit out until it clears. The balance here is the current one, which the transactions add up to.
+      </p>
+    }
+
     @if (handAddedRows().length > 0) {
       <div class="bc-hand">
         <p class="bc-line">

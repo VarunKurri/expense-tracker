@@ -41,6 +41,16 @@
           <span class="view-row-label">Date</span>
           <span class="view-row-value">{{ formatFullDate(tx.date) }}</span>
         </div>
+        <!-- What the bank says about it: so a row can be checked against the bank's app. -->
+        <div class="view-row">
+          <span class="view-row-label">At the bank</span>
+          <span class="view-row-value">
+            @if (!tx.plaidTransactionId) { Added by hand }
+            @else if (tx.plaidPending) { Pending }
+            @else if (tx.postedDate) { Posted {{ formatDate(tx.postedDate) }} }
+            @else { Posted }
+          </span>
+        </div>
         @if (tx.type === 'transfer') {
           <div class="view-row">
             <span class="view-row-label">From</span>

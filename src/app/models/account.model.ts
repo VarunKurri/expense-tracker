@@ -27,6 +27,11 @@ export interface Account {
   // relink sent twice, or more history arriving later, can't move the balance.
   plaidBalance?: number;
   plaidBalanceAt?: number;
+  // The bank's available balance (current less pending debits and holds: the
+  // figure a bank's own app usually leads with for checking), and when the
+  // bank says it last updated its balances, when it does say.
+  plaidAvailable?: number;
+  plaidBalanceUpdated?: string;
   openingBalanceSeeded?: boolean; // legacy: the one-time seed that plaidBalance replaced
 
   // Credit card specific
