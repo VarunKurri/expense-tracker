@@ -1,0 +1,32 @@
+@if (alerts().length > 0) {
+  <div class="panel alerts-card">
+    <div class="alerts-head">
+      <span class="card-label">Worth a look</span>
+    </div>
+    <div class="alerts-intro">
+      <p class="alerts-headline">
+        {{ alerts().length === 1 ? 'One charge looks' : alerts().length + ' charges look' }} different from usual.
+      </p>
+      <p class="alerts-why">Nothing's wrong necessarily, but a quick look now is easier than finding it on a statement.</p>
+    </div>
+    @for (a of shownAlerts(); track a.key) {
+      <div class="alert-row">
+        <button type="button" class="alert-main" (click)="openTx.emit(a.tx)">
+          <span class="alert-title">{{ a.tx.merchant || 'Untitled' }}</span>
+          <span class="alert-text">{{ alertText(a) }}</span>
+        </button>
+        <span class="alert-amount fig">−{{ money(a.tx.amount) }}</span>
+        <button type="button" class="alert-dismiss" (click)="dismissAlert(a)" aria-label="Dismiss" title="Dismiss">
+          <app-icon name="close" [size]="14" />
+        </button>
+      </div>
+    }
+    @if (alerts().length > shownAlerts().length || showAllAlerts()) {
+      <div class="alerts-more">
+        <button type="button" class="btn-row" (click)="showAllAlerts.set(!showAllAlerts())">
+          {{ showAllAlerts() ? 'Show fewer' : 'Show all ' + alerts().length }}
+        </button>
+      </div>
+    }
+  </div>
+}

@@ -111,9 +111,10 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
   - Why: budgets are easier to set when the app suggests realistic amounts from past spending.
   - Done when: category budget forms show recent averages and suggested targets.
 
-- [ ] Add anomaly alerts.
+- [x] Add anomaly alerts. (part 129)
   - Why: users should notice unusual spending, duplicate charges, or bills that changed amount.
   - Done when: dashboard and notifications highlight suspicious or unusually large transactions.
+  - Done: the Dashboard's "Worth a look" card (`app-spending-alerts`, maths in `utils/alerts.ts`): a charge at least 2× and $15 over your usual at that merchant, the same charge twice within a day on one account, and a monthly charge whose price went up. Dismissals sync across devices (`meta/dismissedAlerts`). Notifications not done.
 
 ## Phase 5: Offline, Sync, And Trust
 
@@ -539,6 +540,15 @@ Ported Split's engine (`utils/split/`, integer cents) and built Splitwise-style 
 - [x] Reporting (part 113): Analysis and Reports show "Owed to you" and "You owe" right now, as on Shared (`SharedBalanceService`); period split figures include group bills; a group's "By category" card.
 - [x] Settle-ups by category (part 117): paying a friend back counts in Analysis, Reports, Budgets and the Dashboard under the categories of the shares it paid for (Dining, Gas…), not as one "Transfer" line. Your share still becomes spending only when you pay. (The Transactions page's category filter still lists a payment under its own category.)
 - [ ] Later, if wanted: Splitwise CSV import (dropped for now: groups are entered by hand).
+
+## Phase 13: Linked Banks That Look After Themselves (parts 120–128)
+
+- [x] Manage accounts on a linked bank (part 120): add a replaced or new card through Plaid update mode; a replaced card carries on in the same account.
+- [x] Relinks (parts 121–122): rows a second link sent again are found and merged in the duplicate review; an account linked twice or renumbered by Chase folds back into one.
+- [x] Bank changes never wipe your edits (parts 123–124): a pending charge posts into the same row; a row you edited takes the bank's amount and posted date and keeps your notes, split, category and links; posted dates for computed card statements.
+- [x] Background sync (part 124): webhook plus every 6 hours, balances and card statements applied when the app opens.
+- [x] One income for several purchases (part 123).
+- [x] Balances stay opening balance + transactions (part 128): a bank-pinned balance, Pending tags and a Balance check were tried in parts 121–127 and removed at the user's request.
 
 ---
 

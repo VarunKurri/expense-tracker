@@ -1,0 +1,64 @@
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.alerts-card { margin-bottom: 16px; }
+
+.alerts-head {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.alerts-intro { padding: 14px 18px 8px; }
+.alerts-headline { margin: 0; font-size: 16px; font-weight: 600; color: var(--fg); }
+.alerts-why { margin: 4px 0 0; font-size: 13px; color: var(--fg-3); line-height: 1.5; }
+
+.alert-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px 0 0;
+  border-top: 1px solid var(--line);
+
+  &:hover { background: var(--bg-3); }
+}
+
+.alert-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 0 12px 18px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.alert-title { font-size: 14px; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert-text { font-size: 13px; color: var(--fg-3); line-height: 1.45; }
+.alert-amount { font-size: 14px; font-weight: 600; color: var(--fg); }
+
+.alert-dismiss {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+
+  &:hover { color: var(--fg); background: var(--surface-hi); }
+}
+
+.alerts-more {
+  padding: 10px 18px 14px;
+  border-top: 1px solid var(--line);
+}

@@ -242,6 +242,12 @@ The app is what we copy. Do not "correct" this back to dark.
   its date) and is what spending goes by. `postedDate` is when the bank posted
   it, what statements go by: statement maths use `postedOn` / `postedBalanceOn`
   (utils/finance.ts), e.g. a card's computed statement when the bank sends none.
+- The Dashboard's "Worth a look" (`app-spending-alerts`, maths in
+  utils/alerts.ts, dismissals in `AlertService` / `meta/dismissedAlerts`):
+  a charge at least 2× and $15 over the usual at that merchant (three
+  earlier charges needed), the same charge twice within a day on one
+  account, a monthly charge that went up. Transfers and settle-ups never
+  count. It shows nothing when there's nothing to look at.
 - One income can pay back several purchases (`moneyBackSplits`): linking more
   re-spreads it with `spreadIncome`, oldest purchase first, any surplus on the
   newest. An income with some left over shows up when linking from a purchase.

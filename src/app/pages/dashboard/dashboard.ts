@@ -28,6 +28,7 @@ import {
 } from 'chart.js';
 import { owesMoney } from '../../utils/finance';
 import { spreadOverCategories } from '../../utils/settlements';
+import { SpendingAlerts } from '../../components/spending-alerts/spending-alerts';
 
 Chart.register(ArcElement, DoughnutController, Tooltip, Legend);
 
@@ -36,7 +37,7 @@ Chart.register(ArcElement, DoughnutController, Tooltip, Legend);
   standalone: true,
   imports: [
     CommonModule, TransactionForm, BillForm, Confirm,
-    SpendCalendar, DayDetail, TransactionView,
+    SpendCalendar, DayDetail, TransactionView, SpendingAlerts,
   ],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
