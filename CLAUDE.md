@@ -194,17 +194,14 @@ The app is what we copy. Do not "correct" this back to dark.
   moves to `Account.previousPlaidAccountIds` and every Plaid id lookup goes through
   `accountForPlaidId` (utils/plaid-accounts.ts). The `NEW_ACCOUNTS_AVAILABLE`
   webhook sets `newAccountsAvailable` on the item, shown as a chip on the bank row.
-  A linked account's balance is the bank's: every sync stores Plaid's current
-  balance (`Account.plaidBalance`) and `openingBalanceFor` (utils/finance.ts)
-  works the opening balance out from it. Only an entry added by hand in the
-  last few days (`addsToBankBalance`, `HAND_ADDED_DAYS`) moves the balance on
-  top: the bank may not have it yet. An older hand-added entry is already in
-  the bank's balance (usually something Plaid never sent), so it doesn't;
-  `app-balance-check` lists them all. `AccountService.accounts()` already
-  carries that opening balance, so the screens that add history to it land on
-  the bank; `storedAccounts()` is the saved copy (TransactionService reads it).
-  Never seed or hand-edit a linked account's opening balance: more history
-  arriving later (a relink sends it all again) would move the balance.
+  Every account's balance is its opening balance plus its transactions
+  (`accountBalance` in utils/finance.ts), pending ones included, linked or
+  not, so anything you add moves it. A linked account's opening balance is
+  seeded once from Plaid's balance (`openingBalanceSeeded`) and is yours to
+  edit after. (Parts 121 to 127 pinned linked balances to the bank's figure,
+  with a Balance check card and Pending tags; the user preferred this model,
+  so that was removed. `carriedOpening` moved each pinned balance into its
+  opening balance once.) Pending is never shown in the UI.
   Linking a bank a second time gives every row a new Plaid id. A Plaid account
   matching an earlier link's account (same bank, type and last 4) carries on in
   that account (`sameBankAccount`, which also catches Chase renumbering an account on
@@ -238,20 +235,13 @@ The app is what we copy. Do not "correct" this back to dark.
   `PlaidService`) keeps the rows in step: still pending stays; posted as a
   separate row folds into the pending one (bank-linked, or matched: same
   account, same money or a tip on top at the same merchant, within 5 days);
-  posted with nothing else stands down; dropped by the bank is cancelled; a
-  row the bank lists as pending but the app had as posted is marked pending.
-  The hero balance is the bank's current balance (what transactions add up
-  to); the available one (`plaidAvailable`, what a bank's app usually leads
-  with for checking) shows beside it. The details sheet's "At the bank" row
-  says what the bank reports for a transaction (pending, posted date, or
-  added by hand).
+  posted with nothing else stands down; dropped by the bank is cancelled. This
+  is invisible: it only keeps one row per transaction, so a posted charge
+  never counts next to its own pending copy.
 - Dates: `date` is when you made the purchase (Plaid's authorized date, else
   its date) and is what spending goes by. `postedDate` is when the bank posted
   it, what statements go by: statement maths use `postedOn` / `postedBalanceOn`
-  (utils/finance.ts). Pending rows (`plaidPending`, tagged `.pending-tag`) count
-  as spending but are left out of every balance, as the bank leaves them out.
-  `app-balance-check` on an account's page says where the balance comes from,
-  what's pending, and checks the history against a statement (`checkStatement`).
+  (utils/finance.ts), e.g. a card's computed statement when the bank sends none.
 - One income can pay back several purchases (`moneyBackSplits`): linking more
   re-spreads it with `spreadIncome`, oldest purchase first, any surplus on the
   newest. An income with some left over shows up when linking from a purchase.

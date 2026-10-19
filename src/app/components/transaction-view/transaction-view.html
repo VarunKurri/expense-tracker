@@ -25,9 +25,6 @@
         @if (tx.isInternalTransfer) {
           <div class="view-refunded-badge">↔ Internal transfer, not counted in analysis</div>
         }
-        @if (tx.plaidPending) {
-          <div class="view-pending"><span class="pending-tag">Pending</span> Not in the account's balance until the bank posts it.</div>
-        }
       </div>
 
       <div class="view-details">
@@ -40,16 +37,6 @@
         <div class="view-row">
           <span class="view-row-label">Date</span>
           <span class="view-row-value">{{ formatFullDate(tx.date) }}</span>
-        </div>
-        <!-- What the bank says about it: so a row can be checked against the bank's app. -->
-        <div class="view-row">
-          <span class="view-row-label">At the bank</span>
-          <span class="view-row-value">
-            @if (!tx.plaidTransactionId) { Added by hand }
-            @else if (tx.plaidPending) { Pending }
-            @else if (tx.postedDate) { Posted {{ formatDate(tx.postedDate) }} }
-            @else { Posted }
-          </span>
         </div>
         @if (tx.type === 'transfer') {
           <div class="view-row">

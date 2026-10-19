@@ -78,8 +78,6 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** How one transaction moves one account's transaction total (before credit-card sign). */
 function deltasOf(t: Transaction): [string, number][] {
-  // Not in any balance until the bank posts it (see transactionDeltaForAccount).
-  if (t.plaidPending) return [];
   if (t.type === 'income' && t.accountId) return [[t.accountId, t.amount]];
   if (t.type === 'expense' && t.accountId) return [[t.accountId, -t.amount]];
   if (t.type === 'transfer') {

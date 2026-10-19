@@ -106,10 +106,6 @@
     </div>
 
     <!-- RECENT TRANSACTIONS -->
-    @if (a.plaidAccountId) {
-      <app-balance-check [account]="a" (openTx)="openTxView($event)" />
-    }
-
     <div class="recent-section">
       <div class="recent-header">
         <div class="recent-title">Recent activity</div>
@@ -155,7 +151,6 @@
                 } @else {
                   <div class="recent-tx-title">
                     {{ tx.merchant || 'Untitled' }}
-                    @if (tx.plaidPending) { <span class="pending-tag">Pending</span> }
                   </div>
                   <div class="recent-tx-meta">
                     @if (categoryFor(tx.categoryId); as cat) {

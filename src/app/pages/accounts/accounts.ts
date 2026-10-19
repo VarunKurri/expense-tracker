@@ -223,7 +223,7 @@ export class Accounts {
     if (!a.statementIssueDate) return a.statementBalance;
     const refunds = roundMoney(
       this.transactionSvc.transactions()
-        .filter(t => t.accountId === a.id && t.type === 'income' && !t.plaidPending && postedOn(t) > a.statementIssueDate!)
+        .filter(t => t.accountId === a.id && t.type === 'income' && postedOn(t) > a.statementIssueDate!)
         .reduce((s, t) => s + t.amount, 0)
     );
     return Math.max(0, roundMoney(a.statementBalance - refunds));
@@ -232,7 +232,7 @@ export class Accounts {
   /**
    * Balance owed on a credit card at the end of a day, as the statement has it:
    * by posted date, not purchase date (a purchase on the 16th that posts on the
-   * 18th is on the next statement), and nothing still pending.
+   * 18th is on the next statement).
    */
   private balanceOwedAsOf(a: Account, dateStr: string): number {
     return postedBalanceOn(a, this.transactionSvc.transactions(), dateStr);

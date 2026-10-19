@@ -1,5 +1,5 @@
 import { Account, Transaction } from '../models';
-import { accountBalance, availableCredit, creditCardBalance, handAddedTotal, openingBalanceFor, transactionDeltaForAccount, withBankOpenings } from './finance';
+import { accountBalance, availableCredit, creditCardBalance, transactionDeltaForAccount } from './finance';
 
 describe('finance utilities', () => {
   const checking: Account = {
@@ -42,48 +42,10 @@ describe('finance utilities', () => {
   });
 });
 
-describe('a linked account shows the bank’s balance', () => {
-  const tx = (type: 'income' | 'expense', amount: number, id: string) =>
-    ({ id, type, amount, accountId: 'college', date: '2026-01-15', plaidTransactionId: id }) as Transaction;
-  // History that a relink sent twice: the same $1,000 in twice.
-  const history = [tx('income', 1000, 'a'), tx('income', 1000, 'b'), tx('expense', 100, 'c')];
-  const college = { id: 'college', type: 'checking', openingBalance: 0, plaidBalance: 1214.95 } as Account;
-
-  it('works the opening balance out so the history lands on the bank’s balance', () => {
-    expect(openingBalanceFor(college, history)).toBe(-685.05);
-    expect(accountBalance(college, history)).toBe(1214.95);
-  });
-
-  it('does the same for a card, where the balance is what you owe', () => {
-    const card = { id: 'college', type: 'credit', openingBalance: 0, plaidBalance: 250 } as Account;
-    expect(accountBalance(card, history)).toBe(250);
-    expect(creditCardBalance(card, history)).toBe(250);
-  });
-
-  it('keeps the opening balance you entered on an account the bank does not report', () => {
-    const cash = { id: 'college', type: 'cash', openingBalance: 50 } as Account;
-    expect(openingBalanceFor(cash, history)).toBe(50);
-    expect(withBankOpenings([cash], history)[0]).toBe(cash);
-    expect(withBankOpenings([college], history)[0].openingBalance).toBe(-685.05);
-  });
-});
-
-describe('an entry you add by hand on a linked account', () => {
-  const read = new Date('2026-10-18T12:00:00').getTime();
-  const bankRows = [{ id: 'a', type: 'expense', amount: 100, accountId: 'chk', date: '2026-10-01', plaidTransactionId: 'a' }] as Transaction[];
-  const chk = { id: 'chk', type: 'checking', openingBalance: 0, plaidBalance: 1000, plaidBalanceAt: read } as Account;
-
-  it('moves the balance on top while the bank may not have it yet', () => {
-    expect(accountBalance(chk, bankRows)).toBe(1000);
-    const coffee = { id: 'm', type: 'expense', amount: 5, accountId: 'chk', date: '2026-10-17' } as Transaction;
-    expect(accountBalance(chk, [...bankRows, coffee])).toBe(995);
-    expect(handAddedTotal([...bankRows, coffee], chk)).toBe(5);
-  });
-
-  it('doesn’t once it’s older: the bank’s balance already includes it', () => {
-    // A refund Plaid never sent, filled in by hand weeks ago (the AMEX $37.95).
-    const refund = { id: 'r', type: 'income', amount: 37.95, accountId: 'chk', date: '2026-09-02' } as Transaction;
-    expect(accountBalance(chk, [...bankRows, refund])).toBe(1000);
-    expect(handAddedTotal([...bankRows, refund], chk)).toBe(0);
+describe('pending transactions count like any other', () => {
+  it('moves the balance as soon as it shows up', () => {
+    const chk = { id: 'chk', type: 'checking', openingBalance: 100 } as Account;
+    const pending = { id: 'p', type: 'expense', amount: 11.76, accountId: 'chk', date: '2026-10-18', plaidPending: true } as Transaction;
+    expect(accountBalance(chk, [pending])).toBe(88.24);
   });
 });

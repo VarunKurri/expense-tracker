@@ -12,6 +12,8 @@ import { ToastService } from './toast.service';
 import { EncryptionService } from './encryption.service';
 import { localDateString } from '../utils/date';
 import { BankPending, settlePending } from '../utils/pending';
+import { carriedOpening } from '../utils/opening-carry';
+import { owesMoney, roundMoney } from '../utils/finance';
 import { bankUpdatePatch } from '../utils/bank-updates';
 import { Account, AccountType } from '../models';
 import { accountForPlaidId, linkedTwice, moveToLink, replacementCandidates, sameBankAccount } from '../utils/plaid-accounts';
@@ -49,8 +51,6 @@ export interface PlaidAccount {
   type: string;
   subtype: string | null;
   current_balance: number | null;
-  available_balance?: number | null;
-  balance_updated_at?: string | null;
   credit_limit: number | null;
   minimum_payment: number | null;
   payment_due_day: number | null;
@@ -171,6 +171,16 @@ export class PlaidService {
       const fresh = items.filter(i => i.accountsSnapshot && (i.accountsSnapshotAt ?? 0) > (this.appliedSnapshots.get(i.itemId) ?? 0));
       if (fresh.length) untracked(() => void this.applySnapshots(fresh));
     });
+    // Balances are opening balance + transactions again. An account whose
+    // balance was pinned to the bank's for a while keeps today's figure:
+    // carry it into the opening balance once, then the pin is cleared.
+    effect(() => {
+      const accounts = this.accountSvc.storedAccounts();
+      const txs = this.txService.transactions();
+      if (!this.encryption.unlocked() || !this.accountSvc.loaded() || txs.length === 0) return;
+      const pinned = accounts.filter(a => a.id && a.plaidBalance != null);
+      if (pinned.length) untracked(() => void this.carryPinnedBalances(pinned));
+    });
     // Pending follows the bank: whenever a row the app marks Pending isn't
     // pending at the bank any more (or the bank dropped it), settle it.
     effect(() => {
@@ -179,6 +189,26 @@ export class PlaidService {
       if (!this.encryption.unlocked() || (!txs.some(t => t.plaidPending) && this.bankPending().size === 0)) return;
       untracked(() => void this.settlePendingRows());
     });
+  }
+
+  private carrying = false;
+  private async carryPinnedBalances(accounts: Account[]): Promise<void> {
+    if (this.carrying) return;
+    this.carrying = true;
+    try {
+      const txs = this.txService.transactions();
+      for (const a of accounts) {
+        await this.accountSvc.update(a.id!, {
+          openingBalance: carriedOpening(a, txs),
+          openingBalanceSeeded: true,
+          plaidBalance: undefined, plaidBalanceAt: undefined, plaidAvailable: undefined, plaidBalanceUpdated: undefined,
+        });
+      }
+    } catch (err) {
+      console.error('Could not carry a balance over:', err);
+    } finally {
+      this.carrying = false;
+    }
   }
 
   private async applySnapshots(items: PlaidItem[]): Promise<void> {
@@ -212,8 +242,9 @@ export class PlaidService {
    * it stays; posted as a separate row, that row folds into this one (your
    * notes, split, category and links stay, and the bank's amount and posted
    * date come in); posted with nothing else standing for it, it just stops
-   * being pending; dropped by the bank, it was cancelled and goes. And a row
-   * the bank still has as pending is marked so, if the app had lost that.
+   * being pending; dropped by the bank, it was cancelled and goes. Nothing
+   * shows Pending in the app; this only keeps one row per transaction, so a
+   * posted charge never counts next to its own pending copy.
    */
   private async settlePendingRows(): Promise<void> {
     if (this.settling) return;
@@ -365,10 +396,7 @@ export class PlaidService {
         const same = match ? undefined : sameBankAccount(existing, institutionName, itemId, type, a.mask, returnedIds, claimed);
         if (same?.id) {
           claimed.add(same.id);
-          await this.accountSvc.update(same.id, {
-            ...moveToLink(same, a.account_id, itemId),
-            ...(a.current_balance != null ? { plaidBalance: a.current_balance, plaidBalanceAt: Date.now() } : {}),
-          });
+          await this.accountSvc.update(same.id, moveToLink(same, a.account_id, itemId));
           continue;
         }
         if (match) {
@@ -389,18 +417,30 @@ export class PlaidService {
           if (a.last_payment_date && a.last_payment_date !== match.lastPaymentDate) patch.lastPaymentDate = a.last_payment_date;
           if (a.last_payment_amount != null && a.last_payment_amount !== match.lastPaymentAmount) patch.lastPaymentAmount = a.last_payment_amount;
           if (a.is_overdue != null && a.is_overdue !== match.statementOverdue) patch.statementOverdue = a.is_overdue;
-          // A loan account created before 'loan' existed came in as checking.
-          if (a.type === 'loan' && match.type !== 'loan') patch.type = 'loan';
-          // The bank's balance is the balance (see openingBalanceFor), read fresh
-          // every sync. It replaced a one-time seed of the opening balance, which
-          // went wrong whenever more history arrived later (a relink sends it all
-          // again).
-          if (a.current_balance != null) {
-            patch.plaidBalance = a.current_balance;
-            patch.plaidBalanceAt = Date.now();
+          // One-time opening-balance reconciliation: accounts are auto-created with
+          // openingBalance 0, so the locally-computed balance only reflects whatever
+          // history Plaid happened to sync, so it's wrong whenever the real account had
+          // activity before that window. Once Plaid reports a real current_balance,
+          // back-solve the opening balance that makes our formula land on it exactly,
+          // using whatever's already synced locally at that moment. Only ever runs
+          // once per account (flagged), so it never fights with balance changes the
+          // user makes afterward (the opening balance is theirs to edit from then on).
+          // A loan account created before 'loan' existed came in as checking. Correct
+          // it, and re-seed its opening balance with the owed-money formula.
+          if (a.type === 'loan' && match.type !== 'loan') {
+            patch.type = 'loan';
+            if (a.current_balance != null && match.id) {
+              patch.openingBalance = roundMoney(a.current_balance + this.txService.balanceForAccount(match.id));
+              patch.openingBalanceSeeded = true;
+            }
           }
-          if (a.available_balance != null) patch.plaidAvailable = a.available_balance;
-          if (a.balance_updated_at) patch.plaidBalanceUpdated = a.balance_updated_at;
+          if (!match.openingBalanceSeeded && !patch.openingBalanceSeeded && a.current_balance != null && match.id) {
+            const txDelta = this.txService.balanceForAccount(match.id);
+            patch.openingBalance = roundMoney(
+              owesMoney(match.type) ? a.current_balance + txDelta : a.current_balance - txDelta,
+            );
+            patch.openingBalanceSeeded = true;
+          }
           if (Object.keys(patch).length > 0 && match.id) await this.accountSvc.update(match.id, patch);
           continue;
         }
@@ -438,7 +478,6 @@ export class PlaidService {
       ...(a.last_payment_date ? { lastPaymentDate: a.last_payment_date } : {}),
       ...(a.last_payment_amount != null ? { lastPaymentAmount: a.last_payment_amount } : {}),
       ...(a.is_overdue != null ? { statementOverdue: a.is_overdue } : {}),
-      ...(a.current_balance != null ? { plaidBalance: a.current_balance, plaidBalanceAt: Date.now() } : {}),
       plaidAccountId: a.account_id,
       plaidItemId: itemId,
       archived: false,
@@ -458,7 +497,6 @@ export class PlaidService {
         await this.accountSvc.update(existing.id, {
           ...moveToLink(existing, p.account_id, pending.itemId),
           ...(p.mask ? { last4: p.mask } : {}),
-          ...(p.current_balance != null ? { plaidBalance: p.current_balance, plaidBalanceAt: Date.now() } : {}),
         });
         this.toast.success(`${existing.name} now follows the new card${pending.plaid.mask ? ` ••${pending.plaid.mask}` : ''}.`);
       } else {
@@ -489,10 +527,7 @@ export class PlaidService {
       try {
         const newest = copies[copies.length - 1];
         const earlier = copies.flatMap(c => [c.plaidAccountId!, ...(c.previousPlaidAccountIds ?? [])]);
-        await this.accountSvc.update(keep.id!, {
-          ...moveToLink(keep, newest.plaidAccountId!, newest.plaidItemId!, earlier),
-          ...(newest.plaidBalance != null ? { plaidBalance: newest.plaidBalance, plaidBalanceAt: newest.plaidBalanceAt } : {}),
-        });
+        await this.accountSvc.update(keep.id!, moveToLink(keep, newest.plaidAccountId!, newest.plaidItemId!, earlier));
         for (const copy of copies) {
           await this.txService.moveAccountReferences(copy.id!, keep.id!);
           await this.accountSvc.update(copy.id!, {

@@ -1,4 +1,4 @@
-import { Injectable, Injector, computed, inject, NgZone, signal } from '@angular/core';
+import { Injectable, inject, NgZone, signal } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
   collection, query, orderBy, onSnapshot,
@@ -10,8 +10,6 @@ import { AuthService } from './auth.service';
 import { EncryptionService } from './encryption.service';
 import { Account } from '../models';
 import { displayIcon } from '../utils/legacy-icons';
-import { withBankOpenings } from '../utils/finance';
-import { TransactionService } from './transaction.service';
 
 @Injectable({ providedIn: 'root' })
 export class AccountService {
@@ -77,17 +75,8 @@ export class AccountService {
   /** Accounts exactly as saved. TransactionService reads these to place bank rows. */
   storedAccounts = toSignal(this.accounts$, { initialValue: [] as Account[] });
 
-  // Looked up when first needed: TransactionService needs this service first.
-  private injector = inject(Injector);
-
-  /**
-   * Accounts as the app shows them: a linked account's opening balance is
-   * worked out from the bank's balance, so every screen that adds its history
-   * to the opening balance lands on what the bank says.
-   */
-  accounts = computed(() =>
-    withBankOpenings(this.storedAccounts(), this.injector.get(TransactionService).transactions()),
-  );
+  /** The accounts. (Same signal as storedAccounts, the name TransactionService reads.) */
+  accounts = this.storedAccounts;
 
   async add(account: Omit<Account, 'id' | 'createdAt'>) {
     const user = this.auth.user();

@@ -37,9 +37,6 @@
         <div class="balance-value" [class.pos]="balance() >= 0" [class.neg]="balance() < 0">
           {{ balance() < 0 ? '−' : '' }}{{ formatCurrency(balance()) }}
         </div>
-        @if (a.plaidAvailable != null && a.plaidAvailable !== a.plaidBalance) {
-          <div class="balance-available">Available <span class="fig">{{ formatCurrency(a.plaidAvailable) }}</span></div>
-        }
       </div>
     </div>
 
@@ -72,15 +69,8 @@
       <div class="stat-card">
         <div class="stat-label">Opening balance</div>
         <div class="stat-value">{{ formatCurrency(a.openingBalance || 0) }}</div>
-        @if (a.plaidBalance != null) {
-          <div class="stat-sub">Worked out from {{ a.institution || 'your bank' }}'s balance</div>
-        }
       </div>
     </div>
-
-    @if (a.plaidAccountId) {
-      <app-balance-check [account]="a" (openTx)="openTxView($event)" />
-    }
 
     <!-- RECENT ACTIVITY -->
     <div class="recent-section">
@@ -124,7 +114,6 @@
                 } @else {
                   <div class="recent-tx-title">
                     {{ tx.merchant || 'Untitled' }}
-                    @if (tx.plaidPending) { <span class="pending-tag">Pending</span> }
                   </div>
                   <div class="recent-tx-meta">
                     @if (categoryFor(tx.categoryId); as cat) {

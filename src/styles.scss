@@ -972,22 +972,6 @@ input[type="date"]::-webkit-date-and-time-value {
   }
 }
 
-/* "Pending": the bank hasn't posted it yet, so it isn't in the balance. A
-   state, not data colour, so it stays neutral. */
-.pending-tag {
-  display: inline-block;
-  padding: 1px 6px;
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-xs);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: var(--fg-3);
-  vertical-align: middle;
-}
-
 /* A person's name as a chip ("Split with", who had an item). Names are UI
    text, not data, so they take the UI voice; the mono chip is for figures,
    dates and filters. */

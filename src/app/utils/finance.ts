@@ -1,15 +1,8 @@
 import { Account, AccountType, Transaction } from '../models';
 
-/**
- * How the account's history moves its balance. Pending rows are left out: a
- * bank's balance doesn't include them until they post (Chase shows $588.81
- * with $11.76 pending), so neither does the app's. They still count as
- * spending; see `pendingTotal`.
- */
 export function transactionDeltaForAccount(transactions: Transaction[], accountId: string): number {
   let balance = 0;
   for (const t of transactions) {
-    if (t.plaidPending) continue;
     if (t.type === 'income' && t.accountId === accountId) {
       balance += t.amount;
     } else if (t.type === 'expense' && t.accountId === accountId) {
@@ -33,74 +26,19 @@ export function owesMoney(type: AccountType): boolean {
 
 export function accountBalance(account: Account, transactions: Transaction[]): number {
   const delta = transactionDeltaForAccount(transactions, account.id || '');
-  const opening = openingBalanceFor(account, transactions);
-  return roundMoney(owesMoney(account.type) ? opening - delta : opening + delta);
-}
-
-/**
- * The opening balance the app counts from. A linked account takes the bank's
- * word for its balance (`plaidBalance`), so its opening balance is whatever
- * makes its history land exactly on that. The one exception is an entry you
- * added by hand in the last few days (`addsToBankBalance`): the bank may not
- * have it yet, so it moves the balance on top until the bank's row arrives
- * and is merged with it. An older hand-added entry is already in the bank's
- * balance (it's how you filled in something Plaid never sent), so it doesn't.
- * Every other account uses the opening balance you entered.
- */
-export function openingBalanceFor(account: Account, transactions: Transaction[]): number {
-  if (account.plaidBalance == null || !account.id) return account.openingBalance || 0;
-  const delta = transactionDeltaForAccount(transactions.filter(t => !addsToBankBalance(t, account)), account.id);
-  return roundMoney(owesMoney(account.type) ? account.plaidBalance + delta : account.plaidBalance - delta);
-}
-
-/** A row the bank sent (or one of yours merged with the bank's), as opposed to one you added by hand. */
-export function isBankRow(t: Transaction): boolean {
-  return !!t.plaidTransactionId;
-}
-
-/** Days a hand-added entry counts on top of the bank's balance: about how long a charge takes to reach it. */
-export const HAND_ADDED_DAYS = 5;
-
-/** The first date whose hand-added entries the bank may not have yet. */
-export function handAddedFrom(account: Account): string {
-  const read = account.plaidBalanceAt ? new Date(account.plaidBalanceAt) : new Date();
-  read.setDate(read.getDate() - HAND_ADDED_DAYS);
-  const y = read.getFullYear(), m = String(read.getMonth() + 1).padStart(2, '0'), d = String(read.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-/**
- * A hand-added entry recent enough that the bank's balance may not include it
- * yet, so it moves a linked account's balance on top. Never true for the
- * bank's own rows, or for accounts the bank doesn't report.
- */
-export function addsToBankBalance(t: Transaction, account: Account): boolean {
-  return account.plaidBalance != null && !isBankRow(t) && t.date >= handAddedFrom(account);
-}
-
-/** Hand-added entries counted on top of the bank's balance, as money out (positive) or in (negative). */
-export function handAddedTotal(transactions: Transaction[], account: Account): number {
-  return roundMoney(-transactionDeltaForAccount(transactions.filter(t => addsToBankBalance(t, account)), account.id || ''));
-}
-
-/** Accounts with their opening balance worked out (see `openingBalanceFor`), for code that reads it directly. */
-export function withBankOpenings(accounts: Account[], transactions: Transaction[]): Account[] {
-  return accounts.map(a => a.plaidBalance == null ? a : { ...a, openingBalance: openingBalanceFor(a, transactions) });
+  const balance = owesMoney(account.type)
+    ? account.openingBalance - delta
+    : (account.openingBalance || 0) + delta;
+  return roundMoney(balance);
 }
 
 export function creditCardBalance(account: Account, transactions: Transaction[]): number {
-  return openingBalanceFor(account, transactions) - transactionDeltaForAccount(transactions, account.id || '');
+  return account.openingBalance - transactionDeltaForAccount(transactions, account.id || '');
 }
 
 export function availableCredit(account: Account, transactions: Transaction[]): number {
   if (!account.creditLimit) return 0;
   return roundMoney(account.creditLimit - creditCardBalance(account, transactions));
-}
-
-/** Pending rows on an account, as money out (positive) or in (negative). Not in the balance yet. */
-export function pendingTotal(transactions: Transaction[], accountId: string): number {
-  return roundMoney(-transactionDeltaForAccount(
-    transactions.filter(t => t.plaidPending).map(t => ({ ...t, plaidPending: false })), accountId));
 }
 
 /** The day the bank counts a row on: when it posted, or (for older rows) its date. */
@@ -109,22 +47,13 @@ export function postedOn(t: Transaction): string {
 }
 
 /**
- * The balance at the end of `date` as the bank's books had it: by posted
- * date, pending left out. A linked account walks back from the bank's own
- * balance, so this checks the history between that day and today against a
- * statement. Others count up from the opening balance. For a card, what you owe.
+ * The balance at the end of `date` as a statement has it: by posted date, not
+ * purchase date (a purchase on the 16th that posts on the 18th is on the next
+ * statement). For a card, what you owe.
  */
 export function postedBalanceOn(account: Account, transactions: Transaction[], date: string): number {
-  const id = account.id || '';
-  const owes = owesMoney(account.type);
-  if (account.plaidBalance != null) {
-    // Everything the bank's balance includes (so not a hand-added entry it may not have yet).
-    const after = transactionDeltaForAccount(
-      transactions.filter(t => !addsToBankBalance(t, account) && postedOn(t) > date), id);
-    return roundMoney(owes ? account.plaidBalance + after : account.plaidBalance - after);
-  }
-  const upTo = transactionDeltaForAccount(transactions.filter(t => postedOn(t) <= date), id);
-  return roundMoney(owes ? (account.openingBalance || 0) - upTo : (account.openingBalance || 0) + upTo);
+  const upTo = transactionDeltaForAccount(transactions.filter(t => postedOn(t) <= date), account.id || '');
+  return roundMoney(owesMoney(account.type) ? (account.openingBalance || 0) - upTo : (account.openingBalance || 0) + upTo);
 }
 
 export function roundMoney(value: number): number {
