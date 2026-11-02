@@ -52,5 +52,9 @@ export class Icon {
     wallet:    'M3 6a2 2 0 012-2h10a2 2 0 012 2v1H3V6zm0 2h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm10 3h2',
     card:      'M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm0 3h16M5 13h4',
     cash:      'M2 6a1 1 0 011-1h14a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V6zm8 2a2 2 0 100 4 2 2 0 000-4z',
+    // Spending alerts: a charge well above usual, the same charge twice, a price that went up.
+    spike:     'M10 3l7.5 13h-15L10 3zM10 8.5v3.5M10 14.25v.25',
+    copy:      'M7.5 7.5h8.5v8.5H7.5zM4 12.5V4h8.5',
+    trend:     'M3 14l5-5 3 3 6-6M12.5 6H17v4.5',
   };
 }

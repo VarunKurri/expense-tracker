@@ -2,7 +2,7 @@ import { Component, computed, inject, output, signal } from '@angular/core';
 import { Transaction } from '../../models';
 import { AlertService } from '../../services/alert.service';
 import { ToastService } from '../../services/toast.service';
-import { SpendingAlert } from '../../utils/alerts';
+import { AlertKind, SpendingAlert } from '../../utils/alerts';
 import { Icon } from '../icon/icon';
 
 /**
@@ -29,6 +29,10 @@ export class SpendingAlerts {
   showAllAlerts = signal(false);
   shownAlerts = computed(() => this.showAllAlerts() ? this.alerts() : this.alerts().slice(0, 4));
 
+  /** What kind of alert a row is, at a glance. */
+  readonly kindLabel: Record<AlertKind, string> = { big: 'Bigger than usual', twice: 'Charged twice', price: 'Price went up' };
+  readonly kindIcon: Record<AlertKind, string> = { big: 'spike', twice: 'copy', price: 'trend' };
+
   /** One plain sentence on why a charge is here. */
   alertText(a: SpendingAlert): string {
     if (a.kind === 'big') {
@@ -36,7 +40,7 @@ export class SpendingAlerts {
       return `About ${times}× what you usually spend here (${this.money(a.usual!)}), on ${this.short(a.tx.date)}.`;
     }
     if (a.kind === 'twice') {
-      return `Charged twice: ${this.money(a.tx.amount)} on ${this.short(a.other!.date)} and again on ${this.short(a.tx.date)}. If you only paid once, ask them about it.`;
+      return `${this.money(a.tx.amount)} on ${this.short(a.other!.date)} and again on ${this.short(a.tx.date)}. If you only paid once, ask them about it.`;
     }
     return `Went up from ${this.money(a.usual!)} to ${this.money(a.tx.amount)} a month, on ${this.short(a.tx.date)}.`;
   }
