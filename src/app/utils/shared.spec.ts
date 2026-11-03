@@ -1,0 +1,201 @@
+import { describe, it, expect } from 'vitest';
+import { ME, SharedBill, Transaction } from '../models';
+import { MoneyBackLedger } from './money-back';
+import { balancesByPerson, splitSentence, spreadRepayment, totalOwedCents, totalYouOweCents, withGroups } from './shared';
+import { NO_SPLITS, SplitTotals } from './reporting';
+import { quickSplit, setClosed } from './splits';
+
+class Ledger extends MoneyBackLedger {
+  constructor(public transactions: () => Transaction[]) { super(); }
+}
+
+let n = 0;
+const bill = (date: string, cents: number, people: string[], extra: Partial<Transaction> = {}): Transaction => ({
+  id: `b${++n}`, type: 'expense', amount: cents / 100, date, createdAt: n, updatedAt: 0, accountId: 'a',
+  split: quickSplit(cents, [ME, ...people]), ...extra,
+});
+
+describe('balancesByPerson', () => {
+  const dinner = bill('2026-09-01', 9000, ['m', 'p']);   // $30 each
+  const pizza = bill('2026-09-10', 5000, ['m']);         // $25 each
+  const tacos = bill('2026-09-20', 9000, ['m', 'p']);    // $30 each
+  const txs = [tacos, dinner, pizza];
+  const ledger = new Ledger(() => txs);
+  const balances = () => balancesByPerson(txs, t => ledger.moneyBackEntriesFor(t));
+
+  it('adds up what each person owes across bills, most owed first', () => {
+    const [m, p] = balances();
+    expect(m.personId).toBe('m');
+    expect(m.owedCents).toBe(3000 + 2500 + 3000);
+    expect(p.owedCents).toBe(6000);
+    expect(totalOwedCents(balances())).toBe(8500 + 6000);
+  });
+
+  it('lists open bills oldest first, the order a repayment pays them off', () => {
+    expect(balances()[0].openBills.map(b => b.tx.id)).toEqual([dinner.id, pizza.id, tacos.id]);
+    expect(balances()[0].allBills.map(b => b.tx.id)).toEqual([tacos.id, pizza.id, dinner.id]);
+  });
+
+  it("leaves out bills that are repaid or marked won't be repaid", () => {
+    const repaid = { ...dinner, moneyBack: [{ id: 'r', source: 'repayment' as const, amountCents: 3000, date: '2026-09-02', fromPersonId: 'm' }] };
+    const closed = { ...tacos, split: setClosed(tacos.split!, 'm', true) };
+    const l = new Ledger(() => [repaid, pizza, closed]);
+    const m = balancesByPerson([repaid, pizza, closed], t => l.moneyBackEntriesFor(t)).find(b => b.personId === 'm')!;
+    expect(m.owedCents).toBe(2500);
+    expect(m.openBills.map(b => b.tx.id)).toEqual([pizza.id]);
+    expect(m.allBills).toHaveLength(3);
+  });
+});
+
+describe('spreadRepayment', () => {
+  const dinner = bill('2026-09-01', 9000, ['m']);   // m owes $45
+  const pizza = bill('2026-09-10', 5000, ['m']);    // m owes $25
+  const ledger = new Ledger(() => [dinner, pizza]);
+  const open = () => balancesByPerson([dinner, pizza], t => ledger.moneyBackEntriesFor(t))[0].openBills;
+
+  it('pays off the oldest bill first', () => {
+    expect(spreadRepayment(open(), 5000)).toEqual([
+      { expenseId: dinner.id, amountCents: 4500 },
+      { expenseId: pizza.id, amountCents: 500 },
+    ]);
+  });
+
+  it('clears everything with exactly what is owed', () => {
+    const parts = spreadRepayment(open(), 7000);
+    expect(parts.map(p => p.amountCents)).toEqual([4500, 2500]);
+  });
+
+  it('puts anything beyond what is owed on the newest bill, so the parts add up to what was paid', () => {
+    const parts = spreadRepayment(open(), 8000);
+    expect(parts).toEqual([{ expenseId: dinner.id, amountCents: 4500 }, { expenseId: pizza.id, amountCents: 3500 }]);
+    expect(parts.reduce((t, p) => t + p.amountCents, 0)).toBe(8000);
+  });
+
+  it('nothing to spread', () => {
+    expect(spreadRepayment(open(), 0)).toEqual([]);
+    expect(spreadRepayment([], 5000)).toEqual([]);
+  });
+});
+
+describe('splitSentence (the Analysis "Owed to you" card)', () => {
+  const totals = (over: Partial<SplitTotals>): SplitTotals => ({ ...NO_SPLITS, bills: 2, ...over });
+
+  it('owed, nothing back yet', () => {
+    expect(splitSentence(totals({ forOthersCents: 12000, owedCents: 12000 }), 'this month'))
+      .toBe("You covered $120.00 of other people's shares on 2 split bills this month. Until it comes back, it counts in your spending.");
+  });
+
+  it('partly back', () => {
+    expect(splitSentence(totals({ forOthersCents: 12000, repaidCents: 6000, owedCents: 6000 }), ''))
+      .toBe("You covered $120.00 of other people's shares on 2 split bills, and $60.00 has come back. Until the other $60.00 does, it counts in your spending.");
+  });
+
+  it('all back', () => {
+    expect(splitSentence(totals({ bills: 1, forOthersCents: 6000, repaidCents: 6000 }), 'last month'))
+      .toBe("You covered $60.00 of other people's shares on 1 split bill last month, and all of it came back, so only your share counts as spending.");
+  });
+
+  it("some won't be repaid", () => {
+    expect(splitSentence(totals({ forOthersCents: 12000, repaidCents: 6000, wontBeRepaidCents: 6000 }), ''))
+      .toBe("You covered $120.00 of other people's shares on 2 split bills. $60.00 won't be repaid, so it stays in your spending.");
+  });
+
+  it('split, but nobody owes you (they paid their own way)', () => {
+    expect(splitSentence(totals({ bills: 1 }), 'this year')).toBe('Nobody owes you on your 1 split bill this year. Everyone paid their own way.');
+  });
+});
+
+describe('bills someone else paid, outside groups', () => {
+  const benPaid = (cents: number, people: string[], over: Partial<SharedBill> = {}): SharedBill => ({
+    id: `sb${cents}`, date: '2026-09-20', merchant: 'Tents', createdAt: 1, updatedAt: 1,
+    split: { ...quickSplit(cents, people), payments: [{ personId: 'ben', amountCents: cents }] }, ...over,
+  });
+  const ledger = new (class extends MoneyBackLedger { transactions = () => [] as Transaction[]; })();
+
+  it('what you owe the person who paid', () => {
+    const [ben] = balancesByPerson([], t => ledger.moneyBackEntriesFor(t), () => false, [benPaid(6000, [ME, 'ben'])]);
+    expect(ben).toMatchObject({ personId: 'ben', owedCents: 0, iOweCents: 3000, netCents: -3000 });
+    expect(ben.owedByMe.map(o => o.cents)).toEqual([3000]);
+    expect(totalYouOweCents([ben])).toBe(3000);
+    expect(totalOwedCents([ben])).toBe(0);
+  });
+
+  it('one net balance: what they owe you less what you owe them', () => {
+    const lunch: Transaction = {
+      id: 'l', type: 'expense', amount: 80, date: '2026-09-10', accountId: 'a', createdAt: 0, updatedAt: 0,
+      split: quickSplit(8000, [ME, 'ben']),
+    } as Transaction;
+    const [ben] = balancesByPerson([lunch], t => ledger.moneyBackEntriesFor(t), () => false, [benPaid(6000, [ME, 'ben'])]);
+    // $40 they owe you and $30 you owe them even out: $10 left on your lunch, and you owe nothing.
+    expect(ben).toMatchObject({ owedCents: 1000, iOweCents: 0, netCents: 1000 });
+    expect(ben.openBills[0].nettedCents).toBe(3000);
+    expect(ben.settledOwed).toEqual([expect.objectContaining({ cents: 0, nettedCents: 3000 })]);
+    // ...and groups add to it.
+    const [withTrip] = withGroups([ben], [{ groupId: 'g', name: 'Trip', plan: [{ fromPersonId: ME, toPersonId: 'ben', amountCents: 500 }] }]);
+    expect(withTrip.netCents).toBe(500);
+  });
+
+  it("a bill Ben paid that you weren't on owes him nothing", () => {
+    expect(balancesByPerson([], t => ledger.moneyBackEntriesFor(t), () => false, [benPaid(6000, ['ben', 'cara'])])
+      .find(b => b.personId === 'ben')?.iOweCents ?? 0).toBe(0);
+  });
+});
+
+describe('paying someone back outside groups', () => {
+  const theirs = (id: string, date: string, cents: number): SharedBill => ({
+    id, date, merchant: id, createdAt: 0, updatedAt: 0,
+    split: { ...quickSplit(cents, [ME, 'ben']), payments: [{ personId: 'ben', amountCents: cents }] },
+  });
+  const bills = [theirs('concert', '2026-07-17', 59600), theirs('pizza', '2026-09-29', 2000)]; // you owe $298 + $10
+  const ledger = new (class extends MoneyBackLedger { transactions = () => [] as Transaction[]; })();
+  const ben = (paid: number) => balancesByPerson([], t => ledger.moneyBackEntriesFor(t), () => false, bills,
+    paid ? [{ personId: 'ben', amountCents: paid, date: '2026-10-01', txId: 'venmo' }] : [])[0];
+
+  it('pays their bills off oldest first; a bill paid in full moves to history', () => {
+    const b = ben(30000);
+    expect(b.owedByMe.map(o => [o.bill.id, o.cents, o.paidCents])).toEqual([['pizza', 800, 200]]);
+    expect(b.settledOwed.map(o => [o.bill.id, o.cents, o.paidCents])).toEqual([['concert', 0, 29800]]);
+    expect(b.iOweCents).toBe(800);
+    expect(b.netCents).toBe(-800);
+    expect(b.paidOut).toEqual([expect.objectContaining({ txId: 'venmo', amountCents: 30000 })]);
+  });
+
+  it('paying more than you owe flips it: they owe you the rest', () => {
+    const b = ben(31000);
+    expect(b.iOweCents).toBe(0);
+    expect(b.overpaidCents).toBe(200);
+    expect(b.netCents).toBe(200);
+    expect(withGroups([b], [])[0].netCents).toBe(200);
+  });
+
+  it('someone you have only paid still shows up', () => {
+    const only = balancesByPerson([], () => [], () => false, [], [{ personId: 'cara', amountCents: 500, date: '2026-10-01', paymentId: 'p' }]);
+    expect(only).toEqual([expect.objectContaining({ personId: 'cara', netCents: 500, overpaidCents: 500 })]);
+  });
+});
+
+describe('Splitwise settles "the difference": your payment and what they owe you even out', () => {
+  it('Nikhilesh: ColdStone $7.68 he owes, the $298 concert you owe, you paid $290.32: both settled', () => {
+    const coldstone: Transaction = {
+      id: 'cs', type: 'expense', amount: 15.36, date: '2026-07-02', merchant: 'ColdStone', accountId: 'a', createdAt: 0, updatedAt: 0,
+      split: quickSplit(1536, [ME, 'nik']),
+    } as Transaction;
+    const pizza: Transaction = {
+      id: 'tp', type: 'expense', amount: 24.52, date: '2026-09-29', merchant: 'Tandoori Pizza', accountId: 'a', createdAt: 0, updatedAt: 0,
+      split: quickSplit(2452, [ME, 'nik']),
+    } as Transaction;
+    const concert: SharedBill = {
+      id: 'concert', date: '2026-07-17', merchant: 'Anirudh Concert', createdAt: 0, updatedAt: 0,
+      split: { ...quickSplit(29800, [ME]), payments: [{ personId: 'nik', amountCents: 29800 }] },
+    };
+    const ledger = new (class extends MoneyBackLedger { transactions = () => [coldstone, pizza]; })();
+    const [nik] = balancesByPerson([coldstone, pizza], t => ledger.moneyBackEntriesFor(t), () => false, [concert],
+      [{ personId: 'nik', amountCents: 29032, date: '2026-07-17', txId: 'venmo' }]);
+
+    expect(nik.owedByMe).toEqual([]); // the concert is settled
+    expect(nik.settledOwed).toEqual([expect.objectContaining({ cents: 0, paidCents: 29032, nettedCents: 768 })]);
+    expect(nik.openBills.map(b => b.tx.id)).toEqual(['tp']); // ColdStone evened out; only the pizza is open
+    expect(nik.allBills.find(b => b.tx.id === 'cs')!.nettedCents).toBe(768);
+    expect(nik.netCents).toBe(1226);
+  });
+});

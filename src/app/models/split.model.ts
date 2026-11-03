@@ -1,0 +1,87 @@
+import type { Charges, Item, Payment } from '../utils/split/types';
+
+/**
+ * Bill splitting. The arithmetic is Split's engine (`utils/split/`), unchanged;
+ * these are the shapes Trackr stores around it. Interfaces only.
+ */
+
+/** The reserved person id for you, the owner of the account. */
+export const ME = 'me';
+
+/**
+ * Someone you split bills with. Saved once (encrypted, `people` collection) so
+ * the same Alex is recognised across every bill. That's what makes "Alex owes
+ * you $85 across three dinners" possible.
+ */
+export interface SplitPerson {
+  id?: string;
+  name: string;
+  /**
+   * Cash (or anything outside your accounts) you handed them to pay them back
+   * for their bills outside groups. A bank payment is that expense instead,
+   * with `settlement`. In a group, both live on the group.
+   */
+  payments?: PersonPayment[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * A line on the bill. Split's `Item` (whose `priceCents` is the line total,
+ * which is all the engine divides) plus how many there were, so "2 × Mandi" is
+ * one line, not two. When a quantity is set, `priceCents` is always
+ * `unitPriceCents × quantity`, so the two can't disagree.
+ */
+export interface SplitItem extends Item {
+  /** How many; absent means 1. */
+  quantity?: number;
+  /** The price of one, in cents. */
+  unitPriceCents?: number;
+}
+
+/**
+ * How a bill is shared, attached to the expense transaction that paid for it.
+ *
+ * Money is integer cents throughout, as in Split. The transaction's own
+ * `amount` stays in dollars like every other transaction; it must equal your
+ * entry in `payments`.
+ *
+ * The bill total is never stored: it is always `calculateSplit()`'s
+ * subtotal + tax + tip, so it can't drift from the items.
+ */
+export interface TransactionSplit {
+  /**
+   * `quick`:    one line for the whole bill ("$180, four ways").
+   * `itemized`: individual items, tax and tip (usually from a receipt).
+   * Both are ordinary `items` underneath; the mode only picks the editor.
+   */
+  mode: 'quick' | 'itemized';
+  /** Who shares the cost. Leave `ME` out when you paid for others entirely. */
+  participantIds: string[];
+  items: SplitItem[];
+  charges: Charges;
+  /** Who paid the merchant. Yours equals the transaction amount. */
+  payments: Payment[];
+  /** People marked "won't be repaid": still in your spending, no longer "owed to you". */
+  closedPersonIds?: string[];
+  source: 'manual' | 'receipt';
+  /** The group this bill belongs to (a trip, a flat), if any. See models/group.model.ts. */
+  groupId?: string;
+  /**
+   * When the bill doesn't divide evenly: who pays the extra cent, chosen by
+   * hand (to match Splitwise, which picks per bill). Absent means the
+   * default: whoever paid first, then in bill order.
+   */
+  roundUpIds?: string[];
+}
+
+/** Money you handed someone outside your accounts, outside any group. */
+export interface PersonPayment {
+  id: string;
+  amountCents: number;
+  /** YYYY-MM-DD */
+  date: string;
+  note?: string;
+}
+
+export type { Charges, Item, Payment };

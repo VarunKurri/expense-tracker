@@ -9,6 +9,7 @@ import { TransactionForm } from '../../transactions/transaction-form/transaction
 import { Confirm } from '../../../components/confirm/confirm';
 import { Account, Transaction } from '../../../models';
 import { ToastService } from '../../../services/toast.service';
+import { owesMoney } from '../../../utils/finance';
 
 @Component({
   selector: 'app-account-overview',
@@ -22,7 +23,7 @@ export class AccountOverview {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private accountService = inject(AccountService);
-  private txService = inject(TransactionService);
+  txService = inject(TransactionService);
   private categoryService = inject(CategoryService);
 
   formOpen = signal(false);
@@ -44,7 +45,7 @@ export class AccountOverview {
     const a = this.account();
     if (!a) return 0;
     const delta = this.txService.balanceForAccount(a.id!);
-    return (a.openingBalance || 0) + delta;
+    return owesMoney(a.type) ? a.openingBalance - delta : (a.openingBalance || 0) + delta;
   });
 
   // This month's income and expenses for this account
@@ -173,9 +174,9 @@ export class AccountOverview {
   }
 
   accountName(id?: string): string {
-    if (!id) return '—';
+    if (!id) return 'None';
     const a = this.accountService.accounts().find(a => a.id === id);
-    return a ? `${a.icon} ${a.name}` : '—';
+    return a ? `${a.icon} ${a.name}` : 'None';
   }
 
   formatCurrency(n: number): string {

@@ -17,7 +17,7 @@ function rule(over: Partial<TransactionRule> = {}): TransactionRule {
   return { id: 'r1', enabled: true, priority: 0, createdAt: 0, ...over };
 }
 
-describe('rules — guards', () => {
+describe('rules: guards', () => {
   it('treats a rule with no condition as unusable', () => {
     const r = rule({ setCategoryId: 'food' });
     expect(ruleHasCondition(r)).toBe(false);
@@ -38,7 +38,7 @@ describe('rules — guards', () => {
   });
 });
 
-describe('rules — deleted categories', () => {
+describe('rules: deleted categories', () => {
   const valid = new Set(['food', 'ride']);
 
   it('flags a rule that files into a category that no longer exists', () => {
@@ -83,7 +83,7 @@ describe('rules — deleted categories', () => {
   });
 });
 
-describe('rules — reordering', () => {
+describe('rules: reordering', () => {
   it('moves a rule when every rule shares priority 0', () => {
     // The state every existing list is in: the editor saved each new rule at
     // 0, so swapping priorities traded 0 for 0 and the arrows did nothing.
@@ -131,7 +131,7 @@ describe('rules — reordering', () => {
   });
 });
 
-describe('rules — matching', () => {
+describe('rules: matching', () => {
   it('matches a merchant substring case-insensitively', () => {
     const r = rule({ merchantContains: 'LYFT', setCategoryId: 'ride' });
     expect(ruleMatches(r, tx({ merchant: 'Lyft *Ride Sun 2pm' }))).toBe(true);
@@ -169,13 +169,13 @@ describe('rules — matching', () => {
   });
 });
 
-describe('rules — evaluation', () => {
+describe('rules: evaluation', () => {
   it('the first rule by priority wins a contested field', () => {
     const specific = rule({ id: 'a', priority: 0, merchantContains: 'lyft', setCategoryId: 'rideshare' });
     const broad = rule({ id: 'b', priority: 10, merchantContains: 'l', setCategoryId: 'misc' });
     const out = evaluateRules([broad, specific], tx({ merchant: 'Lyft' }));
     expect(out?.patch.categoryId).toBe('rideshare');
-    // Both matched, even though only one changed anything — the tester needs
+    // Both matched, even though only one changed anything. The tester needs
     // to be able to show overlap.
     expect(out?.matched.map(r => r.id)).toEqual(['a', 'b']);
   });
@@ -198,7 +198,7 @@ describe('rules — evaluation', () => {
   });
 });
 
-describe('rules — drafts', () => {
+describe('rules: drafts', () => {
   it('folds the result into a transaction being created', () => {
     const r = rule({ merchantContains: 'lyft', setCategoryId: 'ride' });
     const draft = { type: 'expense' as const, amount: 12, date: '2026-09-01', merchant: 'Lyft' };
@@ -212,7 +212,7 @@ describe('rules — drafts', () => {
   });
 });
 
-describe('rules — bulk apply', () => {
+describe('rules: bulk apply', () => {
   const r = rule({ merchantContains: 'lyft', setCategoryId: 'ride' });
 
   it('plans one patch per affected transaction', () => {
@@ -252,7 +252,7 @@ describe('rules — bulk apply', () => {
   });
 });
 
-describe('rules — description', () => {
+describe('rules: description', () => {
   const cat = (id: string) => ({ ride: 'Rideshare', misc: 'Misc' }[id] ?? id);
   const acct = (id: string) => ({ a1: 'Chase Checking' }[id] ?? id);
 
@@ -264,8 +264,8 @@ describe('rules — description', () => {
 
   it('says what is missing rather than pretending to be complete', () => {
     expect(describeRule(rule({ setCategoryId: 'ride' }), cat, acct))
-      .toBe('Incomplete rule — add a condition');
+      .toBe('Incomplete rule: add a condition');
     expect(describeRule(rule({ merchantContains: 'Lyft' }), cat, acct))
-      .toBe('Incomplete rule — add an action');
+      .toBe('Incomplete rule: add an action');
   });
 });

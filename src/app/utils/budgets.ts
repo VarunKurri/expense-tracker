@@ -1,6 +1,7 @@
 import { Budget, Transaction } from '../models';
-import { MoneyRules, totalExpenses } from './reporting';
+import { MoneyRules, categorySpend, refundedOut, spendingTransactions } from './reporting';
 import { addMonths, monthLabel } from './calendar';
+import { fromCents, toCents } from './money';
 
 /**
  * Budget rules, kept pure so they can be tested without Firestore.
@@ -13,7 +14,7 @@ import { addMonths, monthLabel } from './calendar';
  * The form used to edit whichever budget document happened to be showing. When
  * you pressed Override on a month with no one-off yet, the one showing was the
  * every-month budget, so saving "Specific month" turned that budget *into* a
- * one-month budget — and every other month lost its limit. The form now
+ * one-month budget, and every other month lost its limit. The form now
  * describes *what* to save (category + scope + month) and `planBudgetSave`
  * picks the document, so editing one scope can never rewrite the other.
  */
@@ -55,7 +56,7 @@ export interface EffectiveBudget {
 
 /**
  * One budget per category for a month. Includes categories that only have a
- * one-off budget for this month — the old list started from every-month budgets
+ * one-off budget for this month. The old list started from every-month budgets
  * only, so a category without one vanished from every screen.
  */
 export function effectiveBudgets(budgets: Budget[], month: string): EffectiveBudget[] {
@@ -81,7 +82,7 @@ export function effectiveBudgets(budgets: Budget[], month: string): EffectiveBud
 
 /**
  * Categories with one-off budgets but no every-month budget, and no budget in
- * `month` — they are invisible while you look at `month`, so the page lists
+ * `month`. They are invisible while you look at `month`, so the page lists
  * where to find them.
  */
 export function budgetsElsewhere(budgets: Budget[], month: string): { categoryId: string; months: string[] }[] {
@@ -123,7 +124,7 @@ export interface BudgetSavePlan {
  * budget the old bug turned into a one-off gets put back.
  */
 export function planBudgetSave(budgets: Budget[], draft: BudgetDraft): BudgetSavePlan {
-  const amount = Math.round(Number(draft.amount) * 100) / 100;
+  const amount = fromCents(toCents(Number(draft.amount)));
   const sameScope = budgets.filter(b =>
     b.categoryId === draft.categoryId && b.id &&
     (draft.scope === 'default' ? b.isDefault : !b.isDefault && b.month === draft.month));
@@ -178,7 +179,7 @@ export type BudgetStatus = 'ok' | 'warn' | 'over';
 export function budgetProgress(spent: number, amount: number) {
   const pct = amount > 0 ? Math.round((spent / amount) * 100) : 0;
   const status: BudgetStatus = pct >= 100 ? 'over' : pct >= 75 ? 'warn' : 'ok';
-  return { pct, status, remaining: Math.round((amount - spent) * 100) / 100 };
+  return { pct, status, remaining: fromCents(toCents(amount) - toCents(spent)) };
 }
 
 /**
@@ -191,11 +192,12 @@ export function budgetProgress(spent: number, amount: number) {
 export function budgetSpent(
   txs: Transaction[], categoryId: string, month: string, rules: MoneyRules,
 ): number {
-  return totalExpenses(
-    txs.filter(t =>
-      t.categoryId === categoryId && t.date.startsWith(month) && !(rules.netting && t.refunded)),
-    rules,
-  );
+  // A settle-up payment counts under the categories it paid for (utils/settlements.ts).
+  let cents = 0;
+  for (const t of spendingTransactions(txs.filter(t => t.date.startsWith(month) && !refundedOut(t, rules)))) {
+    for (const p of categorySpend(t, rules)) if (p.categoryId === categoryId) cents += p.cents;
+  }
+  return fromCents(cents);
 }
 
 /** Month options from `before` months before `from` to `after` months after, plus any extras. */

@@ -1,0 +1,51 @@
+<app-modal [open]="open()" [title]="group() ? 'Edit group' : 'New group'" (closed)="closed.emit()">
+  <div class="form">
+    <div class="field">
+      <label class="label-sm" for="group-name">Name</label>
+      <input id="group-name" class="input-field" [ngModel]="name()" (ngModelChange)="name.set($event)" name="groupName"
+             placeholder="Tahoe Trip" maxlength="60" />
+    </div>
+
+    <app-split-people [participantIds]="memberIds()" label="Who's in it" [withMe]="false"
+                      (added)="addMember($event)" (removed)="removeMember($event)" />
+    <p class="field-hint">You're in it too. Anyone can be added later.</p>
+
+    <div class="form-grid">
+      <div class="field">
+        <label class="label-sm" for="group-start">From <span class="label-optional">(optional)</span></label>
+        <input id="group-start" class="input-field" type="date" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" name="groupStart" />
+      </div>
+      <div class="field">
+        <label class="label-sm" for="group-end">To <span class="label-optional">(optional)</span></label>
+        <input id="group-end" class="input-field" type="date" [min]="startDate()" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" name="groupEnd" />
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Simplify debts</div>
+        <div class="toggle-sub">Settle up in the fewest payments, even if that means paying someone other than who paid the bill. What you owe or are owed stays the same.</div>
+      </div>
+      <button type="button" class="toggle" role="switch" [class.on]="simplify()" [attr.aria-checked]="simplify()"
+              aria-label="Simplify debts" (click)="simplify.set(!simplify())"></button>
+    </div>
+  </div>
+
+  <div class="modal-actions" modal-footer>
+    @if (group()) {
+      <button type="button" class="btn-danger" (click)="confirming.set(true)">Delete</button>
+    }
+    <div class="actions-right">
+      <button type="button" class="btn-ghost" (click)="closed.emit()">Cancel</button>
+      <button type="button" class="btn-primary" [disabled]="saving()" (click)="save()">{{ group() ? 'Save changes' : 'Create group' }}</button>
+    </div>
+  </div>
+</app-modal>
+
+<app-confirm
+  [open]="confirming()"
+  [title]="'Delete ' + (group()?.name ?? 'this group') + '?'"
+  message="Its bills stay as they are, just no longer in a group. Payments you recorded between other people in it are removed."
+  confirmText="Delete"
+  (confirmed)="remove()"
+  (cancelled)="confirming.set(false)" />

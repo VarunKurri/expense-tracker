@@ -12,7 +12,7 @@ let nextLockId = 0;
  * What one day cost, after Origin's "Details" popup.
  *
  * Opened from a calendar cell. It lists that day's transactions and hands one
- * back when tapped, so the caller can open its full transaction view — the
+ * back when tapped, so the caller can open its full transaction view. The
  * popup itself is a summary, not an editor.
  *
  * The total is summed from the rows it is showing rather than taken from the

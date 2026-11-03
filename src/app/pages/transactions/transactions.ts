@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect } from '@angular/core';
+import { Component, inject, signal, computed, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -15,6 +15,9 @@ import { QuickAddService } from '../../services/quick-add.service';
 import { ToastService } from '../../services/toast.service';
 import { ReconciliationService } from '../../services/reconciliation.service';
 import { DateRange, transactionRange } from '../../utils/date-ranges';
+import { isMoneyBackIncome, refundedPatch } from '../../utils/money-back';
+import { Icon } from '../../components/icon/icon';
+import { allShownIds, visibleSelection } from '../../utils/bulk-selection';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
 type SpecialFilter = 'all' | 'uncategorized' | 'refunded' | 'not-refunded' | 'internal-transfer';
@@ -32,7 +35,7 @@ type QuickEditDraft = {
   standalone: true,
   imports: [
     CommonModule, FormsModule, TransactionForm, Confirm,
-    ReconcileReview, ErrorBanner, TransactionView,
+    ReconcileReview, ErrorBanner, TransactionView, Icon,
   ],
   templateUrl: './transactions.html',
   styleUrl: './transactions.scss',
@@ -65,7 +68,7 @@ export class Transactions {
   bulkSaving = signal(false);
   bulkConfirmOpen = signal(false);
 
-  // Filter state — default is last 30 days
+  // Filter state (the default is the last 30 days)
   filterType = signal<FilterType>('all');
   filterDateRange = signal<DateRange>('last-30');
   filterAccountId = signal('');
@@ -91,25 +94,25 @@ export class Transactions {
     if (!this.analysisView()) return false;
     if (t.isInternalTransfer) return true;
     // "Include refunded" also turns off reimbursement netting/exclusion, same as it
-    // does for refunded rows — one toggle for "count things as originally recorded."
+    // does for refunded rows: one toggle for "count things as originally recorded."
     if (!this.analysisExcludeRefunded()) return false;
-    if (t.refunded) return true;
-    // A reimbursement (income linked to an expense) isn't real income — it's folded
-    // into the expense's true cost — so it's greyed out and left out of the totals.
-    if (t.type === 'income' && t.reimbursesId) return true;
+    if (this.txService.isFullyRefunded(t)) return true;
+    // A reimbursement (income linked to an expense) isn't real income. It's folded
+    // into the expense's true cost, so it's greyed out and left out of the totals.
+    if (isMoneyBackIncome(t)) return true;
     return false;
   }
 
   /** True when an expense's reimbursement should show as struck-through-original +
-   *  a net amount alongside — only while netting is actually active (analysis view
+   *  a net amount alongside, but only while netting is actually active (analysis view
    *  with "Excluding refunded" on) and only for expenses that have one. */
   showNetAnalysis(tx: Transaction): boolean {
     return tx.type === 'expense'
       && this.analysisView() && this.analysisExcludeRefunded()
-      && this.txService.reimbursedAmountFor(tx.id) > 0;
+      && this.txService.moneyBackFor(tx) > 0;
   }
 
-  // Date range bounds — see utils/date-ranges.ts ("Last 30 days" has no end,
+  // Date range bounds: see utils/date-ranges.ts ("Last 30 days" has no end,
   // so transactions the bank dated a day ahead still show)
   private dateRange = computed(() =>
     transactionRange(this.filterDateRange(), new Date(), { start: this.customStartDate(), end: this.customEndDate() })
@@ -138,8 +141,8 @@ export class Transactions {
       }
       if (this.filterCategoryId() && t.categoryId !== this.filterCategoryId()) return false;
       if (this.specialFilter() === 'uncategorized' && (t.type === 'transfer' || !!t.categoryId)) return false;
-      if (this.specialFilter() === 'refunded' && !t.refunded) return false;
-      if (this.specialFilter() === 'not-refunded' && t.refunded) return false;
+      if (this.specialFilter() === 'refunded' && !this.txService.isFullyRefunded(t)) return false;
+      if (this.specialFilter() === 'not-refunded' && this.txService.isFullyRefunded(t)) return false;
       if (this.specialFilter() === 'internal-transfer' && !t.isInternalTransfer) return false;
       if (merchantQuery && !(t.merchant || '').toLowerCase().includes(merchantQuery)) return false;
       if (q) {
@@ -168,7 +171,7 @@ export class Transactions {
           if (this.excludedFromAnalysis(t)) return s;
           if (t.type === 'income') return s + t.amount;
           if (t.type === 'expense') {
-            // Same netting rule as `totals` below — a day's subtotal should agree
+            // Same netting rule as `totals` below. A day's subtotal should agree
             // with what each row in it actually shows, not a raw sum from a
             // different accounting mode.
             if (this.showNetAnalysis(t)) {
@@ -181,7 +184,7 @@ export class Transactions {
       }));
   });
 
-  // Totals — in analysis view, refunded + internal-transfer rows are left out so the
+  // Totals. In analysis view, refunded + internal-transfer rows are left out so the
   // numbers match the Analysis page; otherwise everything in range counts.
   totals = computed(() => {
     const netting = this.analysisView() && this.analysisExcludeRefunded();
@@ -191,7 +194,7 @@ export class Transactions {
       if (t.type === 'income') income += t.amount;
       // With netting active, an expense counts at its true cost (net of
       // reimbursements); if reimbursements exceed the expense, the excess is real
-      // profit — add it to income rather than letting effectiveExpenseAmount's
+      // profit; add it to income rather than letting effectiveExpenseAmount's
       // floor silently drop it. With netting off ("include refunded"), everything
       // counts exactly as recorded.
       if (t.type === 'expense') {
@@ -210,17 +213,22 @@ export class Transactions {
     this.categoryService.categories().filter(c => !c.archived)
   );
 
-  selectedTransactions = computed(() => {
-    const ids = this.selectedIds();
-    return this.txService.transactions().filter(t => !!t.id && ids.has(t.id));
-  });
+  /**
+   * The rows a bulk action works on: ticked AND shown under the current
+   * filters (visibleSelection). Every bulk action, the count and the delete
+   * confirmation read this, so nothing off-screen is ever touched.
+   */
+  selectedTransactions = computed(() => visibleSelection(this.filtered(), this.selectedIds()));
 
-  selectedCount = computed(() => this.selectedIds().size);
+  selectedCount = computed(() => this.selectedTransactions().length);
 
   allFilteredSelected = computed(() => {
-    const ids = this.filtered().map(t => t.id).filter((id): id is string => !!id);
-    return ids.length > 0 && ids.every(id => this.selectedIds().has(id));
+    const shown = this.filtered().filter(t => !!t.id).length;
+    return shown > 0 && this.selectedCount() === shown;
   });
+
+  /** Some but not all shown rows ticked: the "Select all" box shows a dash. */
+  someFilteredSelected = computed(() => this.selectedCount() > 0 && !this.allFilteredSelected());
 
   selectedEditableTransactions = computed(() =>
     this.selectedTransactions().filter(t => t.type !== 'transfer')
@@ -241,9 +249,9 @@ export class Transactions {
 
   // Helpers
   accountName(id?: string): string {
-    if (!id) return '—';
+    if (!id) return 'None';
     const a = this.accountService.accounts().find(a => a.id === id);
-    if (!a) return '—';
+    if (!a) return 'None';
     return a.icon ? `${a.icon} ${a.name}` : a.name;
   }
 
@@ -284,7 +292,7 @@ export class Transactions {
     });
   }
 
-  /** Short date, e.g. "Jul 5" — used in the reimbursement rows/picker. */
+  /** Short date, e.g. "Jul 5", used in the reimbursement rows/picker. */
   formatDate(date: string): string {
     return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
@@ -318,7 +326,7 @@ export class Transactions {
     this.exitAnalysisView();
   }
 
-  /** Leave analysis view — refunded/internal rows count again and un-grey. */
+  /** Leave analysis view: refunded/internal rows count again and un-grey. */
   exitAnalysisView() {
     this.analysisView.set(false);
   }
@@ -358,8 +366,7 @@ export class Transactions {
   }
 
   selectAllFiltered() {
-    const ids = this.filtered().map(t => t.id).filter((id): id is string => !!id);
-    this.selectedIds.set(new Set(ids));
+    this.selectedIds.set(allShownIds(this.filtered()));
   }
 
   clearSelection() {
@@ -442,7 +449,14 @@ export class Transactions {
 
     this.bulkSaving.set(true);
     try {
-      await this.txService.updateMany(ids, { refunded });
+      // Each purchase is refunded for its own amount, so this is one patch per row
+      // (a full-refund money-back entry), not one shared patch.
+      const byId = new Map(this.txService.transactions().map(t => [t.id, t]));
+      const patches = ids
+        .map(id => byId.get(id))
+        .filter((t): t is Transaction => !!t?.id && t.type === 'expense')
+        .map(t => ({ id: t.id!, patch: refundedPatch(t, refunded) }));
+      await this.txService.applyPatches(patches);
       this.toastService.success(`Updated ${ids.length} transactions.`);
       this.clearSelection();
     } catch (err) {
@@ -459,7 +473,8 @@ export class Transactions {
 
   async confirmBulkDelete() {
     if (this.bulkSaving()) return;
-    const ids = [...this.selectedIds()];
+    // Exactly the rows listed in the confirmation: ticked and shown.
+    const ids = this.selectedTransactions().map(t => t.id!);
     if (ids.length === 0) return;
 
     this.bulkSaving.set(true);
@@ -611,14 +626,14 @@ export class Transactions {
       const special = params.get('special') as SpecialFilter | null;
       const view = params.get('view');
 
-      // Arriving from the Analysis page's "See all transactions" — mirror its KPIs:
-      // refunded + internal-transfer rows stay visible but are greyed out and left
+      // Arriving from the Analysis page's "See all transactions": mirror its KPIs.
+      // Refunded + internal-transfer rows stay visible but are greyed out and left
       // out of the totals. `excludeRefunded` reflects the Analysis toggle at the time.
       this.analysisView.set(view === 'analysis');
       this.analysisExcludeRefunded.set(params.get('excludeRefunded') !== 'false');
 
       // A start/end pair (e.g. from Analysis' "see all" links) means the caller
-      // picked an exact period — honor it as a custom range instead of falling
+      // picked an exact period, so honor it as a custom range instead of falling
       // back to "all," which the other query-param entry points below still do
       // since they don't carry any date intent of their own.
       if (start || end) {
@@ -663,7 +678,7 @@ export class Transactions {
     });
 
     // Clear bulk selection whenever a filter changes. selectedIds otherwise
-    // persists silently across filter changes — select rows under one filter,
+    // persists silently across filter changes: select rows under one filter,
     // switch filters, select more, and a bulk delete would include the earlier
     // (now off-screen, easy to forget) selections too. Skips the very first run
     // so entering bulk mode / initial load doesn't wipe a selection that was
@@ -675,7 +690,12 @@ export class Transactions {
       this.minAmount(); this.maxAmount(); this.customStartDate(); this.customEndDate();
       this.specialFilter();
       if (firstFilterRun) { firstFilterRun = false; return; }
-      if (this.bulkMode() && this.selectedIds().size > 0) this.clearSelection();
+      // Untracked: this must re-run only when a filter changes. Reading the
+      // selection here used to make it re-run on every tick too, which wiped
+      // "Select all" (and any tick) the moment it was made.
+      untracked(() => {
+        if (this.bulkMode() && this.selectedIds().size > 0) this.clearSelection();
+      });
     });
   }
 

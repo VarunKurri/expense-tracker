@@ -1,5 +1,5 @@
 /* Only what is unique to this form. Fields, pickers, toggles, sections and
-   the footer are shared — styles.scss → FORMS. */
+   the footer are shared (styles.scss → FORMS). */
 
 /* How the account will look in the list, updating as you type. */
 .preview {
@@ -44,7 +44,7 @@
   text-transform: capitalize;
 }
 
-/* Ink, like every balance in the app — the account's colour belongs to its
+/* Ink, like every balance in the app. The account's colour belongs to its
    icon chip, not to the figure. */
 .preview-bal {
   margin-left: auto;

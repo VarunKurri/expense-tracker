@@ -16,7 +16,7 @@ export class AppUpdateService {
     });
 
     // An installed home-screen PWA is almost never "reloaded" the normal browser
-    // way — it gets backgrounded and reopened. Relying only on a timer meant a
+    // way: it gets backgrounded and reopened. Relying only on a timer meant a
     // freshly-deployed fix could sit undetected for up to an hour of real use.
     // Check shortly after boot, and every time the app comes back to the
     // foreground, so a reopen after backgrounding reliably picks up new deploys.
@@ -30,7 +30,7 @@ export class AppUpdateService {
   async reload() {
     // VERSION_READY means the new version finished downloading, but the old
     // service worker is still the one actively serving content until it's
-    // explicitly promoted — a plain reload without this could still hand back
+    // explicitly promoted; a plain reload without this could still hand back
     // the stale cached version.
     await this.swUpdate.activateUpdate();
     document.location.reload();

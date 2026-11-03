@@ -1,0 +1,63 @@
+<app-split-people [participantIds]="state().participantIds"
+                  (added)="add($event)" (removed)="remove($event)" (meToggled)="toggleMe()" />
+
+<!-- HOW -->
+<div class="field">
+  <span class="label-sm">Divided</span>
+  <div class="mini-seg" role="radiogroup" aria-label="How the bill is divided">
+    @for (m of modes; track m.value) {
+      <button type="button" role="radio" [class.active]="state().mode === m.value"
+              [attr.aria-checked]="state().mode === m.value" (click)="setMode(m.value)">{{ m.label }}</button>
+    }
+  </div>
+</div>
+
+@if (state().mode !== 'equal' && state().participantIds.length) {
+  <div class="weights">
+    @for (id of state().participantIds; track id) {
+      <label class="weight-row">
+        <span class="weight-name">{{ people.nameOf(id) }}</span>
+        @switch (state().mode) {
+          @case ('amount') {
+            <span class="input-affix"><span class="affix">$</span>
+              <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
+                     [ngModel]="weightValue(id)" (ngModelChange)="setWeight(id, $event)" [name]="'w-' + id" placeholder="0.00" />
+            </span>
+          }
+          @case ('percent') {
+            <span class="input-affix suffix">
+              <input class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
+                     [ngModel]="weightValue(id)" (ngModelChange)="setWeight(id, $event)" [name]="'w-' + id" placeholder="0" />
+              <span class="affix">%</span>
+            </span>
+          }
+          @default {
+            <input class="input-field" type="number" step="1" min="0" inputmode="numeric"
+                   [ngModel]="weightValue(id)" (ngModelChange)="setWeight(id, $event)" [name]="'w-' + id" placeholder="1" />
+          }
+        }
+      </label>
+    }
+  </div>
+  @if (state().mode === 'shares') {
+    <p class="field-hint">Shares are a ratio: 2 and 1 means one person had twice as much.</p>
+  }
+}
+
+<!-- HOW MUCH IS LEFT: always on screen -->
+<div class="field">
+  <app-split-progress [totalCents]="billCents()" [addedCents]="assignedCents()" verb="assigned" />
+  @if (balanceNote()) { <p class="field-hint">{{ balanceNote() }}</p> }
+</div>
+
+<app-split-payers [payments]="state().otherPayments" (paymentsChange)="setPayments($event)" [candidates]="others()" [hint]="payersHint()" />
+
+<app-split-odd-cents [split]="split()" [chosen]="state().roundUpIds" (chosenChange)="setRoundUps($event)" />
+
+<app-split-summary [split]="split()" [myPaidCents]="myPaidCents()" [paidBy]="paidBy()" />
+
+@if (problems().includes('no-one-else')) {
+  <p class="field-hint">Add someone to split with.</p>
+} @else if (problems().includes('unassigned')) {
+  <p class="field-hint">Give someone a share of the bill.</p>
+}

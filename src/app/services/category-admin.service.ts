@@ -18,7 +18,7 @@ export interface CategoryDraft {
 }
 
 /**
- * Create, edit, archive and delete categories — and keep everything that
+ * Create, edit, archive and delete categories, and keep everything that
  * points at them consistent.
  *
  * Separate from CategoryService because deletion has to write to five other
@@ -80,7 +80,7 @@ export class CategoryAdminService {
     return this.categories.update(category.id!, { archived: false });
   }
 
-  /** What deleting would do, from the current data — shown before confirming. */
+  /** What deleting would do, from the current data, shown before confirming. */
   planDeletion(category: Category, targetId: string | null): DeletionPlan {
     const stored = this.txService.storedInCategory(category.id!);
     const shown = this.txService.countInCategory(category.id!);
@@ -108,7 +108,7 @@ export class CategoryAdminService {
    *     through a moment of showing no category.
    *  2. Every stored reference moves.
    *  3. The category itself is deleted last. If anything above fails, it still
-   *     exists and nothing points at a missing id — deleting again finishes the
+   *     exists and nothing points at a missing id, so deleting again finishes the
    *     job, because the plan is rebuilt from whatever is left.
    */
   async delete(category: Category, targetId: string | null): Promise<DeletionPlan> {

@@ -5,7 +5,7 @@ import { Transaction, TransactionRule } from '../models';
  *
  * Kept as pure functions, separate from the service, for two reasons: they are
  * the part that can silently mis-categorise real money, so they need tests; and
- * they run in two different places — when a transaction is added by hand, and
+ * they run in two different places: when a transaction is added by hand, and
  * in a bulk pass over transactions that arrived from a bank sync.
  *
  * Why the bulk pass exists at all: rules are encrypted with the user's key, so
@@ -18,7 +18,7 @@ export function ruleHasAction(rule: TransactionRule): boolean {
   return rule.setCategoryId !== undefined || rule.setInternalTransfer !== undefined;
 }
 
-/** A rule with no condition would match everything — never what was meant. */
+/** A rule with no condition would match everything, which is never what was meant. */
 export function ruleHasCondition(rule: TransactionRule): boolean {
   return Boolean(
     rule.merchantContains?.trim() ||
@@ -35,7 +35,7 @@ export function ruleHasCondition(rule: TransactionRule): boolean {
  * True when a rule files into a category that no longer exists.
  *
  * Categories can be hard-deleted, and nothing ties a rule to the category it
- * files into — so a deleted category leaves the rule pointing at an id with no
+ * files into, so a deleted category leaves the rule pointing at an id with no
  * record behind it. Left alone, "Re-file everything" would stamp that dead id
  * onto every matching transaction and they would all read as broken.
  */
@@ -62,8 +62,8 @@ export function dropMissingCategories(
  *
  * `rules` must be in display order. Rather than swapping the two rules'
  * priorities, the whole list is renumbered 0..n-1 in its new order. Swapping
- * breaks as soon as two rules share a priority — it trades 0 for 0 and nothing
- * moves — and earlier rules were all saved at priority 0, so every existing
+ * breaks as soon as two rules share a priority (it trades 0 for 0 and nothing
+ * moves), and earlier rules were all saved at priority 0, so every existing
  * list is in exactly that state. Renumbering repairs it on the first move.
  *
  * Returns only the rules whose priority actually changes, so a move writes as
@@ -131,7 +131,7 @@ export interface RuleOutcome {
  * rule that matches but only sets fields already decided still counts as
  * matched, which is what makes the rule tester honest about overlap.
  *
- * Returns null when nothing would change — callers use that to skip a write.
+ * Returns null when nothing would change; callers use that to skip a write.
  */
 export function evaluateRules(rules: TransactionRule[], t: Transaction): RuleOutcome | null {
   const patch: Partial<Transaction> = {};
@@ -162,7 +162,7 @@ export function evaluateRules(rules: TransactionRule[], t: Transaction): RuleOut
 /**
  * Apply rules to a transaction being created, returning the adjusted draft.
  *
- * Used on manual entry, where there is no document to update yet — the rule's
+ * Used on manual entry, where there is no document to update yet. The rule's
  * result is folded into the record before it is written.
  */
 export function applyRulesToDraft<T extends Partial<Transaction>>(
@@ -228,7 +228,7 @@ export function describeRule(
     then.push(rule.setInternalTransfer ? 'mark as internal transfer' : 'clear internal transfer');
   }
 
-  if (!when.length) return 'Incomplete rule — add a condition';
-  if (!then.length) return 'Incomplete rule — add an action';
+  if (!when.length) return 'Incomplete rule: add a condition';
+  if (!then.length) return 'Incomplete rule: add an action';
   return `When ${when.join(' and ')}, ${then.join(' and ')}`;
 }

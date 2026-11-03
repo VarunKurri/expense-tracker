@@ -8,7 +8,7 @@ import { Injectable } from '@angular/core';
  * popup hands off to the transaction view and takes it back when that closes,
  * so for a moment both are live. Whichever one wrote to `body` last won,
  * and since these writes come from Angular effects the order is not something
- * a caller controls — the page could end up scrollable behind an open overlay,
+ * a caller controls. The page could end up scrollable behind an open overlay,
  * or frozen after the last one closed.
  *
  * Holding a set of keys instead makes the result order-independent: the body is

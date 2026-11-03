@@ -1,4 +1,4 @@
-import { Component, HostListener, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Component, HostListener, Injector, computed, effect, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CategoryService } from '../../services/category.service';
@@ -11,7 +11,18 @@ import { Router } from '@angular/router';
 import { loanDirection, loanPayments, loanState } from '../../utils/loans';
 import { localDateString } from '../../utils/date';
 import { Modal } from '../modal/modal';
-import { ManualAsset, Transaction } from '../../models';
+import { Confirm } from '../confirm/confirm';
+import { ReceiptAttach } from '../receipt-attach/receipt-attach';
+import { ReceiptService } from '../../services/receipt.service';
+import { ManualAsset, ME, MoneyBackSource, Transaction, UntrackedReturn } from '../../models';
+import { PersonService } from '../../services/person.service';
+import { GroupService } from '../../services/group.service';
+import { PersonSplitStatus, outstandingFor, setClosed, splitStatus } from '../../utils/splits';
+import { RefundState, SpreadTarget, incomeLinks, incomeLinksPatch, newReturnId, spreadIncome } from '../../utils/money-back';
+import { fromCents, toCents } from '../../utils/money';
+import { TransactionPicker } from '../transaction-picker/transaction-picker';
+import { spreadOverCategories } from '../../utils/settlements';
+import { SharedBalanceService } from '../../services/shared-balance.service';
 
 let nextLockId = 0;
 
@@ -23,7 +34,7 @@ let nextLockId = 0;
  * `dashboard.html` alongside near-identical ones in `analysis.html` and
  * `transactions.html`, and the copies had drifted: only the Transactions one
  * grew reimbursement linking, so the same transaction told you a different
- * story depending on which screen you opened it from — and the one place the
+ * story depending on which screen you opened it from. And the one place the
  * numbers most need explaining (an expense that was partly paid back) was the
  * part that was missing everywhere else.
  *
@@ -35,7 +46,7 @@ let nextLockId = 0;
 @Component({
   selector: 'app-transaction-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, Modal],
+  imports: [CommonModule, FormsModule, Modal, Confirm, ReceiptAttach, TransactionPicker],
   templateUrl: './transaction-view.html',
   styleUrl: './transaction-view.scss',
 })
@@ -73,17 +84,78 @@ export class TransactionView {
     return this.txService.transactions().find(t => t.id === snapshot.id) ?? snapshot;
   });
 
-  // ── Reimbursements ─────────────────────────────────────────
-  reimbursements = computed(() => {
-    const id = this.tx()?.id;
-    return id ? this.txService.reimbursementsFor(id) : [];
+  // ── Receipt photo ──────────────────────────────────────────
+  // Attach one right here; no need to open Edit for a transaction that's
+  // already logged. Once attached it's shown, not changed: replacing or
+  // removing it is in Edit. The photo itself is ReceiptService's.
+  private receipts = inject(ReceiptService);
+  receiptImage = signal<string | null>(null);
+  receiptLoading = signal(false);
+  receiptBusy = signal(false);
+
+  /** Fetch the photo whenever the transaction's receipt changes (and only then). */
+  private receiptId = computed(() => this.tx()?.receiptId);
+  private receiptLoader = effect(onCleanup => {
+    const id = this.receiptId();
+    this.receiptImage.set(null);
+    if (!id) { this.receiptLoading.set(false); return; }
+    let current = true;
+    onCleanup(() => { current = false; });
+    this.receiptLoading.set(true);
+    this.receipts.load(id)
+      .then(r => { if (current) this.receiptImage.set(r?.image ?? null); })
+      .catch(() => { if (current) this.toast.error("Couldn't load the receipt photo."); })
+      .finally(() => { if (current) this.receiptLoading.set(false); });
   });
 
-  reimbursedTotal = computed(() =>
-    this.txService.reimbursedAmountFor(this.tx()?.id ?? undefined));
+  /** A photo was taken or picked: store it and point the transaction at it. */
+  async attachReceipt(file: File) {
+    const t = this.tx();
+    if (!t?.id || this.receiptBusy()) return;
+    const old = t.receiptId;
+    this.receiptBusy.set(true);
+    try {
+      const photo = await this.receipts.fit(file);
+      const receiptId = await this.receipts.save(photo);
+      await this.txService.update(t.id, { receiptId });
+      if (old) this.receipts.remove(old).catch(err => console.warn('Could not delete the old receipt photo:', err));
+      this.toast.success('Receipt attached.');
+    } catch (err: any) {
+      this.toast.error(err?.message || "The receipt photo couldn't be saved. Please try again.");
+    } finally {
+      this.receiptBusy.set(false);
+    }
+  }
+
+  // ── Money back: refunds and repayments ─────────────────────
+  // One section for everything that came back on a purchase (see
+  // utils/money-back.ts). Tracked money back is an income linked to the expense;
+  // untracked (cash, store credit) is recorded on the expense itself.
+
+  /** Incomes linked to this expense. */
+  linkedIncomes = computed(() => this.txService.linkedIncomesFor(this.tx()));
+
+  /** Money back recorded by hand on this expense. */
+  untracked = computed<UntrackedReturn[]>(() => this.tx()?.moneyBack ?? []);
+
+  /** The old "Mark as refunded" flag, shown as a full refund until removed. */
+  legacyRefund = computed(() => {
+    const t = this.tx();
+    return !!t?.refunded && !(t.moneyBack ?? []).some(e => e.source === 'refund');
+  });
+
+  moneyBackTotal = computed(() => {
+    const t = this.tx();
+    return t ? this.txService.moneyBackFor(t) : 0;
+  });
+
+  refundState = computed<RefundState>(() => {
+    const t = this.tx();
+    return t ? this.txService.refundState(t) : 'none';
+  });
 
   /**
-   * The part of the reimbursed total that exceeds the expense — the difference
+   * The part of the money back that exceeds the expense: the difference
    * between "you still spent something" and "you came out ahead".
    */
   reimbursementSurplus = computed(() => {
@@ -96,11 +168,28 @@ export class TransactionView {
     return t ? this.txService.effectiveExpenseAmount(t) : 0;
   });
 
-  /** For an income that pays back an expense: the expense it pays back. */
-  reimbursesExpense = computed<Transaction | null>(() => {
+  /** On an expense: the incomes linked to it, with the part of each that went here. */
+  links = computed(() => this.txService.linksFor(this.tx()));
+
+  /** True when an income was spread over several bills (so its row shows the part). */
+  isSpread(income: Transaction): boolean {
+    return incomeLinks(income).length > 1;
+  }
+
+  /** On an income that's money back: each purchase it paid back, and how much went to each. */
+  moneyBackParts = computed(() => {
     const t = this.tx();
-    if (t?.type !== 'income' || !t.reimbursesId) return null;
-    return this.txService.transactions().find(x => x.id === t.reimbursesId) ?? null;
+    if (!t) return [];
+    const txs = this.txService.transactions();
+    return incomeLinks(t)
+      .map(l => ({ expense: txs.find(x => x.id === l.expenseId), amountCents: l.amountCents }))
+      .filter((p): p is { expense: Transaction; amountCents: number } => !!p.expense);
+  });
+
+  /** For an income that pays back one expense: that expense. */
+  reimbursesExpense = computed<Transaction | null>(() => {
+    const parts = this.moneyBackParts();
+    return parts.length === 1 ? parts[0].expense : null;
   });
 
   /** Shown on the income side too, so a surplus is visible from either end. */
@@ -112,8 +201,351 @@ export class TransactionView {
   reimbursesCovered = computed(() => {
     const exp = this.reimbursesExpense();
     if (!exp) return 0;
-    return Math.min(exp.amount, this.txService.reimbursedAmountFor(exp.id));
+    return Math.min(exp.amount, this.txService.moneyBackFor(exp));
   });
+
+  sourceLabel(source: MoneyBackSource): string {
+    return source === 'refund' ? 'Refund' : 'Repayment';
+  }
+
+  /** A linked income's kind. Links from before refunds existed were repayments. */
+  incomeSource(income: Transaction): MoneyBackSource {
+    return income.moneyBackInfo?.source ?? 'repayment';
+  }
+
+  /** Fix a link's kind without unlinking and relinking. */
+  async setIncomeSource(income: Transaction, source: MoneyBackSource) {
+    if (!income.id || this.incomeSource(income) === source) return;
+    try {
+      await this.txService.update(income.id, { moneyBackInfo: { ...income.moneyBackInfo, source } });
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
+
+  saving = signal(false);
+
+  // ── Split: who owes what, after money back ─────────────────
+  people = inject(PersonService);
+  readonly ME = ME;
+
+  /** For a split expense: everyone's share, what they owed you, and what's come back. */
+  split = computed(() => {
+    const t = this.tx();
+    return t?.type === 'expense' && t.split ? splitStatus(t.split, this.txService.moneyBackEntriesFor(t)) : null;
+  });
+
+  // Looked up only for a bill that's in a group, so screens that show this
+  // sheet don't need Firebase in their tests.
+  private injector = inject(Injector);
+
+  /** The group this bill belongs to, if it's in one that still exists. */
+  splitGroup = computed(() => {
+    const id = this.tx()?.split?.groupId;
+    return id ? this.injector.get(GroupService).byId(id) ?? null : null;
+  });
+
+  /** On an expense that settles up with someone: "Paid Nikhilesh · Tahoe Trip". */
+  settlementText = computed(() => {
+    const s = this.tx()?.settlement;
+    if (!s) return '';
+    const group = s.groupId ? this.injector.get(GroupService).byId(s.groupId) : null;
+    return [`Paid ${this.people.nameOf(s.personId)}`, group?.name].filter(Boolean).join(' · ');
+  });
+
+  /**
+   * How a settle-up payment counts in spending: under the categories of the
+   * shares it paid for ("Dining $40.00 · Gas $13.33"), not its own.
+   */
+  settlementSpend = computed(() => {
+    const t = this.tx();
+    const weights = t?.settlement ? this.txService.settlementCategoryParts(t) : null;
+    if (!t || !weights) return '';
+    return spreadOverCategories(toCents(this.txService.effectiveExpenseAmount(t)), weights)
+      .map(p => `${this.categoryFor(p.categoryId)?.name ?? 'Uncategorized'} ${this.formatCents(p.cents)}`)
+      .join(' · ');
+  });
+
+  /** Not a settle-up after all: back to an ordinary expense, under its own category. */
+  async unsettle(t: Transaction) {
+    if (!t.id) return;
+    try {
+      await this.txService.update(t.id, { settlement: undefined });
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
+
+  openGroup(id: string) {
+    this.close();
+    this.router.navigate(['/shared/groups', id]);
+  }
+
+  /** Everyone on the bill but you. */
+  splitOthers = computed(() => (this.tx()?.split?.participantIds ?? []).filter(id => id !== ME));
+
+  /**
+   * What on this bill was evened out against what you owed each person, the
+   * Shared page's one balance per person (utils/shared.ts). Bills in a group
+   * are settled with the group, so nothing here for them.
+   */
+  private netted = computed(() => {
+    const t = this.tx();
+    const out = new Map<string, number>();
+    if (!t?.split || t.type !== 'expense' || this.splitGroup()) return out;
+    for (const b of this.injector.get(SharedBalanceService).balances()) {
+      const share = b.allBills.find(x => x.tx.id === t.id);
+      if (share?.nettedCents) out.set(b.personId, share.nettedCents);
+    }
+    return out;
+  });
+
+  nettedFor(personId: string): number {
+    return this.netted().get(personId) ?? 0;
+  }
+
+  /** The status line under a person's name, in plain words with no chip. */
+  personStatus(p: PersonSplitStatus): string {
+    const netted = this.nettedFor(p.personId);
+    if (netted) {
+      const left = p.outstandingCents - netted;
+      return left > 0 ? `Owes you · ${this.formatCents(netted)} evened out` : 'Evened out against what you owed them';
+    }
+    switch (p.state) {
+      case 'owed': return 'Owes you';
+      case 'partial': return `Paid back ${this.formatCents(p.repaidCents)} of ${this.formatCents(p.dueToMeCents)}`;
+      case 'repaid': return 'Paid you back';
+      case 'closed': return "Won't be repaid";
+      default: return p.paidCents > 0 ? 'Paid their own way' : 'Nothing to pay back';
+    }
+  }
+
+  /** On a bill in a group: what they paid towards it, if anything; their share is the figure. */
+  groupPersonStatus(p: PersonSplitStatus): string {
+    return p.paidCents > 0 ? `Paid ${this.formatCents(p.paidCents)} · their share` : 'Their share';
+  }
+
+  /** The figure on the right: what's still owed or, once settled, what came back. */
+  personAmountCents(p: PersonSplitStatus): number {
+    const netted = this.nettedFor(p.personId);
+    if (netted) return Math.max(0, p.outstandingCents - netted) || netted;
+    if (p.state === 'repaid') return p.repaidCents;
+    if (p.state === 'none') return p.shareCents;
+    return p.outstandingCents;
+  }
+
+  /** Rows with something to act on: record a repayment, or reopen a closed one. */
+  canOpenPerson(p: PersonSplitStatus): boolean {
+    return p.state === 'owed' || p.state === 'partial' || p.state === 'closed';
+  }
+
+  personAriaLabel(p: PersonSplitStatus): string {
+    const name = this.people.nameOf(p.personId);
+    return p.state === 'closed' ? `Reopen ${name}'s share` : `Record a repayment from ${name}`;
+  }
+
+  /** Tapping a person: record what they paid back or, if closed, offer to reopen. */
+  openPerson(p: PersonSplitStatus) {
+    if (p.state === 'closed') this.reopening.set(p.personId);
+    else this.openDraft(p.personId);
+  }
+
+  /** The person whose closed share is being reopened (the confirm dialog). */
+  reopening = signal<string | null>(null);
+
+  reopenMessage = computed(() => {
+    const id = this.reopening();
+    const p = id ? this.split()?.people.find(x => x.personId === id) : null;
+    if (!p) return '';
+    return `${this.formatCents(p.outstandingCents)} counts as owed to you again. It's in your spending either way until it's paid back.`;
+  });
+
+  async confirmReopen() {
+    const id = this.reopening();
+    this.reopening.set(null);
+    if (id) await this.setPersonClosed(id, false);
+  }
+
+  /** "Won't be repaid", from the repayment dialog opened on that person. */
+  async closeDraftPerson() {
+    const id = this.draftPersonId();
+    if (!id) return;
+    await this.setPersonClosed(id, true);
+    this.closeDraft();
+  }
+
+  /** "Won't be repaid" / reopen. Their share stays in your spending either way. */
+  async setPersonClosed(personId: string, closed: boolean) {
+    const t = this.tx();
+    if (!t?.id || !t.split) return;
+    try {
+      await this.txService.update(t.id, { split: setClosed(t.split, personId, closed) });
+      this.toast.success(closed ? `${this.people.nameOf(personId)} won't be repaying this.` : 'Reopened.');
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
+
+  /** "Repayment from Mrunaal for Mrunaal and Priya": who and whose share, when known. */
+  fromLabel(e: { fromPersonId?: string; coversPersonIds?: string[] }): string {
+    if (!e.fromPersonId) return '';
+    const from = this.people.nameOf(e.fromPersonId);
+    const covers = (e.coversPersonIds ?? []).filter(id => id !== e.fromPersonId);
+    return covers.length
+      ? ` from ${from} for ${[e.fromPersonId, ...covers].map(id => id === e.fromPersonId ? from : this.people.nameOf(id)).join(', ')}`
+      : ` from ${from}`;
+  }
+
+  // The "Add money back" dialog: money that never reached a tracked account
+  // (cash, store credit). It asks refund or repayment because on a split bill
+  // they differ (a refund lowers everyone's share, a repayment settles one
+  // person's), and a bill can be split after its money back was recorded.
+  draftOpen = signal(false);
+  draftSource = signal<MoneyBackSource>('refund');
+  /** "Everything came back": no amount or date to fill in. */
+  draftFull = signal(false);
+  draftAmount = signal<number | null>(null);
+  draftDate = signal('');
+  draftNote = signal('');
+  /** On a split bill, a repayment says who it's from and whose shares it covers. */
+  draftFrom = signal('');
+  draftCovers = signal<string[]>([]);
+  /** Once the amount is typed, choosing people stops re-filling it. */
+  private draftAmountTyped = false;
+  /** Opened from a person's row: whose it is, so the footer can offer "Won't be repaid". */
+  draftPersonId = signal<string | null>(null);
+
+  /** Asking "from whom" only makes sense on a split bill, for a repayment. */
+  askWho = computed(() => !!this.split() && this.draftSource() === 'repayment');
+  /** The same question in the link picker, when linking from a split expense. */
+  askLinkWho = computed(() =>
+    !!this.split() && this.linkSource() === 'repayment' && this.linkingFrom()?.type === 'expense');
+
+  /** What hasn't come back yet, which is what "The full amount / The rest" records. */
+  remainingCents = computed(() => {
+    const t = this.tx();
+    if (!t) return 0;
+    return Math.max(0, toCents(t.amount) - toCents(this.moneyBackTotal()));
+  });
+
+  /** Opened from a person's row, it's a repayment from them, filled in with what they owe. */
+  openDraft(fromPersonId?: string) {
+    this.draftOpen.set(true);
+    this.draftPersonId.set(fromPersonId ?? null);
+    this.draftSource.set(fromPersonId ? 'repayment' : 'refund');
+    this.draftFull.set(false);
+    this.draftAmount.set(null);
+    this.draftDate.set(localDateString());
+    this.draftNote.set('');
+    this.draftAmountTyped = false;
+    const from = fromPersonId ?? this.firstOwing();
+    this.draftFrom.set(from);
+    this.draftCovers.set(from ? [from] : []);
+    if (fromPersonId) this.prefillRepayment();
+  }
+
+  setDraftSource(source: MoneyBackSource) {
+    this.draftSource.set(source);
+    if (this.askWho()) this.prefillRepayment();
+  }
+
+  setDraftAmount(value: number | null) {
+    this.draftAmountTyped = true;
+    this.draftAmount.set(value);
+  }
+
+  /** Changing who it's from: by default it covers just them. */
+  setDraftFrom(personId: string) {
+    this.draftFrom.set(personId);
+    this.draftCovers.set([personId]);
+    this.prefillRepayment();
+  }
+
+  toggleCover(personId: string) {
+    this.draftCovers.update(ids => ids.includes(personId) ? ids.filter(id => id !== personId) : [...ids, personId]);
+    this.prefillRepayment();
+  }
+
+  /** Whoever still owes, first: the likeliest person to be paying you back. */
+  private firstOwing(): string {
+    const s = this.split();
+    return s?.people.find(p => p.outstandingCents > 0 && p.state !== 'closed')?.personId ?? this.splitOthers()[0] ?? '';
+  }
+
+  /** Fill the amount with what the covered people still owe, until it's typed by hand. */
+  private prefillRepayment() {
+    const s = this.split();
+    if (!s || this.draftAmountTyped) return;
+    const owed = outstandingFor(s, this.draftCovers());
+    this.draftAmount.set(owed > 0 ? fromCents(owed) : null);
+  }
+
+  closeDraft() {
+    this.draftOpen.set(false);
+  }
+
+  async saveDraft() {
+    const t = this.tx();
+    if (!t?.id) return;
+    const full = this.draftFull() && this.remainingCents() > 0;
+    const amountCents = full ? this.remainingCents() : toCents(Number(this.draftAmount()));
+    if (amountCents <= 0) { this.toast.error('Enter how much came back.'); return; }
+    const date = full ? localDateString() : this.draftDate();
+    if (!date) { this.toast.error('Pick the date it came back.'); return; }
+    const note = this.draftNote().trim();
+    const source = this.draftSource();
+    if (this.askWho() && !this.draftFrom()) { this.toast.error('Choose who paid you back.'); return; }
+    const entry: UntrackedReturn = {
+      id: newReturnId(), source, amountCents, date, ...(note ? { note } : {}), ...this.whoFields(source),
+    };
+    const ok = await this.saveMoneyBack(t, [...(t.moneyBack ?? []), entry],
+      source === 'refund' ? (full ? 'Marked as refunded.' : 'Refund added.') : (full ? 'Marked as paid back.' : 'Repayment added.'));
+    if (ok) this.closeDraft();
+  }
+
+  async removeUntracked(entry: UntrackedReturn) {
+    const t = this.tx();
+    if (!t?.id) return;
+    await this.saveMoneyBack(t, (t.moneyBack ?? []).filter(e => e.id !== entry.id), 'Removed.');
+  }
+
+  /** Clear the old flag. Nothing else used it, so the purchase simply counts again. */
+  async removeLegacyRefund() {
+    const t = this.tx();
+    if (!t?.id) return;
+    try {
+      await this.txService.update(t.id, { refunded: undefined });
+      this.toast.success('No longer marked as refunded.');
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+    }
+  }
+
+  private async saveMoneyBack(t: Transaction, moneyBack: UntrackedReturn[], message: string): Promise<boolean> {
+    if (!t.id || this.saving()) return false;
+    this.saving.set(true);
+    try {
+      await this.txService.update(t.id, { moneyBack });
+      this.toast.success(message);
+      return true;
+    } catch {
+      this.toast.error('Could not save. Please try again.');
+      return false;
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  /** From / covers, for a repayment on a split bill; nothing otherwise. */
+  private whoFields(source: MoneyBackSource): { fromPersonId?: string; coversPersonIds?: string[] } {
+    if (!this.split() || source !== 'repayment' || !this.draftFrom()) return {};
+    const covers = this.draftCovers().length ? this.draftCovers() : [this.draftFrom()];
+    return { fromPersonId: this.draftFrom(), coversPersonIds: covers };
+  }
+
+  formatCents(cents: number): string {
+    return this.formatCurrency(fromCents(cents));
+  }
 
   // ── Loans ──────────────────────────────────────────────────
   private manualAssets = inject(ManualAssetService);
@@ -214,30 +646,79 @@ export class TransactionView {
 
   // ── Link picker ────────────────────────────────────────────
   linkingFrom = signal<Transaction | null>(null);
-  linkSearch = signal('');
+  /** Repayment by default: a linked income is usually a friend's Venmo or Zelle. */
+  linkSource = signal<MoneyBackSource>('repayment');
 
   /** Opposite-type transactions: an expense picks an income, and vice versa. */
   linkCandidates = computed<Transaction[]>(() => {
     const from = this.linkingFrom();
     if (!from) return [];
     const wantType = from.type === 'income' ? 'expense' : 'income';
-    const q = this.linkSearch().trim().toLowerCase();
+    const already = new Set(from.type === 'income' ? incomeLinks(from).map(l => l.expenseId) : []);
+    // Searching is the picker's; this only says which qualify.
     return this.txService.transactions().filter(t =>
-      t.type === wantType && t.id !== from.id &&
-      // An income can only ever reimburse one expense.
-      !(t.type === 'income' && !!t.reimbursesId) &&
-      (!q || (t.merchant || '').toLowerCase().includes(q) || String(t.amount).includes(q))
-    ).slice(0, 50);
+      t.type === wantType && t.id !== from.id && !already.has(t.id!) &&
+      // An income already paying back other purchases qualifies while some of
+      // it is left over (Priya's $3,150 covers the $3,000 and then the $150).
+      (!this.txService.isMoneyBackIncome(t) || (from.type === 'expense' && this.spareCents(t) > 0)));
   });
 
+  /** What a purchase still needs, not counting this income's own part of it. */
+  private roomFor(expense: Transaction, income: Transaction): SpreadTarget {
+    const own = incomeLinks(income).find(l => l.expenseId === expense.id)?.amountCents ?? 0;
+    const others = toCents(this.txService.moneyBackFor(expense)) - own;
+    return { expenseId: expense.id!, date: expense.date, roomCents: Math.max(0, toCents(expense.amount) - others) };
+  }
+
+  /** How much of an income is left once the purchases it's linked to are covered. */
+  spareCents(income: Transaction): number {
+    const txs = this.txService.transactions();
+    const room = incomeLinks(income)
+      .map(l => txs.find(t => t.id === l.expenseId))
+      .filter((e): e is Transaction => !!e)
+      .reduce((sum, e) => sum + this.roomFor(e, income).roomCents, 0);
+    return Math.max(0, toCents(income.amount) - room);
+  }
+
+  /**
+   * Point an income at these purchases, spread oldest first (spreadIncome).
+   * Returns the part the purchase `added` got: 0 when the income was used up.
+   */
+  private async linkIncomeTo(income: Transaction, expenses: Transaction[], extra: Partial<Transaction> = {}, added?: string): Promise<number> {
+    const parts = spreadIncome(toCents(income.amount), expenses.map(e => this.roomFor(e, income)));
+    await this.txService.update(income.id!, { ...incomeLinksPatch(parts), ...extra });
+    return added ? parts.find(p => p.expenseId === added)?.amountCents ?? 0 : 0;
+  }
+
+  /** The purchases an income is linked to now. */
+  private linkedPurchases(income: Transaction): Transaction[] {
+    const txs = this.txService.transactions();
+    return incomeLinks(income).map(l => txs.find(t => t.id === l.expenseId)).filter((e): e is Transaction => !!e);
+  }
+
+  /** Take one purchase off an income spread over several; the rest re-spread. */
+  async unlinkPurchase(income: Transaction, expense: Transaction) {
+    if (!income.id) return;
+    try {
+      const rest = this.linkedPurchases(income).filter(e => e.id !== expense.id);
+      await this.linkIncomeTo(income, rest, rest.length ? {} : { moneyBackInfo: undefined });
+      this.toast.success(`Unlinked from ${expense.merchant || 'that purchase'}.`);
+    } catch {
+      this.toast.error('Could not unlink. Please try again.');
+    }
+  }
+
   openLinkPicker(tx: Transaction) {
-    this.linkSearch.set('');
+    this.linkSource.set('repayment');
+    // Linking from a split expense asks who it was from, as "Add money back" does.
+    const from = this.firstOwing();
+    this.draftFrom.set(from);
+    this.draftCovers.set(from ? [from] : []);
     this.linkingFrom.set(tx);
   }
 
   closeLinkPicker() {
     this.linkingFrom.set(null);
-    this.linkSearch.set('');
   }
 
   async confirmLink(candidate: Transaction) {
@@ -247,8 +728,14 @@ export class TransactionView {
     const expense = from.type === 'expense' ? from : candidate;
     if (!income.id || !expense.id) return;
     try {
-      await this.txService.update(income.id, { reimbursesId: expense.id });
-      this.toast.success('Reimbursement linked.');
+      const who = from.type === 'expense' ? this.whoFields(this.linkSource()) : {};
+      // Already paying back other purchases: this one joins them.
+      const purchases = [...this.linkedPurchases(income).filter(e => e.id !== expense.id), expense];
+      const got = await this.linkIncomeTo(income, purchases, {
+        moneyBackInfo: { ...income.moneyBackInfo, source: this.linkSource(), ...who },
+      }, expense.id);
+      if (got === 0) this.toast.info('All of that income already went to earlier purchases, so none of it is left for this one.');
+      else this.toast.success(this.linkSource() === 'refund' ? 'Refund linked.' : 'Repayment linked.');
       this.closeLinkPicker();
     } catch {
       this.toast.error('Could not link. Please try again.');
@@ -258,8 +745,11 @@ export class TransactionView {
   async unlinkReimbursement(income: Transaction) {
     if (!income.id) return;
     try {
-      await this.txService.update(income.id, { reimbursesId: undefined });
-      this.toast.success('Reimbursement unlinked.');
+      // A payment spread over several bills unlinks as a whole, so its parts always
+      // add up to what was actually paid.
+      const bills = incomeLinks(income).length;
+      await this.txService.update(income.id, { reimbursesId: undefined, moneyBackSplits: undefined, moneyBackInfo: undefined });
+      this.toast.success(bills > 1 ? `Unlinked from ${bills} bills.` : 'Unlinked.');
     } catch {
       this.toast.error('Could not unlink. Please try again.');
     }
@@ -292,12 +782,14 @@ export class TransactionView {
 
   @HostListener('document:keydown.escape')
   onEscape() {
-    // The picker sits on top of the panel, so Escape closes that first.
+    // The dialogs sit on top of the panel, so Escape closes those first.
+    if (this.draftOpen()) { this.closeDraft(); return; }
     if (this.linkingFrom()) { this.closeLinkPicker(); return; }
     if (this.transaction()) this.close();
   }
 
   close() {
+    this.closeDraft();
     this.closeLinkPicker();
     this.closed.emit();
   }

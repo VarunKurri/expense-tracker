@@ -7,7 +7,13 @@ import { TransactionService } from '../../services/transaction.service';
 import { ManualAssetService } from '../../services/manual-asset.service';
 import { BillService } from '../../services/bill.service';
 import { Account, ManualAsset, Transaction } from '../../models';
+import { MoneyBackLedger } from '../../utils/money-back';
 import { localDateString } from '../../utils/date';
+
+/** The real money-back logic, over a fixed list of transactions. */
+class FakeTransactions extends MoneyBackLedger {
+  constructor(public transactions: () => Transaction[]) { super(); }
+}
 
 /** In-memory stand-in that serialises like the encrypted Firestore service. */
 class FakeManual {
@@ -60,7 +66,7 @@ describe('Net worth page', () => {
         { provide: AccountService, useValue: { accounts: signal([checking, card]) } },
         {
           provide: TransactionService,
-          useValue: { transactions: signal(txs), effectiveExpenseAmount: (t: Transaction) => t.amount, reimbursementSurplus: () => 0 },
+          useValue: new FakeTransactions(signal(txs)),
         },
         { provide: ManualAssetService, useValue: manual },
         { provide: BillService, useValue: { bills: signal([]) } },

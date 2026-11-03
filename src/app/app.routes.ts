@@ -4,7 +4,7 @@ import { authGuard } from './guards/auth.guard';
 export const routes: Routes = [
   { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
   // Landed on directly from email links (password reset, email verify, email
-  // change) — no auth required, and never entered via in-app navigation.
+  // change). No auth required, and never entered via in-app navigation.
   // app.ts renders it outside the normal auth-gated shell; this entry only
   // keeps the URL from being wildcard-redirected away.
   {
@@ -30,6 +30,16 @@ export const routes: Routes = [
     path: 'accounts/:id',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/accounts/account-detail/account-detail').then(m => m.AccountDetail)
+  },
+  {
+    path: 'shared',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/shared/shared').then(m => m.Shared)
+  },
+  {
+    path: 'shared/groups/:id',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/shared/group-detail/group-detail').then(m => m.GroupDetail)
   },
   {
     path: 'net-worth',

@@ -41,3 +41,11 @@ describe('finance utilities', () => {
     expect(availableCredit(credit, transactions)).toBe(455);
   });
 });
+
+describe('pending transactions count like any other', () => {
+  it('moves the balance as soon as it shows up', () => {
+    const chk = { id: 'chk', type: 'checking', openingBalance: 100 } as Account;
+    const pending = { id: 'p', type: 'expense', amount: 11.76, accountId: 'chk', date: '2026-10-18', plaidPending: true } as Transaction;
+    expect(accountBalance(chk, [pending])).toBe(88.24);
+  });
+});

@@ -14,7 +14,7 @@ import { PLAID_TARGET_NAMES } from './plaid-category-map';
  * The one fact everything below is built around: **Plaid transactions are
  * matched to a category by name, at read time, and nothing is stored.** Plaid
  * says FOOD_AND_DRINK, the app looks for a category called "Dining". So a
- * category's name is not just a label — renaming or deleting "Dining" would
+ * category's name is not just a label: renaming or deleting "Dining" would
  * quietly uncategorise every bank transaction that used to land there.
  *
  * That is handled with aliases rather than by writing categories onto bank
@@ -64,7 +64,7 @@ export function validateCategoryName(
  * A category that has taken the name over as an alias wins over one that is
  * merely called it. That is what makes a rename safe: rename "Dining" to
  * "Eating out" and it keeps "Dining" as an alias, so bank transactions keep
- * arriving — even if you later create a new category called "Dining".
+ * arriving, even if you later create a new category called "Dining".
  *
  * Archived categories still match. Their history has to keep showing where it
  * was filed, and resolution happens at read time, so excluding them would
@@ -110,7 +110,7 @@ export interface DeletionInput {
   categories: Category[];
   /**
    * Transactions with this category *stored* on them. Must not include bank
-   * transactions that only match it by name — those follow via aliases.
+   * transactions that only match it by name; those follow via aliases.
    */
   storedTransactions: Transaction[];
   /** Bank transactions that currently match it by name only (none stored). */
@@ -125,7 +125,7 @@ export interface DeletionPlan {
   transactions: { id: string; patch: Partial<Transaction> }[];
   /** Budgets moved onto the target category. */
   budgetMoves: { id: string; patch: Partial<Budget> }[];
-  /** Budgets removed — either no target, or the target already has one. */
+  /** Budgets removed, because either there's no target or the target already has one. */
   budgetDeletes: string[];
   rulePatches: { id: string; patch: Partial<TransactionRule> }[];
   /** Rules switched off because a condition would otherwise silently widen. */
@@ -142,7 +142,7 @@ export interface DeletionPlan {
  * Everything that has to change for a category to be deleted.
  *
  * The rule throughout: **nothing is left pointing at a category that no longer
- * exists.** A dangling id is the worst outcome — the transaction shows no
+ * exists.** A dangling id is the worst outcome: the transaction shows no
  * category, but isn't counted as uncategorised either.
  *
  * Budgets: moved to the target if it has no budget for the same period;
@@ -152,7 +152,7 @@ export interface DeletionPlan {
  *
  * Rules: a rule that *files into* the category is re-pointed at the target. A
  * rule that is *conditioned on* the category ("currently filed as Dining") is
- * re-pointed too — but with no target it is switched off, not stripped of the
+ * re-pointed too, but with no target it is switched off, not stripped of the
  * condition. Dropping the condition would widen the rule to match
  * transactions it was never meant to touch.
  */

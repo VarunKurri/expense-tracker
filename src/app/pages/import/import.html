@@ -89,7 +89,7 @@
 
     @if (warningRows().length > 0) {
       <div class="warning-banner">
-        ⚠️ {{ warningRows().length }} rows have warnings — they will still be imported
+        ⚠️ {{ warningRows().length }} rows have warnings. They will still be imported,
         but may need manual correction in the Transactions page.
       </div>
     }
@@ -120,7 +120,7 @@
           </span>
           <span class="col-category">
             <span [class.unmatched]="!row.categoryId && row.type !== 'transfer'">
-              {{ row.categoryName || (row.type === 'transfer' ? '—' : 'Uncategorized') }}
+              {{ row.categoryName || (row.type === 'transfer' ? 'None' : 'Uncategorized') }}
             </span>
           </span>
           <span class="col-date">{{ row.date }}</span>

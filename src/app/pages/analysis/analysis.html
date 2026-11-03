@@ -17,7 +17,7 @@
     </div>
   </div>
 
-  <!-- Section sub-nav — the Reports screen lives alongside this one rather than
+  <!-- Section sub-nav: the Reports screen lives alongside this one rather than
        hanging off a button in the filter row. -->
   <nav class="subnav">
     <span class="subnav-tab active" aria-current="page">Overview</span>
@@ -56,11 +56,14 @@
 
     <button class="filter-btn"
             [class.active]="excludeRefunded()"
+            [title]="excludeRefunded()
+              ? 'Refunds and repayments are subtracted; fully refunded purchases are left out'
+              : 'Every purchase counts at its full amount'"
             (click)="excludeRefunded.set(!excludeRefunded())">
-      {{ excludeRefunded() ? '✓ Excluding refunded' : 'Include refunded' }}
+      {{ excludeRefunded() ? '✓ Count money back' : 'Count money back' }}
     </button>
 
-    <!-- No emoji — clean text button -->
+    <!-- No emoji, just a clean text button -->
     <button class="filter-btn"
             [class.active]="excludedCategories().size > 0"
             (click)="showCategoryFilter.set(!showCategoryFilter())">
@@ -71,7 +74,7 @@
     </button>
 
     <span class="filter-note"
-          title="Money moved between your own accounts — like paying off a credit card from checking — is never counted as income or spending in these totals, whether Plaid auto-detected it or you flagged it manually on the transaction.">
+          title="Money moved between your own accounts (like paying off a credit card from checking) is never counted as income or spending in these totals, whether Plaid auto-detected it or you flagged it manually on the transaction.">
       ⓘ Internal transfers always excluded
     </span>
 
@@ -107,13 +110,13 @@
         </div>
         <div class="kpi-sub">{{ formatCurrency(top.amount) }}</div>
       } @else {
-        <div class="kpi-value muted">—</div>
+        <div class="kpi-value muted">None</div>
       }
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Savings rate</div>
       @if (totalIncome() === 0) {
-        <div class="kpi-value muted">—</div>
+        <div class="kpi-value muted">No data</div>
         <div class="kpi-sub">No income this period</div>
       } @else if (savingsRate() !== null) {
         <div class="kpi-value"
@@ -123,7 +126,7 @@
         </div>
         <div class="kpi-sub">{{ savingsRateLabel() }}</div>
       } @else {
-        <div class="kpi-value muted">—</div>
+        <div class="kpi-value muted">No data</div>
         <div class="kpi-sub">income vs expenses</div>
       }
     </div>
@@ -133,18 +136,47 @@
         <div class="kpi-value">{{ formatCurrency(big.amount) }}</div>
         <div class="kpi-sub">{{ big.merchant || 'Unknown' }}</div>
       } @else {
-        <div class="kpi-value muted">—</div>
+        <div class="kpi-value muted">None</div>
       }
     </div>
   </div>
 
+  <!-- SPLIT BILLS: only when the period has any. Spending counts what you're
+       out of pocket, so a friend's unpaid share is in it until it comes back;
+       this card says how much of your spending that is. -->
+  @if (showShared()) {
+    <section class="card split-card">
+      <div class="split-main">
+        <a class="card-label" routerLink="/shared">Owed to you ›</a>
+        <div class="split-now">
+          <span class="num-display split-figure">{{ cents(shared.owedToMeCents()) }}</span>
+          @if (shared.youOweCents() > 0) {
+            <span class="split-owe">You owe <span class="fig">{{ cents(shared.youOweCents()) }}</span></span>
+          }
+        </div>
+        <p class="split-hint">Right now, across every split bill and group, as on Shared.</p>
+        @if (splits().bills > 0) {
+          <p class="split-sentence">{{ splitText() }}</p>
+          @if (!excludeRefunded()) {
+            <p class="split-hint">“Count money back” is off, so these bills count at their full amount.</p>
+          }
+        }
+      </div>
+      @if (splits().bills > 0) {
+        <dl class="split-figs">
+          <div><dt class="label-mono">You paid</dt><dd class="fig">{{ cents(splits().paidCents) }}</dd></div>
+          <div><dt class="label-mono">Your share</dt><dd class="fig">{{ cents(splits().myShareCents) }}</dd></div>
+          <div><dt class="label-mono">For others</dt><dd class="fig">{{ cents(splits().forOthersCents) }}</dd></div>
+          <div><dt class="label-mono">Paid back</dt><dd class="fig">{{ cents(splits().repaidCents) }}</dd></div>
+        </dl>
+      }
+    </section>
+  }
+
   <!-- MONTHLY TREND CHART -->
   <div class="chart-card">
-    <div class="chart-card-head">
-      <div>
-        <div class="chart-card-title">Monthly trend</div>
-        <div class="chart-card-sub">Income vs spending</div>
-      </div>
+    <div class="panel-head">
+      <span class="card-label">Monthly trend</span>
       <!-- Legend with actual colored swatches -->
       <div class="chart-legend">
         <div class="legend-item">
@@ -157,6 +189,7 @@
         </div>
       </div>
     </div>
+    <p class="panel-intro">Income vs spending</p>
     <div class="bar-chart-wrap">
       <canvas #barCanvas></canvas>
     </div>
@@ -165,15 +198,13 @@
   <!-- BOTTOM GRID -->
   <div class="bottom-grid">
 
-    <!-- TOP MERCHANTS — rows are now clickable -->
+    <!-- TOP MERCHANTS: rows are now clickable -->
     <div class="card-panel">
       <div class="panel-head">
-        <div class="panel-head-row">
-          <div class="panel-title">Top merchants</div>
-          <a class="see-all-link" [routerLink]="['/transactions']" [queryParams]="seeAllTxParams()">See all transactions →</a>
-        </div>
-        <div class="panel-sub">by total spend</div>
+        <span class="card-label">Top merchants</span>
+        <a class="card-link" [routerLink]="['/transactions']" [queryParams]="seeAllTxParams()">See all transactions →</a>
       </div>
+      <p class="panel-intro">By total spend</p>
       @if (topMerchants().length === 0) {
         <div class="panel-empty">No expense data</div>
       }
@@ -181,7 +212,7 @@
         @for (m of topMerchants(); track m.name) {
           <div class="merchant-item">
 
-            <!-- Main row — click to expand if multiple, open view if single -->
+            <!-- Main row: click to expand if multiple, open view if single -->
             <div class="merchant-row"
                  [class.expanded]="expandedMerchant() === m.name"
                  (click)="m.count === 1 ? openTxView(m.lastTx) : toggleMerchant(m.name)">
@@ -213,12 +244,10 @@
                     <div class="merchant-tx-amount">
                       <!-- The net figure, so these rows add up to the merchant
                            total above them. The charge itself is still shown
-                           when the two differ — it is what is on the statement. -->
+                           when the two differ, because it is what is on the statement. -->
                       −{{ formatCurrency(eff(tx)) }}
-                      @if (reimbursedOn(tx) > 0.005) {
-                        <span class="merchant-tx-net">
-                          {{ formatCurrency(tx.amount) }} · ↩ {{ formatCurrency(reimbursedOn(tx)) }} back
-                        </span>
+                      @if (txNote(tx); as note) {
+                        <span class="merchant-tx-net">{{ note }}</span>
                       }
                     </div>
                   </div>
@@ -234,12 +263,10 @@
     <!-- SPENDING BY CATEGORY -->
     <div class="card-panel">
       <div class="panel-head">
-        <div class="panel-head-row">
-          <div class="panel-title">Where it went</div>
-          <a class="see-all-link" [routerLink]="['/analysis/categories']" [queryParams]="categoryBreakdownParams()">See all categories →</a>
-        </div>
-        <div class="panel-sub">{{ formatCurrency(totalExpenses()) }} total · top 8 categories</div>
+        <span class="card-label">Where it went</span>
+        <a class="card-link" [routerLink]="['/analysis/categories']" [queryParams]="categoryBreakdownParams()">See all categories →</a>
       </div>
+      <p class="panel-intro">{{ formatCurrency(totalExpenses()) }} total · top 8 categories</p>
       <div class="donut-wrap">
         <div class="donut-container">
           <canvas #donutCanvas></canvas>

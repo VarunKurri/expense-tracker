@@ -1,0 +1,23 @@
+// The quick editor's own layout. Shared pieces style themselves (parts/split-parts.scss).
+:host { display: contents; }
+
+.weights {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.weight-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 150px);
+  align-items: center;
+  gap: 10px;
+}
+
+.weight-name {
+  font-size: 13.5px;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

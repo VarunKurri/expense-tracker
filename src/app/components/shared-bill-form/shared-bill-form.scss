@@ -1,0 +1,7 @@
+// Only what's unique to this form; fields, buttons and the split editors are shared.
+.add-payer {
+  display: flex;
+  gap: 8px;
+  margin-top: -6px;
+  .input-field { flex: 1; min-width: 0; }
+}

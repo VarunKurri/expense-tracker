@@ -14,7 +14,7 @@
       <div class="landing-grid-bg" aria-hidden="true"></div>
 
       <nav class="landing-nav">
-        <button type="button" class="landing-brand" (click)="scrollToTop()" aria-label="Trackr — back to top">
+        <button type="button" class="landing-brand" (click)="scrollToTop()" aria-label="Trackr: back to top">
           <app-logo [size]="38" tone="brand" />
           <span class="landing-wordmark">Trackr</span>
         </button>
@@ -72,14 +72,14 @@
       </section>
 
       <footer class="landing-footer">
-        <span>Trackr — your money, private and in one place.</span>
+        <span>Trackr: your money, private and in one place.</span>
       </footer>
     </div>
   } @else {
   <div class="login-shell">
     <div class="login-left">
       <div class="login-left-content">
-        <button type="button" class="login-logo" (click)="backToLanding()" aria-label="Trackr — back to home">
+        <button type="button" class="login-logo" (click)="backToLanding()" aria-label="Trackr: back to home">
           <app-logo [size]="52" tone="brand" />
           <span class="login-wordmark">Trackr</span>
         </button>
@@ -110,7 +110,7 @@
 
     <div class="login-right">
       <div class="login-card">
-        <button type="button" class="login-card-logo" (click)="backToLanding()" aria-label="Trackr — back to home">
+        <button type="button" class="login-card-logo" (click)="backToLanding()" aria-label="Trackr: back to home">
           <app-logo [size]="44" tone="brand" />
         </button>
 
@@ -307,7 +307,7 @@
     }
 
     <aside class="sidebar" [class.open]="sidebarOpen()">
-      <a class="brand" routerLink="/dashboard" (click)="onNavClick()" aria-label="Trackr — go to Home">
+      <a class="brand" routerLink="/dashboard" (click)="onNavClick()" aria-label="Trackr: go to Home">
         <app-logo [size]="28" />
         <span class="brand-name">Trackr</span>
       </a>
@@ -380,7 +380,7 @@
             </svg>
           }
         </button>
-        <a class="topbar-brand" routerLink="/dashboard" (click)="onNavClick()" aria-label="Trackr — go to Home">
+        <a class="topbar-brand" routerLink="/dashboard" (click)="onNavClick()" aria-label="Trackr: go to Home">
           <app-logo [size]="26" />
           <span class="brand-name">Trackr</span>
         </a>

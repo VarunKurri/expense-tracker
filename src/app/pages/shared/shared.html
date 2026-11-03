@@ -1,0 +1,311 @@
+<div class="page">
+
+  <div class="page-head">
+    <div>
+      <h1>Shared</h1>
+      <p class="sub">Bills you split, and who still owes you</p>
+    </div>
+    <div class="head-actions">
+      <button class="btn-primary" (click)="addOtherPaid()">Someone else paid</button>
+      <button class="btn-primary" (click)="newGroupOpen.set(true)">New group</button>
+    </div>
+  </div>
+
+  @if (!balances().length && !groupRows().length) {
+
+    <section class="card empty">
+      <span class="card-label">Shared</span>
+      <h2 class="display">See who <em>owes you</em> what.</h2>
+      <p>Open any expense and turn on “Split this bill”. Everyone's share shows up here, added up across every bill you've shared. Going on a trip? Make a group, and everyone settles up once at the end.</p>
+    </section>
+
+  } @else {
+
+    <!-- HERO: what's owed, and why it matters -->
+    <section class="card hero">
+      <span class="card-label">Owed to you ›</span>
+      <div class="hero-figure"><span class="num-display">{{ money(totalOwedCents()) }}</span></div>
+      <p class="hero-sentence">
+        @if (anythingOwed()) {
+          {{ headline() }} Until it comes back, it counts in your spending. Record repayments here as they arrive.
+        } @else if (!totalYouOweCents()) {
+          Everyone's square. Nothing you've split is waiting to be paid back.
+        }
+        @if (totalYouOweCents()) {
+          You owe {{ money(totalYouOweCents()) }}, which becomes spending when you pay it.
+        }
+      </p>
+    </section>
+
+    <!-- GROUPS: a trip, a flat. Each is settled across all its bills. -->
+    @if (groupRows().length) {
+      <section class="card groups">
+        <div class="groups-head"><span class="card-label">Groups</span></div>
+        @for (row of groupRows(); track row.group.id) {
+          <a class="group-row" [routerLink]="['/shared/groups', row.group.id]">
+            <span class="bill-main">
+              <span class="bill-name">{{ row.group.name }}</span>
+              <span class="bill-date label-mono">{{ groupMeta(row) }}</span>
+            </span>
+            <span class="bill-note fig" [class.pos]="row.bills && row.balanceCents > 0" [class.neg]="row.bills && row.balanceCents < 0">{{ groupNote(row) }}</span>
+          </a>
+        }
+      </section>
+    }
+
+    <!-- ONE CARD PER PERSON YOU'RE NOT SQUARE WITH: their bills, and their groups -->
+    @for (b of open(); track b.personId) {
+      <section class="card person">
+        <div class="person-head">
+          <div class="person-title">
+            <h3>{{ people.nameOf(b.personId) }}</h3>
+            <span class="person-sub">
+              @if (b.netCents < 0) { You owe <span class="fig">{{ money(-b.netCents) }}</span> }
+              @else { <span class="fig">{{ money(b.netCents) }}</span> }
+              {{ personSub(b) }}
+            </span>
+          </div>
+          @if (canRecord(b)) {
+            <button class="btn-primary" (click)="openRepay(b)">Record a payment</button>
+          }
+        </div>
+
+        <div class="bills">
+          <!-- Groups first: each is one running total, not one bill. -->
+          @for (g of b.groups; track g.groupId) {
+            @if (g.cents !== 0) {
+              <a class="bill" [routerLink]="['/shared/groups', g.groupId]">
+                <span class="bill-main">
+                  <span class="bill-name">{{ g.name }}</span>
+                  <span class="bill-date label-mono">Group</span>
+                </span>
+                <span class="bill-note fig">{{ groupPartNote(g.cents) }}</span>
+              </a>
+            }
+          }
+          <!-- Then every open bill, both ways, newest first. -->
+          @for (item of openTimeline(b); track $index) {
+            @if (item.kind === 'mine') {
+              <button type="button" class="bill" (click)="viewingTx.set(item.bill.tx)">
+                <span class="bill-main">
+                  <span class="bill-name">{{ item.bill.tx.merchant || 'Expense' }}</span>
+                  <span class="bill-date label-mono">{{ formatDate(item.bill.tx.date) }}</span>
+                </span>
+                <span class="bill-note fig">{{ billNote(item.bill) }}</span>
+              </button>
+            } @else {
+              <button type="button" class="bill" (click)="openOtherPaid(item.owed.bill)">
+                <span class="bill-main">
+                  <span class="bill-name">{{ item.owed.bill.merchant }}</span>
+                  <span class="bill-date label-mono">{{ formatDate(item.owed.bill.date) }} · they paid</span>
+                </span>
+                <span class="bill-note fig neg">{{ owedNote(item.owed) }}</span>
+              </button>
+            }
+          }
+          @if (showingHistory().has(b.personId)) {
+            @for (item of historyTimeline(b); track $index) {
+              @switch (item.kind) {
+                @case ('paid') {
+                  <button type="button" class="bill settled" (click)="openPaidOut(item.paid)">
+                    <span class="bill-main">
+                      <span class="bill-name">You paid {{ people.nameOf(b.personId) }}</span>
+                      <span class="bill-date label-mono">{{ formatDate(item.paid.date) }} · {{ paidOutVia(item.paid) }}</span>
+                    </span>
+                    <span class="bill-note fig">{{ money(item.paid.amountCents) }}</span>
+                  </button>
+                }
+                @case ('theirs') {
+                  <button type="button" class="bill settled" (click)="openOtherPaid(item.owed.bill)">
+                    <span class="bill-main">
+                      <span class="bill-name">{{ item.owed.bill.merchant }}</span>
+                      <span class="bill-date label-mono">{{ formatDate(item.owed.bill.date) }} · they paid</span>
+                    </span>
+                    <span class="bill-note fig">{{ settledOwedNote(item.owed) }}</span>
+                  </button>
+                }
+                @case ('mine') {
+                  <button type="button" class="bill settled" (click)="viewingTx.set(item.bill.tx)">
+                    <span class="bill-main">
+                      <span class="bill-name">{{ item.bill.tx.merchant || 'Expense' }}</span>
+                      <span class="bill-date label-mono">{{ formatDate(item.bill.tx.date) }}</span>
+                    </span>
+                    <span class="bill-note fig">{{ billNote(item.bill) }}</span>
+                  </button>
+                }
+              }
+            }
+          }
+        </div>
+        @if (historyCount(b)) {
+          <button type="button" class="btn-row history" (click)="toggleHistory(b.personId)">
+            {{ showingHistory().has(b.personId) ? 'Hide history' : 'Show history (' + historyCount(b) + ')' }}
+          </button>
+        }
+      </section>
+    }
+
+    @if (square().length) {
+      <section class="card square">
+        <span class="card-label">All square</span>
+        <p>
+          @for (b of square(); track b.personId; let last = $last) {
+            {{ people.nameOf(b.personId) }}{{ last ? '' : ', ' }}
+          }
+          (nothing owed on {{ square().length === 1 ? 'any bill' : 'any of their bills' }}).
+        </p>
+      </section>
+    }
+  }
+
+</div>
+
+<!-- RECORD A PAYMENT, EITHER WAY, ACROSS BILLS -->
+<app-modal [open]="!!repaying()" [title]="'Payment with ' + (repaying() ? people.nameOf(repaying()!.personId) : '')"
+           size="sm" (closed)="closeRepay()">
+  @if (repaying(); as b) {
+    <div class="form">
+      <div class="field">
+        <span class="label-sm">Who paid</span>
+        <div class="mini-seg" role="radiogroup" aria-label="Who paid">
+          <button type="button" role="radio" [class.active]="repayDir() === 'in'" [attr.aria-checked]="repayDir() === 'in'"
+                  (click)="setRepayDir('in')">{{ people.nameOf(b.personId) }} paid you</button>
+          <button type="button" role="radio" [class.active]="repayDir() === 'out'" [attr.aria-checked]="repayDir() === 'out'"
+                  (click)="setRepayDir('out')">You paid {{ people.nameOf(b.personId) }}</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label-sm">{{ repayDir() === 'out' ? 'You paid with' : 'It came as' }}</span>
+        <div class="mini-seg" role="radiogroup" aria-label="How it came">
+          <button type="button" role="radio" [class.active]="repayHow() === 'cash'" [attr.aria-checked]="repayHow() === 'cash'"
+                  (click)="repayHow.set('cash')">Cash or other</button>
+          <button type="button" role="radio" [class.active]="repayHow() === 'bank'" [attr.aria-checked]="repayHow() === 'bank'"
+                  (click)="repayHow.set('bank')">A bank payment</button>
+        </div>
+        <p class="field-hint">
+          @if (repayDir() === 'out') {
+            {{ repayHow() === 'bank'
+              ? 'A payment already in your transactions (Venmo, Zelle…). It counts as spending, under what it paid for.'
+              : "Money that didn't leave an account Trackr tracks, so it isn't in your spending." }}
+          } @else {
+            {{ repayHow() === 'bank'
+              ? 'A payment already in your transactions (Zelle, Venmo…). It stops counting as income.'
+              : "Money that didn't reach an account Trackr tracks." }}
+          }
+        </p>
+      </div>
+
+      @if (repayHow() === 'bank') {
+        <div class="field">
+          <span class="label-sm">Which payment</span>
+          @if (repayDir() === 'out') {
+            <app-transaction-picker [transactions]="expenseChoices()" [selectedId]="repayExpenseId()" name="payExpense"
+                                    [matchCents]="payTarget()?.owedCents ?? 0" [matchText]="people.nameOf(b.personId)"
+                                    (picked)="repayExpenseId.set($event.id!)" />
+          } @else {
+            <app-transaction-picker [transactions]="incomeChoices()" [selectedId]="repayIncomeId()" name="repayIncome"
+                                    [matchCents]="repayable(b) ? repayableCents(b) : 0" [matchText]="people.nameOf(b.personId)"
+                                    (picked)="repayIncomeId.set($event.id!)" />
+          }
+        </div>
+      } @else {
+        <div class="form-grid">
+          <div class="field">
+            <label class="label-sm" for="repay-amount">Amount</label>
+            <div class="input-affix"><span class="affix">$</span>
+              <input id="repay-amount" class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
+                     [ngModel]="repayAmount()" (ngModelChange)="repayAmount.set($event)" name="repayAmount" placeholder="0.00" />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label-sm" for="repay-date">Date</label>
+            <input id="repay-date" class="input-field" type="date" [ngModel]="repayDate()" (ngModelChange)="repayDate.set($event)" name="repayDate" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label-sm" for="repay-note">Note <span class="label-optional">(optional)</span></label>
+          <input id="repay-note" class="input-field" [ngModel]="repayNote()" (ngModelChange)="repayNote.set($event)" name="repayNote"
+                 placeholder="Cash at dinner…" />
+        </div>
+      }
+
+      @if (repayDir() === 'out') {
+        @if (payPreview().length) {
+          <div class="field">
+            <span class="label-sm">Pays back{{ payTarget()?.groupId ? '' : ', oldest first' }}</span>
+            <div class="preview">
+              @for (p of payPreview(); track p.key) {
+                <div class="preview-row">
+                  <span>{{ p.name }} <span class="label-mono">{{ p.date ? formatDate(p.date) : 'Group' }}</span></span>
+                  <span class="fig">{{ money(p.amountCents) }}{{ p.amountCents >= p.ofCents ? '' : ' of ' + money(p.ofCents) }}</span>
+                </div>
+              }
+            </div>
+            @if (payExtraCents() > 0) {
+              <p class="field-hint">That's {{ money(payExtraCents()) }} more than you owe {{ payTarget()?.groupId ? 'in ' + payTarget()!.name : 'on their bills' }}, so {{ people.nameOf(b.personId) }} will owe you that back.</p>
+            }
+            @if (payTarget()?.groupId) {
+              <p class="field-hint">You don't owe on their bills outside groups, so this pays what you owe in {{ payTarget()!.name }}.</p>
+            }
+          </div>
+        }
+      } @else if (preview().length) {
+        <div class="field">
+          <span class="label-sm">Pays off, oldest first</span>
+          <div class="preview">
+            @for (p of preview(); track p.key) {
+              <div class="preview-row">
+                <span>{{ p.name }} <span class="label-mono">{{ p.date ? formatDate(p.date) : 'Group' }}</span></span>
+                <span class="fig">{{ money(p.amountCents) }}{{ p.amountCents >= p.ofCents ? '' : ' of ' + money(p.ofCents) }}</span>
+              </div>
+            }
+          </div>
+          @if (extraCents() > 0) {
+            <p class="field-hint">That's {{ money(extraCents()) }} more than {{ people.nameOf(b.personId) }} owes, so it counts as extra (income) on the newest bill.</p>
+          }
+        </div>
+      }
+    </div>
+  }
+  <!-- A direct child of app-modal, so it lands in the pinned footer. -->
+  <div class="modal-actions" modal-footer>
+    <div class="actions-right">
+      <button class="btn-ghost" (click)="closeRepay()">Cancel</button>
+      <button class="btn-primary" [disabled]="saving()" (click)="saveRepay()">Save</button>
+    </div>
+  </div>
+</app-modal>
+
+<app-group-form [open]="newGroupOpen()" (closed)="newGroupOpen.set(false)" (saved)="onGroupCreated($event)" />
+
+<app-shared-bill-form [open]="billFormOpen()" [bill]="editingBill()" (closed)="closeBillForm()" (saved)="closeBillForm()" />
+
+<app-shared-bill-view [bill]="viewingBill()" (closed)="viewingBill.set(null)" (editRequested)="editOtherPaid($event)" />
+
+<app-transaction-view
+  [transaction]="viewingTx()"
+  (closed)="viewingTx.set(null)"
+  (editRequested)="editFromTxView($event)" />
+
+<app-transaction-form
+  [open]="txFormOpen()"
+  [transaction]="editingTx()"
+  (closed)="closeTxForm()"
+  (saved)="handleTxSave($event)"
+  (deleteRequested)="askTxDelete()" />
+
+<app-confirm
+  [open]="txConfirmOpen()"
+  title="Delete transaction?"
+  message="This cannot be undone."
+  confirmText="Delete"
+  (confirmed)="confirmTxDelete()"
+  (cancelled)="txConfirmOpen.set(false)" />
+
+<app-confirm
+  [open]="!!removingCash()"
+  title="Remove this payment?"
+  [message]="removingCash() ? 'The ' + money(removingCash()!.amountCents) + ' you gave ' + people.nameOf(removingCash()!.personId) + ' comes off, and what you owe them goes back up.' : ''"
+  confirmText="Remove"
+  (confirmed)="removeCash()"
+  (cancelled)="removingCash.set(null)" />

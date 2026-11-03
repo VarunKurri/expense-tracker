@@ -38,15 +38,15 @@ Chart.register(
 );
 
 /**
- * One month of spending in detail — Origin's Spending tab.
+ * One month of spending in detail: Origin's Spending tab.
  *
  * Deliberately month-shaped, where the Analysis page is range-shaped
  * ("last 90 days"). Both exist because they answer different questions: this
  * one is "how is September going", Analysis is "how am I trending".
  *
  * Every figure here comes from `utils/reporting.ts` under the same money rules
- * Analysis and Reports use — refunded transactions dropped, internal transfers
- * never counted, partial reimbursements netted off the expense they repay — so
+ * Analysis and Reports use (refunded transactions dropped, internal transfers
+ * never counted, partial reimbursements netted off the expense they repay), so
  * the same month reads the same wherever you look at it.
  */
 @Component({
@@ -61,6 +61,8 @@ Chart.register(
 })
 export class Spending implements AfterViewInit, OnDestroy {
   private txService = inject(TransactionService);
+  /** Fully refunded, counting refund incomes linked from the bank. */
+  private isRefunded = (t: Transaction) => this.txService.isFullyRefunded(t);
   private categoryService = inject(CategoryService);
   private budgetService = inject(BudgetService);
   private themeService = inject(ThemeService);
@@ -115,11 +117,7 @@ export class Spending implements AfterViewInit, OnDestroy {
   }
 
   // ── Money ──────────────────────────────────────────────────
-  private rules = computed<MoneyRules>(() => ({
-    netting: true,
-    effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
-    reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
-  }));
+  private rules = computed<MoneyRules>(() => this.txService.moneyRules(true));
 
   /** Bound into the calendar, day popup and trend line alike. */
   spendAmount = (t: Transaction) => this.txService.effectiveExpenseAmount(t);
@@ -127,17 +125,17 @@ export class Spending implements AfterViewInit, OnDestroy {
   /** The month's transactions, refunds already excluded. */
   monthTx = computed(() => {
     const { start, end } = monthRange(this.month());
-    return filterForAnalysis(this.txService.transactions(), { start, end, excludeRefunded: true });
+    return filterForAnalysis(this.txService.transactions(), { start, end, excludeRefunded: true, isRefunded: this.isRefunded });
   });
 
-  /** Only what counts as spending — what the calendar and popup are given. */
+  /** Only what counts as spending: what the calendar and popup are given. */
   spending = computed(() => spendingTransactions(this.monthTx()));
 
   total = computed(() => totalExpenses(this.monthTx(), this.rules()));
 
   private prevMonthTx = computed(() => {
     const { start, end } = monthRange(addMonths(this.month(), -1));
-    return filterForAnalysis(this.txService.transactions(), { start, end, excludeRefunded: true });
+    return filterForAnalysis(this.txService.transactions(), { start, end, excludeRefunded: true, isRefunded: this.isRefunded });
   });
 
   prevTotal = computed(() => totalExpenses(this.prevMonthTx(), this.rules()));
@@ -145,7 +143,7 @@ export class Spending implements AfterViewInit, OnDestroy {
 
   /**
    * Change against the previous month. Null when there is nothing to compare
-   * to — "up 100%" from a month with no spending is not a useful statement.
+   * to, since "up 100%" from a month with no spending is not a useful statement.
    */
   delta = computed(() => {
     const prev = this.prevTotal();
@@ -235,7 +233,7 @@ export class Spending implements AfterViewInit, OnDestroy {
       .sort((a, b) => b.pct - a.pct);
   });
 
-  /** Newest first — this month's spending, for the list under the card. */
+  /** Newest first: this month's spending, for the list under the card. */
   latest = computed(() =>
     [...this.spending()]
       .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? 0) - (a.createdAt ?? 0))
@@ -339,7 +337,7 @@ export class Spending implements AfterViewInit, OnDestroy {
 
   /**
    * The canvas lives inside an `@if`, so it does not exist at the moment the
-   * toggle flips — the ViewChild only resolves once Angular has rendered the
+   * toggle flips; the ViewChild only resolves once Angular has rendered the
    * new branch. Retry briefly rather than drawing into nothing and leaving an
    * empty card behind.
    */
@@ -355,7 +353,7 @@ export class Spending implements AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     this.trendChart?.destroy();
-    // Scroll locks are released by the overlay components — see Dashboard.
+    // Scroll locks are released by the overlay components (see Dashboard).
   }
 
   private renderTrend() {
@@ -370,7 +368,7 @@ export class Spending implements AfterViewInit, OnDestroy {
       this.trendChart.data.datasets[1].data = previous as number[];
       // The dataset labels name the months, so they have to move with the
       // month too. Missing this left the tooltip reading "September / August"
-      // after stepping back to July — and it only looked fixed by toggling to
+      // after stepping back to July, and it only looked fixed by toggling to
       // Calendar and back, because that destroys the chart and rebuilds it
       // with fresh labels.
       this.trendChart.data.datasets[0].label = this.monthName();

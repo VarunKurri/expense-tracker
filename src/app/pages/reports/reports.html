@@ -21,11 +21,11 @@
       <span class="card-label">Reports</span>
       <label class="netting-toggle">
         <input type="checkbox" [checked]="netting()" (change)="netting.set(!netting())" />
-        <span>Net off reimbursements</span>
+        <span>Count money back</span>
       </label>
     </div>
 
-    <!-- Report type — underline tabs, as Origin does -->
+    <!-- Report type: underline tabs, as Origin does -->
     <div class="tabs" role="tablist">
       @for (r of reports; track r.value) {
         <button class="tab"
@@ -150,7 +150,11 @@
           @for (t of drillTransactions(); track t.id) {
             <tr>
               <td class="fig muted">{{ t.date }}</td>
-              <td>{{ t.merchant }}</td>
+              <td>
+                {{ t.merchant }}
+                @if (t.myShare !== null) { <span class="row-note">Split · your share {{ money(t.myShare) }}</span> }
+                @if (t.settles) { <span class="row-note">Paid {{ t.settles }} back · counted under what it paid for</span> }
+              </td>
               <td class="muted">{{ t.category }}</td>
               <td class="right fig" [class.pos]="t.type === 'income'">
                 {{ t.type === 'income' ? '+' : '−' }}{{ money(t.amount) }}
@@ -208,7 +212,7 @@
       </table>
       <p class="table-note">
         Transfers between your own accounts. These are deliberately left out of the
-        income and spending reports — moving money is not earning or spending it.
+        income and spending reports, because moving money is not earning or spending it.
       </p>
     } @else {
       <table class="report-table">
@@ -238,4 +242,133 @@
       </table>
     }
   </section>
+
+  <!-- SPLIT BILLS. Its own question: how much of the expenses above is other
+       people's share, and how much of that has come back. -->
+  @if (showSplits()) {
+    <section class="card split-card">
+      <div class="card-head">
+        <span class="card-label">Split bills</span>
+        <a class="card-link" routerLink="/shared">See who owes you →</a>
+      </div>
+      <p class="split-lede">{{ splitText() }}</p>
+      <table class="report-table">
+        <tbody>
+          <tr><td>You paid</td><td class="right fig">{{ cents(splits().paidCents) }}</td></tr>
+          <tr><td>Your share</td><td class="right fig">{{ cents(splits().myShareCents) }}</td></tr>
+          <tr><td>Paid for others</td><td class="right fig">{{ cents(splits().forOthersCents) }}</td></tr>
+          <tr><td class="muted">Paid back</td><td class="right fig muted">{{ cents(splits().repaidCents) }}</td></tr>
+          <tr>
+            <td>Not back yet <span class="row-note">Only other people's shares. Your {{ cents(splits().myShareCents) }} is yours, so it isn't expected back.</span></td>
+            <td class="right fig">{{ cents(splits().owedCents) }}</td>
+          </tr>
+          @if (splits().wontBeRepaidCents > 0) {
+            <tr><td class="muted">Won't be repaid</td><td class="right fig muted">{{ cents(splits().wontBeRepaidCents) }}</td></tr>
+          }
+        </tbody>
+      </table>
+      <p class="table-note">
+        {{ netting()
+          ? "Expenses count what you're out of pocket, so what's still owed to you is part of them until it comes back."
+          : '“Count money back” is off, so split bills count at their full amount in the expenses above.' }}
+      </p>
+
+      <!-- THE BILLS: where "paid for others" came from. Tap one to open it. -->
+      <div class="split-sub">
+        <span class="label-mono">The bills · {{ splits().bills }}</span>
+        <p>Every split bill you paid in this period. For a bill in a group, "for others" is what you paid beyond your share.</p>
+      </div>
+      <table class="report-table split-bills">
+        <thead>
+          <tr><th>Bill</th><th class="right">For others</th><th class="right hide-sm">Paid back</th><th class="right">Not back yet</th></tr>
+        </thead>
+        <tbody>
+          @for (r of splitRows(); track r.tx.id) {
+            <tr class="clickable" (click)="viewingTx.set(r.tx)" [attr.title]="'Open ' + (r.tx.merchant || 'this bill')">
+              <td>
+                {{ r.tx.merchant || 'Expense' }}
+                <span class="row-note">
+                  {{ shortDate(r.tx.date) }}@if (groupName(r.groupId); as g) { · {{ g }} } · paid {{ cents(r.paidCents) }} · your share {{ cents(r.myShareCents) }}
+                </span>
+              </td>
+              <td class="right fig">{{ cents(r.forOthersCents) }}</td>
+              <td class="right fig muted hide-sm">{{ cents(r.repaidCents) }}</td>
+              <td class="right fig">{{ cents(r.owedCents) }}</td>
+            </tr>
+          }
+          <tr class="total-row">
+            <td>Total</td>
+            <td class="right fig">{{ cents(splits().forOthersCents) }}</td>
+            <td class="right fig hide-sm">{{ cents(splits().repaidCents) }}</td>
+            <td class="right fig">{{ cents(splits().owedCents) }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- WHAT CAME BACK: the payments behind "paid back". -->
+      <div class="split-sub">
+        <span class="label-mono">What came back · {{ splitBackRows().length }}</span>
+        <p>
+          @if (splitBackRows().length) {
+            The payments that paid back other people's shares on these bills. Tap a bank payment to open it, or cash to open its bill.
+          } @else {
+            Nothing has come back on these bills yet.
+          }
+        </p>
+      </div>
+      @if (splitBackRows().length) {
+        <table class="report-table">
+          <tbody>
+            @for (p of splitBackRows(); track $index) {
+              <tr class="clickable" (click)="openPayment(p)">
+                <td>
+                  {{ personName(p.fromPersonId) }}
+                  <span class="row-note">{{ shortDate(p.date) }} · {{ paymentVia(p) }} · {{ paymentBills(p.billIds) }}</span>
+                </td>
+                <td class="right fig">{{ cents(p.amountCents) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        @if (splitBackExtraCents() > 0) {
+          <p class="table-note">
+            That's {{ cents(splitBackExtraCents()) }} more than other people's shares on these bills, so only
+            {{ cents(splits().repaidCents) }} counts as paid back here; the rest counts as income.
+          </p>
+        }
+      }
+      <!-- Not the period: who owes whom today, the same figures as Shared. -->
+      <div class="split-now">
+        <span class="label-mono">Right now</span>
+        <p>Who owes whom today, across every bill and group (the same as Shared), not just this period.</p>
+      </div>
+      <table class="report-table">
+        <tbody>
+          <tr><td>Owed to you</td><td class="right fig">{{ cents(shared.owedToMeCents()) }}</td></tr>
+          <tr><td>You owe</td><td class="right fig">{{ cents(shared.youOweCents()) }}</td></tr>
+        </tbody>
+      </table>
+    </section>
+  }
 </div>
+
+<!-- A transaction from the split bills: the same sheet and form as everywhere -->
+<app-transaction-view
+  [transaction]="viewingTx()"
+  (closed)="viewingTx.set(null)"
+  (editRequested)="editFromTxView($event)" />
+
+<app-transaction-form
+  [open]="txFormOpen()"
+  [transaction]="editingTx()"
+  (closed)="closeTxForm()"
+  (saved)="handleTxSave($event)"
+  (deleteRequested)="askTxDelete()" />
+
+<app-confirm
+  [open]="txConfirmOpen()"
+  title="Delete transaction?"
+  message="This cannot be undone."
+  confirmText="Delete"
+  (confirmed)="confirmTxDelete()"
+  (cancelled)="txConfirmOpen.set(false)" />

@@ -2,7 +2,7 @@ import { Injectable, signal, effect } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  // Light is the default — the Origin product is light, even though their
+  // Light is the default: the Origin product is light, even though their
   // marketing site is near-black. index.html applies the same choice inline
   // before first paint so the page doesn't flash the wrong theme while
   // Angular boots.

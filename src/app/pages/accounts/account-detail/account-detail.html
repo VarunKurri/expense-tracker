@@ -89,7 +89,7 @@
       <div class="dates-row">
         <div class="date-item">
           <div class="date-label">Statement closes</div>
-          <div class="date-value">{{ statementDate() || '—' }}</div>
+          <div class="date-value">{{ statementDate() || 'Not set' }}</div>
           @if (a.statementClosingDay) {
             <div class="date-sub">Day {{ a.statementClosingDay }} of each month</div>
           }
@@ -97,7 +97,7 @@
         <div class="dates-divider"></div>
         <div class="date-item">
           <div class="date-label">Payment due</div>
-          <div class="date-value">{{ paymentDueDate() || '—' }}</div>
+          <div class="date-value">{{ paymentDueDate() || 'Not set' }}</div>
           @if (a.paymentDueDay) {
             <div class="date-sub">Day {{ a.paymentDueDay }} of each month</div>
           }
@@ -149,7 +149,9 @@
                     {{ accountName(tx.fromAccountId) }} → {{ accountName(tx.toAccountId) }}
                   </div>
                 } @else {
-                  <div class="recent-tx-title">{{ tx.merchant || 'Untitled' }}</div>
+                  <div class="recent-tx-title">
+                    {{ tx.merchant || 'Untitled' }}
+                  </div>
                   <div class="recent-tx-meta">
                     @if (categoryFor(tx.categoryId); as cat) {
                       {{ cat.icon }} {{ cat.name }} ·
@@ -219,15 +221,15 @@
           @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
           @else { {{ formatCurrency(tx.amount) }} }
         </div>
-        @if (tx.refunded) {
-          <div class="view-refunded-badge">↩ Refunded — excluded from analysis</div>
+        @if (txService.isFullyRefunded(tx)) {
+          <div class="view-refunded-badge">↩ Refunded and excluded from analysis</div>
         }
       </div>
       <div class="view-details">
         @if (tx.type !== 'transfer') {
           <div class="view-row">
             <span class="view-row-label">{{ tx.type === 'income' ? 'Source' : 'Merchant' }}</span>
-            <span class="view-row-value">{{ tx.merchant || '—' }}</span>
+            <span class="view-row-value">{{ tx.merchant || 'None' }}</span>
           </div>
         }
         <div class="view-row">

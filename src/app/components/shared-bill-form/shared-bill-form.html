@@ -1,0 +1,119 @@
+<app-modal [open]="open()" [title]="bill() ? 'Edit bill' : 'Someone else paid'" (closed)="closed.emit()">
+  <div class="form">
+
+    <!-- RECEIPT: a photo kept with the bill; it can also fill in the form -->
+    <app-receipt-attach
+      [image]="receiptImage()" [loading]="receiptLoading()" [busy]="scanning()"
+      hint="Attach a photo of the receipt, and Trackr can fill in the merchant, amount, items, tax and tip from it."
+      note="Saved encrypted with this bill. Tap it to see it full size. “Fill in from it” has OpenAI read it; OpenAI doesn’t keep it."
+      [actionLabel]="scanning() ? 'Reading…' : (scanned() ? 'Read again' : 'Fill in from it')"
+      (picked)="attachReceipt($event)" (removed)="removeReceipt()" (action)="readReceipt()" />
+    @if (scanned(); as scan) {
+      <div class="form-note">
+        <div><strong>{{ scan.merchant || 'Receipt' }}</strong> · {{ scanSummary(scan) }}</div>
+        @if (scanTaxBreakdown(scan); as breakdown) { <div>Tax &amp; fees is {{ breakdown }}.</div> }
+        @if (scanWarning(scan); as warning) { <div class="field-error">{{ warning }}</div> }
+        <div>The items are under Item by item below. Tap who had each one. Everything stays editable.</div>
+      </div>
+    }
+
+    <!-- WHO PAID, AND HOW MUCH -->
+    <div class="form-grid">
+      <div class="field">
+        <label class="label-sm" for="sb-payer">Who paid</label>
+        <select id="sb-payer" class="input-field" [ngModel]="payerId()" (ngModelChange)="setPayer($event)" name="sbPayer">
+          <option value="" disabled>Choose someone</option>
+          @for (p of payerChoices(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
+        </select>
+      </div>
+      <div class="field">
+        <label class="label-sm" for="sb-amount">They paid</label>
+        <div class="input-affix"><span class="affix">$</span>
+          <input id="sb-amount" class="input-field" type="number" step="0.01" min="0" inputmode="decimal"
+                 [ngModel]="amount()" (ngModelChange)="amount.set($event)" name="sbAmount" placeholder="0.00" />
+        </div>
+      </div>
+    </div>
+    <div class="add-payer">
+      <input class="input-field" [ngModel]="newPayerName()" (ngModelChange)="newPayerName.set($event)" name="sbNewPayer"
+             placeholder="Not listed? Add them by name" aria-label="Add who paid by name"
+             (keydown.enter)="$event.preventDefault(); addPayerByName()" />
+      <button type="button" class="btn-ghost" [disabled]="!newPayerName().trim() || addingPayer()" (click)="addPayerByName()">Add</button>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label class="label-sm" for="sb-merchant">Merchant</label>
+        <input id="sb-merchant" class="input-field" [ngModel]="merchant()" (ngModelChange)="merchant.set($event)" name="sbMerchant"
+               placeholder="Where" maxlength="80" />
+      </div>
+      <div class="field">
+        <label class="label-sm" for="sb-date">Date</label>
+        <input id="sb-date" class="input-field" type="date" [ngModel]="date()" (ngModelChange)="date.set($event)" name="sbDate" />
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label class="label-sm" for="sb-category">Category <span class="label-optional">(optional)</span></label>
+        <select id="sb-category" class="input-field" [ngModel]="categoryId()" (ngModelChange)="categoryId.set($event)" name="sbCategory">
+          <option value="">None</option>
+          @for (c of expenseCategories(); track c.id) { <option [value]="c.id">{{ c.icon }} {{ c.name }}</option> }
+        </select>
+      </div>
+      @if (groupChoices().length) {
+        <div class="field">
+          <label class="label-sm" for="sb-group">Group <span class="label-optional">(optional)</span></label>
+          <select id="sb-group" class="input-field" [ngModel]="group()" (ngModelChange)="setGroup($event)" name="sbGroup">
+            <option value="">None</option>
+            @for (g of groupChoices(); track g.id) { <option [value]="g.id">{{ g.name }}</option> }
+          </select>
+        </div>
+      }
+    </div>
+
+    <!-- HOW IT'S SPLIT -->
+    <div class="form-section">
+      <div class="mini-seg" role="radiogroup" aria-label="Split the">
+        <button type="button" role="radio" [class.active]="kind() === 'quick'" [attr.aria-checked]="kind() === 'quick'"
+                (click)="setKind('quick')">Whole bill</button>
+        <button type="button" role="radio" [class.active]="kind() === 'itemized'" [attr.aria-checked]="kind() === 'itemized'"
+                (click)="setKind('itemized')">Item by item</button>
+      </div>
+      @if (kind() === 'itemized') {
+        <app-itemized-split-editor [myPaidCents]="amountCents()" [paidBy]="payerId() || 'nobody'" [(state)]="itemizedState"
+                                   (useAmount)="useSplitAmount($event)" />
+      } @else {
+        <app-split-editor [myPaidCents]="amountCents()" [paidBy]="payerId() || 'nobody'" [(state)]="quickState" />
+      }
+    </div>
+
+    <div class="field">
+      <label class="label-sm" for="sb-notes">Notes <span class="label-optional">(optional)</span></label>
+      <textarea id="sb-notes" class="input-field" rows="2" [ngModel]="notes()" (ngModelChange)="notes.set($event)" name="sbNotes"
+                placeholder="What it was for"></textarea>
+    </div>
+
+    <p class="form-note">
+      This isn't one of your transactions: no money left your accounts. Your share becomes spending when you pay {{ payerName() }} back.
+    </p>
+  </div>
+
+  <div class="modal-actions" modal-footer>
+    @if (bill()) {
+      <button type="button" class="btn-danger" (click)="confirming.set(true)">Delete</button>
+    }
+    <div class="actions-right">
+      <button type="button" class="btn-ghost" (click)="closed.emit()">Cancel</button>
+      <button type="button" class="btn-primary" [disabled]="saving()" (click)="save()">{{ bill() ? 'Save changes' : 'Add bill' }}</button>
+    </div>
+  </div>
+</app-modal>
+
+<app-confirm
+  [open]="confirming()"
+  [title]="'Delete ' + (bill()?.merchant ?? 'this bill') + '?'"
+  message="It comes off everyone's balances. This cannot be undone."
+  confirmText="Delete"
+  (confirmed)="remove()"
+  (cancelled)="confirming.set(false)" />

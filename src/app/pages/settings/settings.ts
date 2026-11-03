@@ -25,7 +25,7 @@ export class Settings {
 
   // Change email (password-provider accounts only): reauthenticate with the
   // current password, then Firebase emails a confirmation link to the new
-  // address — nothing changes until that link is clicked.
+  // address. Nothing changes until that link is clicked.
   changeEmailModalOpen = signal(false);
   changeEmailPassword = signal('');
   changeEmailNew = signal('');

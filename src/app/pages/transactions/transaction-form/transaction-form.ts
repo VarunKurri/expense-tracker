@@ -1,26 +1,39 @@
-import {
-  Component, EventEmitter, Input, Output,
-  OnChanges, SimpleChanges, inject, signal, computed
-} from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnChanges, SimpleChanges, inject, signal, computed, Injector } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Modal } from '../../../components/modal/modal';
 import { ErrorBanner } from '../../../components/error-banner/error-banner';
+import { SplitEditor } from '../../../components/split-editor/split-editor';
+import { ItemizedSplitEditor } from '../../../components/split-editor/itemized-split-editor';
 import { AccountService } from '../../../services/account.service';
 import { CategoryService } from '../../../services/category.service';
 import { BillService } from '../../../services/bill.service';
 import { TransactionTemplateService } from '../../../services/transaction-template.service';
 import { TransactionService } from '../../../services/transaction.service';
-import { BillAmountMode, BillDueDateMode, BillFrequency, Transaction, TransactionType } from '../../../models';
+import { formatCurrency } from '../../../utils/format';
+import { fromCents, toCents } from '../../../utils/money';
+import {
+  ItemizedSplitState, QuickSplitState, buildItemizedSplit, buildQuickSplit, emptyItemizedState, emptyQuickState,
+  itemizedStateFrom, myPaymentToCoverCents, quickStateFrom, splitProblems,
+} from '../../../utils/splits';
+import { BillAmountMode, BillDueDateMode, BillFrequency, Transaction, TransactionSplit, TransactionType } from '../../../models';
 import { BILL_FREQUENCIES } from '../../../utils/bill-schedule';
 import { TransactionTemplate } from '../../../models';
 import { QuickAddService } from '../../../services/quick-add.service';
 import { ToastService } from '../../../services/toast.service';
+import { ReceiptScanService } from '../../../services/receipt-scan.service';
+import { GroupService } from '../../../services/group.service';
+import { ReceiptService } from '../../../services/receipt.service';
+import { ReceiptAttach } from '../../../components/receipt-attach/receipt-attach';
+import { FittedImage } from '../../../utils/image';
+import {
+  ReceiptScan, itemizedFromScan, scanAmountCents, scanSummaryText, scanTaxBreakdownText, scanWarningText,
+} from '../../../utils/receipt';
 
 @Component({
   selector: 'app-transaction-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, Modal, ErrorBanner],
+  imports: [CommonModule, FormsModule, Modal, ErrorBanner, SplitEditor, ItemizedSplitEditor, ReceiptAttach],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss'
 })
@@ -32,6 +45,12 @@ export class TransactionForm implements OnChanges {
   private transactionService = inject(TransactionService);
   private toastService = inject(ToastService);
   private quickAddService = inject(QuickAddService);
+  private receiptScanner = inject(ReceiptScanService);
+  private receipts = inject(ReceiptService);
+  // Looked up when the split section needs it, so the many pages that embed
+  // this form don't need Firebase in their tests.
+  private injector = inject(Injector);
+  private get groupService() { return this.injector.get(GroupService); }
 
   @Input() open = false;
   @Input() transaction: Transaction | null = null;
@@ -50,12 +69,168 @@ export class TransactionForm implements OnChanges {
   categoryId = signal('');
   fromAccountId: string = '';
   toAccountId: string = '';
-  refunded = false;
   isInternalTransfer = false;
   saveAsTemplate = signal(false);
   templateName = signal('');
 
-  // Returns today's date as YYYY-MM-DD in LOCAL time — never UTC
+  formatCurrency = formatCurrency;
+
+  // ── Bill splitting (expenses) ──────────────────────────────
+  splitOn = signal(false);
+  /** "Whole bill" (quick) or "Item by item" (itemized, with tax and tip). */
+  splitKind = signal<'quick' | 'itemized'>('quick');
+  splitState = signal<QuickSplitState>(emptyQuickState());
+  itemizedState = signal<ItemizedSplitState>(emptyItemizedState());
+  /** The split saved on the transaction being edited, if any. */
+  private existingSplit: TransactionSplit | null = null;
+  /** The group this bill belongs to (a trip, a flat); '' for none. */
+  splitGroupId = signal('');
+
+  /** Groups to choose from: every one not put away, plus the bill's own. */
+  groupChoices = computed(() => this.groupService.groups()
+    .filter(g => g.id && (!g.archived || g.id === this.splitGroupId())));
+
+  /** Putting a bill in a group puts the group's members on it (anyone can still be taken off). */
+  setSplitGroup(id: string) {
+    this.splitGroupId.set(id);
+    const members = this.groupService.byId(id)?.memberIds ?? [];
+    if (!members.length) return;
+    this.splitState.update(s => {
+      const add = members.filter(m => !s.participantIds.includes(m));
+      const weights = { ...s.weights };
+      for (const m of add) if (!(m in weights)) weights[m] = s.mode === 'shares' ? 1 : 0;
+      return { ...s, participantIds: [...s.participantIds, ...add], weights };
+    });
+    this.itemizedState.update(s => ({
+      ...s, participantIds: [...s.participantIds, ...members.filter(m => !s.participantIds.includes(m))],
+    }));
+  }
+
+  /** Switching modes keeps who's on the bill and who paid; each mode keeps its own details. */
+  setSplitKind(kind: 'quick' | 'itemized') {
+    if (kind === this.splitKind()) return;
+    const from = kind === 'itemized' ? this.splitState() : this.itemizedState();
+    const carried = { participantIds: [...from.participantIds], otherPayments: from.otherPayments.map(p => ({ ...p })) };
+    if (kind === 'itemized') this.itemizedState.update(s => ({ ...s, ...carried }));
+    else this.splitState.update(s => ({ ...s, ...carried }));
+    this.splitKind.set(kind);
+  }
+
+  // ── Receipt (expenses) ─────────────────────────────────────
+  // A photo of the receipt, kept with the transaction (ReceiptService). It can
+  // also be read to fill in the form (ReceiptScanService), but attaching one
+  // and reading it are separate: a receipt is worth keeping either way.
+
+  /** The photo shown: a newly picked one, or the one already saved. */
+  receiptImage = signal<string | null>(null);
+  /** A photo picked in this form, stored when the transaction is saved. */
+  private pendingReceipt: FittedImage | null = null;
+  /** The saved photo was removed in this form; deleted when the transaction is saved. */
+  private receiptRemoved = false;
+  receiptLoading = signal(false);
+  scanning = signal(false);
+  /** The last receipt read into this form, kept for the note and saved as aiExtracted. */
+  scanned = signal<ReceiptScan | null>(null);
+
+  /**
+   * A photo was taken or picked. It's attached; and on a blank new expense
+   * (the "snap the receipt to log it" case) it's read straight away too.
+   */
+  async attachReceipt(file: File) {
+    try {
+      const photo = await this.receipts.fit(file);
+      this.pendingReceipt = photo;
+      this.receiptRemoved = false;
+      this.receiptImage.set(photo.dataUrl);
+    } catch (err: any) {
+      this.toastService.error(err?.message || "Couldn't open that photo.");
+      return;
+    }
+    const blank = !this.transaction && !Number(this.amount) && !this.merchant().trim();
+    if (blank) await this.readReceipt();
+  }
+
+  removeReceipt() {
+    this.pendingReceipt = null;
+    this.receiptRemoved = !!this.editing?.receiptId;
+    this.receiptImage.set(null);
+  }
+
+  /** "Fill in from it": read the attached photo and fill in what's missing. */
+  async readReceipt() {
+    const image = this.receiptImage();
+    if (!image || this.scanning()) return;
+    this.scanning.set(true);
+    try {
+      const scan = await this.receiptScanner.scanImage(image);
+      if (!scan.isReceipt) {
+        this.toastService.error("That doesn't look like a receipt, so nothing was filled in. It's still attached.");
+        return;
+      }
+      this.applyScan(scan);
+    } catch (err: any) {
+      this.toastService.error(err?.message || "Couldn't read that receipt.");
+    } finally {
+      this.scanning.set(false);
+    }
+  }
+
+  /** The line under "Receipt attached". */
+  receiptNote(): string {
+    return 'Saved encrypted with this transaction. Tap it to see it full size. “Fill in from it” has OpenAI read it; OpenAI doesn’t keep it.';
+  }
+
+  /** Fetch the saved photo of the transaction being edited. */
+  private loadReceipt(tx: Transaction) {
+    this.pendingReceipt = null;
+    this.receiptRemoved = false;
+    this.receiptImage.set(null);
+    if (!tx.receiptId) { this.receiptLoading.set(false); return; }
+    const id = tx.receiptId;
+    this.receiptLoading.set(true);
+    this.receipts.load(id)
+      .then(r => { if (this.editing?.receiptId === id && !this.pendingReceipt) this.receiptImage.set(r?.image ?? null); })
+      .catch(() => this.toastService.error("Couldn't load the receipt photo."))
+      .finally(() => this.receiptLoading.set(false));
+  }
+
+  /**
+   * What the receipt fills in. It never overwrites what you've typed: the
+   * merchant only when empty, the date only on a new transaction still set to
+   * today, the amount only when there isn't one. The items, tax and tip always
+   * go into "Item by item", ready for when you split the bill.
+   */
+  applyScan(scan: ReceiptScan) {
+    if (scan.merchant && !this.merchant().trim()) this.onMerchantChange(scan.merchant);
+    if (scan.date && !this.transaction && this.date === this.localDateString()) this.date = scan.date;
+    if (!Number(this.amount)) this.amount = fromCents(scanAmountCents(scan));
+    if (this.splitKind() !== 'itemized') this.setSplitKind('itemized');
+    this.itemizedState.update(s => itemizedFromScan(scan, s));
+    this.scanned.set(scan);
+  }
+
+  // What the note under a read receipt says (utils/receipt.ts, shared with
+  // the "someone else paid" form).
+  scanSummary = scanSummaryText;
+  scanTaxBreakdown = scanTaxBreakdownText;
+  scanWarning = scanWarningText;
+
+  /** "Use $X as the amount" from the itemized editor, when the receipt and the amount disagree. */
+  useSplitAmount(cents: number) {
+    this.amount = fromCents(cents);
+  }
+
+  /** What you paid, in cents: the amount field, which is your payment on the bill. */
+  amountCents(): number {
+    return toCents(Number(this.amount) || 0);
+  }
+
+  /** Money back already recorded on the expense being edited, for the note in place of the old refund toggle. */
+  moneyBack(): number {
+    return this.transaction?.type === 'expense' ? this.transactionService.moneyBackFor(this.transaction) : 0;
+  }
+
+  // Returns today's date as YYYY-MM-DD in LOCAL time, never UTC
   private localDateString(d: Date = new Date()): string {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -63,7 +238,7 @@ export class TransactionForm implements OnChanges {
     return `${y}-${m}-${day}`;
   }
 
-  // Bill fields — shown when Subscriptions category is selected
+  // Bill fields, shown when Subscriptions category is selected
   billFrequency: BillFrequency = 'monthly';
   billFrequencies = BILL_FREQUENCIES;
   billNextDueDate: string = '';
@@ -107,21 +282,41 @@ export class TransactionForm implements OnChanges {
     }
   }
 
+  /**
+   * The transaction being edited, as it stands now. The page hands the form the
+   * copy it had when the details sheet opened; anything changed since (a
+   * receipt attached from the sheet, money back recorded) is only in the live
+   * list. Reading the live one means Edit always starts from the truth.
+   */
+  private editing: Transaction | null = null;
+
   private load() {
-    if (this.transaction) {
-      this.type = this.transaction.type;
-      this.amount = this.transaction.amount;
-      this.date = this.transaction.date;
-      this.notes = this.transaction.notes || '';
-      this.merchant.set(this.transaction.merchant || '');
-      this.accountId = this.transaction.accountId || '';
-      this.categoryId.set(this.transaction.categoryId || '');
-      this.fromAccountId = this.transaction.fromAccountId || '';
-      this.toAccountId = this.transaction.toAccountId || '';
-      this.refunded = this.transaction.refunded || false;
-      this.isInternalTransfer = this.transaction.isInternalTransfer || false;
+    const live = this.transaction?.id
+      ? this.transactionService.transactions().find(t => t.id === this.transaction!.id) ?? this.transaction
+      : this.transaction;
+    this.editing = live;
+    if (live) {
+      this.type = live.type;
+      this.amount = live.amount;
+      this.date = live.date;
+      this.notes = live.notes || '';
+      this.merchant.set(live.merchant || '');
+      this.accountId = live.accountId || '';
+      this.categoryId.set(live.categoryId || '');
+      this.fromAccountId = live.fromAccountId || '';
+      this.toAccountId = live.toAccountId || '';
+      this.isInternalTransfer = live.isInternalTransfer || false;
+      this.existingSplit = live.split ?? null;
+      this.splitGroupId.set(live.split?.groupId ?? '');
+      this.splitOn.set(!!this.existingSplit && live.type === 'expense');
+      const itemized = this.existingSplit?.mode === 'itemized';
+      this.splitKind.set(itemized ? 'itemized' : 'quick');
+      this.splitState.set(this.existingSplit && !itemized ? quickStateFrom(this.existingSplit) : emptyQuickState());
+      this.itemizedState.set(this.existingSplit && itemized ? itemizedStateFrom(this.existingSplit) : emptyItemizedState());
       this.saveAsTemplate.set(false);
       this.templateName.set('');
+      this.scanned.set(null);
+      this.loadReceipt(live);
     } else {
       this.type = this.quickAddService.defaultType() || 'expense';
       this.amount = 0;
@@ -130,8 +325,19 @@ export class TransactionForm implements OnChanges {
       this.merchant.set('');
       this.applySmartDefaultsForType();
       this.applyDraft();
+      this.existingSplit = null;
+      this.splitGroupId.set('');
+      this.splitOn.set(false);
+      this.splitKind.set('quick');
+      this.splitState.set(emptyQuickState());
+      this.itemizedState.set(emptyItemizedState());
       this.saveAsTemplate.set(false);
       this.templateName.set('');
+      this.scanned.set(null);
+      this.pendingReceipt = null;
+      this.receiptRemoved = false;
+      this.receiptImage.set(null);
+      this.receiptLoading.set(false);
     }
 
     // Default bill fields
@@ -351,12 +557,12 @@ export class TransactionForm implements OnChanges {
       return;
     }
     // Snapshot every field into locals up front. save() awaits saveCurrentAsTemplate()
-    // and billService.add() below — if the modal gets closed/reopened for another add
+    // and billService.add() below. If the modal gets closed/reopened for another add
     // while those are in flight (easy to trigger on a slow mobile connection: tap Save,
     // nothing visibly happens, tap Cancel, tap +Add again), ngOnChanges' load() resets
     // this.amount/fromAccountId/toAccountId/etc. Reading `this.x` again after an await
     // would then emit whatever the form was reset to, not what the user actually
-    // entered — producing a stray blank transaction. Locals make that impossible.
+    // entered, producing a stray blank transaction. Locals make that impossible.
     const type = this.type;
     const amount = Number(this.amount);
     const date = this.date;
@@ -394,7 +600,6 @@ export class TransactionForm implements OnChanges {
       const merchant = this.merchant().trim();
       const accountId = this.accountId;
       const categoryId = this.categoryId();
-      const refunded = this.refunded;
       const isInternalTransfer = this.isInternalTransfer;
       // Same reasoning as the snapshot above: read before the await, not after,
       // so a form reset in flight can't swap in stale bill settings.
@@ -406,10 +611,54 @@ export class TransactionForm implements OnChanges {
       const billDueDateMode = this.billDueDateMode;
       const billAutopay = this.billAutopay;
       const isNewTransaction = !this.transaction;
+      const scanned = type === 'expense' ? this.scanned() : null;
+      const pendingReceipt = type === 'expense' ? this.pendingReceipt : null;
+      const receiptRemoved = type === 'expense' && this.receiptRemoved;
+      const oldReceiptId = this.editing?.receiptId;
       if (!accountId) { this.toastService.error('Please select an account'); return; }
       if (!merchant) { this.toastService.error('Merchant or source is required'); return; }
 
+      // The split is built here, from the amount as it is now, and checked before
+      // anything is saved: "what you're owed" must rest on a bill that adds up.
+      let split: TransactionSplit | undefined;
+      if (type === 'expense' && this.splitOn()) {
+        const itemized = this.splitKind() === 'itemized';
+        split = itemized
+          ? buildItemizedSplit(this.itemizedState(), toCents(amount), this.existingSplit)
+          : buildQuickSplit(this.splitState(), toCents(amount), this.existingSplit);
+        // Only a group that still exists: a deleted one leaves the bill on its own.
+        const groupId = this.splitGroupId();
+        if (groupId && this.groupService.byId(groupId)) split = { ...split, groupId };
+        const problems = splitProblems(split, toCents(amount));
+        if (problems.includes('no-one-else')) { this.toastService.error('Add someone to split this bill with.'); return; }
+        if (problems.includes('unassigned')) {
+          this.toastService.error(itemized ? "Some items aren't anyone's yet." : 'Give someone a share of the bill before saving.');
+          return;
+        }
+        if (problems.includes('not-covered')) {
+          const cover = formatCurrency(fromCents(myPaymentToCoverCents(this.itemizedState())));
+          this.toastService.error(`The receipt says you paid ${cover}. Fix the items or the amount before saving.`);
+          return;
+        }
+      }
+
       this.submitting.set(true);
+
+      // A new photo is stored first, so the transaction can point at it.
+      let receiptId = oldReceiptId;
+      if (pendingReceipt) {
+        try {
+          receiptId = await this.receipts.save(pendingReceipt);
+        } catch (err: any) {
+          this.toastService.error(err?.message || "The receipt photo couldn't be saved. Try again, or remove it to save without it.");
+          this.submitting.set(false);
+          return;
+        }
+      } else if (receiptRemoved) {
+        receiptId = undefined;
+      }
+      const receiptChanged = receiptId !== oldReceiptId;
+
       try {
         await this.saveCurrentAsTemplate();
       } catch (err) {
@@ -427,9 +676,19 @@ export class TransactionForm implements OnChanges {
         accountId,
         ...(categoryId ? { categoryId } : {}),
         ...(notes ? { notes } : {}),
-        refunded,
         isInternalTransfer,
+        // Filled in from a receipt: marked so it can be told apart later.
+        ...(scanned ? { aiExtracted: true, aiConfidence: scanned.confidence } : {}),
+        // A new receipt photo, or none any more (undefined is dropped when saved).
+        ...(receiptChanged ? { receiptId } : {}),
+        // Turning the split off on an edit clears it; undefined is dropped when saved.
+        ...(split ? { split } : this.existingSplit ? { split: undefined } : {}),
       });
+
+      // The photo it replaced, or that was removed, isn't needed any more.
+      if (receiptChanged && oldReceiptId) {
+        this.receipts.remove(oldReceiptId).catch(err => console.warn('Could not delete the old receipt photo:', err));
+      }
 
       // If Subscriptions category selected, auto-create bill if one doesn't exist yet
       if (isSubscription && merchant && isNewTransaction) {

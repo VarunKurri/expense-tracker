@@ -33,7 +33,7 @@
 
     &.asset     { color: var(--teal); }
     &.liability { color: var(--red); }
-    // Net worth is always neutral — carrying a credit card balance
+    // Net worth is always neutral: carrying a credit card balance
     // is normal, not an error state. Never show net worth in red.
   }
 

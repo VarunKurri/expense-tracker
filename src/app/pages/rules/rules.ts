@@ -158,7 +158,7 @@ export class Rules {
     finally { this.busy.set(false); }
   }
 
-  /** A rule whose target category was deleted — shown with a warning, and not run. */
+  /** A rule whose target category was deleted. It's shown with a warning, and not run. */
   isBroken(r: TransactionRule): boolean {
     return hasMissingCategory(r,
       new Set(this.categories().map(c => c.id).filter((id): id is string => !!id)));
@@ -188,7 +188,7 @@ export class Rules {
     const plan = planBulkApply(this.ruleService.activeRules(), this.txService.transactions(),
       { onlyUncategorised: !all });
     if (!plan.length) {
-      this.toast.info('Nothing to change — every transaction already matches your rules.');
+      this.toast.info('Nothing to change. Every transaction already matches your rules.');
       return;
     }
     this.busy.set(true);

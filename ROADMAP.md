@@ -111,9 +111,10 @@ This checklist focuses on making Trackr faster, easier, and more efficient for d
   - Why: budgets are easier to set when the app suggests realistic amounts from past spending.
   - Done when: category budget forms show recent averages and suggested targets.
 
-- [ ] Add anomaly alerts.
+- [x] Add anomaly alerts. (part 129)
   - Why: users should notice unusual spending, duplicate charges, or bills that changed amount.
   - Done when: dashboard and notifications highlight suspicious or unusually large transactions.
+  - Done: the Dashboard's "Worth a look" card (`app-spending-alerts`, maths in `utils/alerts.ts`): a charge at least 2× and $15 over your usual at that merchant, the same charge twice within a day on one account, and a monthly charge whose price went up. Dismissals sync across devices (`meta/dismissedAlerts`). Notifications not done.
 
 ## Phase 5: Offline, Sync, And Trust
 
@@ -526,6 +527,29 @@ Three-part follow-up request building on Phase 10's credit-card strip and reimbu
   - **"Excluding refunded" didn't govern reimbursement netting anywhere, and one page skipped it entirely.** The toggle only ever touched `refunded`-flagged transactions; reimbursement netting always applied regardless of its state. Per the user's request, the two are now the same on/off switch — "Include refunded" means "count everything exactly as recorded": reimbursing income counts as ordinary income, expenses count at their full amount, no surplus folding. Applied to `analysis.ts` (`eff()`, `income`, `totalIncome`, `monthlyTrend`) and Transactions' analysis-view (`excludedFromAnalysis`, `totals`, `grouped`). Along the way, found `category-breakdown.ts` (the "see all categories" drill-through) had **never** applied reimbursement netting at all since it shipped in part 35/42 — a pre-existing gap, not something the user reported — fixed with the same toggle-gated `eff()` helper for consistency with the Analysis page it drills in from.
   - `ng build` passes clean. Deployed, pushed to `main`. Not yet re-verified on-device.
 
+## Phase 12: Split Bills, Groups And Settling Up (parts 91–113)
+
+Ported Split's engine (`utils/split/`, integer cents) and built Splitwise-style sharing on it.
+
+- [x] One-off splits (parts 91–99): quick and item-by-item splits, tax and tip, one "Money back" model for refunds and repayments, the Shared page, receipt scanning.
+- [x] Integer cents in loans and the Analysis/Reports totals (parts 100–101).
+- [x] Groups (parts 104–109): group balances, simplify debts, bills someone else paid, a read-only sheet for them, "Who paid you?" for unnamed money back, payments between friends.
+- [x] Matching Splitwise to the cent (part 110): pick who pays the odd cents on each bill (`roundUpIds`).
+- [x] Settling up with you against the whole group (part 111): link a Zelle/Venmo or enter cash, any amount; a settle-up expense counts as spending.
+- [x] One searchable transaction picker for every link (part 112, `app-transaction-picker`).
+- [x] Reporting (part 113): Analysis and Reports show "Owed to you" and "You owe" right now, as on Shared (`SharedBalanceService`); period split figures include group bills; a group's "By category" card.
+- [x] Settle-ups by category (part 117): paying a friend back counts in Analysis, Reports, Budgets and the Dashboard under the categories of the shares it paid for (Dining, Gas…), not as one "Transfer" line. Your share still becomes spending only when you pay. (The Transactions page's category filter still lists a payment under its own category.)
+- [ ] Later, if wanted: Splitwise CSV import (dropped for now: groups are entered by hand).
+
+## Phase 13: Linked Banks That Look After Themselves (parts 120–128)
+
+- [x] Manage accounts on a linked bank (part 120): add a replaced or new card through Plaid update mode; a replaced card carries on in the same account.
+- [x] Relinks (parts 121–122): rows a second link sent again are found and merged in the duplicate review; an account linked twice or renumbered by Chase folds back into one.
+- [x] Bank changes never wipe your edits (parts 123–124): a pending charge posts into the same row; a row you edited takes the bank's amount and posted date and keeps your notes, split, category and links; posted dates for computed card statements.
+- [x] Background sync (part 124): webhook plus every 6 hours, balances and card statements applied when the app opens.
+- [x] One income for several purchases (part 123).
+- [x] Balances stay opening balance + transactions (part 128): a bank-pinned balance, Pending tags and a Balance check were tried in parts 121–127 and removed at the user's request.
+
 ---
 
 ### Session handoff (2026-08-27) — continue here
@@ -567,5 +591,6 @@ Three-part follow-up request building on Phase 10's credit-card strip and reimbu
 - Add a `[disabled]`/busy guard to the shared `Confirm` component so a double-tap on a slow connection can't fire its action twice.
 - Visually verify authenticated pages on iOS WebKit/iPhone viewport once there's a way to get a logged-in session in this environment (test credentials, or a scripted sign-in).
 - Analysis page has no UI to *create* a reimbursement link itself (only Transactions does) — noted as a possible follow-up in part 42, not committed to.
+- **Integer cents, the rest of the app.** Loans (part 100) and the Analysis, Reports, Budgets and category-breakdown totals (part 101, via `utils/reporting.ts`) now add up in whole cents (`toCents` → integer sums → `fromCents`). Still summing dollar floats: `utils/forecast.ts` (cash ahead), the Net worth page (account + manual asset totals), and the Dashboard's own totals. Same treatment, with their specs as the regression net; stored amounts stay in dollars.
 
 ---

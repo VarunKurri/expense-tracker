@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { Transaction } from '../models';
+import { ME, Transaction } from '../models';
 import {
   MoneyRules, totalExpenses, totalIncome, spendingTransactions, incomeTransactions,
   categoryTotals, monthlySeries, monthsBetween, transferTotals, sankeyLinks, sankeyLabel,
+  NO_SPLITS, SplitTotals, splitTotals, splitBills, splitPayments, addUpSplitBills,
 } from './reporting';
+import { MoneyBackLedger } from './money-back';
+import { quickSplit } from './splits';
 
-/** Minimal transaction factory — only the fields the reporting math reads. */
+/** Minimal transaction factory: only the fields the reporting math reads. */
 function tx(over: Partial<Transaction> & { type: Transaction['type']; amount: number }): Transaction {
   return {
     id: over.id ?? Math.random().toString(36).slice(2),
@@ -28,7 +31,7 @@ function rulesWith(netting: boolean, reimbursed: Record<string, number> = {}): M
   };
 }
 
-describe('reporting — spending and income selection', () => {
+describe('reporting: spending and income selection', () => {
   it('excludes internal transfers from both sides', () => {
     const txs = [
       tx({ type: 'expense', amount: 100 }),
@@ -69,7 +72,7 @@ describe('reporting — spending and income selection', () => {
   });
 });
 
-describe('reporting — category totals', () => {
+describe('reporting: category totals', () => {
   it('sorts largest first and pools uncategorised under __none__', () => {
     const txs = [
       tx({ type: 'expense', amount: 10, categoryId: 'food' }),
@@ -96,7 +99,7 @@ describe('reporting — category totals', () => {
   });
 });
 
-describe('reporting — monthly series', () => {
+describe('reporting: monthly series', () => {
   it('emits every requested month, including empty ones', () => {
     const rows = monthlySeries([tx({ type: 'expense', amount: 10, date: '2026-08-04' })],
       rulesWith(true), ['2026-07', '2026-08', '2026-09']);
@@ -129,7 +132,7 @@ describe('reporting — monthly series', () => {
   });
 });
 
-describe('reporting — monthsBetween', () => {
+describe('reporting: monthsBetween', () => {
   it('spans a year boundary', () => {
     expect(monthsBetween('2026-11-05', '2027-02-20'))
       .toEqual(['2026-11', '2026-12', '2027-01', '2027-02']);
@@ -147,7 +150,7 @@ describe('reporting — monthsBetween', () => {
   });
 });
 
-describe('reporting — transfers', () => {
+describe('reporting: transfers', () => {
   it('reports money moved without counting it as income or spending', () => {
     const txs = [
       tx({ type: 'transfer', amount: 250, fromAccountId: 'a', toAccountId: 'b' }),
@@ -164,7 +167,65 @@ describe('reporting — transfers', () => {
   });
 });
 
-describe('reporting — sankey', () => {
+describe('reporting: totals in whole cents', () => {
+  it('a thousand 10¢ coffees are exactly $100', () => {
+    const txs = Array.from({ length: 1000 }, () => tx({ type: 'expense', amount: 0.1, categoryId: 'coffee' }));
+    const r = rulesWith(true);
+    expect(totalExpenses(txs, r)).toBe(100);
+    expect(categoryTotals(txs, r)).toEqual([{ categoryId: 'coffee', amount: 100 }]);
+    expect(monthlySeries(txs, r, ['2026-09'])[0].expenses).toBe(100);
+  });
+
+  it('0.1 + 0.2 is 0.3, on every side', () => {
+    const txs = [
+      tx({ type: 'income', amount: 0.1 }), tx({ type: 'income', amount: 0.2 }),
+      tx({ type: 'expense', amount: 0.1 }), tx({ type: 'expense', amount: 0.2 }),
+      tx({ type: 'transfer', amount: 0.1, toAccountId: 'b' }), tx({ type: 'transfer', amount: 0.2, toAccountId: 'b' }),
+    ];
+    const r = rulesWith(true);
+    expect(totalIncome(txs, r)).toBe(0.3);
+    expect(totalExpenses(txs, r)).toBe(0.3);
+    expect(transferTotals(txs).movedIn).toBe(0.3);
+    expect(monthlySeries(txs, r, ['2026-09'])[0]).toMatchObject({ income: 0.3, expenses: 0.3, net: 0 });
+  });
+
+  it('a total is the sum of its rows as shown, to the cent', () => {
+    // An amount with a stray third decimal (an old import) shows as $0.13. Two
+    // of them are $0.26, not $0.25, which adding first and rounding after gives.
+    const txs = [
+      tx({ type: 'expense', amount: 0.125, categoryId: 'a' }),
+      tx({ type: 'expense', amount: 0.125, categoryId: 'b' }),
+    ];
+    const r = rulesWith(false); // raw amounts (rulesWith's netting rounds them itself)
+    expect(categoryTotals(txs, r).map(c => c.amount)).toEqual([0.13, 0.13]);
+    expect(totalExpenses(txs, r)).toBe(0.26);
+  });
+
+  it('reads 1.005 as $1.01, the way it is shown', () => {
+    const txs = [tx({ type: 'income', amount: 1.005 })];
+    expect(totalIncome(txs, rulesWith(true))).toBe(1.01);
+  });
+
+  it('many small amounts, category rows and months reconcile exactly with the totals', () => {
+    const cats = ['a', 'b', 'c', 'd', 'e'];
+    const txs = Array.from({ length: 997 }, (_, i) => tx({
+      type: i % 7 === 0 ? 'income' : 'expense',
+      amount: ((i * 37) % 1000) / 100 + 0.01,
+      categoryId: cats[i % cats.length],
+      date: `2026-0${7 + (i % 3)}-15`,
+    }));
+    const r = rulesWith(true);
+    const cents = (n: number) => Math.round(n * 100);
+    const total = totalExpenses(txs, r);
+    expect(categoryTotals(txs, r).reduce((s, c) => s + cents(c.amount), 0)).toBe(cents(total));
+    const rows = monthlySeries(txs, r, ['2026-07', '2026-08', '2026-09']);
+    expect(rows.reduce((s, m) => s + cents(m.expenses), 0)).toBe(cents(total));
+    expect(rows.reduce((s, m) => s + cents(m.income), 0)).toBe(cents(totalIncome(txs, r)));
+    for (const m of rows) expect(cents(m.net)).toBe(cents(m.income) - cents(m.expenses));
+  });
+});
+
+describe('reporting: sankey', () => {
   it('routes sources through a single pool to categories', () => {
     const links = sankeyLinks(
       [{ name: 'Salary', amount: 300 }],
@@ -186,5 +247,135 @@ describe('reporting — sankey', () => {
 
   it('drops zero and negative flows', () => {
     expect(sankeyLinks([{ name: 'A', amount: 0 }], [{ name: 'B', amount: -5 }])).toEqual([]);
+  });
+});
+
+describe('reporting: split bills', () => {
+  // The real money-back logic, so linked and recorded money back both count.
+  class Ledger extends MoneyBackLedger {
+    constructor(public transactions: () => Transaction[]) { super(); }
+  }
+  const totalsOf = (txs: Transaction[]) => {
+    const l = new Ledger(() => txs);
+    return splitTotals(txs, t => l.moneyBackEntriesFor(t));
+  };
+  const bill = (cents: number, who: string[], over: Partial<Transaction> = {}) =>
+    tx({ type: 'expense', amount: cents / 100, split: quickSplit(cents, who), ...over });
+  const repay = (from: string, cents: number, covers = [from]) =>
+    ({ id: `r${from}${cents}`, source: 'repayment' as const, amountCents: cents, date: '2026-09-12', fromPersonId: from, coversPersonIds: covers });
+  const identity = (t: SplitTotals) => t.forOthersCents === t.repaidCents + t.owedCents + t.wontBeRepaidCents;
+
+  it('$180 three ways: your share is $60, $120 is owed to you', () => {
+    const t = totalsOf([bill(18000, [ME, 'a', 'b'])]);
+    expect(t).toEqual({ bills: 1, paidCents: 18000, myShareCents: 6000, forOthersCents: 12000, repaidCents: 0, owedCents: 12000, wontBeRepaidCents: 0 });
+  });
+
+  it('one friend repaying for two clears both; what is left is your share', () => {
+    const t = totalsOf([bill(18000, [ME, 'a', 'b'], { moneyBack: [repay('a', 12000, ['a', 'b'])] })]);
+    expect(t.repaidCents).toBe(12000);
+    expect(t.owedCents).toBe(0);
+    expect(identity(t)).toBe(true);
+  });
+
+  it('a linked bank repayment counts the same as one recorded by hand', () => {
+    const dinner = bill(18000, [ME, 'a', 'b'], { id: 'dinner' });
+    const zelle = tx({ type: 'income', amount: 60, reimbursesId: 'dinner', moneyBackInfo: { source: 'repayment', fromPersonId: 'a' } });
+    const t = totalsOf([dinner, zelle]);
+    expect(t.repaidCents).toBe(6000);
+    expect(t.owedCents).toBe(6000);
+  });
+
+  it('"won\'t be repaid" leaves "owed to you" but is still counted', () => {
+    const t = totalsOf([bill(18000, [ME, 'a', 'b'], { split: { ...quickSplit(18000, [ME, 'a', 'b']), closedPersonIds: ['b'] } })]);
+    expect(t.owedCents).toBe(6000);
+    expect(t.wontBeRepaidCents).toBe(6000);
+    expect(identity(t)).toBe(true);
+  });
+
+  it('a bill in a group counts too: what you paid beyond your share, and the money back on it', () => {
+    const l = (txs: Transaction[]) => new Ledger(() => txs);
+    const food = bill(12000, [ME, 'a', 'b'], { split: { ...quickSplit(12000, [ME, 'a', 'b']), groupId: 'trip' },
+      moneyBack: [repay('a', 5000)] });
+    const txs = [food];
+    const ledger = l(txs);
+    const t = splitTotals(txs, x => ledger.moneyBackEntriesFor(x), x => x.split?.groupId === 'trip');
+    expect(t).toEqual({ bills: 1, paidCents: 12000, myShareCents: 4000, forOthersCents: 8000, repaidCents: 5000, owedCents: 3000, wontBeRepaidCents: 0 });
+    expect(identity(t)).toBe(true);
+  });
+
+  it('paid for others with no share of your own', () => {
+    const t = totalsOf([bill(9000, ['a', 'b'])]);
+    expect(t.myShareCents).toBe(0);
+    expect(t.forOthersCents).toBe(9000);
+    expect(t.owedCents).toBe(9000);
+  });
+
+  it('a refund on a split bill shrinks every share, yours included', () => {
+    const t = totalsOf([bill(24000, [ME, 'a', 'b', 'c'], {
+      moneyBack: [{ id: 'f', source: 'refund', amountCents: 4000, date: '2026-09-11' }],
+    })]);
+    expect(t.myShareCents).toBe(5000);
+    expect(t.forOthersCents).toBe(15000);
+  });
+
+  it('adds up across bills, to the cent, and ignores everything that is not a split expense', () => {
+    const t = totalsOf([
+      bill(10000, [ME, 'a', 'b']),           // 33.34 / 33.33 / 33.33
+      bill(5000, [ME, 'a'], { moneyBack: [repay('a', 1000)] }),
+      tx({ type: 'expense', amount: 99 }),   // not split
+      tx({ type: 'expense', amount: 50, isInternalTransfer: true, split: quickSplit(5000, [ME, 'a']) }),
+      tx({ type: 'income', amount: 40 }),
+    ]);
+    expect(t.bills).toBe(2);
+    expect(t.paidCents).toBe(15000);
+    expect(t.myShareCents + t.forOthersCents).toBe(15000);
+    expect(t.repaidCents).toBe(1000);
+    expect(identity(t)).toBe(true);
+  });
+
+  it('partly paid: Alex paid $60 of a $240 bill, so only Ben and Cara owe you', () => {
+    const split = { ...quickSplit(24000, [ME, 'a', 'b', 'c']), payments: [{ personId: ME, amountCents: 18000 }, { personId: 'a', amountCents: 6000 }] };
+    const t = totalsOf([bill(18000, [ME], { split })]);
+    expect(t.paidCents).toBe(18000);
+    expect(t.myShareCents).toBe(6000);
+    expect(t.forOthersCents).toBe(12000);
+    expect(t.owedCents).toBe(12000);
+  });
+
+  it('nothing split: all zero', () => {
+    expect(totalsOf([tx({ type: 'expense', amount: 20 })])).toEqual(NO_SPLITS);
+  });
+});
+
+describe('splitBills and splitPayments: the report behind the totals', () => {
+  class Ledger extends MoneyBackLedger {
+    constructor(public transactions: () => Transaction[]) { super(); }
+  }
+  const dinner = tx({ id: 'dinner', type: 'expense', amount: 90, date: '2026-09-05', merchant: 'Dinner', split: quickSplit(9000, [ME, 'a', 'b']) });
+  const lunch = tx({ id: 'lunch', type: 'expense', amount: 60, date: '2026-09-08', merchant: 'Lunch', split: quickSplit(6000, [ME, 'a', 'b']),
+    moneyBack: [{ id: 'c1', source: 'repayment', amountCents: 2000, date: '2026-09-09', fromPersonId: 'b', note: 'cash at the bar' }] });
+  // One Zelle from A for both bills: $30 dinner + $20 lunch.
+  const zelle = tx({ id: 'z', type: 'income', amount: 50, date: '2026-09-12', merchant: 'Zelle from A',
+    moneyBackSplits: [{ expenseId: 'dinner', amountCents: 3000 }, { expenseId: 'lunch', amountCents: 2000 }],
+    moneyBackInfo: { source: 'repayment', fromPersonId: 'a', coversPersonIds: ['a'] } });
+  const txs = [dinner, lunch, zelle];
+  const ledger = new Ledger(() => txs);
+  const mb = (t: Transaction) => ledger.moneyBackEntriesFor(t);
+
+  it('one row per bill, newest first, adding up to the totals; not back yet is never your share', () => {
+    const rows = splitBills(txs, mb);
+    expect(rows.map(r => [r.tx.id, r.paidCents, r.myShareCents, r.forOthersCents, r.repaidCents, r.owedCents])).toEqual([
+      ['lunch', 6000, 2000, 4000, 4000, 0],
+      ['dinner', 9000, 3000, 6000, 3000, 3000],
+    ]);
+    expect(addUpSplitBills(rows)).toEqual(splitTotals(txs, mb));
+    for (const r of rows) expect(r.owedCents).toBeLessThanOrEqual(r.forOthersCents);
+  });
+
+  it('lists what came back: the Zelle once (over both bills), and the cash', () => {
+    expect(splitPayments(splitBills(txs, mb), mb)).toEqual([
+      { fromPersonId: 'a', date: '2026-09-12', amountCents: 5000, incomeId: 'z', billIds: ['lunch', 'dinner'] },
+      { fromPersonId: 'b', date: '2026-09-09', amountCents: 2000, note: 'cash at the bar', billIds: ['lunch'] },
+    ]);
   });
 });

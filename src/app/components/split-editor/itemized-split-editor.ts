@@ -1,0 +1,206 @@
+import { Component, computed, inject, input, model, output } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { ME, Payment, SplitItem } from '../../models';
+import { PersonService } from '../../services/person.service';
+import { formatCurrency } from '../../utils/format';
+import { fromCents, toCents } from '../../utils/money';
+import { amountGapCents, calculateSplit, splitIsBalanced } from '../../utils/split/split';
+import type { ChargeMode, SplitMode, TipBasis } from '../../utils/split/types';
+import {
+  ItemizedSplitState, assignUnclaimedTo, buildItemizedSplit, itemQuantity, itemUnitPriceCents, myPaymentToCoverCents, newItem,
+  paidTowardsBillCents, removeFromItemized, setItemQuantity, setItemUnitPrice,
+  setItemMode, setItemWeight, splitProblems, toBill, toggleAssignee,
+} from '../../utils/splits';
+import { SplitPayers } from './parts/split-payers';
+import { SplitProgress } from './parts/split-progress';
+import { SplitPeople } from './parts/split-people';
+import { SplitSummary } from './parts/split-summary';
+import { SplitOddCents } from './parts/split-odd-cents';
+import { SPLIT_MODES, balanceNote, parseWeight } from './split-editor';
+
+/**
+ * Item by item: the receipt's lines, who had each, and tax and tip, which
+ * Split's engine shares out in proportion to what each person had, so the
+ * friend who only had a salad pays tip on a salad.
+ *
+ * Like the quick editor it holds only the choices; every figure on screen is
+ * the engine's answer for exactly what will be saved.
+ */
+@Component({
+  selector: 'app-itemized-split-editor',
+  standalone: true,
+  imports: [FormsModule, SplitPeople, SplitPayers, SplitProgress, SplitSummary, SplitOddCents],
+  templateUrl: './itemized-split-editor.html',
+  styleUrl: './itemized-split-editor.scss',
+})
+export class ItemizedSplitEditor {
+  people = inject(PersonService);
+
+  /** What the payer paid: the transaction amount, in cents (the bill's amount when someone else paid). */
+  myPaidCents = input.required<number>();
+  /** Who paid it: you (an expense of yours) or a friend (a bill someone else paid). */
+  paidBy = input<string>(ME);
+  readonly me = ME;
+  state = model.required<ItemizedSplitState>();
+  /** "Use $X as the amount": the receipt says you paid something else. */
+  useAmount = output<number>();
+
+  readonly modes = SPLIT_MODES;
+
+  // ── Derived, all from the engine ───────────────────────────
+  split = computed(() => buildItemizedSplit(this.state(), this.myPaidCents(), null, this.paidBy()));
+  result = computed(() => calculateSplit(toBill(this.split())));
+  problems = computed(() => splitProblems(this.split(), this.myPaidCents(), this.paidBy()));
+  /** Who else could have paid part: everyone on the bill but you and the payer. */
+  others = computed(() => this.state().participantIds.filter(id => id !== ME && id !== this.paidBy()));
+  includesMe = computed(() => this.state().participantIds.includes(ME));
+
+  /** The bill being split: what you paid plus what anyone else paid. */
+  billCents = computed(() => paidTowardsBillCents(this.state(), this.myPaidCents(), this.paidBy()));
+
+  /** What you'd have had to pay for the receipt to add up, given what others paid. */
+  coverCents = computed(() => myPaymentToCoverCents(this.state(), this.paidBy()));
+  mismatch = computed(() => this.result().subtotalCents > 0 && this.coverCents() !== this.myPaidCents());
+
+  private unclaimed = computed(() => new Set(this.result().unassignedItemIds));
+  isUnclaimed(item: SplitItem): boolean {
+    return item.priceCents > 0 && this.unclaimed().has(item.id);
+  }
+  anyUnclaimed = computed(() => this.state().items.some(i => this.isUnclaimed(i)));
+
+  // ── People ─────────────────────────────────────────────────
+  toggleMe() {
+    if (this.includesMe()) this.state.set(removeFromItemized(this.state(), ME));
+    else this.state.update(s => ({ ...s, participantIds: [ME, ...s.participantIds] }));
+  }
+
+  add(id: string) {
+    this.state.update(s => ({ ...s, participantIds: [...s.participantIds, id] }));
+  }
+
+  remove(id: string) {
+    this.state.set(removeFromItemized(this.state(), id));
+  }
+
+  /** Who pays the odd cents: picked by hand, or undefined for the default. */
+  setRoundUps(roundUpIds: string[] | undefined) {
+    this.state.update(s => ({ ...s, roundUpIds }));
+  }
+
+  setPayments(otherPayments: Payment[]) {
+    this.state.update(s => ({ ...s, otherPayments }));
+  }
+
+  // ── Items ──────────────────────────────────────────────────
+  private updateItem(index: number, change: (item: SplitItem) => SplitItem) {
+    this.state.update(s => ({ ...s, items: s.items.map((it, i) => i === index ? change(it) : it) }));
+  }
+
+  addItem() {
+    this.state.update(s => ({ ...s, items: [...s.items, newItem()] }));
+  }
+
+  removeItem(index: number) {
+    this.state.update(s => ({ ...s, items: s.items.filter((_, i) => i !== index) }));
+  }
+
+  setName(index: number, name: string) {
+    this.updateItem(index, it => ({ ...it, name }));
+  }
+
+  readonly quantityOf = itemQuantity;
+
+  /** The price field is the price of one; with a quantity, the line total follows. */
+  priceValue(item: SplitItem): number | null {
+    const unit = itemUnitPriceCents(item);
+    return unit ? fromCents(unit) : null;
+  }
+
+  setPrice(index: number, raw: number | string | null) {
+    const n = Number(raw);
+    this.updateItem(index, it => setItemUnitPrice(it, Number.isFinite(n) && n > 0 ? toCents(n) : 0));
+  }
+
+  setQuantity(index: number, raw: number | string | null) {
+    this.updateItem(index, it => setItemQuantity(it, Number(raw)));
+  }
+
+  hasPart(item: SplitItem, personId: string): boolean {
+    return item.assignments.some(a => a.personId === personId && a.weight > 0);
+  }
+
+  toggle(index: number, personId: string) {
+    this.updateItem(index, it => toggleAssignee(it, personId));
+  }
+
+  setMode(index: number, mode: SplitMode) {
+    this.updateItem(index, it => setItemMode(it, mode, this.state().participantIds));
+  }
+
+  weightValue(item: SplitItem, personId: string): number | null {
+    const w = item.assignments.find(a => a.personId === personId)?.weight;
+    if (w === undefined || w === 0) return null;
+    return item.splitMode === 'amount' ? fromCents(w) : w;
+  }
+
+  setWeight(index: number, personId: string, raw: number | string | null) {
+    this.updateItem(index, it => setItemWeight(it, personId, parseWeight(it.splitMode, raw)));
+  }
+
+  itemNote(item: SplitItem): string {
+    return splitIsBalanced(item) ? '' : balanceNote(item.splitMode, item.assignments, amountGapCents(item), 'this item');
+  }
+
+  claimTheRest() {
+    this.state.set(assignUnclaimedTo(this.state(), ME));
+  }
+
+  // ── Tax and tip ────────────────────────────────────────────
+  setTaxMode(taxMode: ChargeMode) {
+    this.state.update(s => ({ ...s, charges: { ...s.charges, taxMode } }));
+  }
+
+  setTipMode(tipMode: ChargeMode) {
+    this.state.update(s => ({ ...s, charges: { ...s.charges, tipMode } }));
+  }
+
+  setTipBasis(tipBasis: TipBasis) {
+    this.state.update(s => ({ ...s, charges: { ...s.charges, tipBasis } }));
+  }
+
+  chargeValue(which: 'tax' | 'tip'): number | null {
+    const c = this.state().charges;
+    const mode = which === 'tax' ? c.taxMode : c.tipMode;
+    const v = mode === 'percent'
+      ? (which === 'tax' ? c.taxPercent : c.tipPercent)
+      : fromCents(which === 'tax' ? c.taxCents : c.tipCents);
+    return v || null;
+  }
+
+  setCharge(which: 'tax' | 'tip', raw: number | string | null) {
+    const n = Number(raw);
+    const v = Number.isFinite(n) && n > 0 ? n : 0;
+    this.state.update(s => {
+      const c = { ...s.charges };
+      const mode = which === 'tax' ? c.taxMode : c.tipMode;
+      if (which === 'tax') {
+        if (mode === 'percent') c.taxPercent = Math.min(100, v);
+        // "Tax & fees" as an amount can be negative (discounts and credits bigger
+        // than tax and fees), but never by more than the items themselves.
+        else c.taxCents = Number.isFinite(n) ? Math.max(-itemsCents(s), toCents(n)) : 0;
+      }
+      else { if (mode === 'percent') c.tipPercent = Math.min(100, v); else c.tipCents = toCents(v); }
+      return { ...s, charges: c };
+    });
+  }
+
+  money(cents: number): string {
+    // "−$4.71", not "-$4.71": a real minus sign, like the rest of the app's figures.
+    return cents < 0 ? `−${formatCurrency(fromCents(-cents))}` : formatCurrency(fromCents(cents));
+  }
+}
+
+/** What the items add up to, before tax, fees and tip. */
+function itemsCents(state: { items: { priceCents: number }[] }): number {
+  return state.items.reduce((total, i) => total + i.priceCents, 0);
+}

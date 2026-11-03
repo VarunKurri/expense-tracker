@@ -9,26 +9,41 @@
 
 .view-panel {
   position: fixed; bottom: 0; left: 0; right: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+  /* Never taller than the screen below the status bar (part 91): a long
+     sheet (notes, reimbursements, a loan) scrolls in .view-scroll instead of
+     pushing the close button up under the notch. Desktop sets its own below. */
+  max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top) - 16px));
+  overflow: hidden;
   background: var(--surface-hi);
   border-radius: 24px 24px 0 0;
   border: 1px solid var(--line);
   border-bottom: none;
   z-index: 51;
-  padding: 0 0 calc(40px + env(safe-area-inset-bottom));
-  /* Never taller than the screen below the status bar: long content (notes,
-     reimbursements, a loan) scrolls inside instead of pushing the close
-     button up under the notch. Desktop sets its own height below. */
-  max-height: calc(100dvh - env(safe-area-inset-top) - 16px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
   animation: slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* The scrolling part, inside the panel's rounded edge, like a modal's body. */
+.view-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden; /* up and down only, like .modal-body */
+  overscroll-behavior: contain;
+  padding: 0 0 calc(40px + env(safe-area-inset-bottom));
+}
+
 @media (min-width: 640px) {
+  /* Centred with margin: auto, not transform: a transformed box traps any
+     fixed-position pop-up inside it (the receipt opened tiny, inside the
+     sheet). This way a pop-up from the sheet fills the window like any other. */
   .view-panel {
-    bottom: auto; left: 50%; top: 50%;
-    transform: translate(-50%, -50%);
-    width: 480px; max-height: 85vh; overflow-y: auto;
+    inset: 0;
+    margin: auto;
+    height: fit-content;
+    width: 480px; max-height: 85vh;
     border-radius: 20px; border: 1px solid var(--line);
     box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 24px 64px rgba(0,0,0,0.1);
     animation: popIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -125,7 +140,10 @@
   &.transfer { background: var(--bg-3); color: var(--fg-3); }
 }
 
-/* ── Reimbursements ────────────────────────────────────────── */
+/* ── Receipt photo ─────────────────────────────────────────── */
+.view-receipt { margin: 14px 20px 0; }
+
+/* ── Money back (and the loan card, which shares its look) ─── */
 .view-reimburse {
   margin: 14px 20px 0;
   padding: 14px 16px;
@@ -189,31 +207,66 @@
     &:hover { background: var(--bg-3); color: var(--red); }
   }
 
-  .reimburse-add {
-    margin-top: 8px;
-    width: 100%;
-    padding: 9px 12px;
-    border: 1px dashed var(--line-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--fg-2);
-    font-family: var(--font-ui);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    &:hover { background: var(--bg-3); color: var(--fg); }
+  /* The look is the shared .btn-add; this is only its spacing here. */
+  .reimburse-add { margin-top: 8px; }
+
+  /* Two actions side by side; they wrap to a column on a narrow phone. */
+  .money-back-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 8px;
+    .reimburse-add { flex: 1 1 140px; }
   }
+
+  .mini-seg { margin-bottom: 4px; }
+
+  /* A split bill: one row per person: name and what they owe, their state,
+     and "Won't be repaid". The name and amount are the button: tap to record. */
+  .split-people {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 8px;
+  }
+
+  /* Each person reads like a transaction row: name and a plain status line
+     on the left, the figure on the right. The whole row is the button: tap
+     to record what they paid back ("Won't be repaid" lives in that dialog). */
+  .split-person {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: calc(100% + 32px);
+    margin: 0 -16px;
+    padding: 10px 16px;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.18s ease;
+
+    &:last-child { border-bottom: none; }
+    &:hover:not(:disabled) { background: var(--bg-3); }
+    &:disabled { cursor: default; }
+    &:focus-visible { outline: none; box-shadow: inset 0 0 0 3px var(--focus-ring); }
+    &.settled .split-person-amount { color: var(--fg-4); }
+    /* A bill in a group: shares only, nothing to tap. */
+    &.static { cursor: default; &:hover { background: none; } }
+  }
+
+  .split-person-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .split-person-name { font-size: 14px; font-weight: 500; color: var(--fg); }
+  .split-person-status { font-size: 12.5px; color: var(--fg-3); }
+  .split-person-amount { font-size: 14px; font-weight: 600; color: var(--fg); white-space: nowrap; }
+  .split-hint { margin-top: 2px; }
 }
 
-/* ── Link picker ───────────────────────────────────────────── */
-.link-search { width: 100%; margin-bottom: 12px; }
+.cover-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.link-who { margin-bottom: 12px; }
 
-.link-list {
-  display: flex;
-  flex-direction: column;
-  max-height: 320px;
-  overflow-y: auto;
-}
+/* The link picker's list is app-transaction-picker. */
 
 /* Loan section: the reimbursement card's look, with room for two actions. */
 .view-loan {
@@ -222,54 +275,29 @@
   .input-field { margin-bottom: 8px; }
 }
 
-.link-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 11px 8px;
-  border: none;
-  border-top: 1px solid var(--line);
-  background: transparent;
-  font-family: var(--font-ui);
-  text-align: left;
-  cursor: pointer;
-
-  &:first-child { border-top: none; }
-  &:hover { background: var(--bg-3); }
-
-  .link-item-main {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--fg);
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .link-item-meta {
-    font-size: 12.5px;
-    color: var(--fg-3);
-    flex-shrink: 0;
-    font-variant-numeric: tabular-nums;
-  }
-}
-
-.link-empty {
-  padding: 22px 8px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--fg-3);
-}
-
 @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 @keyframes popIn   {
-  from { transform: translate(-50%, -48%) scale(0.97); opacity: 0; }
-  to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  from { transform: translateY(8px) scale(0.97); opacity: 0; }
+  to   { transform: none; opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .view-panel, .view-backdrop { animation: none; }
 }
+
+/* A bill in a group: shares only (nothing to tap), then a small link to the group. */
+.split-group-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 14px;
+  .split-hint { margin: 2px 0 0; }
+}
+
+/* The bill-someone-else-paid sheet (app-shared-bill-view) shares this stylesheet. */
+.view-paid-by { margin-top: 6px; font-size: 13px; color: var(--fg-3); }
+
+/* "Paid Nikhilesh · Tahoe Trip" with a small Unlink beside it. */
+.view-row-value.settles { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }

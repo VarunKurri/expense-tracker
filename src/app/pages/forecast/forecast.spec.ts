@@ -9,7 +9,13 @@ import { BillService } from '../../services/bill.service';
 import { ManualAssetService } from '../../services/manual-asset.service';
 import { CategoryService } from '../../services/category.service';
 import { Account, Bill, ManualAsset, Transaction } from '../../models';
+import { MoneyBackLedger } from '../../utils/money-back';
 import { localDateString } from '../../utils/date';
+
+/** The real money-back logic, over a fixed list of transactions. */
+class FakeTransactions extends MoneyBackLedger {
+  constructor(public transactions: () => Transaction[]) { super(); }
+}
 
 const checking: Account = { id: 'chk', name: 'Checking', type: 'checking', openingBalance: 1000, currency: 'USD', createdAt: 0 };
 
@@ -56,7 +62,7 @@ describe('Forecast page', () => {
         { provide: AccountService, useValue: { accounts: signal([checking]) } },
         {
           provide: TransactionService,
-          useValue: { transactions: signal(txs), effectiveExpenseAmount: (t: Transaction) => t.amount, reimbursementSurplus: () => 0 },
+          useValue: new FakeTransactions(signal(txs)),
         },
         { provide: BillService, useValue: { bills: signal(bills) } },
         { provide: ManualAssetService, useValue: { items: signal(manual), error: signal(null) } },
@@ -92,7 +98,7 @@ describe('Forecast page', () => {
     expect(el.querySelector('.month-row:not(.head)')!.textContent).toContain('(rest)');
   });
 
-  it('leaving out the one-off month changes the pace — on the same card as what it changes', async () => {
+  it('leaving out the one-off month changes the pace, on the same card as what it changes', async () => {
     await setup(history());
     const card = el.querySelector('.typical')!;
     // The months, the choice of how many, and the figures they make are one card.

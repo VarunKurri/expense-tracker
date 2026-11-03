@@ -64,7 +64,7 @@ export class BillService {
 
   bills = toSignal(this.bills$, { initialValue: [] });
 
-  // Upcoming bills — due within next 30 days
+  // Upcoming bills: due within the next 30 days
   upcomingBills(days = 30) {
     const today = localDateString();
     const future = new Date();
@@ -84,7 +84,7 @@ export class BillService {
     return this.advanceDate(bill.nextDueDate, bill.frequency);
   }
 
-  /** See utils/bill-schedule.ts — clamps to month end, and stays in local time. */
+  /** See utils/bill-schedule.ts. Clamps to month end, and stays in local time. */
   advanceDate(from: string, frequency: BillFrequency): string {
     return advanceDueDate(from, frequency);
   }

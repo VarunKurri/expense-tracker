@@ -150,7 +150,7 @@
 }
 
 // The pre-refund statement figure, kept visible (struck through) so it's clear the
-// number moved and why — not just silently swapped out.
+// number moved and why, rather than silently swapped out.
 .cc-item-amount-original {
   font-size: 11.5px;
   color: var(--fg-4);
@@ -461,3 +461,6 @@
   .dtl-date { color: var(--fg-3); flex-shrink: 0; }
   .dtl-amount { color: var(--fg); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 }
+
+/* A new account: the cards it might replace, then "new", one per row. */
+.replace-choices { display: flex; flex-direction: column; gap: 8px; }

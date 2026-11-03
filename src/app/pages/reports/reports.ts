@@ -11,16 +11,28 @@ import {
 } from 'chart.js';
 import { SankeyController, Flow } from 'chartjs-chart-sankey';
 
+import { Transaction } from '../../models';
 import { TransactionService } from '../../services/transaction.service';
+import { GroupService } from '../../services/group.service';
+import { SharedBalanceService } from '../../services/shared-balance.service';
 import { CategoryService } from '../../services/category.service';
 import { ThemeService } from '../../services/theme.service';
 import { filterForAnalysis } from '../../utils/analysis-filter';
+import { isMoneyBackIncome } from '../../utils/money-back';
 import { chartColors, categoryPalette, otherColor } from '../../utils/theme-colors';
 import {
   MoneyRules, totalExpenses, totalIncome, categoryTotals, incomeTotals,
   monthlySeries, monthsBetween, transferTotals, sankeyLinks, sankeyLabel,
-  expenseAmount,
+  expenseAmount, categorySpend, splitBills, splitPayments, addUpSplitBills,
 } from '../../utils/reporting';
+import { PersonService } from '../../services/person.service';
+import { ToastService } from '../../services/toast.service';
+import { TransactionView } from '../../components/transaction-view/transaction-view';
+import { TransactionForm } from '../transactions/transaction-form/transaction-form';
+import { Confirm } from '../../components/confirm/confirm';
+import { splitStatus } from '../../utils/splits';
+import { splitSentence } from '../../utils/shared';
+import { fromCents, toCents } from '../../utils/money';
 import { localDateString } from '../../utils/date';
 
 Chart.register(
@@ -50,12 +62,14 @@ const VIEWS: Record<ReportKey, { id: string; label: string }[]> = {
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, TransactionView, TransactionForm, Confirm],
   templateUrl: './reports.html',
   styleUrl: './reports.scss',
 })
 export class Reports implements AfterViewInit, OnDestroy {
   private txService = inject(TransactionService);
+  /** Fully refunded, counting refund incomes linked from the bank. */
+  private isRefunded = (t: Transaction) => this.txService.isFullyRefunded(t);
   private categoryService = inject(CategoryService);
   private themeService = inject(ThemeService);
   private router = inject(Router);
@@ -72,7 +86,7 @@ export class Reports implements AfterViewInit, OnDestroy {
   /** Netting matches the Analysis page's "exclude refunded" default. */
   netting = signal(true);
 
-  todayStr = localDateString(); // local, not UTC — UTC is already tomorrow on a US evening
+  todayStr = localDateString(); // local, not UTC (UTC is already tomorrow on a US evening)
 
   reports: { value: ReportKey; label: string }[] = [
     { value: 'cash-flow', label: 'Cash flow' },
@@ -143,16 +157,119 @@ export class Reports implements AfterViewInit, OnDestroy {
   private filtered = computed(() => {
     const { start, end } = this.dateRange();
     return filterForAnalysis(this.txService.transactions(), {
-      start, end, excludeRefunded: this.netting(),
+      start, end, excludeRefunded: this.netting(), isRefunded: this.isRefunded,
     });
   });
 
+  /** Split bills in the period: the "Split bills" rows under the numbers. */
+  private groups = inject(GroupService);
+  /** Each split bill in the period (group bills included: what you paid beyond your share, and the money back on it). */
+  splitRows = computed(() => splitBills(this.filtered(), t => this.txService.moneyBackEntriesFor(t),
+    t => !!this.groups.byId(t.split?.groupId)));
+  /** Their totals: the summary rows. Added up from the same rows, so the list and the totals always agree. */
+  splits = computed(() => addUpSplitBills(this.splitRows()));
+  /** What came back on those bills, one row per payment. */
+  splitBackRows = computed(() => splitPayments(this.splitRows(), t => this.txService.moneyBackEntriesFor(t)));
+  /** Payments can run past what these bills' shares were (a friend overpaid, or paid for later bills too). */
+  splitBackExtraCents = computed(() =>
+    Math.max(0, this.splitBackRows().reduce((s, p) => s + p.amountCents, 0) - this.splits().repaidCents));
+
+  private people = inject(PersonService);
+
+  /** "Tahoe & Cali Trip" for a bill in a group, else nothing. */
+  groupName(id?: string): string {
+    return id ? this.groups.byId(id)?.name ?? '' : '';
+  }
+
+  /** "Vybhav", or "Someone" when the payment doesn't say. */
+  personName(id?: string): string {
+    return id ? this.people.nameOf(id) : 'Someone';
+  }
+
+  /** How it came: the income's name ("Zelle from VYBHAV J"), or cash. */
+  paymentVia(p: { incomeId?: string; note?: string }): string {
+    if (p.incomeId) return this.txService.transactions().find(t => t.id === p.incomeId)?.merchant || 'A bank payment';
+    return p.note ? `Cash · ${p.note}` : 'Cash or other';
+  }
+
+  /** "On BevMo!" / "On BevMo! and 2 more" */
+  paymentBills(ids: string[]): string {
+    const first = this.splitRows().find(r => r.tx.id === ids[0])?.tx.merchant || 'a bill';
+    return ids.length > 1 ? `on ${first} and ${ids.length - 1} more` : `on ${first}`;
+  }
+
+  /** "Sep 12" */
+  shortDate(date: string): string {
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  /** A bank payment opens the income it came as; cash opens the bill it paid back. */
+  openPayment(p: { incomeId?: string; billIds: string[] }) {
+    const all = this.txService.transactions();
+    const t = p.incomeId ? all.find(x => x.id === p.incomeId) : all.find(x => x.id === p.billIds[0]);
+    if (t) this.viewingTx.set(t);
+  }
+
+  // ── A transaction: read, edit, delete (the same sheet and form as everywhere) ──
+  private toast = inject(ToastService);
+  viewingTx = signal<Transaction | null>(null);
+  editingTx = signal<Transaction | null>(null);
+  txFormOpen = signal(false);
+  txConfirmOpen = signal(false);
+  private txToDelete = signal<Transaction | null>(null);
+
+  editFromTxView(tx: Transaction) {
+    this.viewingTx.set(null);
+    this.editingTx.set(tx);
+    this.txFormOpen.set(true);
+  }
+
+  closeTxForm() { this.txFormOpen.set(false); this.editingTx.set(null); }
+
+  async handleTxSave(data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
+    const tx = this.editingTx();
+    if (!tx?.id) return;
+    try { await this.txService.update(tx.id, data); this.closeTxForm(); }
+    catch { this.toast.error('Could not save. Please try again.'); }
+  }
+
+  askTxDelete() {
+    this.txToDelete.set(this.editingTx());
+    this.txFormOpen.set(false);
+    this.txConfirmOpen.set(true);
+  }
+
+  async confirmTxDelete() {
+    const tx = this.txToDelete();
+    if (!tx?.id) return;
+    try { await this.txService.remove(tx.id); }
+    catch { this.toast.error('Could not delete. Please try again.'); }
+    finally {
+      this.txConfirmOpen.set(false);
+      this.txToDelete.set(null);
+      this.editingTx.set(null);
+    }
+  }
+  /** Who owes whom today, the same figures as Shared. */
+  shared = inject(SharedBalanceService);
+  /** "You covered $74.69 of other people's shares on 2 split bills in the last 6 months…" */
+  splitText = computed(() => splitSentence(this.splits(), this.periodPhrase()));
+
+  /** How the period reads in a sentence. */
+  private periodPhrase = computed(() => {
+    switch (this.range()) {
+      case '3-months': return 'in the last 3 months';
+      case '6-months': return 'in the last 6 months';
+      case 'this-year': return 'this year';
+      default: return 'in this period';
+    }
+  });
+
+  /** Shown on the reports that count spending. */
+  showSplits = computed(() => this.splits().bills > 0 && (this.report() === 'cash-flow' || this.report() === 'expenses'));
+
   /** Injected so the reporting helpers stay pure and testable. */
-  private rules = computed<MoneyRules>(() => ({
-    netting: this.netting(),
-    effectiveExpense: t => this.txService.effectiveExpenseAmount(t),
-    reimbursementSurplus: t => this.txService.reimbursementSurplus(t),
-  }));
+  private rules = computed<MoneyRules>(() => this.txService.moneyRules(this.netting()));
 
   private months = computed(() => {
     const { start, end } = this.dateRange();
@@ -163,10 +280,10 @@ export class Reports implements AfterViewInit, OnDestroy {
 
   totalIn = computed(() => totalIncome(this.filtered(), this.rules()));
   totalOut = computed(() => totalExpenses(this.filtered(), this.rules()));
-  netFlow = computed(() => Math.round((this.totalIn() - this.totalOut()) * 100) / 100);
+  netFlow = computed(() => fromCents(toCents(this.totalIn()) - toCents(this.totalOut())));
   avgPerMonth = computed(() => {
     const n = this.months().length || 1;
-    return Math.round((this.netFlow() / n) * 100) / 100;
+    return fromCents(Math.round(toCents(this.netFlow()) / n));
   });
 
   transfers = computed(() => transferTotals(this.filtered()));
@@ -180,7 +297,7 @@ export class Reports implements AfterViewInit, OnDestroy {
    * Category rows for the current report, capped at eight named slots with the
    * tail folded into "Other".
    *
-   * Eight is the depth of the validated colour ramp — a ninth slice would need a
+   * Eight is the depth of the validated colour ramp. A ninth slice would need a
    * hue that has not been checked for colour-blind separation, so the tail is
    * pooled instead.
    */
@@ -190,7 +307,7 @@ export class Reports implements AfterViewInit, OnDestroy {
     const raw = this.report() === 'income'
       ? incomeTotals(this.filtered(), this.rules())
       : categoryTotals(this.filtered(), this.rules());
-    const total = raw.reduce((s, r) => s + r.amount, 0);
+    const total = fromCents(raw.reduce((s, r) => s + toCents(r.amount), 0));
     const palette = categoryPalette();
 
     const head = raw.slice(0, this.MAX_SLICES).map((r, i) => ({
@@ -202,7 +319,7 @@ export class Reports implements AfterViewInit, OnDestroy {
 
     const tail = raw.slice(this.MAX_SLICES);
     if (tail.length) {
-      const amount = Math.round(tail.reduce((s, r) => s + r.amount, 0) * 100) / 100;
+      const amount = fromCents(tail.reduce((s, r) => s + toCents(r.amount), 0));
       head.push({
         name: `Other (${tail.length})`,
         amount,
@@ -231,7 +348,7 @@ export class Reports implements AfterViewInit, OnDestroy {
                 | { kind: 'category'; name: string; categoryId: string }
                 | null>(null);
 
-  /** Category id for a display name — the charts only carry names. */
+  /** Category id for a display name, since the charts only carry names. */
   private categoryIdFor(name: string): string {
     if (name === 'Uncategorized') return '__none__';
     return this.categoryService.categories().find(c => c.name === name)?.id ?? '';
@@ -253,7 +370,7 @@ export class Reports implements AfterViewInit, OnDestroy {
    * The transactions behind whatever was clicked, newest first.
    *
    * Filtered by the SAME rules the headline figures use, so the rows always add
-   * up to the number that was clicked — internal transfers excluded, and the
+   * up to the number that was clicked: internal transfers excluded, and the
    * report's own side (spending or income) respected.
    */
   drillTransactions = computed(() => {
@@ -266,14 +383,18 @@ export class Reports implements AfterViewInit, OnDestroy {
     if (d.kind === 'month') {
       txs = txs.filter(t => t.date.slice(0, 7) === d.month);
     } else {
-      const id = d.categoryId;
-      txs = txs.filter(t => (t.categoryId || '__none__') === (id || '__none__'));
+      // A settle-up payment is in every category it paid for (utils/settlements.ts).
+      const id = d.categoryId || '__none__';
+      txs = txs.filter(t => t.type === 'expense'
+        ? categorySpend(t, rules).some(p => p.categoryId === id)
+        : (t.categoryId || '__none__') === id);
     }
+    const inCategory = d.kind === 'category' ? (d.categoryId || '__none__') : null;
 
     // Expenses and Income tabs each show only their own side; Cash flow shows both.
     if (this.report() === 'expenses') txs = txs.filter(t => t.type === 'expense');
     if (this.report() === 'income') {
-      txs = txs.filter(t => t.type === 'income' && (!rules.netting || !t.reimbursesId));
+      txs = txs.filter(t => t.type === 'income' && (!rules.netting || !isMoneyBackIncome(t)));
     }
 
     return [...txs]
@@ -282,15 +403,24 @@ export class Reports implements AfterViewInit, OnDestroy {
         id: t.id!,
         date: t.date,
         merchant: t.merchant || t.notes || 'Untitled',
-        category: this.catName(t.categoryId || '__none__'),
+        category: this.catName(inCategory ?? (t.categoryId || '__none__')),
         type: t.type,
-        amount: t.type === 'expense' ? expenseAmount(t, rules) : t.amount,
+        // In a category, a settle-up payment counts only its part there.
+        amount: t.type !== 'expense' ? t.amount
+          : inCategory && t.settlement
+            ? fromCents(categorySpend(t, rules).find(p => p.categoryId === inCategory)?.cents ?? 0)
+            : expenseAmount(t, rules),
+        /** A settle-up payment: who it paid, so the row says why it's here. */
+        settles: t.type === 'expense' && t.settlement ? this.personName(t.settlement.personId) : null,
+        /** On a split bill, your part of it, i.e. what the row's amount is made of. */
+        myShare: t.type === 'expense' && t.split
+          ? fromCents(splitStatus(t.split, this.txService.moneyBackEntriesFor(t)).myShareCents)
+          : null,
       }));
   });
 
-  drillTotal = computed(() =>
-    Math.round(this.drillTransactions().reduce(
-      (s, t) => s + (t.type === 'expense' ? t.amount : -t.amount), 0) * -100) / -100);
+  drillTotal = computed(() => fromCents(this.drillTransactions().reduce(
+    (s, t) => s + (t.type === 'expense' ? toCents(t.amount) : -toCents(t.amount)), 0)));
 
   drillTitle = computed(() => {
     const d = this.drill();
@@ -329,6 +459,10 @@ export class Reports implements AfterViewInit, OnDestroy {
   money(n: number): string {
     return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   }
+  /** Integer cents, as currency. */
+  cents(n: number): string {
+    return this.money(fromCents(n));
+  }
   moneyShort(n: number): string {
     const a = Math.abs(n);
     if (a >= 1000) return `${n < 0 ? '-' : ''}$${Math.round(a / 100) / 10}k`;
@@ -361,7 +495,7 @@ export class Reports implements AfterViewInit, OnDestroy {
 
     const c = chartColors();
 
-    // Every mark is a way into the underlying transactions — a report you
+    // Every mark is a way into the underlying transactions; a report you
     // cannot open is just a picture.
     const onClick = (kind: 'month' | 'category') => (_evt: any, els: any[]) => {
       if (!els.length) return;
@@ -458,7 +592,7 @@ export class Reports implements AfterViewInit, OnDestroy {
       return;
     }
 
-    // Bars. Only Cash flow shows both series — Expenses and Income each show
+    // Bars. Only Cash flow shows both series. Expenses and Income each show
     // their own, which is the whole point of picking that tab.
     const stacked = view === 'stacked';
     const bar = (label: string, data: number[], colour: string) => ({
@@ -546,7 +680,7 @@ export class Reports implements AfterViewInit, OnDestroy {
     });
   }
 
-  /** Legend entries for the current chart — never colour alone. */
+  /** Legend entries for the current chart, never colour alone. */
   legend = computed(() => {
     const c = chartColors();
     switch (this.report()) {

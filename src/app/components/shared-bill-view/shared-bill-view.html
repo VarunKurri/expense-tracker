@@ -1,0 +1,96 @@
+@if (b(); as bill) {
+  <div class="view-backdrop" (click)="close()"></div>
+  <div class="view-panel" role="dialog" aria-modal="true" aria-label="Bill details">
+    <div class="view-scroll">
+      <div class="view-handle"></div>
+
+      <div class="view-header">
+        <button class="view-close" (click)="close()" aria-label="Close">✕</button>
+        <button class="view-edit-btn" (click)="edit()">Edit</button>
+      </div>
+
+      <div class="view-amount-wrap">
+        <div class="view-amount">{{ money(status()?.billTotalCents ?? 0) }}</div>
+        <div class="view-paid-by">Paid by {{ name(payerId()) }}</div>
+      </div>
+
+      <div class="view-details">
+        <div class="view-row">
+          <span class="view-row-label">Merchant</span>
+          <span class="view-row-value">{{ bill.merchant || 'None' }}</span>
+        </div>
+        <div class="view-row">
+          <span class="view-row-label">Date</span>
+          <span class="view-row-value">{{ formatFullDate(bill.date) }}</span>
+        </div>
+        <div class="view-row">
+          <span class="view-row-label">Paid by</span>
+          <span class="view-row-value">
+            @for (p of payers(); track p.personId; let last = $last) {
+              {{ name(p.personId) }} {{ money(p.amountCents) }}{{ last ? '' : ', ' }}
+            }
+          </span>
+        </div>
+        @if (category(); as cat) {
+          <div class="view-row">
+            <span class="view-row-label">Category</span>
+            <span class="view-row-value">{{ cat.icon }} {{ cat.name }}</span>
+          </div>
+        }
+        @if (group(); as g) {
+          <div class="view-row">
+            <span class="view-row-label">Group</span>
+            <span class="view-row-value">{{ g.name }}</span>
+          </div>
+        }
+        @if (bill.notes) {
+          <div class="view-row view-row-notes">
+            <span class="view-row-label">Notes</span>
+            <span class="view-row-value notes-text">{{ bill.notes }}</span>
+          </div>
+        }
+      </div>
+
+      @if (bill.receiptId) {
+        <div class="view-receipt">
+          <app-receipt-attach [image]="receiptImage()" [loading]="receiptLoading()" [editable]="false"
+                              note="Saved encrypted with this bill. Tap it to see it full size; to change or remove it, choose Edit." />
+        </div>
+      }
+
+      <!-- SHARES: everyone's part, and what you owe -->
+      <div class="view-reimburse">
+        <div class="view-reimburse-head">Shares</div>
+        <div class="split-people">
+          @for (r of rows(); track r.personId) {
+            <div class="split-person static">
+              <span class="split-person-main">
+                <span class="split-person-name">{{ name(r.personId) }}</span>
+                <span class="split-person-status">{{ rowNote(r) }}</span>
+              </span>
+              <span class="split-person-amount fig">{{ money(r.shareCents) }}</span>
+            </div>
+          }
+        </div>
+        @if (group(); as g) {
+          <div class="split-group-foot">
+            <p class="reimburse-hint split-hint">
+              This bill is in <strong>{{ g.name }}</strong>, where who pays whom is worked out across all its bills.
+              Your share becomes spending when you settle up.
+            </p>
+            <button type="button" class="btn-row" (click)="openGroup(g.id!)">Open group</button>
+          </div>
+        } @else {
+          @for (t of youOwe(); track t.toPersonId) {
+            <p class="reimburse-hint split-hint">
+              You owe {{ name(t.toPersonId) }} <span class="fig">{{ money(t.amountCents) }}</span>.
+              It becomes spending when you pay it back.
+            </p>
+          } @empty {
+            <p class="reimburse-hint split-hint">You don't owe anything on this.</p>
+          }
+        }
+      </div>
+    </div>
+  </div>
+}

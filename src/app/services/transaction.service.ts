@@ -1,4 +1,4 @@
-import { Injectable, inject, NgZone, signal, computed } from '@angular/core';
+import { Injectable, Injector, inject, NgZone, signal, computed } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
   collection, query, orderBy, onSnapshot,
@@ -17,9 +17,14 @@ import { plaidCategoryName } from '../utils/plaid-category-map';
 import { resolvePlaidCategory } from '../utils/categories';
 import { TransactionRuleService } from './transaction-rule.service';
 import { applyRulesToDraft } from '../utils/rules';
+import { MoneyBackLedger } from '../utils/money-back';
+import { accountForPlaidId } from '../utils/plaid-accounts';
+import { bankUpdatePatch, withoutBankSidecars } from '../utils/bank-updates';
+import { CategoryPart, settlementCategories } from '../utils/settlements';
+import { SharedBillService } from './shared-bill.service';
 
 @Injectable({ providedIn: 'root' })
-export class TransactionService {
+export class TransactionService extends MoneyBackLedger {
   private db = inject(Firestore);
   private auth = inject(AuthService);
   private encryption = inject(EncryptionService);
@@ -47,7 +52,15 @@ export class TransactionService {
             const results = await Promise.allSettled(
               snap.docs.map(async d => {
                 try {
-                  return { id: d.id, ...(await this.encryption.decryptDoc<Transaction>(d.data())) };
+                  const data = d.data();
+                  const tx: Transaction = { id: d.id, ...(await this.encryption.decryptDoc<Transaction>(data)) };
+                  // Beside a row you've edited, never inside it (see syncItem in functions).
+                  if (data['bankRemoved']) tx.bankRemoved = true;
+                  if (data['bankUpdate']) {
+                    try { tx.bankUpdate = await this.encryption.decryptDoc<Transaction>(data['bankUpdate']); }
+                    catch (err) { console.error(`bank update on ${d.id} could not be read:`, err); }
+                  }
+                  return tx;
                 } catch (err) {
                   throw new Error(`doc ${d.id}: ${(err as Error)?.message || err}`);
                 }
@@ -59,6 +72,8 @@ export class TransactionService {
               if (r.status === 'fulfilled') transactions.push(r.value);
               else { failed++; console.error('Failed to decrypt a transaction doc:', r.reason); }
             }
+            // The bank changed rows you've edited: take its figures, keep your edits.
+            void this.applyBankUpdates(transactions);
             this.ngZone.run(() => {
               this.error.set(failed > 0
                 ? `${failed} transaction${failed === 1 ? '' : 's'} failed to decrypt and ${failed === 1 ? 'is' : 'are'} hidden. The rest are shown below.`
@@ -87,14 +102,15 @@ export class TransactionService {
    */
   transactions = computed<Transaction[]>(() => {
     const txs = this.rawTransactions();
-    const accounts = this.accountSvc.accounts();
+    // As saved: the shown accounts work their balances out from these transactions.
+    const accounts = this.accountSvc.storedAccounts();
     const categories = this.categorySvc.categories();
 
     return txs.map(t => {
       let out = t;
 
       if (!out.accountId && out.plaidAccountId) {
-        const match = accounts.find(a => a.plaidAccountId === out.plaidAccountId);
+        const match = accountForPlaidId(accounts, out.plaidAccountId);
         if (match?.id) out = { ...out, accountId: match.id };
       }
 
@@ -112,7 +128,7 @@ export class TransactionService {
 
   /**
    * Transactions with this category actually stored on them. Excludes bank
-   * transactions that only match it by name — those carry no stored category
+   * transactions that only match it by name; those carry no stored category
    * and follow the category's Plaid aliases instead.
    */
   storedInCategory(categoryId: string): Transaction[] {
@@ -128,53 +144,18 @@ export class TransactionService {
     return transactionDeltaForAccount(this.transactions(), accountId);
   }
 
-  // ── Partial reimbursements ─────────────────────────────────
-  // Total reimbursed per expense: sum of every income's amount that points at it via
-  // `reimbursesId`. One source of truth (the income), so an expense never gets stale.
-  reimbursedByExpense = computed<Map<string, number>>(() => {
-    const map = new Map<string, number>();
-    for (const t of this.transactions()) {
-      if (t.type === 'income' && t.reimbursesId) {
-        map.set(t.reimbursesId, (map.get(t.reimbursesId) ?? 0) + t.amount);
-      }
-    }
-    return map;
-  });
+  // Money back (refunds and repayments): moneyBackFor, effectiveExpenseAmount,
+  // reimbursementSurplus, refundState, isFullyRefunded, moneyRules… are inherited
+  // from MoneyBackLedger (utils/money-back.ts), where they're tested on their own.
 
-  /** How much of an expense has been reimbursed by linked income. */
-  reimbursedAmountFor(expenseId?: string): number {
-    if (!expenseId) return 0;
-    return Math.round((this.reimbursedByExpense().get(expenseId) ?? 0) * 100) / 100;
-  }
+  // Looked up when first needed rather than injected: the bills friends paid
+  // are only read for a settle-up payment's categories.
+  private injector = inject(Injector);
 
-  /** An expense's true cost after reimbursements (floored at 0). Non-expenses pass through. */
-  effectiveExpenseAmount(t: Transaction): number {
-    if (t.type !== 'expense' || !t.id) return t.amount;
-    return Math.max(0, Math.round((t.amount - this.reimbursedAmountFor(t.id)) * 100) / 100);
-  }
-
-  /** When linked reimbursements exceed the original expense (e.g. split evenly but one
-   *  side rounded up), the excess is real profit, not spending — it belongs in income,
-   *  not silently floored away by `effectiveExpenseAmount`. Zero for non-expenses. */
-  reimbursementSurplus(t: Transaction): number {
-    if (t.type !== 'expense' || !t.id) return 0;
-    return Math.max(0, Math.round((this.reimbursedAmountFor(t.id) - t.amount) * 100) / 100);
-  }
-
-  /** The income transactions that reimburse a given expense. */
-  reimbursementsFor(expenseId?: string): Transaction[] {
-    if (!expenseId) return [];
-    return this.transactions().filter(t => t.type === 'income' && t.reimbursesId === expenseId);
-  }
-
-  /** For an income that reimburses an expense: that expense's surplus, if any. Surplus
-   *  belongs to the expense as a whole (it can come from one or several linked
-   *  incomes together), not to any single payment — this just lets a reimbursing
-   *  income's own row indicate "this is part of a package that came out ahead." */
-  reimbursementSurplusForIncome(income: Transaction): number {
-    if (income.type !== 'income' || !income.reimbursesId) return 0;
-    const expense = this.transactions().find(t => t.id === income.reimbursesId);
-    return expense ? this.reimbursementSurplus(expense) : 0;
+  /** A settle-up payment counts under the categories of the shares it paid for. */
+  override settlementCategoryParts(t: Transaction): CategoryPart[] | null {
+    if (!t.settlement) return null;
+    return settlementCategories(t, this.injector.get(SharedBillService).bills());
   }
 
   // For credit cards: currentBalance = openingBalance + txBalance
@@ -187,13 +168,42 @@ availableCredit(account: Account): number {
   return availableCredit(account, this.transactions());
 }
 
+  /** Rows whose bank update is being written, so a second snapshot doesn't write it twice. */
+  private applying = new Set<string>();
+
+  /**
+   * Fold the bank's newer version into rows you've edited (an amount that
+   * settled, a pending charge that posted). Saving the row clears the
+   * waiting update, since a save replaces the whole document.
+   */
+  private async applyBankUpdates(txs: Transaction[]) {
+    for (const t of txs) {
+      // (A pending row the bank dropped is settled by PlaidService: folded into
+      // its posted version, or removed if it was cancelled.)
+      if (!t.id || !t.bankUpdate || this.applying.has(t.id)) continue;
+      this.applying.add(t.id);
+      try {
+        await this.update(t.id, bankUpdatePatch(t, t.bankUpdate));
+      } catch (err) {
+        console.error('Could not apply a bank update:', err);
+      } finally {
+        this.applying.delete(t.id);
+      }
+    }
+  }
+
+  /** Keep a row the bank no longer lists: saving it clears the flag. */
+  async keepRemovedByBank(id: string) {
+    await this.update(id, {});
+  }
+
   async add(tx: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
     const now = Date.now();
     // Rules run before the write, so a manually added transaction lands already
     // filed rather than needing a second pass.
-    const ruled = applyRulesToDraft(this.ruleService.activeRules(), tx);
+    const ruled = applyRulesToDraft(this.ruleService.activeRules(), withoutBankSidecars(tx));
     const data = {
       ...ruled, createdAt: now, updatedAt: now
     };
@@ -214,7 +224,7 @@ availableCredit(account: Account): number {
     const rules = this.ruleService.activeRules();
 
     for (const tx of txs) {
-      const ruled = applyRulesToDraft(rules, tx);
+      const ruled = applyRulesToDraft(rules, withoutBankSidecars(tx));
       const data = { ...ruled, createdAt: now + count, updatedAt: now + count };
       batch.set(doc(ref), await this.encryption.encryptForWrite(data));
       count++;
@@ -237,10 +247,18 @@ availableCredit(account: Account): number {
     const current = await this.encryption.decryptDoc<Transaction>(snap.data());
     // setDoc (full replace), not updateDoc (partial merge): a Plaid-synced transaction
     // is a differently-shaped `__envelope` document (encryptedDEK, tag, no __encrypted
-    // flag). Editing it re-encrypts it as a symmetric `__encrypted` doc — updateDoc
+    // flag). Editing it re-encrypts it as a symmetric `__encrypted` doc; updateDoc
     // would leave the old envelope-only fields in place alongside the new ciphertext,
     // producing a document that's neither validly enveloped nor validly symmetric.
-    await setDoc(ref, await this.encryption.encryptForWrite({ ...current, ...patch, updatedAt: Date.now() }) as any);
+    await setDoc(ref, await this.encryption.encryptForWrite(withoutBankSidecars({ ...current, ...patch, updatedAt: Date.now() })) as any);
+  }
+
+  /** Everything saved against one account now belongs to another (an account linked twice, folded into one). */
+  async moveAccountReferences(fromId: string, toId: string) {
+    const raw = this.rawTransactions();
+    await this.updateMany(raw.filter(t => t.accountId === fromId).map(t => t.id!), { accountId: toId });
+    await this.updateMany(raw.filter(t => t.fromAccountId === fromId).map(t => t.id!), { fromAccountId: toId });
+    await this.updateMany(raw.filter(t => t.toAccountId === fromId).map(t => t.id!), { toAccountId: toId });
   }
 
   async updateMany(ids: string[], patch: Partial<Transaction>) {
@@ -257,7 +275,7 @@ availableCredit(account: Account): number {
       const snap = await getDoc(ref);
       if (!snap.exists()) continue;
       const current = await this.encryption.decryptDoc<Transaction>(snap.data());
-      batch.set(ref, await this.encryption.encryptForWrite({ ...current, ...patch, updatedAt: now + count }));
+      batch.set(ref, await this.encryption.encryptForWrite(withoutBankSidecars({ ...current, ...patch, updatedAt: now + count })));
       count++;
 
       if (count % 400 === 0) {
@@ -311,9 +329,10 @@ availableCredit(account: Account): number {
 
     let batch = writeBatch(this.db);
     let count = 0;
+    const receiptIds = this.receiptIdsOf(ids);
 
-    for (const id of ids) {
-      batch.delete(doc(this.db, `users/${user.uid}/transactions/${id}`));
+    for (const id of [...ids.map(i => `transactions/${i}`), ...receiptIds.map(r => `receipts/${r}`)]) {
+      batch.delete(doc(this.db, `users/${user.uid}/${id}`));
       count++;
 
       if (count % 400 === 0) {
@@ -328,6 +347,18 @@ availableCredit(account: Account): number {
   async remove(id: string) {
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in');
+    const [receiptId] = this.receiptIdsOf([id]);
     await deleteDoc(doc(this.db, `users/${user.uid}/transactions/${id}`));
+    // Its receipt photo goes with it; a leftover photo would just take up space.
+    if (receiptId) {
+      await deleteDoc(doc(this.db, `users/${user.uid}/receipts/${receiptId}`))
+        .catch(err => console.warn('Could not delete the receipt photo:', err));
+    }
+  }
+
+  /** The receipt photos attached to these transactions. */
+  private receiptIdsOf(ids: string[]): string[] {
+    const wanted = new Set(ids);
+    return this.transactions().filter(t => t.id && wanted.has(t.id) && t.receiptId).map(t => t.receiptId!);
   }
 }

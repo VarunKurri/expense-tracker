@@ -47,6 +47,35 @@
       }
     }
 
+    <!-- RECEIPT: a photo kept with the transaction; it can also fill in the form -->
+    @if (type === 'expense') {
+      <app-receipt-attach
+        [image]="receiptImage()" [loading]="receiptLoading()" [busy]="scanning()"
+        hint="Attach a photo of the receipt, and Trackr can fill in the merchant, amount, items, tax and tip from it."
+        [note]="receiptNote()"
+        [actionLabel]="scanning() ? 'Reading…' : (scanned() ? 'Read again' : 'Fill in from it')"
+        (picked)="attachReceipt($event)" (removed)="removeReceipt()" (action)="readReceipt()" />
+      @if (scanned(); as scan) {
+        <div class="form-note scan-note">
+          <div><strong>{{ scan.merchant || 'Receipt' }}</strong> · {{ scanSummary(scan) }}</div>
+          @if (scanTaxBreakdown(scan); as breakdown) {
+            <div>Tax &amp; fees is {{ breakdown }}.</div>
+          }
+          @if (scanWarning(scan); as warning) {
+            <div class="field-error">{{ warning }}</div>
+          }
+          <div>
+            @if (splitOn() && splitKind() === 'itemized') {
+              The items are under Item by item below. Tap who had each one.
+            } @else {
+              To divide it item by item, turn on Split this bill.
+            }
+            Everything stays editable.
+          </div>
+        </div>
+      }
+    }
+
     <!-- AMOUNT -->
     <div class="amount-field">
       <span class="amount-curr">$</span>
@@ -123,7 +152,47 @@
              [(ngModel)]="date" name="date" />
     </div>
 
-    <!-- RECURRING BILL SECTION — slides in when Subscriptions category selected -->
+    <!-- SPLIT: shared with friends (who owes you what) -->
+    @if (type === 'expense') {
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Split this bill</div>
+          <div class="toggle-sub">Shared with friends? Track who owes you what.</div>
+        </div>
+        <button type="button" class="toggle" role="switch" [class.on]="splitOn()" [attr.aria-checked]="splitOn()"
+                aria-label="Split this bill" (click)="splitOn.set(!splitOn())"></button>
+      </div>
+      @if (splitOn()) {
+        <div class="form-section">
+          @if (groupChoices().length) {
+            <div class="field">
+              <label class="label-sm" for="split-group">Group <span class="label-optional">(optional)</span></label>
+              <select id="split-group" class="input-field" [ngModel]="splitGroupId()" (ngModelChange)="setSplitGroup($event)" name="splitGroup">
+                <option value="">None</option>
+                @for (g of groupChoices(); track g.id) { <option [value]="g.id">{{ g.name }}</option> }
+              </select>
+              @if (splitGroupId()) {
+                <p class="field-hint">Balances for this bill are worked out across the whole group, so everyone settles up once.</p>
+              }
+            </div>
+          }
+          <div class="mini-seg" role="radiogroup" aria-label="Split the">
+            <button type="button" role="radio" [class.active]="splitKind() === 'quick'"
+                    [attr.aria-checked]="splitKind() === 'quick'" (click)="setSplitKind('quick')">Whole bill</button>
+            <button type="button" role="radio" [class.active]="splitKind() === 'itemized'"
+                    [attr.aria-checked]="splitKind() === 'itemized'" (click)="setSplitKind('itemized')">Item by item</button>
+          </div>
+          @if (splitKind() === 'itemized') {
+            <app-itemized-split-editor [myPaidCents]="amountCents()" [(state)]="itemizedState"
+                                       (useAmount)="useSplitAmount($event)" />
+          } @else {
+            <app-split-editor [myPaidCents]="amountCents()" [(state)]="splitState" />
+          }
+        </div>
+      }
+    }
+
+    <!-- RECURRING BILL SECTION: slides in when Subscriptions category selected -->
     @if (isSubscription() && type === 'expense' && !transaction && !hasExistingBill()) {
       <div class="form-section recurring">
         <div>
@@ -245,21 +314,15 @@
       }
     }
 
-    <!-- REFUNDED TOGGLE -->
+    <!-- MONEY BACK: refunds and repayments live on the transaction view now, so
+         partial refunds and who-paid-what have one home. -->
     @if (transaction && type === 'expense') {
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">Mark as refunded</div>
-          <div class="toggle-sub">
-            Excludes from analysis. For partial refunds, log the payback as income instead.
-          </div>
-        </div>
-        <button type="button"
-                class="toggle"
-                [class.on]="refunded"
-                (click)="refunded = !refunded">
-        </button>
-      </div>
+      <p class="form-note">
+        @if (moneyBack() > 0) {
+          {{ formatCurrency(moneyBack()) }} has come back on this so far.
+        }
+        Refunds and repayments are recorded under <strong>Money back</strong> on the transaction's details.
+      </p>
     }
 
     <!-- INTERNAL TRANSFER TOGGLE -->

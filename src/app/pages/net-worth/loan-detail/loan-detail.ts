@@ -20,7 +20,7 @@ import { localDateString, parseLocalDate } from '../../../utils/date';
 
 /**
  * One loan in full: what is owed, how far through it you are, what it is
- * really costing, and every payment — made, missed and still to come.
+ * really costing, and every payment: made, missed and still to come.
  *
  * Payments are the loan's own list (linked by hand, or recognised by its
  * matching rule); linking and un-linking here only ever writes to the loan,
@@ -105,7 +105,7 @@ export class LoanDetail {
     if (!o.nextDue) return 'On track.';
     // Due date passed but still inside its window: on its way, not missed.
     if (o.nextIsLate) {
-      return `${this.monthName(o.nextDue)}'s payment is on its way — expected by ${this.formatDate(o.nextDueBy!)}.`;
+      return `${this.monthName(o.nextDue)}'s payment is on its way, expected by ${this.formatDate(o.nextDueBy!)}.`;
     }
     const when = mode === 'flexible'
       ? `expected around ${this.formatDate(o.nextDue)} (by ${this.formatDate(o.nextDueBy!)})`
@@ -114,7 +114,7 @@ export class LoanDetail {
     return `On track. Next payment of ${this.money(s.payment)} is ${when}.`;
   });
 
-  /** What it bought, and what that's worth now — the other side of the loan. */
+  /** What it bought, and what that's worth now: the other side of the loan. */
   bought = computed(() => {
     const l = this.loan();
     const other = l?.linkedId ? this.manualService.items().find(m => m.id === l.linkedId) : null;
@@ -134,7 +134,7 @@ export class LoanDetail {
 
   /**
    * Payments so far, newest first, with how each was split. `unusual` marks a
-   * payment far from the regular amount at the time — the ones worth asking
+   * payment far from the regular amount at the time. Those are the ones worth asking
    * "was this a lump sum?" about.
    */
   made = computed(() => {
@@ -296,7 +296,7 @@ export class LoanDetail {
     return (this.state()?.splits ?? []).some(sp => sp.tx.id !== tx.id && !sp.lump && sp.tx.date.slice(0, 7) === month);
   }
 
-  /** The loan with this lump sum set as chosen — what Save would make it. */
+  /** The loan with this lump sum set as chosen, i.e. what Save would make it. */
   private withLump(l: ManualAsset, tx: Transaction, mode: LumpSum['mode'], onTop: boolean): LoanTerms {
     const t = l.loan!;
     const lump: LumpSum = { txId: tx.id!, mode, ...(onTop ? { onTop: true } : {}) };
@@ -398,7 +398,7 @@ export class LoanDetail {
       await this.manualService.update(l.id, { loan: undefined, purchase: undefined, depreciationRate: undefined, ...save.entry });
       this.toast.success(`${save.entry.name} saved.`);
       this.formOpen.set(false);
-      // Changed into something that isn't a loan — its page no longer applies.
+      // Changed into something that isn't a loan, so its page no longer applies.
       if (!save.entry.loan) this.router.navigate(['/net-worth']);
     } catch {
       this.toast.error('Could not save. Please try again.');

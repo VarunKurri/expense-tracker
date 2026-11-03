@@ -22,7 +22,7 @@ export class AccountDetail {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private accountService = inject(AccountService);
-  private txService = inject(TransactionService);
+  txService = inject(TransactionService);
   private categoryService = inject(CategoryService);
   private toastService = inject(ToastService);
 
@@ -167,9 +167,9 @@ export class AccountDetail {
   }
 
   accountName(id?: string): string {
-    if (!id) return '—';
+    if (!id) return 'None';
     const a = this.accountService.accounts().find(a => a.id === id);
-    return a ? `${a.icon} ${a.name}` : '—';
+    return a ? `${a.icon} ${a.name}` : 'None';
   }
 
   formatCurrency(n: number): string {

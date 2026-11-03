@@ -41,11 +41,27 @@ export function availableCredit(account: Account, transactions: Transaction[]): 
   return roundMoney(account.creditLimit - creditCardBalance(account, transactions));
 }
 
-export function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
+/** The day the bank counts a row on: when it posted, or (for older rows) its date. */
+export function postedOn(t: Transaction): string {
+  return t.postedDate ?? t.date;
 }
 
-/** Money in/out for one account within a given "YYYY-MM" month — includes transfers
+/**
+ * The balance at the end of `date` as a statement has it: by posted date, not
+ * purchase date (a purchase on the 16th that posts on the 18th is on the next
+ * statement). For a card, what you owe.
+ */
+export function postedBalanceOn(account: Account, transactions: Transaction[], date: string): number {
+  const upTo = transactionDeltaForAccount(transactions.filter(t => postedOn(t) <= date), account.id || '');
+  return roundMoney(owesMoney(account.type) ? (account.openingBalance || 0) - upTo : (account.openingBalance || 0) + upTo);
+}
+
+export function roundMoney(value: number): number {
+  // `+ 0` turns −0 (from negating an empty total) into 0.
+  return Math.round(value * 100) / 100 + 0;
+}
+
+/** Money in/out for one account within a given "YYYY-MM" month. Includes transfers
  *  (a transfer is a real movement of money through that specific account, even
  *  though it's excluded from app-wide income/expense totals). */
 export function monthActivityForAccount(

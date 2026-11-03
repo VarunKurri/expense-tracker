@@ -188,7 +188,7 @@
   }
 }
 
-// Deliberately its own class, not a reuse of .filter-select — that class sets
+// Deliberately its own class, not a reuse of .filter-select: that class sets
 // `appearance: none` plus a custom dropdown-chevron background-image meant for
 // <select>, which fights with iOS Safari's native date-picker chrome on
 // <input type="date"> (can suppress the calendar affordance / look doubled-up).
@@ -275,30 +275,10 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;
-  padding: 20px 24px;
+  overflow: hidden;
 }
 
-.chart-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-}
-
-.chart-card-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--fg);
-  letter-spacing: -0.01em;
-}
-
-.chart-card-sub {
-  font-size: 12px;
-  color: var(--fg-3);
-  margin-top: 3px;
-}
-
-/* ── LEGEND — fixed with actual colored swatches ───────────── */
+/* ── LEGEND: fixed with actual colored swatches ───────────── */
 .chart-legend {
   display: flex;
   gap: 16px;
@@ -313,7 +293,7 @@
   color: var(--fg-3);
 }
 
-/* Actual color swatches — rounded squares, not just dots */
+/* Actual color swatches: rounded squares, not just dots */
 .legend-swatch {
   width: 12px;
   height: 12px;
@@ -328,6 +308,7 @@
 .bar-chart-wrap {
   height: 200px;
   position: relative;
+  margin: 12px 20px 20px;
 }
 
 /* ── BOTTOM GRID ───────────────────────────────────────────── */
@@ -345,41 +326,24 @@
   overflow: hidden;
 }
 
+/* Every card's head: the eyebrow and, on the right, its link or legend.
+   Nothing else above the hairline, as on Spending and the Dashboard. */
 .panel-head {
-  padding: 18px 20px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 15px 20px;
   border-bottom: 1px solid var(--line);
 }
 
-.panel-head-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-}
-
-.panel-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--fg);
-  letter-spacing: -0.01em;
-}
-
-.panel-sub {
-  font-size: 12px;
+/* The line under the hairline that says what the card shows. */
+.panel-intro {
+  margin: 0;
+  padding: 14px 20px 4px;
+  font-size: 13px;
   color: var(--fg-3);
-  margin-top: 3px;
-}
-
-.see-all-link {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--fg-2);
-  text-decoration: none;
-  white-space: nowrap;
-  flex-shrink: 0;
-
-  &:hover { color: var(--fg); }
 }
 
 .panel-empty {
@@ -509,7 +473,7 @@
   text-align: right;
 }
 
-/* The original charge, under the net figure — smaller and quieter, because the
+/* The original charge, under the net figure, smaller and quieter because the
    net is the number this page is actually counting. */
 .merchant-tx-net {
   display: block;
@@ -517,6 +481,40 @@
   font-size: 11px;
   font-weight: 400;
   color: var(--fg-3);
+}
+
+/* ── SPLIT BILLS: "Owed to you" ─────────────────────────────
+   The figure and its sentence on the left, the four figures behind it on the
+   right; stacked on a phone. */
+.split-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px 32px;
+  align-items: center;
+  padding: 20px 24px;
+}
+.split-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.split-figure { font-size: 34px; }
+/* "Owed to you" with "You owe" beside it, both right now. */
+.split-now { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; }
+.split-owe { color: var(--fg-2); font-size: 14px; .fig { color: var(--fg); font-weight: 600; } }
+.split-sentence { margin: 0; max-width: 560px; color: var(--fg-2); font-size: 14px; line-height: 1.5; }
+.split-hint { margin: 0; color: var(--fg-3); font-size: 12.5px; }
+
+.split-figs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(110px, auto));
+  gap: 14px 28px;
+  margin: 0;
+
+  dt { color: var(--fg-3); margin-bottom: 4px; }
+  dd { margin: 0; font-size: 16px; font-weight: 600; color: var(--fg); }
+}
+
+@media (max-width: 768px) {
+  .split-card { grid-template-columns: 1fr; padding: 16px; }
+  .split-figure { font-size: 28px; }
+  .split-figs { padding-top: 14px; border-top: 1px solid var(--line); }
 }
 
 /* ── DONUT CHART ───────────────────────────────────────────── */

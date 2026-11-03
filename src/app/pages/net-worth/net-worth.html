@@ -15,7 +15,7 @@
     <section class="card empty">
       <span class="card-label">Net worth</span>
       <h2 class="display">See the whole picture, <em>not just the bank</em>.</h2>
-      <p>Connect or add an account, or add something you own or owe — a home, a car, a loan — and your net worth starts here.</p>
+      <p>Connect or add an account, or add something you own or owe (a home, a car, a loan), and your net worth starts here.</p>
       <button class="btn-primary" (click)="openNew()">+ Add asset or debt</button>
     </section>
 
@@ -62,8 +62,8 @@
           @if (projecting()) {
             @if (projection().length) {
               <span class="projection-note">
-                The dashed line assumes the next months look like the last three — your usual income and spending,
-                bills on their dates, loan payments on schedule — with investments held flat.
+                The dashed line assumes the next months look like the last three: your usual income and spending,
+                bills on their dates and loan payments on schedule, with investments held flat.
                 <a routerLink="/analysis/forecast">See the forecast ›</a>
               </span>
             } @else {
@@ -122,7 +122,7 @@
         <div class="side-head">
           <span class="card-label">Tracked, not counted</span>
         </div>
-        <p class="tracked-note">Loans being repaid to you for someone else. The money is theirs, so it isn't in your net worth — the payments you receive still count as income.</p>
+        <p class="tracked-note">Loans being repaid to you for someone else. The money is theirs, so it isn't in your net worth. The payments you receive still count as income.</p>
         @for (t of tracked(); track t.id) {
           <button type="button" class="row" (click)="openLoan(t.id)">
             <span class="row-icon">🤲</span>
@@ -140,7 +140,7 @@
       <section class="card promo">
         <span class="card-label">Beyond your accounts</span>
         <h2 class="display">Count <em>what you own</em>, not just what's in the bank.</h2>
-        <p>A home, a car, a retirement account Plaid can't reach, or a loan — add them once and update the value whenever it changes. Each update is kept, so the history above stays honest.</p>
+        <p>A home, a car, a retirement account Plaid can't reach, or a loan: add them once and update the value whenever it changes. Each update is kept, so the history above stays honest.</p>
         <button class="btn-primary" (click)="openNew()">+ Add asset or debt</button>
       </section>
     }
@@ -159,7 +159,7 @@
 <app-confirm
   [open]="confirmOpen()"
   title="Delete this entry?"
-  [message]="(toDelete()?.name ?? 'It') + ' and its value history will be removed, and it will no longer count toward your net worth — past months included.'"
+  [message]="(toDelete()?.name ?? 'It') + ' and its value history will be removed, and it will no longer count toward your net worth, past months included.'"
   confirmText="Delete"
   (confirmed)="confirmDelete()"
   (cancelled)="cancelDelete()" />

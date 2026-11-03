@@ -39,7 +39,7 @@
       <div class="rb-text">
         <span class="rb-icon">📊</span>
         <span>
-          <strong>Analysis view</strong> — matching the Analysis page.
+          <strong>Analysis view</strong>, matching the Analysis page.
           Internal transfers{{ analysisExcludeRefunded() ? ' and refunded rows' : '' }}
           are shown but greyed out and left out of the totals.
         </span>
@@ -96,7 +96,7 @@
       }
     </div>
 
-    <!-- Date range — Last 30 days is default and first option -->
+    <!-- Date range: Last 30 days is the default and first option -->
     <select class="filter-select"
             [value]="filterDateRange()"
             (change)="filterDateRange.set($any($event.target).value)">
@@ -207,62 +207,77 @@
   }
 
   @if (bulkMode() && grouped().length > 0) {
-    <div class="bulk-bar" [class.active]="selectedCount() > 0">
-      <label class="bulk-select-all">
-        <input type="checkbox"
-               [checked]="allFilteredSelected()"
-               (change)="toggleAllFiltered($event)" />
-        <span>{{ selectedCount() > 0 ? selectedCount() + ' selected' : 'Select all visible' }}</span>
-      </label>
+    <!-- BULK EDIT: built from the filter bar's pieces (filter-select, small
+         outlined buttons), so it reads as part of the same page. -->
+    <div class="bulk-bar">
+      <div class="bulk-head">
+        <label class="bulk-select-all">
+          <input type="checkbox"
+                 [checked]="allFilteredSelected()"
+                 [indeterminate]="someFilteredSelected()"
+                 (change)="toggleAllFiltered($event)" />
+          <span>{{ selectedCount() > 0 ? selectedCount() + ' of ' + filtered().length + ' selected' : 'Select all ' + filtered().length }}</span>
+        </label>
+        @if (selectedCount() > 0) {
+          <div class="bulk-head-actions">
+            <button class="btn-ghost sm" type="button" [disabled]="bulkSaving()" (click)="clearSelection()">Clear selection</button>
+            <button class="btn-danger sm" type="button" [disabled]="bulkSaving()" (click)="askBulkDelete()">
+              Delete {{ selectedCount() }}
+            </button>
+          </div>
+        }
+      </div>
 
       @if (selectedCount() > 0) {
-        <div class="bulk-controls">
-          <div class="bulk-group">
-            <select class="bulk-select"
-                    [ngModel]="bulkCategoryId()"
-                    (ngModelChange)="bulkCategoryId.set($event)"
-                    [disabled]="!bulkCategoryKind() || bulkSaving()">
-              <option value="">{{ bulkCategoryKind() ? 'Choose category' : 'Category unavailable for mixed types' }}</option>
-              @for (c of bulkCategories(); track c.id) {
-                <option [value]="c.id">{{ optionLabel(c.icon, c.name) }}</option>
-              }
-            </select>
-            <button class="bulk-btn primary" type="button" [disabled]="bulkSaving() || !bulkCategoryId()" (click)="applyBulkCategory()">
-              Categorize
-            </button>
+        <div class="bulk-actions">
+          <div class="bulk-field">
+            <span class="label-sm">Category</span>
+            <div class="bulk-pair">
+              <select class="filter-select"
+                      [ngModel]="bulkCategoryId()"
+                      (ngModelChange)="bulkCategoryId.set($event)"
+                      [disabled]="!bulkCategoryKind() || bulkSaving()"
+                      aria-label="Category for the selected transactions">
+                <option value="">{{ bulkCategoryKind() ? 'Choose a category' : 'Select only money in or only money out' }}</option>
+                @for (c of bulkCategories(); track c.id) {
+                  <option [value]="c.id">{{ optionLabel(c.icon, c.name) }}</option>
+                }
+              </select>
+              <button class="btn-primary sm" type="button" [disabled]="bulkSaving() || !bulkCategoryId()" (click)="applyBulkCategory()">
+                Apply
+              </button>
+            </div>
           </div>
 
-          <div class="bulk-group">
-            <select class="bulk-select"
-                    [ngModel]="bulkAccountId()"
-                    (ngModelChange)="bulkAccountId.set($event)"
-                    [disabled]="bulkSaving()">
-              <option value="">Choose account</option>
-              @for (a of activeAccounts(); track a.id) {
-                <option [value]="a.id">{{ optionLabel(a.icon, a.name) }}</option>
-              }
-            </select>
-            <button class="bulk-btn primary" type="button" [disabled]="bulkSaving() || !bulkAccountId()" (click)="applyBulkAccount()">
-              Move
-            </button>
+          <div class="bulk-field">
+            <span class="label-sm">Account</span>
+            <div class="bulk-pair">
+              <select class="filter-select"
+                      [ngModel]="bulkAccountId()"
+                      (ngModelChange)="bulkAccountId.set($event)"
+                      [disabled]="bulkSaving()"
+                      aria-label="Account to move the selected transactions to">
+                <option value="">Choose an account</option>
+                @for (a of activeAccounts(); track a.id) {
+                  <option [value]="a.id">{{ optionLabel(a.icon, a.name) }}</option>
+                }
+              </select>
+              <button class="btn-primary sm" type="button" [disabled]="bulkSaving() || !bulkAccountId()" (click)="applyBulkAccount()">
+                Move
+              </button>
+            </div>
           </div>
 
-          <div class="bulk-group compact">
-            <button class="bulk-btn" type="button" [disabled]="bulkSaving()" (click)="applyBulkRefunded(true)">
-              Mark refunded
-            </button>
-            <button class="bulk-btn" type="button" [disabled]="bulkSaving()" (click)="applyBulkRefunded(false)">
-              Clear refund
-            </button>
-          </div>
-
-          <div class="bulk-group compact end">
-            <button class="bulk-btn danger" type="button" [disabled]="bulkSaving()" (click)="askBulkDelete()">
-              Delete
-            </button>
-            <button class="bulk-clear" type="button" [disabled]="bulkSaving()" (click)="clearSelection()">
-              Clear selection
-            </button>
+          <div class="bulk-field">
+            <span class="label-sm">Refund</span>
+            <div class="bulk-pair even">
+              <button class="btn-primary sm" type="button" [disabled]="bulkSaving()" (click)="applyBulkRefunded(true)">
+                Mark refunded
+              </button>
+              <button class="btn-primary sm" type="button" [disabled]="bulkSaving()" (click)="applyBulkRefunded(false)">
+                Clear refund
+              </button>
+            </div>
           </div>
         </div>
       }
@@ -443,23 +458,23 @@
                         @else if (tx.type === 'income') { +{{ formatCurrency(tx.amount) }} }
                         @else { {{ formatCurrency(tx.amount) }} }
                       </div>
-                      @if (tx.refunded) {
+                      @if (txService.isFullyRefunded(tx)) {
                         <span class="refunded-badge">↩ Refunded</span>
                       }
-                      @if (tx.type === 'income' && tx.reimbursesId) {
-                        <span class="refunded-badge">↩ Reimbursement{{ txService.reimbursementSurplusForIncome(tx) > 0 ? ' + surplus' : '' }}</span>
+                      @if (txService.isMoneyBackIncome(tx)) {
+                        <span class="refunded-badge">↩ {{ tx.moneyBackInfo?.source === 'refund' ? 'Refund' : 'Repayment' }}{{ txService.reimbursementSurplusForIncome(tx) > 0 ? ' + surplus' : '' }}</span>
                       }
-                      @if (tx.type === 'expense' && txService.reimbursedAmountFor(tx.id) > 0) {
-                        <!-- A reimbursement is money coming back — always green, always the
+                      @if (tx.type === 'expense' && !txService.isFullyRefunded(tx) && txService.moneyBackFor(tx) > 0) {
+                        <!-- A reimbursement is money coming back: always green, always the
                              full amount, same convention as an income row. In analysis view
                              (with netting active) it's struck through with the net effect
                              shown alongside, rather than recolored to imply "still owed." -->
                         <span class="reimburse-net-row">
                           <span class="refunded-badge" [class.struck]="showNetAnalysis(tx)">
-                            ↩ +{{ formatCurrency(txService.reimbursedAmountFor(tx.id)) }}
+                            ↩ +{{ formatCurrency(txService.moneyBackFor(tx)) }}
                           </span>
                           @if (showNetAnalysis(tx)) {
-                            <!-- Exactly-reimbursed ($0 either way) stays neutral — it's
+                            <!-- Exactly-reimbursed ($0 either way) stays neutral, since it's
                                  neither still owed nor a gain, so no color applies. -->
                             <span class="tx-net-amt"
                                   [class.pos]="txService.reimbursementSurplus(tx) > 0.005"
@@ -476,8 +491,16 @@
                       @if (tx.isInternalTransfer) {
                         <span class="refunded-badge">↔ Transfer</span>
                       }
-                      @if (tx.notes) {
-                        <span class="has-notes">📝</span>
+                      <!-- What's attached: quiet line icons, side by side -->
+                      @if (tx.notes || tx.receiptId) {
+                        <span class="tx-flags">
+                          @if (tx.notes) {
+                            <span title="Has notes" aria-label="Has notes"><app-icon name="note" [size]="13" [stroke]="1.6" /></span>
+                          }
+                          @if (tx.receiptId) {
+                            <span title="Receipt attached" aria-label="Receipt attached"><app-icon name="receipt" [size]="13" [stroke]="1.6" /></span>
+                          }
+                        </span>
                       }
                     </div>
                     @if (!bulkMode()) {
@@ -529,7 +552,7 @@
 <app-confirm
   [open]="bulkConfirmOpen()"
   title="Delete selected transactions?"
-  [message]="'This will permanently delete ' + selectedCount() + ' selected transaction' + (selectedCount() === 1 ? '' : 's') + '. This cannot be undone — review the list below before confirming.'"
+  [message]="'This will permanently delete ' + selectedCount() + ' selected transaction' + (selectedCount() === 1 ? '' : 's') + '. This cannot be undone, so review the list below before confirming.'"
   confirmText="Delete selected"
   (confirmed)="confirmBulkDelete()"
   (cancelled)="bulkConfirmOpen.set(false)">

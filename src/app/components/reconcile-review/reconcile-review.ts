@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, Output, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Modal } from '../modal/modal';
 import { ReconciliationService, ReconcileMatch } from '../../services/reconciliation.service';
@@ -20,14 +20,18 @@ export class ReconcileReview {
   private categorySvc = inject(CategoryService);
   private accountSvc = inject(AccountService);
 
+  relinkCount = computed(() => this.reconcile.matches().filter(m => m.kind === 'relink').length);
+  manualCount = computed(() => this.reconcile.matches().filter(m => m.kind === 'manual').length);
+  removedCount = computed(() => this.reconcile.matches().filter(m => m.kind === 'removed').length);
+
   categoryName(id?: string): string {
     if (!id) return 'Uncategorized';
     return this.categorySvc.categories().find(c => c.id === id)?.name ?? 'Uncategorized';
   }
 
   accountName(id?: string): string {
-    if (!id) return '—';
-    return this.accountSvc.accounts().find(a => a.id === id)?.name ?? '—';
+    if (!id) return 'None';
+    return this.accountSvc.accounts().find(a => a.id === id)?.name ?? 'None';
   }
 
   formatCurrency(n: number): string {

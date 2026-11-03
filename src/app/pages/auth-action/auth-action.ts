@@ -13,7 +13,7 @@ type ActionMode = 'resetPassword' | 'verifyEmail' | 'verifyAndChangeEmail' | 're
 /**
  * Branded landing page for Firebase Auth email action links (password reset,
  * email verification, email change confirmation). Reached ONLY via an external
- * link from an email — never via in-app navigation — so it deliberately lives
+ * link from an email (never via in-app navigation), so it deliberately lives
  * outside the normal auth/encryption-gated shell (see app.ts: isAuthActionRoute).
  * We read mode/oobCode straight from the URL rather than ActivatedRoute so it
  * behaves the same whether or not the router's own state has settled yet.
@@ -78,7 +78,7 @@ export class AuthAction {
         return;
       }
 
-      // verifyEmail, verifyAndChangeEmail, recoverEmail all just "apply" —
+      // verifyEmail, verifyAndChangeEmail, recoverEmail all just "apply";
       // no further user input needed.
       const info = await checkActionCode(this.auth, this.oobCode);
       await applyActionCode(this.auth, this.oobCode);
@@ -115,7 +115,7 @@ export class AuthAction {
   }
 
   goToApp() {
-    // Full reload, not a router navigation — cleanly re-enters the normal
+    // Full reload, not a router navigation. It cleanly re-enters the normal
     // auth-gated app instead of staying in this standalone action view.
     window.location.href = '/';
   }

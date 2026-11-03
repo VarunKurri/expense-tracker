@@ -33,6 +33,7 @@ export class Icon {
     analysis:  'M2.5 15.5l5-6.5 4 4 5.5-8M15 5h3.5v3.5',
     networth:  'M3 17h14M5 17v-5M10 17V8M15 17V4',
     profile:   'M10 10a3 3 0 100-6 3 3 0 000 6zM4 17c0-3 3-5 6-5s6 2 6 5',
+    shared:    'M7.5 9.5a2.75 2.75 0 100-5.5 2.75 2.75 0 000 5.5zM2 16.5c0-2.6 2.5-4.3 5.5-4.3s5.5 1.7 5.5 4.3M13.5 4.2a2.6 2.6 0 010 5.1M15.2 12.4c1.7.5 2.8 1.9 2.8 4.1',
     settings:  'M10 13a3 3 0 100-6 3 3 0 000 6zM16 10l2-1-1-2-2 1-1.5-1L13 5h-2l-.5 2L9 8l-2-1-1 2 2 1v2l-2 1 1 2 2-1 1.5 1L11 17h2l.5-2L15 14l2 1 1-2-2-1z',
     search:    'M8 14A6 6 0 108 2a6 6 0 000 12zM18 18l-4.35-4.35',
     bell:      'M4 8a6 6 0 1112 0v4l2 3H2l2-3V8zM8 18a2 2 0 004 0',
@@ -44,11 +45,16 @@ export class Icon {
     arrowDown: 'M10 3v14M4 11l6 6 6-6',
     trash:     'M5 6h10M8 6V4h4v2m-6 0l1 11h6l1-11',
     edit:      'M12 4l4 4L7 17H3v-4zM11 5l4 4',
+    note:      'M4 5h12M4 9h12M4 13h7',
     filter:    'M3 5h14M5 10h10M8 15h4',
     calendar:  'M4 5h12a1 1 0 011 1v11a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM3 9h14M7 3v4M13 3v4',
     receipt:   'M5 3h10v14l-2-1-1.5 1L10 16l-1.5 1L7 16l-2 1V3zm2 4h6m-6 3h6m-6 3h4',
     wallet:    'M3 6a2 2 0 012-2h10a2 2 0 012 2v1H3V6zm0 2h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm10 3h2',
     card:      'M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm0 3h16M5 13h4',
     cash:      'M2 6a1 1 0 011-1h14a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V6zm8 2a2 2 0 100 4 2 2 0 000-4z',
+    // Spending alerts: a charge well above usual, the same charge twice, a price that went up.
+    spike:     'M10 3l7.5 13h-15L10 3zM10 8.5v3.5M10 14.25v.25',
+    copy:      'M7.5 7.5h8.5v8.5H7.5zM4 12.5V4h8.5',
+    trend:     'M3 14l5-5 3 3 6-6M12.5 6H17v4.5',
   };
 }

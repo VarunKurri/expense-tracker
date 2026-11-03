@@ -18,7 +18,7 @@ export class AccountService {
   private encryption = inject(EncryptionService);
   private ngZone = inject(NgZone);
   error = signal<string | null>(null);
-  // True once the first accounts snapshot (empty or not) has been received — lets
+  // True once the first accounts snapshot (empty or not) has been received; it lets
   // callers (autopay's Plaid-linked check) tell "genuinely no accounts" apart from
   // "still loading," since the signal itself starts at [] either way.
   loaded = signal(false);
@@ -72,7 +72,11 @@ export class AccountService {
     })
   );
 
-  accounts = toSignal(this.accounts$, { initialValue: [] });
+  /** Accounts exactly as saved. TransactionService reads these to place bank rows. */
+  storedAccounts = toSignal(this.accounts$, { initialValue: [] as Account[] });
+
+  /** The accounts. (Same signal as storedAccounts, the name TransactionService reads.) */
+  accounts = this.storedAccounts;
 
   async add(account: Omit<Account, 'id' | 'createdAt'>) {
     const user = this.auth.user();
