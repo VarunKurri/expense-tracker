@@ -207,63 +207,77 @@
   }
 
   @if (bulkMode() && grouped().length > 0) {
-    <div class="bulk-bar" [class.active]="selectedCount() > 0">
-      <label class="bulk-select-all">
-        <input type="checkbox"
-               [checked]="allFilteredSelected()"
-               [indeterminate]="someFilteredSelected()"
-               (change)="toggleAllFiltered($event)" />
-        <span>{{ selectedCount() > 0 ? selectedCount() + ' of ' + filtered().length + ' selected' : 'Select all ' + filtered().length }}</span>
-      </label>
+    <!-- BULK EDIT: built from the filter bar's pieces (filter-select, small
+         outlined buttons), so it reads as part of the same page. -->
+    <div class="bulk-bar">
+      <div class="bulk-head">
+        <label class="bulk-select-all">
+          <input type="checkbox"
+                 [checked]="allFilteredSelected()"
+                 [indeterminate]="someFilteredSelected()"
+                 (change)="toggleAllFiltered($event)" />
+          <span>{{ selectedCount() > 0 ? selectedCount() + ' of ' + filtered().length + ' selected' : 'Select all ' + filtered().length }}</span>
+        </label>
+        @if (selectedCount() > 0) {
+          <div class="bulk-head-actions">
+            <button class="btn-ghost sm" type="button" [disabled]="bulkSaving()" (click)="clearSelection()">Clear selection</button>
+            <button class="btn-danger sm" type="button" [disabled]="bulkSaving()" (click)="askBulkDelete()">
+              Delete {{ selectedCount() }}
+            </button>
+          </div>
+        }
+      </div>
 
       @if (selectedCount() > 0) {
-        <div class="bulk-controls">
-          <div class="bulk-group">
-            <select class="bulk-select"
-                    [ngModel]="bulkCategoryId()"
-                    (ngModelChange)="bulkCategoryId.set($event)"
-                    [disabled]="!bulkCategoryKind() || bulkSaving()">
-              <option value="">{{ bulkCategoryKind() ? 'Choose category' : 'Category unavailable for mixed types' }}</option>
-              @for (c of bulkCategories(); track c.id) {
-                <option [value]="c.id">{{ optionLabel(c.icon, c.name) }}</option>
-              }
-            </select>
-            <button class="bulk-btn primary" type="button" [disabled]="bulkSaving() || !bulkCategoryId()" (click)="applyBulkCategory()">
-              Categorize
-            </button>
+        <div class="bulk-actions">
+          <div class="bulk-field">
+            <span class="label-sm">Category</span>
+            <div class="bulk-pair">
+              <select class="filter-select"
+                      [ngModel]="bulkCategoryId()"
+                      (ngModelChange)="bulkCategoryId.set($event)"
+                      [disabled]="!bulkCategoryKind() || bulkSaving()"
+                      aria-label="Category for the selected transactions">
+                <option value="">{{ bulkCategoryKind() ? 'Choose a category' : 'Select only money in or only money out' }}</option>
+                @for (c of bulkCategories(); track c.id) {
+                  <option [value]="c.id">{{ optionLabel(c.icon, c.name) }}</option>
+                }
+              </select>
+              <button class="btn-primary sm" type="button" [disabled]="bulkSaving() || !bulkCategoryId()" (click)="applyBulkCategory()">
+                Apply
+              </button>
+            </div>
           </div>
 
-          <div class="bulk-group">
-            <select class="bulk-select"
-                    [ngModel]="bulkAccountId()"
-                    (ngModelChange)="bulkAccountId.set($event)"
-                    [disabled]="bulkSaving()">
-              <option value="">Choose account</option>
-              @for (a of activeAccounts(); track a.id) {
-                <option [value]="a.id">{{ optionLabel(a.icon, a.name) }}</option>
-              }
-            </select>
-            <button class="bulk-btn primary" type="button" [disabled]="bulkSaving() || !bulkAccountId()" (click)="applyBulkAccount()">
-              Move
-            </button>
+          <div class="bulk-field">
+            <span class="label-sm">Account</span>
+            <div class="bulk-pair">
+              <select class="filter-select"
+                      [ngModel]="bulkAccountId()"
+                      (ngModelChange)="bulkAccountId.set($event)"
+                      [disabled]="bulkSaving()"
+                      aria-label="Account to move the selected transactions to">
+                <option value="">Choose an account</option>
+                @for (a of activeAccounts(); track a.id) {
+                  <option [value]="a.id">{{ optionLabel(a.icon, a.name) }}</option>
+                }
+              </select>
+              <button class="btn-primary sm" type="button" [disabled]="bulkSaving() || !bulkAccountId()" (click)="applyBulkAccount()">
+                Move
+              </button>
+            </div>
           </div>
 
-          <div class="bulk-group compact">
-            <button class="bulk-btn" type="button" [disabled]="bulkSaving()" (click)="applyBulkRefunded(true)">
-              Mark refunded
-            </button>
-            <button class="bulk-btn" type="button" [disabled]="bulkSaving()" (click)="applyBulkRefunded(false)">
-              Clear refund
-            </button>
-          </div>
-
-          <div class="bulk-group compact end">
-            <button class="bulk-btn danger" type="button" [disabled]="bulkSaving()" (click)="askBulkDelete()">
-              Delete
-            </button>
-            <button class="bulk-clear" type="button" [disabled]="bulkSaving()" (click)="clearSelection()">
-              Clear selection
-            </button>
+          <div class="bulk-field">
+            <span class="label-sm">Refund</span>
+            <div class="bulk-pair even">
+              <button class="btn-primary sm" type="button" [disabled]="bulkSaving()" (click)="applyBulkRefunded(true)">
+                Mark refunded
+              </button>
+              <button class="btn-primary sm" type="button" [disabled]="bulkSaving()" (click)="applyBulkRefunded(false)">
+                Clear refund
+              </button>
+            </div>
           </div>
         </div>
       }
