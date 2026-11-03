@@ -211,8 +211,9 @@
       <label class="bulk-select-all">
         <input type="checkbox"
                [checked]="allFilteredSelected()"
+               [indeterminate]="someFilteredSelected()"
                (change)="toggleAllFiltered($event)" />
-        <span>{{ selectedCount() > 0 ? selectedCount() + ' selected' : 'Select all visible' }}</span>
+        <span>{{ selectedCount() > 0 ? selectedCount() + ' of ' + filtered().length + ' selected' : 'Select all ' + filtered().length }}</span>
       </label>
 
       @if (selectedCount() > 0) {

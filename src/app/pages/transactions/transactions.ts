@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect } from '@angular/core';
+import { Component, inject, signal, computed, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -17,6 +17,7 @@ import { ReconciliationService } from '../../services/reconciliation.service';
 import { DateRange, transactionRange } from '../../utils/date-ranges';
 import { isMoneyBackIncome, refundedPatch } from '../../utils/money-back';
 import { Icon } from '../../components/icon/icon';
+import { allShownIds, visibleSelection } from '../../utils/bulk-selection';
 
 type FilterType = 'all' | 'income' | 'expense' | 'transfer';
 type SpecialFilter = 'all' | 'uncategorized' | 'refunded' | 'not-refunded' | 'internal-transfer';
@@ -212,17 +213,22 @@ export class Transactions {
     this.categoryService.categories().filter(c => !c.archived)
   );
 
-  selectedTransactions = computed(() => {
-    const ids = this.selectedIds();
-    return this.txService.transactions().filter(t => !!t.id && ids.has(t.id));
-  });
+  /**
+   * The rows a bulk action works on: ticked AND shown under the current
+   * filters (visibleSelection). Every bulk action, the count and the delete
+   * confirmation read this, so nothing off-screen is ever touched.
+   */
+  selectedTransactions = computed(() => visibleSelection(this.filtered(), this.selectedIds()));
 
-  selectedCount = computed(() => this.selectedIds().size);
+  selectedCount = computed(() => this.selectedTransactions().length);
 
   allFilteredSelected = computed(() => {
-    const ids = this.filtered().map(t => t.id).filter((id): id is string => !!id);
-    return ids.length > 0 && ids.every(id => this.selectedIds().has(id));
+    const shown = this.filtered().filter(t => !!t.id).length;
+    return shown > 0 && this.selectedCount() === shown;
   });
+
+  /** Some but not all shown rows ticked: the "Select all" box shows a dash. */
+  someFilteredSelected = computed(() => this.selectedCount() > 0 && !this.allFilteredSelected());
 
   selectedEditableTransactions = computed(() =>
     this.selectedTransactions().filter(t => t.type !== 'transfer')
@@ -360,8 +366,7 @@ export class Transactions {
   }
 
   selectAllFiltered() {
-    const ids = this.filtered().map(t => t.id).filter((id): id is string => !!id);
-    this.selectedIds.set(new Set(ids));
+    this.selectedIds.set(allShownIds(this.filtered()));
   }
 
   clearSelection() {
@@ -468,7 +473,8 @@ export class Transactions {
 
   async confirmBulkDelete() {
     if (this.bulkSaving()) return;
-    const ids = [...this.selectedIds()];
+    // Exactly the rows listed in the confirmation: ticked and shown.
+    const ids = this.selectedTransactions().map(t => t.id!);
     if (ids.length === 0) return;
 
     this.bulkSaving.set(true);
@@ -684,7 +690,12 @@ export class Transactions {
       this.minAmount(); this.maxAmount(); this.customStartDate(); this.customEndDate();
       this.specialFilter();
       if (firstFilterRun) { firstFilterRun = false; return; }
-      if (this.bulkMode() && this.selectedIds().size > 0) this.clearSelection();
+      // Untracked: this must re-run only when a filter changes. Reading the
+      // selection here used to make it re-run on every tick too, which wiped
+      // "Select all" (and any tick) the moment it was made.
+      untracked(() => {
+        if (this.bulkMode() && this.selectedIds().size > 0) this.clearSelection();
+      });
     });
   }
 
