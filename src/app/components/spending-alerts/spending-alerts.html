@@ -1,39 +1,33 @@
 @if (alerts().length > 0) {
-  <div class="panel alerts-card">
-    <div class="alerts-head">
-      <span class="card-label">Worth a look</span>
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Worth a look</div>
+        <div class="panel-sub-text">
+          {{ alerts().length === 1 ? 'One charge looks' : alerts().length + ' charges look' }} different from usual
+        </div>
+      </div>
+      @if (alerts().length > 4) {
+        <button class="panel-link" (click)="showAllAlerts.set(!showAllAlerts())">
+          {{ showAllAlerts() ? 'Fewer' : 'All ' + alerts().length }} →
+        </button>
+      }
     </div>
-    <div class="alerts-intro">
-      <p class="alerts-headline">
-        {{ alerts().length === 1 ? 'One charge looks' : alerts().length + ' charges look' }} different from usual.
-      </p>
-      <p class="alerts-why">Nothing's wrong necessarily, but a quick look now is easier than finding it on a statement.</p>
-    </div>
-    <div class="alerts-list-head">
-      <span class="label-mono">To review · {{ alerts().length }}</span>
-    </div>
+
     @for (a of shownAlerts(); track a.key) {
       <div class="alert-row">
-        <button type="button" class="alert-main" (click)="openTx.emit(a.tx)">
-          <span class="alert-chip" aria-hidden="true">
+        <button type="button" class="activity-row" (click)="openTx.emit(a.tx)" [title]="alertText(a)">
+          <span class="activity-icon" aria-hidden="true">
             <app-icon [name]="kindIcon[a.kind]" [size]="16" [stroke]="1.7" />
           </span>
-          <span class="alert-body">
-            <span class="alert-kind">{{ kindLabel[a.kind] }}</span>
-            <span class="alert-title">{{ a.tx.merchant || 'Untitled' }}</span>
-            <span class="alert-text">{{ alertText(a) }}</span>
+          <span class="activity-main">
+            <span class="activity-title">{{ a.tx.merchant || 'Untitled' }}</span>
+            <span class="activity-meta">{{ alertMeta(a) }}</span>
           </span>
+          <span class="activity-amount">−{{ money(a.tx.amount) }}</span>
         </button>
-        <span class="alert-amount fig">−{{ money(a.tx.amount) }}</span>
         <button type="button" class="alert-dismiss" (click)="dismissAlert(a)" aria-label="Dismiss" title="Dismiss">
-          <app-icon name="close" [size]="14" />
-        </button>
-      </div>
-    }
-    @if (alerts().length > shownAlerts().length || showAllAlerts()) {
-      <div class="alerts-more">
-        <button type="button" class="btn-row" (click)="showAllAlerts.set(!showAllAlerts())">
-          {{ showAllAlerts() ? 'Show fewer' : 'Show all ' + alerts().length }}
+          <app-icon name="close" [size]="13" />
         </button>
       </div>
     }

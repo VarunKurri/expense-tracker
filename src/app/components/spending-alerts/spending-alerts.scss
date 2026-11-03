@@ -1,94 +1,129 @@
+// The Dashboard's own panel and activity-row look (dashboard.scss), so this
+// card reads like Where it went, Upcoming and Recent transactions beside it.
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;
   overflow: hidden;
+  margin-bottom: 16px;
 }
-.alerts-card { margin-bottom: 16px; }
 
-.alerts-head {
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   padding: 16px 18px 12px;
   border-bottom: 1px solid var(--line);
 }
 
-.alerts-intro { padding: 20px 18px 20px; }
-.alerts-headline { margin: 0; font-size: 18px; font-weight: 600; color: var(--fg); letter-spacing: -0.01em; }
-.alerts-why { margin: 4px 0 0; font-size: 13px; color: var(--fg-3); line-height: 1.5; }
-
-.alerts-list-head {
-  padding: 8px 18px;
-  background: var(--bg-3);
-  border-top: 1px solid var(--line);
+.panel-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
   color: var(--fg-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.panel-sub-text { font-size: 12px; color: var(--fg-3); margin-top: 2px; }
+
+.panel-link {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fg-3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  &:hover { color: var(--fg); }
 }
 
 .alert-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 0 10px 0 0;
-  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  transition: background 0.18s ease;
 
+  &:last-child { border-bottom: none; }
   &:hover { background: var(--bg-3); }
 }
 
-.alert-main {
-  display: flex;
-  align-items: flex-start;
+.activity-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   gap: 12px;
-  min-width: 0;
-  padding: 14px 0 14px 18px;
-  border: 0;
+  align-items: center;
+  width: 100%;
+  padding: 11px 6px 11px 18px;
+  border: none;
   background: transparent;
+  font-family: var(--font-ui);
   text-align: left;
-  color: inherit;
-  font: inherit;
   cursor: pointer;
+
+  &:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 }
 
-.alert-chip {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-sm);
+.activity-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: var(--bg-3);
   border: 1px solid var(--line);
-  color: var(--fg-2);
-}
-
-.alert-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-
-.alert-kind {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--fg-3);
 }
 
-.alert-title { font-size: 14px; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.alert-text { font-size: 13px; color: var(--fg-3); line-height: 1.45; }
-.alert-amount { font-size: 14px; font-weight: 600; color: var(--fg); }
+.activity-main { min-width: 0; display: block; }
+
+.activity-title {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-meta {
+  display: block;
+  font-size: 11.5px;
+  color: var(--fg-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-amount {
+  font-size: 13.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--fg);
+}
 
 .alert-dismiss {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
+  margin-right: 12px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--fg-3);
+  color: var(--fg-4, var(--fg-3));
   cursor: pointer;
 
   &:hover { color: var(--fg); background: var(--surface-hi); }
 }
 
-.alerts-more {
-  padding: 10px 18px 14px;
-  border-top: 1px solid var(--line);
+// On a phone the reason wraps rather than being cut off.
+@media (max-width: 640px) {
+  .activity-meta { white-space: normal; }
 }

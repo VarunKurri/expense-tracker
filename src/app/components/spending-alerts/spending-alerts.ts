@@ -29,11 +29,18 @@ export class SpendingAlerts {
   showAllAlerts = signal(false);
   shownAlerts = computed(() => this.showAllAlerts() ? this.alerts() : this.alerts().slice(0, 4));
 
+
   /** What kind of alert a row is, at a glance. */
-  readonly kindLabel: Record<AlertKind, string> = { big: 'Bigger than usual', twice: 'Charged twice', price: 'Price went up' };
   readonly kindIcon: Record<AlertKind, string> = { big: 'spike', twice: 'copy', price: 'trend' };
 
-  /** One plain sentence on why a charge is here. */
+  /** The row's grey line, short like the other Dashboard rows: why it's here, and when. */
+  alertMeta(a: SpendingAlert): string {
+    if (a.kind === 'big') return `About ${Math.round(a.tx.amount / a.usual!)}× your usual ${this.money(a.usual!)} · ${this.short(a.tx.date)}`;
+    if (a.kind === 'twice') return `Charged twice · ${this.short(a.other!.date)} and ${this.short(a.tx.date)}`;
+    return `Price went up from ${this.money(a.usual!)} · ${this.short(a.tx.date)}`;
+  }
+
+  /** The whole sentence, as the row's tooltip. */
   alertText(a: SpendingAlert): string {
     if (a.kind === 'big') {
       const times = Math.round(a.tx.amount / a.usual!);
