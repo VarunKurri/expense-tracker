@@ -130,7 +130,7 @@
             <div class="bank-actions">
               @if (needsReconnect(item)) {
                 <button
-                  class="btn btn-primary-outline"
+                  class="btn-primary sm"
                   (click)="reconnectItem(item)"
                   [disabled]="plaidSvc.reauthenticatingId() === item.itemId">
                   {{ plaidSvc.reauthenticatingId() === item.itemId ? 'Reconnecting…' : 'Reconnect' }}
@@ -138,14 +138,14 @@
               }
               <!-- Add a replaced card or a new account to this connection (never link the bank twice). -->
               <button
-                class="btn btn-primary-outline"
+                class="btn-primary sm"
                 (click)="manageAccounts(item)"
                 [disabled]="plaidSvc.reauthenticatingId() === item.itemId"
                 title="Choose which accounts this bank shares, e.g. a replacement card">
                 Manage accounts
               </button>
               <button
-                class="btn btn-danger-outline"
+                class="btn-danger sm"
                 (click)="askDisconnect(item)"
                 [disabled]="plaidSvc.disconnectingId() === item.itemId">
                 {{ plaidSvc.disconnectingId() === item.itemId ? 'Disconnecting…' : 'Disconnect' }}
