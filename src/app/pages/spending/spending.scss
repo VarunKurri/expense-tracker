@@ -167,7 +167,8 @@
 /* ── Category / budget rows ────────────────────────────────── */
 .cat-row {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  // The figures column has a floor so every bar ends at the same place.
+  grid-template-columns: 34px minmax(0, 1fr) minmax(88px, auto);
   gap: 12px;
   align-items: center;
   width: 100%;

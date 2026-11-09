@@ -74,20 +74,16 @@
 
 .upload-btn {
   padding: 9px 20px;
-  border-radius: 10px;
-  background: var(--bg-3);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
   color: var(--fg);
   font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.18s ease;
 
-  &:hover {
-    background: var(--surface-hi);
-    border-color: var(--teal);
-    color: var(--teal);
-  }
+  &:hover { background: var(--bg-3); }
 }
 
 .upload-count {
@@ -283,6 +279,8 @@
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
   .page-head { flex-direction: column; align-items: stretch; }
+  // The sentence gets the full width, with its button under it.
+  .seed-banner { flex-direction: column; align-items: flex-start; gap: 10px; }
 
   .table-header,
   .table-row {

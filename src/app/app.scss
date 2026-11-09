@@ -351,6 +351,15 @@
   }
 }
 
+@media (max-width: 480px) {
+  .unlock-shell { padding-left: 16px; padding-right: 16px; }
+  .unlock-card {
+    padding: 22px 20px;
+    gap: 18px;
+    h1 { font-size: 22px; line-height: 1.25; letter-spacing: -0.02em; }
+  }
+}
+
 .text-btn {
   align-self: center;
   color: var(--fg-3);
@@ -387,6 +396,9 @@
     border-top: 1px solid var(--line);
     padding: 40px 24px;
   }
+  // The dark band already carries the logo; a second one on the card read
+  // as a stutter.
+  .login-card-logo { display: none; }
 }
 
 // Phone-sized: compact the hero to a thin strip and let the card pane scroll on
@@ -405,13 +417,24 @@
     flex-shrink: 0;
   }
 
+  // Left-aligned with the card below, logo and wordmark on one line and the
+  // line under them across the full width (it was boxed into the wordmark's
+  // width and broke over three lines).
+  .login-left { justify-content: flex-start; }
+
   .login-left-content {
+    width: 100%;
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
+    gap: 6px;
   }
 
-  .login-hero-text h1 { font-size: 19px; margin-bottom: 0; }
+  .login-logo { gap: 10px; }
+  .login-logo svg { width: 34px; height: 34px; }
+  .login-wordmark { font-size: 32px; }
+
+  .login-hero-text h1 { font-size: 17px; margin-bottom: 0; }
+  .login-hero-text br { display: none; }
   .login-hero-text p  { display: none; }
 
   .login-right {
@@ -1307,6 +1330,8 @@
 
   &:hover { background: rgba(255, 255, 255, 0.08); }
   &.lg { font-size: 15px; }
+  // Matches .landing-cta.sm so the two nav buttons are the same height.
+  &.sm { padding: 8px 16px; border-radius: 11px; }
 }
 
 .landing-hero {

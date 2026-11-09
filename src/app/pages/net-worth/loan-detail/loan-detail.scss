@@ -13,6 +13,9 @@
   align-items: center;
   justify-content: space-between;
 }
+// The back link's text lines up with the cards below; its hover background
+// reaches out into the margin.
+.top-bar > .btn-ghost:first-child { margin-left: -12px; }
 
 /* ── Hero ─────────────────────────────────────────────────── */
 .hero {

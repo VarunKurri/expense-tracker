@@ -11,10 +11,12 @@ import { Account, Transaction } from '../../../models';
 import { ToastService } from '../../../services/toast.service';
 import { owesMoney } from '../../../utils/finance';
 
+import { TransactionView } from '../../../components/transaction-view/transaction-view';
+
 @Component({
   selector: 'app-account-detail',
   standalone: true,
-  imports: [CommonModule, AccountForm, TransactionForm, Confirm],
+  imports: [TransactionView, CommonModule, AccountForm, TransactionForm, Confirm],
   templateUrl: './account-detail.html',
   styleUrl: './account-detail.scss'
 })
@@ -104,22 +106,17 @@ export class AccountDetail {
   // Transaction view panel methods
   openTxView(tx: Transaction) {
     this.viewingTx.set(tx);
-    document.body.style.overflow = 'hidden';
   }
 
   closeTxView() {
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
   }
 
-  editFromTxView() {
-    const tx = this.viewingTx();
+  // The sheet hands over the live transaction, never a stale copy.
+  editFromTxView(tx: Transaction) {
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
-    if (tx) {
-      this.editingTx.set(tx);
-      this.txFormOpen.set(true);
-    }
+    this.editingTx.set(tx);
+    this.txFormOpen.set(true);
   }
 
   closeTxForm() {

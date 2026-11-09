@@ -506,9 +506,11 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* iPhone: Safari zooms the whole page into any field set under 16px when you
    tap it, and leaves it zoomed after the form closes. On touch screens every
    field is 16px, including page-level filters that set their own smaller
-   size, hence !important. Desktop keeps 14px. */
+   size, hence !important. Desktop keeps 14px. A field that's already bigger
+   (the transaction form's amount) keeps its own size: 16px is a floor, not a
+   size for everything. */
 @media (pointer: coarse) {
-  input, select, textarea, .input, .input-field { font-size: 16px !important; }
+  input:not(.amount-input), select, textarea, .input, .input-field { font-size: 16px !important; }
 }
 
 /* Selects get our chevron, inset like the text on the left, in place of the
@@ -536,6 +538,12 @@ select option,
 select optgroup {
   background-color: var(--surface);
   color: var(--fg);
+}
+
+/* Checkboxes and radios the browser draws: ticked is the ink accent, like a
+   selected pill, not the browser's own blue. */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--accent);
 }
 
 /* The browser paints this button itself; `color-scheme` on :root is what makes

@@ -10,6 +10,9 @@
 .top-bar {
   display: flex;
   align-items: center;
+  // The back link's text lines up with the card edge below; its hover
+  // background reaches out into the margin.
+  .btn-ghost { margin-left: -12px; }
 }
 
 /* ── Hero ─────────────────────────────────────────────────── */

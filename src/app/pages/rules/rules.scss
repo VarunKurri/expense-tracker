@@ -27,6 +27,15 @@
 
 .header-actions { display: flex; gap: 10px; }
 
+// Phone: the way back sits above the title, as on the other detail pages, and
+// the page's action gets a full row under it.
+@media (max-width: 640px) {
+  .header-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  .header-actions { display: contents; }
+  .header-actions .btn-ghost { order: -1; align-self: flex-start; margin: 0 0 -4px -12px; padding: 6px 12px; font-size: 13px; }
+  .header-actions .btn-primary { width: 100%; justify-content: center; }
+}
+
 .card {
   background: var(--card-grad);
   border: 1px solid var(--line);

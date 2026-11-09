@@ -6,7 +6,7 @@
 
     <div class="top-bar">
       <button class="btn-ghost sm" (click)="back()">← Net worth</button>
-      <button class="btn-ghost sm" (click)="formOpen.set(true)">Edit loan</button>
+      <button class="btn-row" (click)="formOpen.set(true)">Edit loan</button>
     </div>
 
     <!-- HERO -->
@@ -91,18 +91,18 @@
         <div class="cost-actions">
           @if (downPayment(); as d) {
             <span class="muted">Down payment: {{ d.tx.merchant || 'Untitled' }}, {{ formatDate(d.tx.date) }} · {{ money(d.tx.amount) }}</span>
-            <button class="btn-ghost sm" (click)="unlink(d.tx)">Unlink</button>
+            <button class="btn-row" (click)="unlink(d.tx)">Unlink</button>
           } @else {
-            <button class="btn-ghost sm" (click)="openLink('down')">Link the down payment</button>
+            <button class="btn-row" (click)="openLink('down')">Link the down payment</button>
           }
-          <button class="btn-ghost sm" (click)="openCorrection()">Enter statement balance</button>
+          <button class="btn-row" (click)="openCorrection()">Enter statement balance</button>
         </div>
       </section>
     } @else if (!tracked()) {
       <div class="cost-actions plain">
         @if (downPayment(); as d) {
           <span class="muted">Sent: {{ d.tx.merchant || 'Untitled' }}, {{ formatDate(d.tx.date) }} · {{ money(d.tx.amount) }}</span>
-          <button class="btn-ghost sm" (click)="unlink(d.tx)">Unlink</button>
+          <button class="btn-row" (click)="unlink(d.tx)">Unlink</button>
         } @else {
           <button class="btn-ghost sm" (click)="openLink('down')">Link the money you sent</button>
         }

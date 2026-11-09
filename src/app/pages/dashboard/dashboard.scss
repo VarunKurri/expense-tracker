@@ -520,7 +520,34 @@
   .page { padding: 20px 16px 40px; }
   .hero { padding: 20px; }
   .hero-number .whole { font-size: 52px; }
-  .kpi-grid { grid-template-columns: 1fr; }
+  // One card, three columns, like the Transactions totals.
+  .kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+    background: var(--card-grad);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .kpi {
+    padding: 12px 12px 13px;
+    gap: 4px;
+    border: none;
+    border-radius: 0;
+    background: none;
+    min-width: 0;
+    & + .kpi { border-left: 1px solid var(--line); }
+  }
+  .kpi-value { font-size: 16px; letter-spacing: -0.02em; }
+  .kpi-sub { font-size: 11px; }
+  .kpi-dot { width: 6px; height: 6px; }
+  // Add money and Add expense share the row; Accounts is right below.
+  .hero-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    button { justify-content: center; }
+    .hero-accounts { display: none; }
+  }
   .accts-strip { grid-template-columns: repeat(2, 1fr); }
   .hero-top { flex-wrap: wrap; gap: 12px; }
   .spend-main { padding: 16px 14px 18px; }

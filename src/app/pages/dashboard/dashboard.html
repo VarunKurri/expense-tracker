@@ -35,9 +35,8 @@
 
     <div class="hero-actions">
       <button class="btn-primary" (click)="addMoney()">+ Add money</button>
-      <button class="btn-ghost" (click)="addExpense()">− Add expense</button>
-      <!-- Fixed: proper SVG accounts icon matching sidebar nav -->
-      <button class="btn-ghost" (click)="navigate('/accounts')">
+      <button class="btn-primary" (click)="addExpense()">− Add expense</button>
+      <button class="btn-ghost hero-accounts" (click)="navigate('/accounts')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="5" width="20" height="14" rx="2"/>
           <line x1="2" y1="10" x2="22" y2="10"/>

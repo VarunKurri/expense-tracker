@@ -261,7 +261,19 @@ The app is what we copy. Do not "correct" this back to dark.
   Never fork a second copy: the three that existed before drifted, and only one
   of them had reimbursements, so the same transaction read differently
   depending on which screen you opened it from.
-- Desktop-first, responsive down to mobile.
+- Desktop-first, responsive down to mobile. On a phone (part 135):
+  - **Page header:** the title and subtitle get the full width. The page's
+    actions sit underneath on their own row: full width, or two side by side.
+    A sub-page's "← Back" sits above the title, with its text lined up with
+    the cards (ghost button with `margin-left: -12px`).
+  - **Figures:** a row of figures (Income / Spending / Net) is one card split
+    into three columns, not three stacked cards. Stat cards go two to a row.
+  - **List rows** keep the amount on the right, like `.tx-row` on the
+    Dashboard. In a grid row the text column is `minmax(0, 1fr)`, so a long
+    name ends in "…" instead of pushing the amount off the card.
+  - The 16px touch font floor on inputs is a minimum; the transaction form's
+    `.amount-input` keeps its own larger size.
+  - Checkboxes and radios use `accent-color: var(--accent)`.
 - Microcopy follows Origin: mono uppercase eyebrow → plain-English sentence
   headline → a calm sentence explaining *why it matters*. Never just a number.
 - **No em dashes (U+2014) anywhere in the code**: not in UI copy, aria-labels,

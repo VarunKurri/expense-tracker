@@ -363,7 +363,8 @@
 
 .merchant-row {
   display: grid;
-  grid-template-columns: 36px 1fr auto;
+  // minmax(0, …): a long merchant name truncates instead of pushing the amount out.
+  grid-template-columns: 36px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   padding: 12px 20px;

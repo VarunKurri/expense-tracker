@@ -230,3 +230,8 @@
     &.chosen { color: var(--fg); }
   }
 }
+
+// Keyboard shortcuts mean nothing on a touch screen with no keyboard.
+@media (hover: none) and (pointer: coarse) {
+  .shortcuts-section { display: none; }
+}

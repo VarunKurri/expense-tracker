@@ -31,9 +31,11 @@
       </p>
 
       <table class="rule-table">
-        <thead>
-          <tr><th>Order</th><th>Rule</th><th>Status</th><th class="right">Actions</th></tr>
-        </thead>
+        @if (rules().length) {
+          <thead>
+            <tr><th>Order</th><th>Rule</th><th>Status</th><th class="right">Actions</th></tr>
+          </thead>
+        }
         <tbody>
           @for (r of rules(); track r.id; let i = $index) {
             <tr [class.off]="!r.enabled">

@@ -9,6 +9,9 @@
 }
 
 .top-bar { display: flex; justify-content: space-between; align-items: center; }
+// The back link's text lines up with the cards below; its hover background
+// reaches out into the margin.
+.top-bar > .btn-ghost:first-child { margin-left: -12px; }
 
 /* ── Hero: where you stand ────────────────────────────────── */
 .hero { padding: 20px 24px 22px; display: flex; flex-direction: column; gap: 8px; }

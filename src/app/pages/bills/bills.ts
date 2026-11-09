@@ -16,10 +16,12 @@ import { localDateString } from '../../utils/date';
 
 type BillTab = 'active' | 'paused';
 
+import { TransactionView } from '../../components/transaction-view/transaction-view';
+
 @Component({
   selector: 'app-bills',
   standalone: true,
-  imports: [CommonModule, BillForm, TransactionForm, Confirm, ErrorBanner],
+  imports: [TransactionView, CommonModule, BillForm, TransactionForm, Confirm, ErrorBanner],
   templateUrl: './bills.html',
   styleUrl: './bills.scss'
 })
@@ -72,22 +74,17 @@ export class Bills {
 
   openTxView(tx: Transaction) {
     this.viewingTx.set(tx);
-    document.body.style.overflow = 'hidden';
   }
 
   closeTxView() {
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
   }
 
-  editFromTxView() {
-    const tx = this.viewingTx();
+  // The sheet hands over the live transaction, never a stale copy.
+  editFromTxView(tx: Transaction) {
     this.viewingTx.set(null);
-    document.body.style.overflow = '';
-    if (tx) {
-      this.editingTx.set(tx);
-      this.txFormOpen.set(true);
-    }
+    this.editingTx.set(tx);
+    this.txFormOpen.set(true);
   }
 
   closeTxForm() {

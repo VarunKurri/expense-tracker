@@ -342,7 +342,14 @@
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
   .page-head { flex-direction: column; align-items: stretch; }
-  .head-actions { justify-content: space-between; }
+  // The month stepper and New budget each get a full row: side by side they
+  // ran past the right edge of a phone.
+  .head-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    .btn-primary { order: -1; width: 100%; justify-content: center; }
+  }
   .hero { padding: 16px; }
   .hero-head { flex-wrap: wrap; }
   .hero-figure .num-display { font-size: 30px; }

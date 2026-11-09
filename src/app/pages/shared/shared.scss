@@ -137,6 +137,13 @@
 
 @media (max-width: 768px) {
   .page { padding: 20px 16px 40px; }
+  // Title on its own, then both actions side by side under it, like the other pages.
+  .page-head { flex-direction: column; align-items: stretch; gap: 14px; }
+  .head-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    .btn-primary { justify-content: center; }
+  }
   .hero, .square { padding: 16px; }
   .person { --pad-x: 16px; --pad-y: 16px; }
   .groups { --pad-x: 16px; }
